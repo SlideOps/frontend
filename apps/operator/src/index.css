@@ -13,3 +13,22 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+@layer utilities {
+  /* A notification toast eases in and settles, never a jarring pop. It plays
+     once when the toast mounts, respecting reduced motion like everything else. */
+  @keyframes so-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .so-toast {
+    animation: so-toast-in var(--so-duration-base) var(--so-ease-entrance) both;
+  }
+}

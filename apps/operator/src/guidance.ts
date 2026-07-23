@@ -100,6 +100,36 @@ export const guidance: GuidanceRegistry = {
     label: 'Category',
     summary: 'The area of work a Capability belongs to, such as security or networking.',
   },
+  'capability.outcome': {
+    label: 'Outcome',
+    summary: 'What this Capability achieves on a Node, stated as a result rather than a set of commands.',
+  },
+  'capability.intent': {
+    label: 'Intent',
+    summary: 'Why this Capability exists and the goal it serves, so you choose it for the right reason.',
+  },
+  'capability.platforms': {
+    label: 'Supported platforms',
+    summary: 'The Linux families this Capability runs on. It adapts to the one your Node uses.',
+    detail:
+      'A Capability is written once and runs across the common distributions through a shared platform layer. It detects your Node family from Discovery and uses the right package manager, service manager, and backend for it.',
+  },
+  'capability.verification': {
+    label: 'How verification proves it',
+    summary: 'The way SlideOps confirms the outcome really happened before calling the Operation done.',
+    detail:
+      'Every Operation ends by proving its result: SlideOps re-reads the Node and, where it matters, opens a fresh connection so a change that would lock you out is caught. The evidence is shown with each check.',
+  },
+  'capability.start': {
+    label: 'Start an Operation',
+    summary: 'Choose a Node, fill in any inputs, and open the plan. Nothing runs until you approve it.',
+    detail:
+      'Some Capabilities need a few inputs, such as a domain or a path. Those are shown as a form here, each field with its own guidance and validation. When you start, the Operation opens at its plan for you to review and approve.',
+  },
+  'parameters.form': {
+    label: 'Inputs',
+    summary: 'The details this Capability needs to run, each validated as you type.',
+  },
   'operation.plan': {
     label: 'Plan',
     summary: 'The exact steps SlideOps proposes. Nothing runs until you approve it.',
@@ -189,5 +219,17 @@ export const guidance: GuidanceRegistry = {
   'security.disable': {
     label: 'Confirm your password',
     summary: 'Confirming your password proves it is you before protection is removed.',
+  },
+  'notifications.center': {
+    label: 'Notifications',
+    summary: 'A running list of your Operation results: what completed and whether verification passed.',
+    detail:
+      'As your Operations finish, their results appear here in real time over the same live connection that drives the terminal. Open one to jump straight to its full record. Nothing here leaves your Workspace.',
+  },
+  'notifications.push': {
+    label: 'Browser notifications',
+    summary: 'Let SlideOps notify you when an Operation completes, even when this tab is in the background.',
+    detail:
+      'Turn this on to receive a notification from your browser the moment an Operation completes or its verification result is in, so you do not have to watch the screen. Your browser asks for permission first, and you can turn it off at any time.',
   },
 };

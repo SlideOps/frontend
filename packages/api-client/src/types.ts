@@ -65,8 +65,38 @@ export interface Node {
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 /**
+ * The input type of a Capability parameter. The frontend reads this to render
+ * the right control and the right validation: a single line, a multi-line text
+ * area, a number, a boolean toggle, a domain name, an absolute path, or an SSH
+ * public key. Types stay open ended so a new one never breaks rendering.
+ */
+export type CapabilityParameterType =
+  | 'string'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'domain'
+  | 'path'
+  | 'public_key';
+
+/**
+ * One input a Capability needs before it can run, described in metadata so the
+ * frontend generates the form and the Provider reads the value. The label and
+ * help are plain-language, the placeholder is an example the Operator can copy.
+ */
+export interface CapabilityParameter {
+  key: string;
+  label: string;
+  type: CapabilityParameterType;
+  required: boolean;
+  help: string;
+  placeholder?: string;
+}
+
+/**
  * A Capability is technology independent metadata: what outcome it delivers,
- * where it applies, and how risky it is. The catalog exposes these.
+ * where it applies, how risky it is, and any inputs it needs. The catalog
+ * exposes these.
  */
 export interface Capability {
   key: string;
@@ -77,6 +107,8 @@ export interface Capability {
   risk_level: RiskLevel;
   supported_platforms?: string[];
   verification_strategy?: string;
+  /** The inputs this Capability needs. Empty when it needs none. */
+  parameters?: CapabilityParameter[];
 }
 
 /** One step of a Plan: what it does, why, and how risky it is. */
@@ -169,6 +201,8 @@ export interface Operation {
   plan: Plan | null;
   verification: Verification | null;
   error: string | null;
+  /** The parameter values supplied at creation, with any secret values redacted. */
+  parameters?: Record<string, unknown>;
   created_at: string;
   approved_at: string | null;
   started_at: string | null;

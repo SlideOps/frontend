@@ -6,6 +6,8 @@ import type { Operation, OperationStatus } from './types';
 export interface CreateOperationInput {
   node_id: string;
   capability_key: string;
+  /** The values for the Capability's parameters, keyed by parameter key. */
+  parameters?: Record<string, unknown>;
 }
 
 /**

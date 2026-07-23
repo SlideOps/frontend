@@ -214,9 +214,9 @@ export function Workspace() {
                         variant="ghost"
                         size="sm"
                         className="mt-2 px-0"
-                        onClick={() => navigate('/capabilities')}
+                        onClick={() => navigate(`/capabilities/${capability.key}`)}
                       >
-                        Explore in the catalog
+                        View this Capability
                         <ArrowRight width={15} height={15} aria-hidden />
                       </Button>
                     </div>

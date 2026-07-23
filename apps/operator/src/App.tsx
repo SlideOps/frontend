@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './components/RequireAuth';
 import { Capabilities } from './screens/Capabilities';
+import { CapabilityDetail } from './screens/CapabilityDetail';
 import { History } from './screens/History';
 import { Login } from './screens/Login';
 import { MfaVerify } from './screens/MfaVerify';
@@ -65,6 +66,14 @@ export function App() {
         element={
           <RequireAuth>
             <Capabilities />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/capabilities/:key"
+        element={
+          <RequireAuth>
+            <CapabilityDetail />
           </RequireAuth>
         }
       />

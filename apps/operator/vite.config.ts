@@ -14,6 +14,30 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'slideops-mark.svg', 'icon-180.png'],
+      workbox: {
+        // The API is never a navigation fallback; app shell routes are.
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            // Cache the read-only resource lists so History and cached views stay
+            // readable offline. NetworkFirst serves fresh data when online and
+            // the last good response when the Node is unreachable.
+            urlPattern: ({ url, request }: { url: URL; request: Request }) =>
+              request.method === 'GET' &&
+              (url.pathname.startsWith('/api/v1/operations') ||
+                url.pathname.startsWith('/api/v1/nodes') ||
+                url.pathname.startsWith('/api/v1/capabilities') ||
+                url.pathname.startsWith('/api/v1/projects')),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'slideops-api-read',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'SlideOps Operator',
         short_name: 'SlideOps',

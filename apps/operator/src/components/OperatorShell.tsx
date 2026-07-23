@@ -2,6 +2,7 @@ import { Activity, LayoutDashboard, Layers, Server, Shield } from '@slideops/ico
 import { AppShell, type NavItem } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { NotificationsBell } from '../notifications/NotificationsBell';
 import { LogoutButton } from './LogoutButton';
 
 export type ActiveKey = 'home' | 'nodes' | 'capabilities' | 'operations' | 'security';
@@ -49,7 +50,16 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
   ];
 
   return (
-    <AppShell nav={nav} surface="Operator" actions={<LogoutButton />}>
+    <AppShell
+      nav={nav}
+      surface="Operator"
+      actions={
+        <>
+          <NotificationsBell />
+          <LogoutButton />
+        </>
+      }
+    >
       {children}
     </AppShell>
   );

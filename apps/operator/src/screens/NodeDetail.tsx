@@ -1,18 +1,16 @@
 import {
   ApiError,
-  createOperation,
   discoverNode,
   getNode,
   listCapabilities,
   type Assessment,
-  type Capability,
   type DiscoveryResult,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
-  Play,
   RefreshCw,
   Server,
   ShieldCheck,
@@ -90,8 +88,6 @@ export function NodeDetail() {
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
-  const [startingKey, setStartingKey] = useState<string | null>(null);
-  const [startError, setStartError] = useState<string | null>(null);
 
   const recommendedKeys = new Set<string>(
     discovery?.assessment.recommendations.map((recommendation) => recommendation.capability_key) ??
@@ -108,18 +104,6 @@ export function NodeDetail() {
       setDiscoverError(error instanceof ApiError ? error.message : 'Discovery did not complete.');
     } finally {
       setDiscovering(false);
-    }
-  };
-
-  const startOperation = async (capability: Capability) => {
-    setStartingKey(capability.key);
-    setStartError(null);
-    try {
-      const operation = await createOperation({ node_id: id, capability_key: capability.key });
-      navigate(`/operations/${operation.id}`);
-    } catch (error) {
-      setStartError(error instanceof ApiError ? error.message : 'The Operation could not start.');
-      setStartingKey(null);
     }
   };
 
@@ -237,27 +221,21 @@ export function NodeDetail() {
                         key={capability.key}
                         capability={capability}
                         footer={
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => startOperation(capability)}
-                                disabled={startingKey !== null}
-                              >
-                                <Play width={15} height={15} aria-hidden />
-                                {startingKey === capability.key ? 'Starting' : 'Start an Operation'}
-                              </Button>
-                              {recommendedKeys.has(capability.key) ? (
-                                <span className="inline-flex items-center gap-1 text-xs text-success">
-                                  <CheckCircle2 width={14} height={14} aria-hidden />
-                                  Recommended here
-                                </span>
-                              ) : null}
-                            </div>
-                            {startError && startingKey === null ? (
-                              <p role="alert" className="text-sm text-danger">
-                                {startError}
-                              </p>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                navigate(`/capabilities/${capability.key}?node=${id}`)
+                              }
+                            >
+                              Start an Operation
+                              <ArrowRight width={15} height={15} aria-hidden />
+                            </Button>
+                            {recommendedKeys.has(capability.key) ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-success">
+                                <CheckCircle2 width={14} height={14} aria-hidden />
+                                Recommended here
+                              </span>
                             ) : null}
                           </div>
                         }

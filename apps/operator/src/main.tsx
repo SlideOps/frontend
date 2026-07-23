@@ -6,6 +6,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { guidance } from './guidance';
 import { GuidanceProvider } from '@slideops/tooltips';
+import { NotificationsProvider } from './notifications/NotificationsProvider';
 import './index.css';
 
 const container = document.getElementById('root');
@@ -18,7 +19,9 @@ createRoot(container).render(
     <ThemeProvider>
       <GuidanceProvider registry={guidance}>
         <BrowserRouter>
-          <App />
+          <NotificationsProvider>
+            <App />
+          </NotificationsProvider>
         </BrowserRouter>
       </GuidanceProvider>
     </ThemeProvider>

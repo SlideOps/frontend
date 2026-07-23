@@ -62,6 +62,8 @@ export type {
   NodeAuthKind,
   RiskLevel,
   Capability,
+  CapabilityParameter,
+  CapabilityParameterType,
   PlanStep,
   Plan,
   VerificationCheck,
