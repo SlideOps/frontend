@@ -1,11 +1,17 @@
 import { useEffect } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './components/RequireAuth';
-import { Dashboard } from './screens/Dashboard';
+import { Capabilities } from './screens/Capabilities';
+import { History } from './screens/History';
 import { Login } from './screens/Login';
 import { MfaVerify } from './screens/MfaVerify';
+import { NodeDetail } from './screens/NodeDetail';
+import { NodeRegister } from './screens/NodeRegister';
+import { Nodes } from './screens/Nodes';
+import { OperationDetail } from './screens/OperationDetail';
 import { Register } from './screens/Register';
 import { Security } from './screens/Security';
+import { Workspace } from './screens/Workspace';
 import { useAuthStore } from './store/auth';
 
 export function App() {
@@ -26,7 +32,55 @@ export function App() {
         path="/"
         element={
           <RequireAuth>
-            <Dashboard />
+            <Workspace />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/nodes"
+        element={
+          <RequireAuth>
+            <Nodes />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/nodes/new"
+        element={
+          <RequireAuth>
+            <NodeRegister />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/nodes/:id"
+        element={
+          <RequireAuth>
+            <NodeDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/capabilities"
+        element={
+          <RequireAuth>
+            <Capabilities />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/operations"
+        element={
+          <RequireAuth>
+            <History />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/operations/:id"
+        element={
+          <RequireAuth>
+            <OperationDetail />
           </RequireAuth>
         }
       />

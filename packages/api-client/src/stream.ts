@@ -1,3 +1,5 @@
+import type { OperationEvent } from './types';
+
 export interface StreamHandlers<TEvent> {
   onEvent: (event: TEvent) => void;
   onOpen?: () => void;
@@ -11,9 +13,8 @@ export interface StreamHandle {
 
 /**
  * Open a websocket to the backend event stream and decode each JSON message
- * into a typed event. Long-running Operations publish their progress here so
- * the dashboard can show live plan execution and verification. Returns a handle
- * for closing the connection.
+ * into a typed event. Returns a handle for closing the connection. This is the
+ * low-level primitive; most callers want openOperationStream below.
  */
 export function openEventStream<TEvent>(
   url: string,
@@ -34,5 +35,107 @@ export function openEventStream<TEvent>(
 
   return {
     close: () => socket.close(),
+  };
+}
+
+/**
+ * Derive the websocket URL for the Operator event stream from the current
+ * location: wss when the page is served over https, ws otherwise, always on the
+ * same origin at /api/v1/stream so the session cookie is sent with the upgrade.
+ */
+export function operationStreamUrl(): string {
+  if (typeof window === 'undefined' || !window.location) {
+    return 'ws://localhost/api/v1/stream';
+  }
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.host}/api/v1/stream`;
+}
+
+export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
+
+export interface OperationStreamOptions {
+  /** Called for every decoded Operation event, replayed or live. */
+  onEvent: (event: OperationEvent) => void;
+  /** Called when the connection status changes, for a live indicator. */
+  onStatusChange?: (status: StreamStatus) => void;
+  /** Override the derived URL, mainly for tests. */
+  url?: string;
+  /** The largest reconnect delay, in milliseconds. */
+  maxBackoffMs?: number;
+}
+
+const INITIAL_BACKOFF_MS = 500;
+const DEFAULT_MAX_BACKOFF_MS = 15000;
+
+/**
+ * Subscribe to the Operator's Operation events. It connects to the cookie
+ * authenticated stream, decodes each JSON frame into a typed OperationEvent, and
+ * reconnects with exponential backoff if the connection drops. Close the handle
+ * to stop; an intentional close does not reconnect.
+ */
+export function openOperationStream(options: OperationStreamOptions): StreamHandle {
+  const url = options.url ?? operationStreamUrl();
+  const maxBackoff = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
+
+  let socket: WebSocket | null = null;
+  let backoff = INITIAL_BACKOFF_MS;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  const setStatus = (status: StreamStatus) => options.onStatusChange?.(status);
+
+  const connect = () => {
+    if (closed) {
+      return;
+    }
+    setStatus(backoff === INITIAL_BACKOFF_MS ? 'connecting' : 'reconnecting');
+    socket = new WebSocket(url);
+
+    socket.addEventListener('open', () => {
+      backoff = INITIAL_BACKOFF_MS;
+      setStatus('open');
+    });
+
+    socket.addEventListener('message', (message) => {
+      try {
+        options.onEvent(JSON.parse(message.data as string) as OperationEvent);
+      } catch {
+        // A malformed frame should never take down the stream; skip it.
+      }
+    });
+
+    socket.addEventListener('close', () => {
+      if (closed) {
+        setStatus('closed');
+        return;
+      }
+      scheduleReconnect();
+    });
+
+    socket.addEventListener('error', () => {
+      // The close handler follows an error and drives the reconnect, so there is
+      // nothing to do here beyond letting the socket settle.
+    });
+  };
+
+  const scheduleReconnect = () => {
+    setStatus('reconnecting');
+    reconnectTimer = setTimeout(() => {
+      backoff = Math.min(backoff * 2, maxBackoff);
+      connect();
+    }, backoff);
+  };
+
+  connect();
+
+  return {
+    close: () => {
+      closed = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      socket?.close();
+    },
   };
 }

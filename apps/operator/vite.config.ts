@@ -39,6 +39,9 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        // Upgrade websocket connections too, so the /api/v1/stream event feed
+        // works in development from the same origin as the session cookie.
+        ws: true,
       },
     },
   },

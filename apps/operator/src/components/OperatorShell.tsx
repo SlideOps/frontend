@@ -1,10 +1,10 @@
-import { Activity, LayoutDashboard, Server, Shield } from '@slideops/icons';
+import { Activity, LayoutDashboard, Layers, Server, Shield } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogoutButton } from './LogoutButton';
 
-type ActiveKey = 'home' | 'nodes' | 'operations' | 'security';
+export type ActiveKey = 'home' | 'nodes' | 'capabilities' | 'operations' | 'security';
 
 /** The Operator app frame: shared navigation plus a working sign out action. */
 export function OperatorShell({ active, children }: { active: ActiveKey; children: ReactNode }) {
@@ -18,8 +18,27 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       active: active === 'home',
       onSelect: () => navigate('/'),
     },
-    { key: 'nodes', label: 'Nodes', icon: Server, active: active === 'nodes' },
-    { key: 'operations', label: 'Operations', icon: Activity, active: active === 'operations' },
+    {
+      key: 'nodes',
+      label: 'Nodes',
+      icon: Server,
+      active: active === 'nodes',
+      onSelect: () => navigate('/nodes'),
+    },
+    {
+      key: 'capabilities',
+      label: 'Capabilities',
+      icon: Layers,
+      active: active === 'capabilities',
+      onSelect: () => navigate('/capabilities'),
+    },
+    {
+      key: 'operations',
+      label: 'History',
+      icon: Activity,
+      active: active === 'operations',
+      onSelect: () => navigate('/operations'),
+    },
     {
       key: 'security',
       label: 'Security',

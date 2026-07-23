@@ -15,6 +15,8 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@slideops/api-client": "workspace:*",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
     "@slideops/design-system": "workspace:*",
     "@slideops/icons": "workspace:*",
     "@slideops/tooltips": "workspace:*",
