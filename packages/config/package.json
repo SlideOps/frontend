@@ -1,0 +1,30 @@
+{
+  "name": "@slideops/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared tooling for the SlideOps frontend: tsconfig base, eslint flat config, prettier config, and the Tailwind preset that encodes the Everlasting Beauty palette and semantic tokens.",
+  "exports": {
+    "./tailwind": "./tailwind-preset.js",
+    "./eslint": "./eslint.config.js",
+    "./prettier": "./prettier.config.js",
+    "./tsconfig": "./tsconfig.base.json"
+  },
+  "files": [
+    "tailwind-preset.js",
+    "eslint.config.js",
+    "prettier.config.js",
+    "tsconfig.base.json"
+  ],
+  "scripts": {
+    "lint": "echo \"config: nothing to lint\"",
+    "typecheck": "echo \"config: nothing to typecheck\"",
+    "build": "echo \"config: no build step\"",
+    "test": "echo \"config: no tests\""
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.0.0"
+  }
+}

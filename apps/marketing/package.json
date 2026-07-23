@@ -1,0 +1,35 @@
+{
+  "name": "@slideops/marketing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The SlideOps public landing and marketing site.",
+  "scripts": {
+    "dev": "vite --port 4321",
+    "build": "vite build",
+    "preview": "vite preview --port 4321",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@slideops/design-system": "workspace:*",
+    "@slideops/icons": "workspace:*",
+    "@slideops/tooltips": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@slideops/config": "workspace:*",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.14.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}

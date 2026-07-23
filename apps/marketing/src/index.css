@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg-app);
+    color: var(--color-text-primary);
+    font-family:
+      Inter,
+      system-ui,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  /* A gentle, easeful rise used to bring sections in. It plays once and settles,
+     never loops, so the page feels calm rather than busy. */
+  @keyframes so-rise {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .so-rise {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+  }
+
+  .so-rise-2 {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+    animation-delay: 90ms;
+  }
+
+  .so-rise-3 {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+    animation-delay: 180ms;
+  }
+
+  /* A slow, seamless wash behind the hero. Position only, so it drifts softly. */
+  @keyframes so-drift {
+    0% {
+      transform: translate3d(-4%, -2%, 0);
+    }
+    50% {
+      transform: translate3d(4%, 2%, 0);
+    }
+    100% {
+      transform: translate3d(-4%, -2%, 0);
+    }
+  }
+
+  .so-drift {
+    animation: so-drift 22s var(--so-ease-standard) infinite;
+  }
+}

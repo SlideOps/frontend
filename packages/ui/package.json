@@ -1,0 +1,35 @@
+{
+  "name": "@slideops/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Composed SlideOps components built on the design system: the app shell with navigation, the page header, and empty states.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "peerDependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "dependencies": {
+    "@slideops/design-system": "workspace:*",
+    "@slideops/icons": "workspace:*",
+    "@slideops/tooltips": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.14.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

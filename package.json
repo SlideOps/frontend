@@ -1,0 +1,30 @@
+{
+  "name": "slideops-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SlideOps frontend monorepo: marketing site, operator dashboard, admin control plane, and the shared packages that keep them consistent.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "fmt": "prettier --write \"**/*.{ts,tsx,css,json,md}\""
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@types/node": "^22.9.0",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.13.0"
+  }
+}
