@@ -13,10 +13,26 @@ export type OperationStatus =
   | 'verified'
   | 'failed';
 
+/**
+ * An Operator account, as returned by the auth endpoints. Field names mirror
+ * the backend contract exactly so the wire shape and the type never drift.
+ */
 export interface Operator {
   id: string;
   email: string;
-  displayName: string;
+  mfa_enabled: boolean;
+  created_at: string;
+}
+
+/**
+ * An Admin account. Admins sign in through the separate control-plane surface
+ * and cannot self register. The shape mirrors the backend contract.
+ */
+export interface Admin {
+  id: string;
+  email: string;
+  mfa_enabled: boolean;
+  created_at: string;
 }
 
 export interface Node {

@@ -2,6 +2,7 @@ import { Card, Text } from '@slideops/design-system';
 import { Activity, Gauge, ListChecks, ShieldCheck, Users } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { AppShell, PageHeader, type NavItem } from '@slideops/ui';
+import { LogoutButton } from '../components/LogoutButton';
 
 const nav: NavItem[] = [
   { key: 'overview', label: 'Overview', icon: Gauge, active: true },
@@ -26,7 +27,7 @@ const metrics: Metric[] = [
 /** Placeholder Admin overview. Denser and calmer than the Operator surface. */
 export function Overview() {
   return (
-    <AppShell surface="Admin" nav={nav} dense>
+    <AppShell surface="Admin" nav={nav} dense actions={<LogoutButton />}>
       <PageHeader
         title="Overview"
         description="A calm read on the whole platform. Oversight and analytics across every tenant, with emergency controls kept close but deliberate."

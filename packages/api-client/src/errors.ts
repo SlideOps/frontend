@@ -19,10 +19,17 @@ interface BackendErrorShape {
   details?: unknown;
 }
 
-/** Turn any thrown value or error body into a predictable ApiError. */
+/**
+ * Turn any thrown value or error body into a predictable ApiError. The backend
+ * contract nests failures under an `error` envelope, `{"error":{"code","message"}}`,
+ * so we unwrap that when present and fall back to a top-level shape otherwise.
+ */
 export function normalizeError(status: number, body: unknown): ApiError {
   if (body && typeof body === 'object') {
-    const shape = body as BackendErrorShape;
+    const outer = body as { error?: unknown } & BackendErrorShape;
+    const shape = (
+      outer.error && typeof outer.error === 'object' ? outer.error : outer
+    ) as BackendErrorShape;
     const code = typeof shape.code === 'string' ? shape.code : 'unknown_error';
     const message =
       typeof shape.message === 'string' ? shape.message : 'The request could not be completed.';

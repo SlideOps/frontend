@@ -25,9 +25,17 @@ export const guidance: GuidanceRegistry = {
   'login.email': {
     label: 'Admin email',
     summary: 'Admin sign in is separate and stricter than Operator sign in.',
+    detail:
+      'Admin accounts are provisioned by the platform, never self created. This surface has its own sign in, its own session cookie, and in production its own hostname and network restrictions.',
   },
   'login.password': {
     label: 'Admin password',
     summary: 'Credentials are never stored in plain text and never appear in logs.',
+  },
+  'mfa.code': {
+    label: 'Verification code',
+    summary: 'The 6 digit code from your authenticator app. It changes every 30 seconds.',
+    detail:
+      'The control plane asks for a second step at sign in on top of the password. The code comes from an authenticator app that only you hold and refreshes every 30 seconds, so a stolen password alone cannot reach oversight or emergency controls.',
   },
 };

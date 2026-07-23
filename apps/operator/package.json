@@ -13,6 +13,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.9.1",
     "@slideops/api-client": "workspace:*",
     "@slideops/design-system": "workspace:*",
     "@slideops/icons": "workspace:*",

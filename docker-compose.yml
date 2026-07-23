@@ -1,3 +1,7 @@
+# A fixed project name so this stack never collides with a directory that
+# happens to be named frontend.
+name: slideops-frontend
+
 services:
   marketing:
     image: node:22-alpine

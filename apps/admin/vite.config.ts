@@ -31,5 +31,14 @@ export default defineConfig({
   ],
   server: {
     port: 4323,
+    // Forward API calls to the backend during development so the session cookie
+    // is same origin. In production the app is served from the same origin as
+    // the API, so no proxy is needed there.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
 });

@@ -5,8 +5,27 @@ export {
   type StreamHandlers,
   type StreamHandle,
 } from './stream';
+export {
+  register,
+  login,
+  mfaVerify,
+  logout,
+  me,
+  mfaSetup,
+  mfaEnable,
+  mfaDisable,
+  adminLogin,
+  adminMfaVerify,
+  adminLogout,
+  adminMe,
+  type Credentials,
+  type MfaSetup,
+  type LoginResult,
+  type AdminLoginResult,
+} from './auth';
 export type {
   Operator,
+  Admin,
   Node,
   Capability,
   Operation,
