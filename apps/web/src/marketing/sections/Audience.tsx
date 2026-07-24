@@ -8,6 +8,7 @@ import {
   Users,
   type LucideIcon,
 } from '@slideops/icons';
+import { useReveal } from '../useReveal';
 
 interface Audience {
   icon: LucideIcon;
@@ -50,6 +51,7 @@ const audiences: Audience[] = [
 
 /** Who SlideOps is for, from a single developer to a whole team. */
 export function Audience() {
+  const { ref, shown } = useReveal<HTMLDivElement>();
   return (
     <section id="who" className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
@@ -66,10 +68,16 @@ export function Audience() {
           </Text>
         </div>
 
-        <div className="so-rise-2 mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          ref={ref}
+          className={`mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 so-reveal${shown ? ' so-reveal-in' : ''}`}
+        >
           {audiences.map(({ icon: Icon, title, body }) => (
-            <article key={title} className="flex items-start gap-4 rounded-lg border border-border bg-app p-6">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+            <article
+              key={title}
+              className="so-stagger group flex items-start gap-4 rounded-lg border border-border bg-app p-6 transition-shadow duration-base ease-standard hover:shadow-md"
+            >
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-subtle text-brand transition-transform duration-base ease-standard group-hover:-translate-y-0.5">
                 <Icon width={22} height={22} aria-hidden />
               </span>
               <div className="min-w-0">

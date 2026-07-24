@@ -46,6 +46,38 @@
     animation-delay: 180ms;
   }
 
+  /* Scroll reveal: an element starts hidden and plays the shared rise once the
+     reveal hook confirms it has entered the viewport. It reuses the so-rise
+     keyframe and motion tokens, so it stays calm and honors reduced motion. */
+  .so-reveal {
+    opacity: 0;
+  }
+
+  .so-reveal-in {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+  }
+
+  /* Staggered children for a reveal group, so a grid settles row by row rather
+     than all at once. Position and opacity only, never color. */
+  .so-reveal-in > .so-stagger {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+  }
+  .so-reveal-in > .so-stagger:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .so-reveal-in > .so-stagger:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .so-reveal-in > .so-stagger:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .so-reveal-in > .so-stagger:nth-child(5) {
+    animation-delay: 240ms;
+  }
+  .so-reveal-in > .so-stagger:nth-child(6) {
+    animation-delay: 300ms;
+  }
+
   /* A slow, seamless wash behind the hero. Position only, so it drifts softly. */
   @keyframes so-drift {
     0% {

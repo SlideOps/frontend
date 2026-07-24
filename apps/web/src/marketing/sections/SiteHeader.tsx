@@ -1,5 +1,5 @@
 import { Button, Text } from '@slideops/design-system';
-import { Logo } from '@slideops/icons';
+import { ArrowRight, Logo } from '@slideops/icons';
 import { Link } from 'react-router-dom';
 import { ThemeToggle } from '../ThemeToggle';
 import { signInUrl, signUpUrl } from '../content/site';
@@ -14,8 +14,8 @@ const navLinks = [
 /** The sticky site header: the lockup, section links, theme, and the sign in calls. */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-app/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+    <header className="sticky top-0 z-40 border-b border-border bg-app/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <Link
           to="/"
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
@@ -23,12 +23,15 @@ export function SiteHeader() {
         >
           <Logo size={28} />
         </Link>
-        <nav aria-label="Sections" className="hidden items-center gap-1 lg:flex">
+        <nav
+          aria-label="Sections"
+          className="hidden items-center gap-1 rounded-pill border border-border bg-surface/60 px-1.5 py-1 lg:flex"
+        >
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-md px-3 py-2 text-sm font-medium text-ink-muted transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="rounded-pill px-3.5 py-1.5 text-sm font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Text as="span" variant="body-sm">
                 {link.label}
@@ -45,7 +48,10 @@ export function SiteHeader() {
             Sign in
           </Link>
           <Link to={signUpUrl}>
-            <Button size="sm">Sign up</Button>
+            <Button size="sm">
+              Sign up
+              <ArrowRight width={15} height={15} aria-hidden />
+            </Button>
           </Link>
         </div>
       </div>

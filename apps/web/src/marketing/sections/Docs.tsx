@@ -94,7 +94,7 @@ export function Docs() {
           </a>
         </nav>
 
-        <article className="rounded-lg border border-border bg-surface p-6 md:p-10">
+        <article className="rounded-lg border border-border bg-surface p-6 shadow-sm md:p-10">
           <div className="so-prose max-w-none">
             <ReactMarkdown>{active.content}</ReactMarkdown>
           </div>

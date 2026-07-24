@@ -1,5 +1,6 @@
 import { Text } from '@slideops/design-system';
 import { ListChecks, ShieldCheck, Sparkles, type LucideIcon } from '@slideops/icons';
+import { useReveal } from '../useReveal';
 
 interface Pillar {
   icon: LucideIcon;
@@ -25,20 +26,9 @@ const pillars: Pillar[] = [
   },
 ];
 
-const lifecycle = [
-  'Discover',
-  'Assess',
-  'Recommend',
-  'Plan',
-  'Approve',
-  'Execute',
-  'Verify',
-  'Observe',
-  'Record',
-];
-
-/** The story from the blueprint: understandable, in control, confidence, and the lifecycle. */
+/** The story from the blueprint: understandable, in control, and confident by design. */
 export function Story() {
+  const { ref, shown } = useReveal<HTMLDivElement>();
   return (
     <section id="how" className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
@@ -57,10 +47,16 @@ export function Story() {
           </Text>
         </div>
 
-        <div className="so-rise-2 mt-12 grid gap-6 md:grid-cols-3">
+        <div
+          ref={ref}
+          className={`mt-12 grid gap-6 md:grid-cols-3 so-reveal${shown ? ' so-reveal-in' : ''}`}
+        >
           {pillars.map(({ icon: Icon, title, body }) => (
-            <article key={title} className="rounded-lg border border-border bg-app p-6">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-subtle text-brand">
+            <article
+              key={title}
+              className="so-stagger group rounded-lg border border-border bg-app p-6 transition-shadow duration-base ease-standard hover:shadow-md"
+            >
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-subtle text-brand transition-transform duration-base ease-standard group-hover:-translate-y-0.5">
                 <Icon width={22} height={22} aria-hidden />
               </span>
               <Text variant="h4" className="mt-4">
@@ -71,31 +67,6 @@ export function Story() {
               </Text>
             </article>
           ))}
-        </div>
-
-        <div className="so-rise-3 mt-14">
-          <Text variant="caption" tone="secondary">
-            Every Operation follows one lifecycle
-          </Text>
-          <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-3">
-            {lifecycle.map((step, index) => (
-              <li key={step} className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-pill border border-border bg-app px-3 py-1.5">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-pill bg-subtle text-xs font-semibold text-brand">
-                    {index + 1}
-                  </span>
-                  <Text as="span" variant="body-sm">
-                    {step}
-                  </Text>
-                </span>
-                {index < lifecycle.length - 1 ? (
-                  <span aria-hidden className="text-ink-muted">
-                    &rsaquo;
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
     </section>

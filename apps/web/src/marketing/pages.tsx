@@ -1,9 +1,15 @@
 import { Audience } from './sections/Audience';
 import { CapabilitiesShowcase } from './sections/CapabilitiesShowcase';
+import { ClosingCta } from './sections/ClosingCta';
+import { DeployMonitor } from './sections/DeployMonitor';
 import { Docs } from './sections/Docs';
+import { Faq } from './sections/Faq';
 import { Hero } from './sections/Hero';
+import { Lifecycle } from './sections/Lifecycle';
 import { Pricing } from './sections/Pricing';
+import { Security } from './sections/Security';
 import { Story } from './sections/Story';
+import { TwoLevel } from './sections/TwoLevel';
 
 /**
  * The marketing pages. The home page tells the whole story in one calm scroll,
@@ -11,16 +17,22 @@ import { Story } from './sections/Story';
  * can link straight to it. Every page renders inside the marketing layout.
  */
 
-/** The full marketing home: hero, story, capabilities, audience, docs, pricing. */
+/** The full marketing home: the whole system, top to bottom. */
 export function MarketingHome() {
   return (
     <>
       <Hero />
       <Story />
+      <TwoLevel />
+      <Lifecycle />
       <CapabilitiesShowcase />
-      <Audience />
-      <Docs />
+      <Security />
+      <DeployMonitor />
       <Pricing />
+      <Audience />
+      <Faq />
+      <Docs />
+      <ClosingCta />
     </>
   );
 }
