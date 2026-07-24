@@ -1,0 +1,114 @@
+import { listCapabilities, listProjectNodes, type Capability, type Node } from '@slideops/api-client';
+import { Button, Text } from '@slideops/design-system';
+import { ArrowRight, Layers, Server } from '@slideops/icons';
+import { Guidance } from '@slideops/tooltips';
+import { EmptyState } from '@slideops/ui';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { CapabilityCard } from './CapabilityCard';
+import { ErrorNote, Loading } from './Feedback';
+
+interface CapabilitiesData {
+  capabilities: Capability[];
+  nodes: Node[];
+}
+
+async function loadCapabilities(projectId: string, signal: AbortSignal): Promise<CapabilitiesData> {
+  const [capabilities, nodes] = await Promise.all([
+    listCapabilities({ projectId }, signal),
+    listProjectNodes(projectId, signal),
+  ]);
+  return { capabilities, nodes };
+}
+
+/** Whether a Capability comes from a Plugin, so it must run with Project context. */
+function isPluginCapability(capability: Capability): boolean {
+  return Boolean(capability.plugin_id && capability.plugin_id.toLowerCase() !== 'core');
+}
+
+const selectClass =
+  'h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+
+/**
+ * The Capabilities available in this Project: the Core security Capabilities plus
+ * the Capabilities this Project's installed Plugins add. A Plugin Capability must
+ * run with Project context, so its start link carries both a chosen assigned
+ * server and this Project; a Core Capability carries only the server. When no
+ * server is assigned yet, this prompts to assign one first.
+ */
+export function ProjectCapabilities({ projectId }: { projectId: string }) {
+  const navigate = useNavigate();
+  const { state } = useAsyncData((signal) => loadCapabilities(projectId, signal), [projectId]);
+  const [serverId, setServerId] = useState('');
+
+  const ready = state.status === 'ready' ? state.data : null;
+  const nodes = ready?.nodes ?? [];
+  const chosen = serverId || nodes[0]?.id || '';
+
+  const startHref = (capability: Capability): string => {
+    const base = `/app/capabilities/${capability.key}?node=${chosen}`;
+    return isPluginCapability(capability) ? `${base}&project=${projectId}` : base;
+  };
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <Layers width={20} height={20} className="text-brand" aria-hidden />
+        <Text variant="h3">Capabilities available here</Text>
+        <Guidance for="project.capabilities" />
+      </div>
+      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
+        The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an
+        Operation on one of this Project's servers; a Plugin Capability runs with this Project's
+        context.
+      </Text>
+
+      {state.status === 'loading' ? <Loading label="Loading the Capabilities for this Project" /> : null}
+      {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
+      {ready ? (
+        nodes.length === 0 ? (
+          <EmptyState
+            icon={Server}
+            title="Assign a server first"
+            description="A Capability runs on a server. Assign a server to this Project above, then come back to start an Operation here."
+          />
+        ) : (
+          <>
+            <div className="mb-4 flex max-w-md flex-wrap items-center gap-3">
+              <label htmlFor="capability-server" className="text-sm font-medium text-ink">
+                Run on server
+              </label>
+              <select
+                id="capability-server"
+                className={`${selectClass} max-w-xs`}
+                value={chosen}
+                onChange={(event) => setServerId(event.target.value)}
+              >
+                {nodes.map((node) => (
+                  <option key={node.id} value={node.id}>
+                    {node.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-4">
+              {ready.capabilities.map((capability) => (
+                <CapabilityCard
+                  key={capability.key}
+                  capability={capability}
+                  footer={
+                    <Button size="sm" onClick={() => navigate(startHref(capability))}>
+                      Start an Operation
+                      <ArrowRight width={15} height={15} aria-hidden />
+                    </Button>
+                  }
+                />
+              ))}
+            </div>
+          </>
+        )
+      ) : null}
+    </section>
+  );
+}

@@ -33,10 +33,17 @@ export function StartOperation({
   capability,
   nodes,
   initialNodeId,
+  initialProjectId,
 }: {
   capability: Capability;
   nodes: Node[];
   initialNodeId?: string;
+  /**
+   * The Project this Operation runs in, read from the ?project= param. A Plugin
+   * Capability requires it; a Core Capability is started without one, so this is
+   * undefined and no project_id is sent.
+   */
+  initialProjectId?: string;
 }) {
   const navigate = useNavigate();
   const parameters = useMemo<CapabilityParameter[]>(() => capability.parameters ?? [], [capability]);
@@ -83,6 +90,10 @@ export function StartOperation({
       const operation = await createOperation({
         node_id: nodeId,
         capability_key: capability.key,
+        // Carry the Project only when one was passed. A Plugin Capability runs
+        // with it; a Core Capability is started without one and sends no
+        // project_id, which the backend requires.
+        project_id: initialProjectId,
         parameters: Object.keys(cleaned).length > 0 ? cleaned : undefined,
       });
       navigate(`/app/operations/${operation.id}`);
@@ -90,6 +101,7 @@ export function StartOperation({
       if (cause instanceof ApiError && cause.code === 'capability_not_installed') {
         setNotInstalled(true);
       } else {
+        // project_required and any other backend error carry a clear message.
         setError(cause instanceof ApiError ? cause.message : 'The Operation could not be started.');
       }
       setSubmitting(false);

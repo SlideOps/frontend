@@ -28,6 +28,9 @@ export {
   createProject,
   getProject,
   removeProject,
+  listProjectNodes,
+  assignNodeToProject,
+  unassignNodeFromProject,
   type CreateProjectInput,
 } from './projects';
 export {

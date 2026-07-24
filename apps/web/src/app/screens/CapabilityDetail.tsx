@@ -49,6 +49,9 @@ export function CapabilityDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedNode = searchParams.get('node') ?? undefined;
+  // A Plugin Capability started from a Project carries ?project=; a Core
+  // Capability carries none, so this stays undefined and no project_id is sent.
+  const preselectedProject = searchParams.get('project') ?? undefined;
 
   const capabilityResult = useAsyncData<Capability>((signal) => getCapability(key, signal), [key]);
   const nodesResult = useAsyncData<Node[]>((signal) => listNodes(signal), []);
@@ -159,6 +162,7 @@ export function CapabilityDetail() {
                   capability={capabilityResult.state.data}
                   nodes={nodes}
                   initialNodeId={preselectedNode}
+                  initialProjectId={preselectedProject}
                 />
               )}
             </Card>

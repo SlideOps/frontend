@@ -2,20 +2,24 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ApiError,
   deployService,
+  getGitHubStatus,
   getTier,
+  listGitHubRepos,
   listNodes,
   listProjects,
+  type GitHubRepo,
+  type GitHubStatus,
   type Node,
   type Project,
   type TierInfo,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Container } from '@slideops/icons';
+import { Container, GitBranch } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useMemo, useRef, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import {
@@ -30,15 +34,21 @@ interface DeployData {
   projects: Project[];
   nodes: Node[];
   tier: TierInfo;
+  github: GitHubStatus;
+  repos: GitHubRepo[];
 }
 
 async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
-  const [projects, nodes, tier] = await Promise.all([
+  const [projects, nodes, tier, github] = await Promise.all([
     listProjects(signal),
     listNodes(signal),
     getTier(signal),
+    // GitHub is optional here, so a failure or an unconfigured platform must not
+    // block the deploy form; fall back to an unconnected status.
+    getGitHubStatus(signal).catch(() => ({ configured: false, connected: false }) as GitHubStatus),
   ]);
-  return { projects, nodes, tier };
+  const repos = github.connected ? await listGitHubRepos(signal).catch(() => []) : [];
+  return { projects, nodes, tier, github, repos };
 }
 
 const inputClass =
@@ -52,10 +62,17 @@ function headroomFor(tier: TierInfo): QuotaHeadroom {
 }
 
 /** The deploy form, rendered once the Projects, Nodes, and tier are loaded. */
-function DeployForm({ data }: { data: DeployData }) {
+function DeployForm({ data, initialProjectId }: { data: DeployData; initialProjectId?: string }) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [quotaHit, setQuotaHit] = useState(false);
+
+  // Preselect the Project only when it is one the Operator owns, so a stray
+  // param never selects nothing.
+  const preselectedProject =
+    initialProjectId && data.projects.some((project) => project.id === initialProjectId)
+      ? initialProjectId
+      : '';
 
   const headroom = headroomFor(data.tier);
   const headroomRef = useRef(headroom);
@@ -73,17 +90,19 @@ function DeployForm({ data }: { data: DeployData }) {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ServiceFormValues>({
     resolver,
     defaultValues: {
-      project_id: '',
+      project_id: preselectedProject,
       node_id: '',
       name: '',
       runtime: 'container',
       source_type: 'image',
       image: '',
       repository_url: '',
+      branch: 'main',
       build: '',
       command: '',
       cpu_limit: 0.5,
@@ -96,6 +115,17 @@ function DeployForm({ data }: { data: DeployData }) {
 
   const sourceType = watch('source_type');
   const runtime = watch('runtime');
+
+  // Filling in a repository from the connected GitHub account sets the clone URL
+  // and defaults the branch to that repository's default branch.
+  const onPickRepo = (fullName: string) => {
+    const repo = data.repos.find((entry) => entry.full_name === fullName);
+    if (!repo) {
+      return;
+    }
+    setValue('repository_url', repo.clone_url, { shouldValidate: true });
+    setValue('branch', repo.default_branch, { shouldValidate: true });
+  };
   const servicesLeft = Math.max(0, data.tier.limits.services - data.tier.usage.services);
 
   const onSubmit = handleSubmit(async (values) => {
@@ -143,7 +173,12 @@ function DeployForm({ data }: { data: DeployData }) {
               </label>
               <Guidance for="service.project" />
             </div>
-            <select id="project_id" className={inputClass} defaultValue="" {...register('project_id')}>
+            <select
+              id="project_id"
+              className={inputClass}
+              defaultValue={preselectedProject}
+              {...register('project_id')}
+            >
               <option value="" disabled>
                 Choose a Project
               </option>
@@ -239,12 +274,48 @@ function DeployForm({ data }: { data: DeployData }) {
           />
         ) : (
           <div className="grid gap-5">
+            {data.github.connected && data.repos.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="github_repo" className="text-sm font-medium text-ink">
+                    From GitHub (optional)
+                  </label>
+                  <Guidance for="service.githubRepo" />
+                </div>
+                <select
+                  id="github_repo"
+                  className={inputClass}
+                  defaultValue=""
+                  onChange={(event) => onPickRepo(event.target.value)}
+                >
+                  <option value="">Choose a repository to fill the URL and branch</option>
+                  {data.repos.map((repo) => (
+                    <option key={repo.full_name} value={repo.full_name}>
+                      {repo.full_name}
+                      {repo.private ? ' (private)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
+                  <GitBranch width={14} height={14} aria-hidden />
+                  Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository fills
+                  the URL and branch below.
+                </Text>
+              </div>
+            ) : null}
             <Field
               label="Repository URL"
-              placeholder="https://example.com/app.git"
+              placeholder="https://github.com/you/app.git"
               error={errors.repository_url?.message}
               labelAdornment={<Guidance for="service.repository" />}
               {...register('repository_url')}
+            />
+            <Field
+              label="Branch"
+              placeholder="main"
+              error={errors.branch?.message}
+              labelAdornment={<Guidance for="service.branch" />}
+              {...register('branch')}
             />
             <Field
               label="Build command (optional)"
@@ -368,6 +439,9 @@ function DeployForm({ data }: { data: DeployData }) {
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */
 export function ServiceDeploy() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Deploying from inside a Project preselects it here via ?project=.
+  const initialProjectId = searchParams.get('project') ?? undefined;
   const { state } = useAsyncData((signal) => loadDeployData(signal), []);
 
   return (
@@ -405,7 +479,7 @@ export function ServiceDeploy() {
             </div>
           </Card>
         ) : (
-          <DeployForm data={state.data} />
+          <DeployForm data={state.data} initialProjectId={initialProjectId} />
         )
       ) : null}
     </OperatorShell>

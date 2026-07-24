@@ -35,6 +35,56 @@ export const guidance: GuidanceRegistry = {
     label: 'Projects',
     summary: 'A Project groups related Nodes so your Workspace stays organized as it grows.',
   },
+  'project.overview': {
+    label: 'Project',
+    summary: 'The second level of the model: a Project runs a stack on one or more of your servers.',
+    detail:
+      'You connect and secure your servers at the server level, then create a Project, assign the servers it runs on, install only the Plugins it needs, connect a repository, and deploy its Services. A Project carries its own stack, so each one holds only what it uses.',
+  },
+  'project.create': {
+    label: 'Create a Project',
+    summary: 'Name a new Project and, optionally, describe what it runs. You assign servers and install its stack next.',
+  },
+  'project.name': {
+    label: 'Name',
+    summary: 'A friendly name for this Project, such as online shop or staging.',
+  },
+  'project.description': {
+    label: 'Description',
+    summary: 'An optional note on what this Project runs and why it exists.',
+  },
+  'project.servers': {
+    label: 'Servers',
+    summary: 'The servers assigned to this Project. A server is connected and secured at the server level first, then assigned here.',
+    detail:
+      'A Project runs its stack and Services on the servers assigned to it. Assign a server you already connected and secured; unassigning returns it to the server level without touching the server itself.',
+  },
+  'project.assign': {
+    label: 'Assign a server',
+    summary: 'Add one of your servers to this Project. Only servers not already in a Project can be assigned.',
+  },
+  'project.stack': {
+    label: 'Stack',
+    summary: 'The Plugins installed into this Project. Install only what this Project needs; each unlocks its Capabilities here.',
+    detail:
+      'This is the per-Project Marketplace. Installing, enabling, and uninstalling act on this Project, so it carries only the stack it uses. The Core security bundle is on every server and shows as built in, so it is never installed or removed here.',
+  },
+  'project.capabilities': {
+    label: 'Capabilities available here',
+    summary: "The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an Operation on one of its servers.",
+    detail:
+      'A Core Capability runs on any server. A Plugin Capability runs only inside a Project that installed its Plugin, so starting one here carries this Project as its context. Assign a server to the Project first, since a Capability always runs on a server.',
+  },
+  'project.github': {
+    label: 'GitHub',
+    summary: 'Connect GitHub so a Service with a repository source can clone on first deploy and pull on redeploys.',
+    detail:
+      'Connecting GitHub needs an OAuth app the platform registered. Once it is configured, connect your account to let deploys pull from your repositories. The access token is stored encrypted and never shown.',
+  },
+  'project.services': {
+    label: 'Services',
+    summary: 'The Services deployed in this Project, each on one of its servers under hard resource limits.',
+  },
   'node.name': {
     label: 'Name',
     summary: 'A friendly name you will recognize, such as web-1 or staging database.',
@@ -451,6 +501,18 @@ export const guidance: GuidanceRegistry = {
   'service.repository': {
     label: 'Repository',
     summary: 'The repository to clone and build before the workload runs.',
+  },
+  'service.branch': {
+    label: 'Branch',
+    summary: 'The branch to clone and pull on redeploys. Defaults to main.',
+    detail:
+      'A repository source is cloned on first deploy and pulled on redeploys with git pull on this branch, so there is no re-clone. Leave it as main unless the Service runs a different branch.',
+  },
+  'service.githubRepo': {
+    label: 'From GitHub',
+    summary: 'Pick a repository from your connected GitHub account to fill the URL and branch for you.',
+    detail:
+      'When GitHub is connected, the repositories you can reach are listed here. Choosing one fills the repository URL and defaults the branch to that repository default branch. You can still edit both afterward.',
   },
   'service.command': {
     label: 'Command',

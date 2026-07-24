@@ -4,6 +4,7 @@ import {
   Clock,
   Container,
   FileText,
+  FolderKanban,
   LayoutDashboard,
   Layers,
   Package,
@@ -24,6 +25,7 @@ import { LogoutButton } from './LogoutButton';
 export type ActiveKey =
   | 'home'
   | 'nodes'
+  | 'projects'
   | 'services'
   | 'capabilities'
   | 'marketplace'
@@ -109,6 +111,13 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Server,
       active: active === 'nodes',
       onSelect: () => navigate('/app/nodes'),
+    },
+    {
+      key: 'projects',
+      label: 'Projects',
+      icon: FolderKanban,
+      active: active === 'projects',
+      onSelect: () => navigate('/app/projects'),
     },
     {
       key: 'services',

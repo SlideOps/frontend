@@ -40,6 +40,7 @@ export function buildServiceSchema(headroom: QuotaHeadroom) {
       source_type: z.enum(['image', 'repository']),
       image: z.string().trim().optional(),
       repository_url: z.string().trim().optional(),
+      branch: z.string().trim().max(255, 'Keep the branch name short.').optional(),
       build: z.string().trim().optional(),
       command: z.string().trim().optional(),
       cpu_limit: z.coerce
@@ -148,6 +149,8 @@ export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
       : {
           type: 'repository' as const,
           repository_url: values.repository_url,
+          // The backend defaults an empty branch to main, so send it only when set.
+          branch: values.branch || undefined,
           build: values.build || undefined,
           command: values.command || undefined,
         };
