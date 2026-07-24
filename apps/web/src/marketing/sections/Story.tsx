@@ -1,5 +1,6 @@
 import { Text } from '@slideops/design-system';
 import { ListChecks, ShieldCheck, Sparkles, type LucideIcon } from '@slideops/icons';
+import { Reveal } from '../motion';
 
 interface Pillar {
   icon: LucideIcon;
@@ -42,7 +43,7 @@ export function Story() {
   return (
     <section id="how" className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
-        <div className="so-rise max-w-2xl">
+        <Reveal className="max-w-2xl">
           <Text variant="caption" tone="accent">
             Why SlideOps
           </Text>
@@ -55,7 +56,7 @@ export function Story() {
             intend from the Provider that carries it out on your platform, so the same goal works
             across different systems. Three ideas hold it together.
           </Text>
-        </div>
+        </Reveal>
 
         <div className="so-rise-2 mt-12 grid gap-6 md:grid-cols-3">
           {pillars.map(({ icon: Icon, title, body }) => (

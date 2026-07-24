@@ -2,6 +2,7 @@ import { Button, Text } from '@slideops/design-system';
 import { ArrowRight, Logo, ShieldCheck } from '@slideops/icons';
 import { Link } from 'react-router-dom';
 import { signUpUrl } from '../content/site';
+import { Reveal } from '../motion';
 
 const assurances = [
   'Your servers stay yours',
@@ -22,7 +23,7 @@ export function Hero() {
         }}
       />
       <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-        <div className="so-rise max-w-3xl">
+        <Reveal className="max-w-3xl">
           <div className="mb-8">
             <Logo size={44} />
           </div>
@@ -61,7 +62,7 @@ export function Hero() {
               </li>
             ))}
           </ul>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

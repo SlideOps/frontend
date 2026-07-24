@@ -35,6 +35,20 @@
   --so-danger: #c8402f;
   --so-info: #3d7a8c;
 
+  /*
+   * Marketing hero-world surfaces (warm glow on warm dark).
+   *
+   * The living marketing experience flips between a warm-dark "hero-world" and
+   * warm-light "paper" sections, the fold motif from the inspiration still.
+   * These are brand-fixed like the palette primitives: the hero-world is always
+   * warm dark and paper is always warm light, in either theme. The theme-aware
+   * glow and grain tokens below sit on top of them. All are derived from the
+   * Everlasting Beauty palette, never invented color.
+   */
+  --so-marketing-ink: #1a0f0c; /* neutral-950, the deepest warm dark */
+  --so-marketing-ink-raised: #241713; /* neutral-900, a lifted hero-world panel */
+  --so-marketing-paper: #faf6f4; /* neutral-50, the warm paper underside */
+
   /* Spacing on a 4px base scale */
   --so-space-1: 0.25rem;
   --so-space-2: 0.5rem;
@@ -86,6 +100,18 @@
   --color-warning: var(--so-warning);
   --color-danger: var(--so-danger);
   --color-info: var(--so-info);
+
+  /*
+   * Ambient marketing glow and grain, tuned for the light app background.
+   * Warm embers (cognac, peach, rose quartz) sit softly over the warm neutrals,
+   * and the grain is a faint ink tint. Consumed by the marketing Glow and Grain
+   * layers; the app and admin surfaces never reference these.
+   */
+  --so-glow-warm: rgba(153, 99, 80, 0.22); /* cognac */
+  --so-glow-ember: rgba(229, 190, 160, 0.34); /* peach */
+  --so-glow-rose: rgba(250, 220, 220, 0.4); /* rose quartz */
+  --so-grain-color: 43, 28, 23; /* ink, as an rgb triple so the layer can set its own alpha */
+  --so-grain-opacity: 0.045;
   color-scheme: light;
 }
 
@@ -108,6 +134,17 @@
   --color-warning: #d79f5c;
   --color-danger: #e05a49;
   --color-info: #5b98a9;
+
+  /*
+   * Ambient marketing glow and grain, tuned for the dark app background. The
+   * embers read brighter here to glow against the warm dark, and the grain is a
+   * faint warm-light tint instead of ink.
+   */
+  --so-glow-warm: rgba(166, 86, 72, 0.4); /* brand ember */
+  --so-glow-ember: rgba(229, 190, 160, 0.26); /* peach */
+  --so-glow-rose: rgba(250, 220, 220, 0.16); /* rose quartz */
+  --so-grain-color: 247, 236, 232; /* warm light, as an rgb triple */
+  --so-grain-opacity: 0.05;
   color-scheme: dark;
 }
 
@@ -131,6 +168,13 @@
     --color-warning: #d79f5c;
     --color-danger: #e05a49;
     --color-info: #5b98a9;
+
+    /* Marketing glow and grain, matching the explicit dark theme above. */
+    --so-glow-warm: rgba(166, 86, 72, 0.4);
+    --so-glow-ember: rgba(229, 190, 160, 0.26);
+    --so-glow-rose: rgba(250, 220, 220, 0.16);
+    --so-grain-color: 247, 236, 232;
+    --so-grain-opacity: 0.05;
     color-scheme: dark;
   }
 }

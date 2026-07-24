@@ -63,6 +63,29 @@
     animation: so-drift 22s var(--so-ease-standard) infinite;
   }
 
+  /* A slow, seamless breathing loop for the marketing ambient glows. It animates
+     only opacity and a small scale on the compositor, so an idle page does no
+     per-frame layout work. The transform keeps the glow centred on its anchor,
+     matching the base transform the Glow component sets. Reduced motion is
+     honored globally by the reduce media query, and the component also omits the
+     class entirely when reduced motion is set. */
+  @keyframes so-glow-pulse {
+    0%,
+    100% {
+      opacity: 0.8;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+  }
+
+  .so-glow-pulse {
+    animation: so-glow-pulse 9s var(--so-ease-standard) infinite;
+    will-change: opacity, transform;
+  }
+
   /* A notification toast eases in and settles, never a jarring pop. It plays
      once when the toast mounts, respecting reduced motion like everything else. */
   @keyframes so-toast-in {
