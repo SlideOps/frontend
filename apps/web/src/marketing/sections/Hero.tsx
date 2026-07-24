@@ -1,11 +1,7 @@
-import { Button } from '@slideops/design-system';
-import { ArrowRight, ShieldCheck } from '@slideops/icons';
+import { Button, Text } from '@slideops/design-system';
+import { ArrowRight, Logo, ShieldCheck } from '@slideops/icons';
 import { Link } from 'react-router-dom';
 import { signUpUrl } from '../content/site';
-import { Glow, Grain, Reveal, WordReveal } from '../motion';
-import { NodeNetwork } from './NodeNetwork';
-
-const headline = 'Knowledge becomes Capabilities. Capabilities create Confidence.';
 
 const assurances = [
   'Your servers stay yours',
@@ -13,95 +9,59 @@ const assurances = [
   'Verification after every execution',
 ];
 
-/**
- * Warm a key headline word into an ember as it arrives: every Capabilities into
- * cognac, every Confidence into peach. The primitive stays copy-agnostic; this
- * hook holds the hero's own emphasis, matched on the leading word so trailing
- * punctuation still lands.
- */
-function warmWord(word: string): string | undefined {
-  if (word.startsWith('Capabilities')) return 'so-hero-word-cognac';
-  if (word.startsWith('Confidence')) return 'so-hero-word-peach';
-  return undefined;
-}
-
-/**
- * The living hero: the video's opening beat in our palette. The headline
- * assembles word by word over a breathing node network, the Capability engine
- * core radiating to its servers and Capabilities. Warm embers glow on warm
- * dark; the whole surface is a deliberate dark hero-world in both app themes.
- */
+/** The hero: the lockup, the line, the promise, and the primary calls. */
 export function Hero() {
   return (
-    <section id="top" className="so-hero-world relative isolate overflow-hidden">
-      {/* Ambient warmth and the living network, all decorative and behind copy. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <Glow color="ember" size="46rem" x="78%" y="4%" pulse />
-        <Glow color="warm" size="42rem" x="14%" y="72%" pulse />
-        <Glow color="rose" size="30rem" x="52%" y="60%" pulse />
-        <NodeNetwork className="absolute inset-0" coreY={0.64} />
-        <Grain style={{ position: 'absolute' }} />
-      </div>
-
-      <div className="mx-auto flex min-h-[88vh] max-w-4xl flex-col items-center justify-center px-6 py-28 text-center md:py-36">
-        <Reveal kind="fade">
-          <span className="inline-flex items-center gap-2 rounded-pill border border-[color:var(--so-hero-hairline)] bg-[var(--so-hero-panel)] px-3 py-1 text-xs font-medium uppercase tracking-wide text-[color:var(--so-hero-ink-faint)]">
+    <section id="top" className="relative overflow-hidden">
+      <div
+        aria-hidden
+        className="so-drift pointer-events-none absolute inset-0 -z-10 opacity-70"
+        style={{
+          background:
+            'radial-gradient(55% 55% at 18% 22%, var(--color-bg-subtle), transparent), radial-gradient(45% 50% at 85% 12%, var(--color-highlight), transparent)',
+        }}
+      />
+      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+        <div className="so-rise max-w-3xl">
+          <div className="mb-8">
+            <Logo size={44} />
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wide text-ink-muted">
             Infrastructure Operations, in plain language
           </span>
-        </Reveal>
-
-        <WordReveal
-          as="h1"
-          text={headline}
-          delay={0.15}
-          stagger={0.09}
-          wordClassName={warmWord}
-          className="mt-7 max-w-3xl font-display text-5xl font-semibold tracking-tight text-[color:var(--so-hero-ink)] md:text-6xl"
-        />
-
-        <Reveal kind="fade" delay={0.5} className="max-w-2xl">
-          <p className="mt-7 text-lg leading-relaxed text-[color:var(--so-hero-ink-soft)]">
+          <Text as="h1" variant="display" className="mt-6">
+            Knowledge becomes Capabilities. Capabilities create Confidence.
+          </Text>
+          <Text variant="body" tone="secondary" className="mt-6 max-w-2xl text-lg">
             Connect and secure your servers over SSH, then run Projects on them: install only the
             stack each Project needs, deploy resource-limited Services from GitHub, and monitor
             everything. SlideOps orchestrates and explains the tools you already run, and it never
             owns your infrastructure. You do.
-          </p>
-        </Reveal>
-
-        <Reveal kind="fade" delay={0.65}>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          </Text>
+          <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link to={signUpUrl}>
               <Button size="lg">
                 Get started
                 <ArrowRight width={18} height={18} aria-hidden />
               </Button>
             </Link>
-            <a
-              href="#how"
-              className="inline-flex h-12 items-center justify-center rounded-md border border-[color:var(--so-hero-hairline)] bg-[var(--so-hero-panel)] px-6 text-base font-medium text-[color:var(--so-hero-ink)] transition-colors duration-fast ease-standard hover:border-[color:var(--so-hero-ink-faint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--so-marketing-ink)]"
-            >
-              See how it works
+            <a href="#how">
+              <Button size="lg" variant="secondary">
+                See how it works
+              </Button>
             </a>
           </div>
-        </Reveal>
-
-        <Reveal kind="fade" delay={0.8}>
-          <ul className="mt-11 flex flex-wrap justify-center gap-x-6 gap-y-3">
+          <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-3">
             {assurances.map((line) => (
               <li key={line} className="flex items-center gap-2">
-                <ShieldCheck
-                  width={18}
-                  height={18}
-                  className="text-[color:var(--so-peach)]"
-                  aria-hidden
-                />
-                <span className="text-sm leading-relaxed text-[color:var(--so-hero-ink-soft)]">
+                <ShieldCheck width={18} height={18} className="text-brand" aria-hidden />
+                <Text as="span" variant="body-sm" tone="secondary">
                   {line}
-                </span>
+                </Text>
               </li>
             ))}
           </ul>
-        </Reveal>
+        </div>
       </div>
     </section>
   );

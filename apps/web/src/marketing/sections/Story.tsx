@@ -1,6 +1,5 @@
 import { Text } from '@slideops/design-system';
 import { ListChecks, ShieldCheck, Sparkles, type LucideIcon } from '@slideops/icons';
-import { Glow, Grain, Reveal } from '../motion';
 
 interface Pillar {
   icon: LucideIcon;
@@ -41,17 +40,9 @@ const lifecycle = [
 /** The story from the blueprint: understandable, in control, confidence, and the lifecycle. */
 export function Story() {
   return (
-    <section id="how" className="so-paper-world relative isolate overflow-hidden">
-      {/* The fold opens into this warm-light paper. A little ambient warmth and
-          the tactile grain carry the inspiration still into the section. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <Glow color="ember" size="34rem" x="88%" y="-8%" />
-        <Glow color="rose" size="28rem" x="4%" y="108%" />
-        <Grain style={{ position: 'absolute' }} />
-      </div>
-
+    <section id="how" className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
-        <Reveal className="max-w-2xl">
+        <div className="so-rise max-w-2xl">
           <Text variant="caption" tone="accent">
             Why SlideOps
           </Text>
@@ -64,7 +55,7 @@ export function Story() {
             intend from the Provider that carries it out on your platform, so the same goal works
             across different systems. Three ideas hold it together.
           </Text>
-        </Reveal>
+        </div>
 
         <div className="so-rise-2 mt-12 grid gap-6 md:grid-cols-3">
           {pillars.map(({ icon: Icon, title, body }) => (

@@ -5,44 +5,25 @@ import { MfaVerify } from './auth/MfaVerify';
 import { Register } from './auth/Register';
 import { RequireAdmin } from './components/RequireAdmin';
 import { RequireAuth, Splash } from './components/RequireAuth';
+import { MarketingLayout } from './marketing/MarketingLayout';
+import {
+  AudiencePage,
+  CapabilitiesPage,
+  DocsPage,
+  MarketingHome,
+  PricingPage,
+  StoryPage,
+} from './marketing/pages';
 import { useAuthStore } from './store/auth';
 
 /*
- * One application, three areas, each code-split so no area pays for another.
- * The two auth screens load eagerly because a visitor may arrive straight at a
- * sign-in link. The public marketing surface is split behind React.lazy so its
- * living-experience motion layer (Framer Motion, the ambient glow and grain, the
- * scroll reveals) loads only on the marketing routes and never weighs on the
- * signed-in areas. The operator area under /app and the admin control plane
- * under /admin are likewise split per screen, so their code and the heavy
- * libraries they pull in (charts, the terminal) arrive only when opened.
+ * One application, three areas. The public marketing pages and the two auth
+ * screens load eagerly so the first paint of the site stays immediate. The
+ * operator area under /app and the admin control plane under /admin are split
+ * per screen with React.lazy, so their code and the heavy libraries they pull in
+ * (charts, the terminal) only arrive when a signed-in account opens them and
+ * never weigh on the marketing first load.
  */
-
-// Public marketing surface: layout plus one page per route.
-const MarketingLayout = lazy(() =>
-  import('./marketing/MarketingLayout').then((m) => ({ default: m.MarketingLayout })),
-);
-const MarketingHome = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.MarketingHome })),
-);
-const StoryPage = lazy(() => import('./marketing/pages').then((m) => ({ default: m.StoryPage })));
-const CapabilitiesPage = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.CapabilitiesPage })),
-);
-const SecurityPage = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.SecurityPage })),
-);
-const AudiencePage = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.AudiencePage })),
-);
-const FaqPage = lazy(() => import('./marketing/pages').then((m) => ({ default: m.FaqPage })));
-const DocsPage = lazy(() => import('./marketing/pages').then((m) => ({ default: m.DocsPage })));
-const PricingPage = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.PricingPage })),
-);
-const ContactPage = lazy(() =>
-  import('./marketing/pages').then((m) => ({ default: m.ContactPage })),
-);
 
 // Operator area.
 const Workspace = lazy(() => import('./app/screens/Workspace').then((m) => ({ default: m.Workspace })));
@@ -139,12 +120,9 @@ export function App() {
           <Route path="/" element={<MarketingHome />} />
           <Route path="/story" element={<StoryPage />} />
           <Route path="/capabilities" element={<CapabilitiesPage />} />
-          <Route path="/security" element={<SecurityPage />} />
           <Route path="/audience" element={<AudiencePage />} />
-          <Route path="/faq" element={<FaqPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/start" element={<ContactPage />} />
         </Route>
 
         {/* Unified sign in and sign up. */}

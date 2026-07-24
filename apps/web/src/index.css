@@ -5,10 +5,6 @@
 @layer base {
   html {
     scroll-behavior: smooth;
-    /* Never let a wide diagram, canvas, or glow push the page sideways. Set on
-       the root so it propagates to the viewport without turning any element into
-       a new scroll container, so the sticky marketing header keeps working. */
-    overflow-x: hidden;
   }
 
   body {
@@ -65,103 +61,6 @@
 
   .so-drift {
     animation: so-drift 22s var(--so-ease-standard) infinite;
-  }
-
-  /* A slow, seamless breathing loop for the marketing ambient glows. It animates
-     only opacity and a small scale on the compositor, so an idle page does no
-     per-frame layout work. The transform keeps the glow centred on its anchor,
-     matching the base transform the Glow component sets. Reduced motion is
-     honored globally by the reduce media query, and the component also omits the
-     class entirely when reduced motion is set. */
-  @keyframes so-glow-pulse {
-    0%,
-    100% {
-      opacity: 0.8;
-      transform: translate(-50%, -50%) scale(1);
-    }
-    50% {
-      opacity: 1;
-      transform: translate(-50%, -50%) scale(1.06);
-    }
-  }
-
-  .so-glow-pulse {
-    animation: so-glow-pulse 9s var(--so-ease-standard) infinite;
-    will-change: opacity, transform;
-  }
-
-  /* The hero-world: a deliberate warm-dark surface used in both app themes, the
-     video's opening beat. Text and hairline colors are scoped here from the
-     Everlasting Beauty neutrals so copy stays legible on the fixed warm dark,
-     and the grain tint switches to the warm-light value so the tactile noise
-     reads on the dark in either theme. All values come from palette tokens. */
-  .so-hero-world {
-    background-color: var(--so-marketing-ink);
-    color: var(--so-neutral-50);
-    --so-hero-ink: var(--so-neutral-50);
-    --so-hero-ink-soft: var(--so-neutral-300);
-    --so-hero-ink-faint: var(--so-neutral-400);
-    --so-hero-hairline: var(--so-neutral-800);
-    --so-hero-panel: var(--so-marketing-ink-raised);
-    /* The grain reads as a faint warm-light tint on the dark, matching the dark
-       theme's own grain value, so the hero stays tactile in both themes. */
-    --so-grain-color: 247, 236, 232;
-  }
-
-  /* The paper-world: the warm-light counterpart to the hero-world, the underside
-     the fold peels open into. Like the hero-world it is a brand-fixed surface,
-     always warm light in either app theme, so the how-it-works flow reads the
-     same for every operator. It re-maps the semantic surface and text tokens to
-     the light-paper values locally (the same technique the print stylesheet
-     uses), so ordinary tokened markup inside it stays legible on the paper
-     regardless of the app theme, and the grain tint switches to warm ink so the
-     tactile noise reads on the light. All values resolve from palette tokens. */
-  .so-paper-world {
-    background-color: var(--so-marketing-paper);
-    color: var(--so-ink);
-    --color-bg-app: var(--so-marketing-paper);
-    --color-bg-surface: var(--so-neutral-0);
-    --color-bg-raised: var(--so-neutral-0);
-    --color-bg-subtle: var(--so-rose-quartz);
-    --color-text-primary: var(--so-ink);
-    --color-text-secondary: var(--so-neutral-600);
-    --color-border: var(--so-neutral-200);
-    --color-brand: var(--so-marsala);
-    --color-accent: var(--so-cognac);
-    --color-highlight: var(--so-peach);
-    --color-focus-ring: var(--so-cognac);
-    /* Ink noise on the warm light, mirroring the light theme's grain value. */
-    --so-grain-color: 43, 28, 23;
-  }
-
-  /* Key headline words warm into the embers as they arrive: Capabilities into
-     cognac, Confidence into peach, both palette primitives. A soft warm halo
-     lifts them off the dark without touching the large-text contrast. */
-  .so-hero-word-cognac {
-    color: var(--so-cognac);
-    text-shadow: 0 0 24px var(--so-glow-warm);
-  }
-
-  .so-hero-word-peach {
-    color: var(--so-peach);
-    text-shadow: 0 0 26px var(--so-glow-ember);
-  }
-
-  /* The core mark breathes on a slow, seamless loop. Transform only, so it costs
-     nothing per frame; the global reduce-motion query halts it to a still mark. */
-  @keyframes so-core-breathe {
-    0%,
-    100% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.05);
-    }
-  }
-
-  .so-core-breathe {
-    animation: so-core-breathe 7s var(--so-ease-standard) infinite;
-    will-change: transform;
   }
 
   /* A notification toast eases in and settles, never a jarring pop. It plays
