@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createNode, discoverNode, listNodes } from './nodes';
+import {
+  createNode,
+  discoverNode,
+  listNodeUsers,
+  listNodes,
+  rotateNodeCredential,
+} from './nodes';
 
 /** Build a Response-like stub for the mocked fetch. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -88,5 +94,71 @@ describe('nodes requests', () => {
       status: 404,
       code: 'not_found',
     });
+  });
+
+  it('rotates the connection credential and unwraps the returned Node', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        node: { id: 'nd_1', name: 'web-1', ssh_username: 'deploy', auth_kind: 'private_key' },
+      }),
+    );
+
+    const node = await rotateNodeCredential('nd_1', {
+      username: 'deploy',
+      auth_kind: 'private_key',
+      secret: 'NEW-KEY-MATERIAL',
+    });
+
+    expect(node.ssh_username).toBe('deploy');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/nodes/nd_1/credential');
+    const sent = JSON.parse(String(init?.body)) as {
+      username: string;
+      auth_kind: string;
+      secret: string;
+    };
+    expect(sent).toEqual({
+      username: 'deploy',
+      auth_kind: 'private_key',
+      secret: 'NEW-KEY-MATERIAL',
+    });
+  });
+
+  it('surfaces a typed ApiError when the new credential cannot sign in', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(400, {
+        error: {
+          code: 'credential_verification_failed',
+          message: 'The new credential could not sign in.',
+        },
+      }),
+    );
+
+    await expect(
+      rotateNodeCredential('nd_1', { auth_kind: 'password', secret: 'wrong' }),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+      code: 'credential_verification_failed',
+    });
+  });
+
+  it('lists the server users, unwrapping the users array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        users: [
+          { username: 'deploy', access_level: 'admin', system: false, connection: true },
+          { username: 'root', access_level: 'admin', system: true, connection: false },
+        ],
+      }),
+    );
+
+    const users = await listNodeUsers('nd_1');
+
+    expect(users).toHaveLength(2);
+    expect(users[0]?.connection).toBe(true);
+    expect(users[1]?.system).toBe(true);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/nodes/nd_1/users');
   });
 });

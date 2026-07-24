@@ -99,6 +99,78 @@ export const guidance: GuidanceRegistry = {
     label: 'Recent history',
     summary: 'Memory, disk, and CPU load over the recent readings from the monitoring log.',
   },
+  'server.posture': {
+    label: 'Security posture',
+    summary: 'How this server is secured right now: the account SlideOps signs in as, how it signs in, and whether root can still sign in.',
+    detail:
+      'A secure server never lets SlideOps operate as root. This reads the connection account and, from the last quick check, whether root sign in is still permitted and whether password sign in is on. Anything the quick check has not read yet is shown as unknown rather than guessed.',
+  },
+  'server.secure': {
+    label: 'Secure this server',
+    summary: 'A guided path to stop operating as root: create a non-root administrator, harden SSH, then switch SlideOps to the new account.',
+    detail:
+      'SlideOps should never operate a server as root once it is connected. This checklist walks you through it in order: run the quick check, create a non-root administrator with full sudo, harden SSH so root can no longer sign in, then switch the stored credential to the new account. Each step is a normal Operation you review and approve, and the final switch verifies the new account can sign in before it changes anything.',
+  },
+  'server.secure.discover': {
+    label: 'Run the quick check',
+    summary: 'Read the server over SSH first, so the steps that follow are planned from what is really there. It changes nothing.',
+  },
+  'server.secure.admin': {
+    label: 'Create a non-root administrator',
+    summary: 'Create a dedicated account with full sudo so SlideOps never has to sign in as root. This opens an Operation you approve.',
+    detail:
+      'This launches the Create Application User Capability with full sudo. Give the account a username and a public key you hold. When you start it, the Operation opens at its plan for you to review and approve before anything runs.',
+  },
+  'server.secure.hardenSsh': {
+    label: 'Harden SSH',
+    summary: 'Turn off direct root sign in over SSH, so the only way in is the non-root account you created. This opens an Operation you approve.',
+    detail:
+      'This launches the Secure SSH Capability, which sets PermitRootLogin to no among other hardening. Do this only after the non-root administrator exists and works, so you are never left without a way in. The Operation opens at its plan for you to review and approve.',
+  },
+  'server.secure.rotate': {
+    label: 'Switch to the new account',
+    summary: 'Point SlideOps at the non-root account. The new credential is verified before the switch, so a wrong one changes nothing.',
+    detail:
+      'Once the non-root administrator exists and SSH is hardened, switch the stored connection credential to that account. SlideOps signs in with the new credential first and only switches if that succeeds, so a mistake here can never lock you out. From then on every Operation runs as the non-root account, never as root.',
+  },
+  'server.settings': {
+    label: 'Server settings',
+    summary: 'Manage ongoing access to this server: rotate the connection credential and manage the accounts on it.',
+  },
+  'server.credential': {
+    label: 'Connection credential',
+    summary: 'Change the account or secret SlideOps signs in with. The new credential is verified before the switch, so you are never locked out.',
+    detail:
+      'This rotates the stored credential SlideOps uses to reach the server. You can move the connection to a different account at the same time. SlideOps signs in with the new credential before it switches, so if the new credential cannot sign in nothing changes and the old one keeps working.',
+  },
+  'server.credential.username': {
+    label: 'Connection username',
+    summary: 'Leave this to keep the current account, or set a different account for SlideOps to sign in as.',
+  },
+  'server.credential.authKind': {
+    label: 'How to sign in',
+    summary: 'Whether the new credential is a private key or a password. A key is stronger.',
+  },
+  'server.credential.secret': {
+    label: 'New credential',
+    summary: 'The new password or private key. It is stored encrypted the moment it arrives and never shown again.',
+  },
+  'server.users': {
+    label: 'Server accounts',
+    summary: 'The accounts on this server and their access level. The account SlideOps connects with is protected and cannot be removed.',
+    detail:
+      'This reads the accounts on the server: full administrators, limited accounts with no sudo, and the built-in system accounts. The account SlideOps signs in with is marked and cannot be removed, so managing accounts never locks you out.',
+  },
+  'server.users.create': {
+    label: 'Create or update an account',
+    summary: 'Add an account or reset its password, choosing whether it is a full administrator or a limited account. This opens an Operation you approve.',
+    detail:
+      'Give the account a username and, when you want to set or reset it, a password. Choose a full administrator with sudo, or a limited account with no sudo. This launches the manage-server-user Operation, which opens at its plan for you to review and approve.',
+  },
+  'server.users.remove': {
+    label: 'Remove an account',
+    summary: 'Remove an account from the server. The connection account, root, and system accounts are protected and cannot be removed.',
+  },
   'reports.overview': {
     label: 'Reports',
     summary: 'Generate a readable report from your Operations, verifications, discoveries, and metrics.',
