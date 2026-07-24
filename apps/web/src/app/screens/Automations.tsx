@@ -179,7 +179,7 @@ export function Automations() {
     const [automations, nodes, capabilities] = await Promise.all([
       listAutomations(signal),
       listNodes(signal),
-      listCapabilities(undefined, signal),
+      listCapabilities({}, signal),
     ]);
     return { automations, nodes, capabilities };
   }, []);

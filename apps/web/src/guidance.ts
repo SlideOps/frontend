@@ -185,6 +185,12 @@ export const guidance: GuidanceRegistry = {
     label: 'Search by outcome',
     summary: 'Search for what you want to achieve, not the technology behind it.',
   },
+  'capability.core': {
+    label: 'Core and Plugin Capabilities',
+    summary: 'These are the Core security Capabilities, on every server. A Project unlocks more once its Plugin is installed.',
+    detail:
+      'The Core security bundle is available on every Node with no Project: secure SSH, configure the firewall, create an application user, and manage packages and updates. Every other Capability comes from a Plugin and becomes available inside a Project once that Project installs the Plugin from the Marketplace.',
+  },
   'capability.risk': {
     label: 'Risk',
     summary: 'How much a Capability changes on the Node. You always review a plan before anything runs.',
@@ -343,9 +349,15 @@ export const guidance: GuidanceRegistry = {
   },
   'marketplace.overview': {
     label: 'Marketplace',
-    summary: 'Browse first-party Plugins and install the ones you need to unlock more Capabilities.',
+    summary: 'Browse first-party Plugins here, then install the ones a Project needs from inside that Project.',
     detail:
-      'A Plugin is a first-party bundle of Capabilities and Providers behind one manifest. The ten Capabilities you start with are the pre-installed Core bundle; installing a Plugin adds its Capabilities to your catalog. Everything a Plugin adds runs inside the same discover, plan, approve, execute, and verify loop as the rest of SlideOps.',
+      'A Plugin is a first-party bundle of Capabilities and Providers behind one manifest. The Core security bundle is pre-installed on every server; every other Plugin is installed per Project, so a Project carries only the stack it needs. This catalog is for browsing; open a Project to install a Plugin there. Everything a Plugin adds runs inside the same discover, plan, approve, execute, and verify loop as the rest of SlideOps.',
+  },
+  'marketplace.perProject': {
+    label: 'Installed per Project',
+    summary: 'Plugins install into a Project, not globally. Open a Project to install and configure the ones it needs.',
+    detail:
+      'Only the Core security bundle is pre-installed and always available. Every other Plugin is installed per Project, so each Project carries only the stack it uses. This catalog stays global for browsing; the install, configure, enable, and uninstall actions live inside a Project.',
   },
   'marketplace.search': {
     label: 'Search by outcome',
@@ -365,9 +377,9 @@ export const guidance: GuidanceRegistry = {
   },
   'marketplace.install': {
     label: 'Install',
-    summary: 'Install the Plugin for your account. If it needs configuration, you fill it in first.',
+    summary: 'Plugins install into a Project. Open the Project you want, then install and configure it there.',
     detail:
-      'Installing is per Operator: a Plugin you install unlocks its Capabilities only for you. When a Plugin needs configuration, the form here is generated from its manifest, each field validated the same way a Capability input is. Secret values are stored encrypted and redacted afterward.',
+      'Installing is per Project: a Plugin unlocks its Capabilities inside the Project it is installed in. When a Plugin needs configuration, the form is generated from its manifest, each field validated the same way a Capability input is. Secret values are stored encrypted and redacted afterward.',
   },
   'marketplace.reconfigure': {
     label: 'Reconfigure',

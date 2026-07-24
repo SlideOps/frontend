@@ -71,6 +71,32 @@ describe('services requests', () => {
     expect(sent.source.image).toBe('nginx:latest');
   });
 
+  it('sends the branch for a repository source', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(201, {
+        service: { id: 'sv_3', name: 'from-repo', status: 'deploying', runtime: 'container' },
+      }),
+    );
+
+    await deployService({
+      project_id: 'pr_1',
+      node_id: 'nd_1',
+      name: 'from-repo',
+      runtime: 'container',
+      source: {
+        type: 'repository',
+        repository_url: 'https://github.com/octocat/app.git',
+        branch: 'release',
+      },
+      cpu_limit: 0.5,
+      memory_mb: 256,
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    const sent = JSON.parse(String(init?.body)) as { source: { branch: string } };
+    expect(sent.source.branch).toBe('release');
+  });
+
   it('surfaces a typed quota_exceeded error on an over-quota deploy', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(403, {

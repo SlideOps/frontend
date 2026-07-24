@@ -1,6 +1,6 @@
 import { listCapabilities, type Capability } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, Grid3x3, Layers, Search } from '@slideops/icons';
+import { Button, Card, Text } from '@slideops/design-system';
+import { ArrowRight, Grid3x3, Layers, Search, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
@@ -27,7 +27,7 @@ export function Capabilities() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const catalog = useAsyncData(
-    (signal) => listCapabilities(query.trim() || undefined, signal),
+    (signal) => listCapabilities({ q: query.trim() || undefined }, signal),
     [query],
   );
 
@@ -44,6 +44,22 @@ export function Capabilities() {
           </Button>
         }
       />
+
+      <Card className="mb-8 flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+          <ShieldCheck width={18} height={18} aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Text variant="h4">Core security Capabilities</Text>
+            <Guidance for="capability.core" />
+          </div>
+          <Text variant="body-sm" tone="secondary" className="mt-1 block">
+            These run on any server with no Project. More Capabilities become available inside a
+            Project once you install its Plugin from the Marketplace.
+          </Text>
+        </div>
+      </Card>
 
       <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">
         <Search width={18} height={18} className="text-ink-muted" aria-hidden />

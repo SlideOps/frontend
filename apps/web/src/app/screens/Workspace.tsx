@@ -32,7 +32,7 @@ async function loadWorkspace(signal: AbortSignal): Promise<WorkspaceData> {
     listProjects(signal),
     listNodes(signal),
     listOperations({}, signal),
-    listCapabilities(undefined, signal),
+    listCapabilities({}, signal),
   ]);
   return { projects, nodes, operations, capabilities };
 }

@@ -47,9 +47,18 @@ export {
   listCapabilities,
   getCapability,
   getMatrix,
+  type ListCapabilitiesParams,
   type CapabilityMatrix,
   type CapabilityMatrixRow,
 } from './capabilities';
+export {
+  getGitHubStatus,
+  githubAuthorizeUrl,
+  disconnectGitHub,
+  listGitHubRepos,
+  type GitHubStatus,
+  type GitHubRepo,
+} from './github';
 export {
   listAutomations,
   getAutomation,

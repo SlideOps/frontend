@@ -6,6 +6,11 @@ import type { Operation, OperationStatus } from './types';
 export interface CreateOperationInput {
   node_id: string;
   capability_key: string;
+  /**
+   * The Project this Operation runs in. A Plugin Capability requires it; a Core
+   * Capability needs none, so it is omitted for Core.
+   */
+  project_id?: string;
   /** The values for the Capability's parameters, keyed by parameter key. */
   parameters?: Record<string, unknown>;
 }

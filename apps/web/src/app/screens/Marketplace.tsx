@@ -1,5 +1,5 @@
 import { listMarketplacePlugins, type Plugin } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
+import { Button, Card, Text } from '@slideops/design-system';
 import { ArrowRight, Boxes, Check, Package, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
@@ -85,7 +85,7 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
         onClick={onOpen}
         className="mt-1 inline-flex items-center gap-1 self-start text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        {plugin.installed ? 'Manage' : 'View and install'}
+        View details
         <ArrowRight width={15} height={15} aria-hidden />
       </button>
     </Card>
@@ -101,7 +101,7 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
 export function Marketplace() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const catalog = useAsyncData((signal) => listMarketplacePlugins(signal), []);
+  const catalog = useAsyncData((signal) => listMarketplacePlugins(undefined, signal), []);
 
   const filtered = useMemo(() => {
     if (catalog.state.status !== 'ready') {
@@ -115,9 +115,31 @@ export function Marketplace() {
     <OperatorShell active="marketplace">
       <PageHeader
         title="Marketplace"
-        description="Install first-party Plugins to unlock more Capabilities. Each Plugin bundles what it needs behind one manifest, and everything it adds runs inside the same discover, plan, approve, execute, and verify loop."
+        description="Browse the first-party Plugins that unlock more Capabilities. Each Plugin bundles what it needs behind one manifest, and everything it adds runs inside the same discover, plan, approve, execute, and verify loop. Plugins are installed per Project, so open a Project to install the ones it needs."
         guidanceKey="marketplace.overview"
       />
+
+      <Card className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+            <Boxes width={18} height={18} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Text variant="h4">Installed per Project</Text>
+              <Guidance for="marketplace.perProject" />
+            </div>
+            <Text variant="body-sm" tone="secondary" className="mt-1 block">
+              The Core security bundle is on every server. Every other Plugin installs into a Project,
+              so each Project carries only the stack it needs. Open a Project to install.
+            </Text>
+          </div>
+        </div>
+        <Button variant="secondary" className="shrink-0" onClick={() => navigate('/app/projects')}>
+          Open a Project to install
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      </Card>
 
       <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">
         <Search width={18} height={18} className="text-ink-muted" aria-hidden />

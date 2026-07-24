@@ -41,10 +41,25 @@ describe('marketplace requests', () => {
     expect(plugins[0]?.installed).toBe(false);
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.credentials).toBe('include');
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/marketplace/plugins');
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toContain('/api/v1/marketplace/plugins');
+    // With no Project the catalog stays global and carries no project_id.
+    expect(url).not.toContain('project_id');
   });
 
-  it('installs a Plugin and reports it installed and enabled', async () => {
+  it('reflects a Project in the catalog with project_id', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { plugins: [] }));
+
+    await listMarketplacePlugins('pr_1');
+
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toContain('/api/v1/marketplace/plugins');
+    expect(url).toContain('project_id=pr_1');
+  });
+
+  it('installs a Plugin into a Project and reports it installed and enabled', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(201, {
         plugin: {
@@ -56,20 +71,24 @@ describe('marketplace requests', () => {
       }),
     );
 
-    const installed = await installPlugin({ plugin_id: 'postgresql', config: { port: 5432 } });
+    const installed = await installPlugin('pr_1', {
+      plugin_id: 'postgresql',
+      config: { port: 5432 },
+    });
 
     expect(installed.plugin_id).toBe('postgresql');
     expect(installed.enabled).toBe(true);
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/plugins');
     const sent = JSON.parse(String(init?.body)) as { plugin_id: string; config: { port: number } };
     expect(sent.plugin_id).toBe('postgresql');
     expect(sent.config.port).toBe(5432);
   });
 
-  it('reflects install then uninstall in the installed list', async () => {
-    // First read: the Plugin is installed.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+  it('reflects install then uninstall in a Project installed list', async () => {
+    // First read: the Plugin is installed in the Project.
+    const listMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       jsonResponse(200, {
         plugins: [
           {
@@ -81,35 +100,36 @@ describe('marketplace requests', () => {
         ],
       }),
     );
-    const before = await listInstalledPlugins();
+    const before = await listInstalledPlugins('pr_1');
     expect(before.map((p) => p.plugin_id)).toContain('postgresql');
+    expect(String(listMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/plugins');
 
-    // Uninstall issues a DELETE against the plugin id.
+    // Uninstall issues a DELETE against the Project's plugin id.
     const deleteMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse(204, undefined));
-    await uninstallPlugin('postgresql');
+    await uninstallPlugin('pr_1', 'postgresql');
     const deleteInit = deleteMock.mock.calls[0]?.[1];
     expect(deleteInit?.method).toBe('DELETE');
-    expect(String(deleteMock.mock.calls[0]?.[0])).toContain('/api/v1/plugins/postgresql');
+    expect(String(deleteMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/plugins/postgresql');
 
     // Second read: the Plugin is gone.
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(200, { plugins: [] }));
-    const after = await listInstalledPlugins();
+    const after = await listInstalledPlugins('pr_1');
     expect(after.map((p) => p.plugin_id)).not.toContain('postgresql');
   });
 
   it('surfaces a typed error when Core cannot be uninstalled', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(403, {
-        error: { code: 'core_not_removable', message: 'The Core bundle cannot be uninstalled.' },
+        error: { code: 'core_immutable', message: 'The Core bundle cannot be uninstalled.' },
       }),
     );
 
-    await expect(uninstallPlugin('core')).rejects.toMatchObject({
+    await expect(uninstallPlugin('pr_1', 'core')).rejects.toMatchObject({
       name: 'ApiError',
       status: 403,
-      code: 'core_not_removable',
+      code: 'core_immutable',
     });
   });
 });

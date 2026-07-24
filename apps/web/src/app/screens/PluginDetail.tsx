@@ -1,37 +1,20 @@
 import {
   getMarketplacePlugin,
-  installPlugin,
   listCapabilities,
-  listInstalledPlugins,
-  uninstallPlugin,
-  updatePlugin,
   type Capability,
-  type InstalledPlugin,
   type Plugin,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Boxes,
-  Check,
-  Lock,
-  Play,
-  ShieldCheck,
-  Trash2,
-} from '@slideops/icons';
+import { ArrowLeft, ArrowRight, Boxes, Lock, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import { PluginConfigForm } from '../components/PluginConfigForm';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface PluginView {
   plugin: Plugin;
-  installedRecord?: InstalledPlugin;
   capabilities: Capability[];
 }
 
@@ -58,48 +41,25 @@ function Section({
 }
 
 /**
- * The Plugin detail: its manifest, the Capabilities it adds, the permissions it
- * asks for, and the install action. When the Plugin needs config, the install
- * and reconfigure forms are generated from its config schema, reusing the same
- * fields and validation a Capability's inputs use. An installed Plugin can be
- * reconfigured, enabled or disabled, and uninstalled, and its Capabilities link
- * straight to where they run. The Core bundle shows as built in and stays.
+ * The Plugin detail as a browse-only catalog entry: its manifest, the
+ * Capabilities it adds, and the permissions it asks for. Plugins are installed
+ * per Project, so this global view does not install anything; it points the
+ * Operator to open a Project to install and configure the Plugin there. The Core
+ * bundle shows as built in and always available.
  */
 export function PluginDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [confirmUninstall, setConfirmUninstall] = useState(false);
 
   const result = useAsyncData<PluginView>(async (signal) => {
-    const [plugin, installed, capabilities] = await Promise.all([
-      getMarketplacePlugin(id, signal),
-      listInstalledPlugins(signal),
-      listCapabilities(undefined, signal),
+    // No Project here: the catalog is global, so only Core reads as installed and
+    // the Capability lookup resolves the Core security Capabilities by name.
+    const [plugin, capabilities] = await Promise.all([
+      getMarketplacePlugin(id, undefined, signal),
+      listCapabilities({}, signal),
     ]);
-    return {
-      plugin,
-      installedRecord: installed.find((p) => p.plugin_id === plugin.id),
-      capabilities,
-    };
+    return { plugin, capabilities };
   }, [id]);
-
-  async function run(action: () => Promise<unknown>) {
-    setBusy(true);
-    setActionError(null);
-    try {
-      await action();
-      result.reload();
-    } catch (cause) {
-      setActionError(
-        cause instanceof Error ? cause.message : 'That action could not be completed.',
-      );
-    } finally {
-      setBusy(false);
-      setConfirmUninstall(false);
-    }
-  }
 
   return (
     <OperatorShell active="marketplace">
@@ -116,10 +76,8 @@ export function PluginDetail() {
       {result.state.status === 'error' ? <ErrorNote error={result.state.error} /> : null}
       {result.state.status === 'ready'
         ? (() => {
-            const { plugin, installedRecord, capabilities } = result.state.data;
-            const installed = plugin.installed || Boolean(installedRecord);
-            const isCore = Boolean(plugin.is_core || installedRecord?.is_core);
-            const enabled = installedRecord ? installedRecord.enabled : true;
+            const { plugin, capabilities } = result.state.data;
+            const isCore = Boolean(plugin.is_core);
             const byKey = new Map(capabilities.map((c) => [c.key, c]));
 
             return (
@@ -138,14 +96,10 @@ export function PluginDetail() {
                       </div>
                     </div>
                   </div>
-                  {installed ? (
+                  {isCore ? (
                     <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-3 py-1 text-xs font-medium text-success">
-                      {isCore ? (
-                        <ShieldCheck width={13} height={13} aria-hidden />
-                      ) : (
-                        <Check width={13} height={13} aria-hidden />
-                      )}
-                      {isCore ? 'Built in' : enabled ? 'Installed' : 'Installed, disabled'}
+                      <ShieldCheck width={13} height={13} aria-hidden />
+                      Built in
                     </span>
                   ) : null}
                 </div>
@@ -164,32 +118,18 @@ export function PluginDetail() {
                           <div className="flex flex-col gap-2">
                             {plugin.provides.map((key) => {
                               const capability = byKey.get(key);
-                              const available = installed && enabled && capability;
                               return (
                                 <div
                                   key={key}
-                                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2"
+                                  className="rounded-md border border-border bg-surface px-3 py-2"
                                 >
-                                  <div className="min-w-0">
-                                    <Text variant="body-sm" className="font-medium">
-                                      {capability?.name ?? key}
+                                  <Text variant="body-sm" className="font-medium">
+                                    {capability?.name ?? key}
+                                  </Text>
+                                  {capability?.description ? (
+                                    <Text variant="caption" tone="secondary" className="block">
+                                      {capability.description}
                                     </Text>
-                                    {capability?.description ? (
-                                      <Text variant="caption" tone="secondary" className="block">
-                                        {capability.description}
-                                      </Text>
-                                    ) : null}
-                                  </div>
-                                  {available ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="shrink-0 px-2"
-                                      onClick={() => navigate(`/app/capabilities/${key}`)}
-                                    >
-                                      <Play width={14} height={14} aria-hidden />
-                                      Run
-                                    </Button>
                                   ) : null}
                                 </div>
                               );
@@ -224,137 +164,44 @@ export function PluginDetail() {
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes width={18} height={18} className="text-brand" aria-hidden />
                       <Text variant="h4">
-                        {installed ? 'Manage this Plugin' : 'Install this Plugin'}
+                        {isCore ? 'Built in' : 'Install this Plugin'}
                       </Text>
                       <Guidance for="marketplace.install" />
                     </div>
 
-                    {!installed ? (
-                      <PluginConfigForm
-                        config={plugin.config ?? []}
-                        submitLabel="Install"
-                        pendingLabel="Installing"
-                        note={
-                          plugin.config && plugin.config.length > 0
-                            ? 'These settings configure the Plugin when it installs.'
-                            : 'This unlocks its Capabilities for you.'
-                        }
-                        onSubmit={(config) =>
-                          run(async () => {
-                            await installPlugin({
-                              plugin_id: plugin.id,
-                              config: Object.keys(config).length > 0 ? config : undefined,
-                            });
-                          })
-                        }
-                      />
+                    {isCore ? (
+                      <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-3">
+                        <ShieldCheck
+                          width={16}
+                          height={16}
+                          className="mt-0.5 shrink-0 text-brand"
+                          aria-hidden
+                        />
+                        <Text variant="body-sm" tone="secondary">
+                          The Core security bundle is pre-installed on every server and always
+                          available. It cannot be disabled or uninstalled.
+                        </Text>
+                      </div>
                     ) : (
-                      <div className="flex flex-col gap-5">
-                        {isCore ? (
-                          <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-3">
-                            <ShieldCheck
-                              width={16}
-                              height={16}
-                              className="mt-0.5 shrink-0 text-brand"
-                              aria-hidden
-                            />
-                            <Text variant="body-sm" tone="secondary">
-                              The Core bundle is pre-installed and always available. It cannot be
-                              disabled or uninstalled.
-                            </Text>
-                          </div>
-                        ) : (
-                          <>
-                            {plugin.config && plugin.config.length > 0 ? (
-                              <Section title="Reconfigure" guidanceKey="marketplace.reconfigure">
-                                <PluginConfigForm
-                                  config={plugin.config}
-                                  submitLabel="Save configuration"
-                                  pendingLabel="Saving"
-                                  onSubmit={(config) =>
-                                    run(async () => {
-                                      await updatePlugin(plugin.id, { config });
-                                    })
-                                  }
-                                />
-                              </Section>
-                            ) : null}
-
-                            <div className="flex flex-wrap items-center gap-3">
-                              <Button
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() =>
-                                  run(async () => {
-                                    await updatePlugin(plugin.id, { enabled: !enabled });
-                                  })
-                                }
-                              >
-                                {enabled ? 'Disable' : 'Enable'}
-                              </Button>
-                              <Guidance for="marketplace.enabled" />
-                            </div>
-
-                            {confirmUninstall ? (
-                              <div className="flex flex-col gap-3 rounded-md border border-border bg-subtle p-3">
-                                <Text variant="body-sm" tone="secondary">
-                                  Uninstall {plugin.name}? Its Capabilities become unavailable to
-                                  you until you install it again.
-                                </Text>
-                                <div className="flex flex-wrap gap-2">
-                                  <Button
-                                    variant="danger"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      run(async () => {
-                                        await uninstallPlugin(plugin.id);
-                                      })
-                                    }
-                                  >
-                                    <Trash2 width={15} height={15} aria-hidden />
-                                    {busy ? 'Uninstalling' : 'Confirm uninstall'}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    disabled={busy}
-                                    onClick={() => setConfirmUninstall(false)}
-                                  >
-                                    Keep it
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                className="self-start px-0 text-danger"
-                                disabled={busy}
-                                onClick={() => setConfirmUninstall(true)}
-                              >
-                                <Trash2 width={15} height={15} aria-hidden />
-                                Uninstall
-                              </Button>
-                            )}
-                          </>
-                        )}
+                      <div className="flex flex-col gap-4">
+                        <Text variant="body-sm" tone="secondary">
+                          Plugins are installed per Project, not globally. Open the Project that needs
+                          this Plugin to install and configure it there; its Capabilities then become
+                          available inside that Project.
+                        </Text>
+                        <Button
+                          variant="secondary"
+                          className="self-start"
+                          onClick={() => navigate('/app/projects')}
+                        >
+                          Open a Project to install
+                          <ArrowRight width={15} height={15} aria-hidden />
+                        </Button>
+                        <Text variant="caption" tone="secondary">
+                          Open a Project to install.
+                        </Text>
                       </div>
                     )}
-
-                    {actionError ? (
-                      <p role="alert" className="text-sm text-danger">
-                        {actionError}
-                      </p>
-                    ) : null}
-
-                    {installed && enabled && !isCore ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate('/app/capabilities')}
-                        className="inline-flex items-center gap-1 self-start text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                      >
-                        See it in the Capability catalog
-                        <ArrowRight width={15} height={15} aria-hidden />
-                      </button>
-                    ) : null}
                   </Card>
                 </div>
               </>

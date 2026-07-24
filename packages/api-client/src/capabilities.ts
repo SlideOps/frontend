@@ -3,11 +3,30 @@ import type { Capability } from './types';
 
 /** The Capability catalog. Capabilities are searchable by outcome, not technology. */
 
-/** List Capabilities, optionally filtered by an outcome query. */
-export function listCapabilities(q?: string, signal?: AbortSignal): Promise<Capability[]> {
-  return apiRequest<{ capabilities: Capability[] }>('/capabilities', { query: { q }, signal }).then(
-    (r) => r.capabilities,
-  );
+/** The context for a Capability listing: an optional Project and outcome query. */
+export interface ListCapabilitiesParams {
+  /**
+   * The Project to list Capabilities for. With a Project the catalog is Core plus
+   * that Project's installed Plugin Capabilities; without one it is Core only.
+   */
+  projectId?: string;
+  /** Filter by a plain-language outcome query. */
+  q?: string;
+}
+
+/**
+ * List Capabilities. With no Project id the backend returns the Core security
+ * Capabilities only; passing a Project id adds that Project's installed Plugin
+ * Capabilities, each tagged with its plugin id.
+ */
+export function listCapabilities(
+  params: ListCapabilitiesParams = {},
+  signal?: AbortSignal,
+): Promise<Capability[]> {
+  return apiRequest<{ capabilities: Capability[] }>('/capabilities', {
+    query: { project_id: params.projectId, q: params.q },
+    signal,
+  }).then((r) => r.capabilities);
 }
 
 /** Read one Capability by its key. */

@@ -26,6 +26,8 @@ export interface ServiceSource {
   type: 'image' | 'repository';
   image?: string;
   repository_url?: string;
+  /** The branch to clone and pull for a repository source. Defaults to main. */
+  branch?: string;
   build?: string;
   command?: string;
 }

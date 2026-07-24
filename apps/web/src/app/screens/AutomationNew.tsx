@@ -98,7 +98,7 @@ export function AutomationNew() {
   const { state } = useAsyncData<NewData>(async (signal) => {
     const [nodes, capabilities] = await Promise.all([
       listNodes(signal),
-      listCapabilities(undefined, signal),
+      listCapabilities({}, signal),
     ]);
     return { nodes, capabilities };
   }, []);

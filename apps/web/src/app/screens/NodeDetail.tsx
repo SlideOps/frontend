@@ -87,7 +87,7 @@ export function NodeDetail() {
   const navigate = useNavigate();
 
   const nodeResult = useAsyncData((signal) => getNode(id, signal), [id]);
-  const capabilitiesResult = useAsyncData((signal) => listCapabilities(undefined, signal), []);
+  const capabilitiesResult = useAsyncData((signal) => listCapabilities({}, signal), []);
 
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
   const [discovering, setDiscovering] = useState(false);
