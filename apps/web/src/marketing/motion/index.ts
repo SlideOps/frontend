@@ -8,14 +8,15 @@
  * are code-split into the marketing chunks and never weigh on the operator app
  * or the admin control plane.
  *
- * Later chunks add the section paper-fold primitive, the node network, and the
- * dotted globe; those are intentionally not part of this foundation.
+ * Later chunks add the node network and the dotted globe; those are
+ * intentionally not part of this foundation.
  */
 export { useReducedMotion } from './useReducedMotion';
 export { Reveal } from './Reveal';
 export { WordReveal } from './WordReveal';
 export { Glow, type GlowColor } from './Glow';
 export { Grain } from './Grain';
+export { SectionFold, type FoldDirection, type FoldDensity } from './SectionFold';
 export {
   revealVariants,
   wordRevealVariants,

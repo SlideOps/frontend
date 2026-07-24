@@ -22,6 +22,7 @@ Do not import this module from `app/` or `admin/`.
 | `WordReveal` | Reveals a heading one word at a time, with an optional per-word class hook for warming key words. Exposes the full line as a single accessible label. | Renders the whole heading at once, complete and readable. |
 | `Glow` | A soft, positionable radial ember from the warm palette; optionally pulses on a slow, compositor-friendly loop. | Pulse is dropped; the glow renders static. |
 | `Grain` | A subtle, static tiled noise overlay (inline SVG feTurbulence as an alpha mask) for tactile paper depth. | Identical; it never animates. |
+| `SectionFold` | The paper-curl transition between two sections: a warm-dark sheet peeling to reveal a warm-light underside (or the reverse), driven by `useScroll` progress and applied only through `transform`. Takes a `direction` (`dark-to-light` \| `light-to-dark`) and a `density` (`subtle` \| `standard` \| `bold`) so any section boundary can reuse it. | Renders a still, composed seam: the sheet frozen at a gentle mid-peel with its warm lip showing, no animation. |
 
 Plus the variant helpers (`revealVariants`, `wordRevealVariants`, `entranceEase`,
 `revealDuration`, `revealOffset`) for composing custom entrances on the same
@@ -36,7 +37,13 @@ system: `--so-glow-warm`, `--so-glow-ember`, `--so-glow-rose`,
 `--so-marketing-ink`, `--so-marketing-ink-raised`, `--so-marketing-paper`. The
 glow and grain tokens carry distinct light and dark values.
 
+The `SectionFold` surfaces are the fixed marketing ink and paper, so a fold reads
+continuous with the warm-dark and warm-light sections it joins; its warm lip is
+drawn from `--so-cognac` and `--so-peach`. The light how-it-works sections it
+opens into use the `so-paper-world` surface class (declared in the app's
+`index.css`), the warm-light counterpart to `so-hero-world`.
+
 ## Not in this chunk
 
-The section paper-fold / curl primitive, the node network, and the dotted globe
-are later chunks and are intentionally absent here.
+The node network and the dotted globe are later chunks and are intentionally
+absent here.

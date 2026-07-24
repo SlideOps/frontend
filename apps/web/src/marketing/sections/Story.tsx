@@ -1,6 +1,6 @@
 import { Text } from '@slideops/design-system';
 import { ListChecks, ShieldCheck, Sparkles, type LucideIcon } from '@slideops/icons';
-import { Reveal } from '../motion';
+import { Glow, Grain, Reveal } from '../motion';
 
 interface Pillar {
   icon: LucideIcon;
@@ -41,7 +41,15 @@ const lifecycle = [
 /** The story from the blueprint: understandable, in control, confidence, and the lifecycle. */
 export function Story() {
   return (
-    <section id="how" className="border-y border-border bg-surface">
+    <section id="how" className="so-paper-world relative isolate overflow-hidden">
+      {/* The fold opens into this warm-light paper. A little ambient warmth and
+          the tactile grain carry the inspiration still into the section. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <Glow color="ember" size="34rem" x="88%" y="-8%" />
+        <Glow color="rose" size="28rem" x="4%" y="108%" />
+        <Grain style={{ position: 'absolute' }} />
+      </div>
+
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
         <Reveal className="max-w-2xl">
           <Text variant="caption" tone="accent">

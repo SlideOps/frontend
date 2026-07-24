@@ -1,7 +1,9 @@
+import { SectionFold } from './motion';
 import { Audience } from './sections/Audience';
 import { CapabilitiesShowcase } from './sections/CapabilitiesShowcase';
 import { Docs } from './sections/Docs';
 import { Hero } from './sections/Hero';
+import { Lifecycle } from './sections/Lifecycle';
 import { Pricing } from './sections/Pricing';
 import { Story } from './sections/Story';
 
@@ -11,12 +13,18 @@ import { Story } from './sections/Story';
  * can link straight to it. Every page renders inside the marketing layout.
  */
 
-/** The full marketing home: hero, story, capabilities, audience, docs, pricing. */
+/**
+ * The full marketing home. The hero-world folds into the light how-it-works flow
+ * (the story, then the lifecycle pipeline) through the paper-curl SectionFold,
+ * then continues into capabilities, audience, docs, and pricing.
+ */
 export function MarketingHome() {
   return (
     <>
       <Hero />
+      <SectionFold direction="dark-to-light" density="standard" />
       <Story />
+      <Lifecycle />
       <CapabilitiesShowcase />
       <Audience />
       <Docs />

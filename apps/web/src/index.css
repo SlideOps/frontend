@@ -104,6 +104,32 @@
     --so-grain-color: 247, 236, 232;
   }
 
+  /* The paper-world: the warm-light counterpart to the hero-world, the underside
+     the fold peels open into. Like the hero-world it is a brand-fixed surface,
+     always warm light in either app theme, so the how-it-works flow reads the
+     same for every operator. It re-maps the semantic surface and text tokens to
+     the light-paper values locally (the same technique the print stylesheet
+     uses), so ordinary tokened markup inside it stays legible on the paper
+     regardless of the app theme, and the grain tint switches to warm ink so the
+     tactile noise reads on the light. All values resolve from palette tokens. */
+  .so-paper-world {
+    background-color: var(--so-marketing-paper);
+    color: var(--so-ink);
+    --color-bg-app: var(--so-marketing-paper);
+    --color-bg-surface: var(--so-neutral-0);
+    --color-bg-raised: var(--so-neutral-0);
+    --color-bg-subtle: var(--so-rose-quartz);
+    --color-text-primary: var(--so-ink);
+    --color-text-secondary: var(--so-neutral-600);
+    --color-border: var(--so-neutral-200);
+    --color-brand: var(--so-marsala);
+    --color-accent: var(--so-cognac);
+    --color-highlight: var(--so-peach);
+    --color-focus-ring: var(--so-cognac);
+    /* Ink noise on the warm light, mirroring the light theme's grain value. */
+    --so-grain-color: 43, 28, 23;
+  }
+
   /* Key headline words warm into the embers as they arrive: Capabilities into
      cognac, Confidence into peach, both palette primitives. A soft warm halo
      lifts them off the dark without touching the large-text contrast. */
