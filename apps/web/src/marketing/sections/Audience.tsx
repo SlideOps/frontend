@@ -34,7 +34,7 @@ const audiences: Audience[] = [
   {
     icon: Cpu,
     title: 'Home labs',
-    body: 'Experiment freely on your own Nodes, with discovery that never changes anything until you say so.',
+    body: 'Experiment freely on your own servers, with a quick check that never changes anything until you say so.',
   },
   {
     icon: Rocket,

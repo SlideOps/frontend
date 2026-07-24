@@ -10,11 +10,13 @@ export function CapabilitiesShowcase() {
           Capabilities
         </Text>
         <Text as="h2" variant="h1" className="mt-3">
-          Searchable by outcome, never by tool
+          Core security on every server, the rest from the marketplace
         </Text>
         <Text variant="body" tone="secondary" className="mt-5">
-          These are the outcomes SlideOps delivers on day one. Each one plans, executes, verifies,
-          and rolls back on its own, and adapts to the Linux family your Node runs.
+          The first four outcomes are Core: pre-installed on every server, so a server is secured
+          the moment you connect it. Everything after them is a marketplace Plugin you install per
+          Project, so each Project carries only the stack it uses. Each outcome plans, executes,
+          verifies, and rolls back on its own, and adapts to the Linux family your server runs.
         </Text>
       </div>
 

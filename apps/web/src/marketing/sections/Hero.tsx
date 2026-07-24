@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { signUpUrl } from '../content/site';
 
 const assurances = [
-  'Your Nodes stay yours',
+  'Your servers stay yours',
   'Approval before any change',
   'Verification after every execution',
 ];
@@ -33,9 +33,10 @@ export function Hero() {
             Knowledge becomes Capabilities. Capabilities create Confidence.
           </Text>
           <Text variant="body" tone="secondary" className="mt-6 max-w-2xl text-lg">
-            SlideOps helps Operators discover, configure, deploy, secure, verify, and monitor their
-            own Linux infrastructure over SSH. It orchestrates and explains the tools you already
-            run, and it never owns your infrastructure. You do.
+            Connect and secure your servers over SSH, then run Projects on them: install only the
+            stack each Project needs, deploy resource-limited Services from GitHub, and monitor
+            everything. SlideOps orchestrates and explains the tools you already run, and it never
+            owns your infrastructure. You do.
           </Text>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link to={signUpUrl}>

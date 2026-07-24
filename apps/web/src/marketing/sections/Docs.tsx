@@ -3,6 +3,7 @@ import { BookOpen, FileText } from '@slideops/icons';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import gettingStarted from '../docs/getting-started.md?raw';
+import serversAndProjects from '../docs/servers-and-projects.md?raw';
 import howAnOperationWorks from '../docs/how-an-operation-works.md?raw';
 
 interface Doc {
@@ -16,8 +17,14 @@ const docs: Doc[] = [
   {
     slug: 'getting-started',
     title: 'Getting started',
-    summary: 'From a fresh account to your first verified Operation.',
+    summary: 'From a fresh account to a secured server and a running Service.',
     content: gettingStarted,
+  },
+  {
+    slug: 'servers-and-projects',
+    title: 'Servers and Projects',
+    summary: 'The two levels, Core versus the marketplace, and tiers.',
+    content: serversAndProjects,
   },
   {
     slug: 'how-an-operation-works',
@@ -39,11 +46,12 @@ export function Docs() {
           Docs
         </Text>
         <Text as="h2" variant="h1" className="mt-3">
-          Learn the loop, then run it
+          Secure your servers, then run Projects on them
         </Text>
         <Text variant="body" tone="secondary" className="mt-5">
-          Plain-language guides to how SlideOps works. The product teaches as you go, and these
-          cover the shape of it before you start.
+          Plain-language guides to how SlideOps works: connect and secure a server, then create
+          Projects, install only what each one needs, and deploy. The product teaches as you go, and
+          these cover the shape of it before you start.
         </Text>
       </div>
 

@@ -4,10 +4,11 @@ import { Link } from 'react-router-dom';
 import { signUpUrl } from '../content/site';
 
 const included = [
-  'Connect your own Nodes over SSH',
-  'The full day-one Capability set',
+  'Connect and secure your own servers over SSH',
+  'Core security on every server, the rest per Project from the marketplace',
+  'Resource-limited Services, deployed from GitHub',
   'Plan, approve, execute, verify, and roll back',
-  'Live output, History, and notifications',
+  'Live output, monitoring, History, and notifications',
 ];
 
 /** A simple pricing placeholder, clearly marked as coming soon. */
@@ -23,8 +24,10 @@ export function Pricing() {
             Simple pricing, coming soon
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
-            We are still shaping the plans. While we do, you can start using SlideOps and run
-            Operations on your own Nodes.
+            Four tiers (Free, Starter, Pro, and Enterprise) will set how many servers, Projects, and
+            Services you run and the CPU, memory, and disk each Service may use, so several Projects
+            can share one large server under hard limits. We are still shaping the plans. While we
+            do, you can start using SlideOps and run Operations on your own servers.
           </Text>
         </div>
 

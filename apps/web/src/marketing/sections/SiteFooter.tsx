@@ -18,6 +18,7 @@ const columns = [
     links: [
       { to: '/docs', label: 'Docs' },
       { to: '/docs', label: 'Getting started' },
+      { to: '/docs', label: 'Servers and Projects' },
       { to: '/docs', label: 'How an Operation works' },
     ],
   },

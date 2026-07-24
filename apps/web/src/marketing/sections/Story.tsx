@@ -11,12 +11,12 @@ const pillars: Pillar[] = [
   {
     icon: Sparkles,
     title: 'Infrastructure should be understandable',
-    body: 'You describe the outcome you want, not the commands to type. SlideOps reads your Node in plain language and explains every step as you go, so the system teaches as you work.',
+    body: 'You describe the outcome you want, not the commands to type. SlideOps reads your server in plain language and explains every step as you go, so the system teaches as you work.',
   },
   {
     icon: ShieldCheck,
     title: 'Operators stay in control',
-    body: 'Nothing runs until you approve a plan. Your Nodes stay yours, your credentials are encrypted, and you are never locked out of your own machine.',
+    body: 'Nothing runs until you approve a plan. SlideOps never operates as root, your servers stay yours, your credentials are encrypted, and you are never locked out of your own machine.',
   },
   {
     icon: ListChecks,
@@ -50,9 +50,10 @@ export function Story() {
             One clear path from intent to a verified outcome
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
-            SlideOps separates the Capability you intend from the Provider that carries it out on
-            your platform, so the same goal works across different systems. Three ideas hold it
-            together.
+            You work in two levels: first secure your servers, then run Projects on them, installing
+            only the stack each Project needs. Underneath, SlideOps separates the Capability you
+            intend from the Provider that carries it out on your platform, so the same goal works
+            across different systems. Three ideas hold it together.
           </Text>
         </div>
 
