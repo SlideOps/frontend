@@ -22,6 +22,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CapabilityCard } from '../components/CapabilityCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { FactsView } from '../components/FactsView';
+import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -162,6 +163,8 @@ export function NodeDetail() {
             </Card>
 
             <div className="flex flex-col gap-6">
+              <NodeHealth nodeId={id} />
+
               <Card>
                 <div className="mb-4 flex items-center gap-2">
                   <Text variant="h4">Discovery</Text>

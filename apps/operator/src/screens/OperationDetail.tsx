@@ -13,11 +13,10 @@ import { Button, Card, Text } from '@slideops/design-system';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Terminal, Wifi, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
-import { OperationTerminal } from '../components/OperationTerminal';
 import { PlanReview } from '../components/PlanReview';
 import { StepTimeline } from '../components/StepTimeline';
 import { VerificationView } from '../components/VerificationView';
@@ -39,6 +38,12 @@ const REFETCH_ON: OperationEvent['type'][] = [
 ];
 
 const EMPTY_EVENTS: OperationEvent[] = [];
+
+// The live terminal embeds xterm.js, which is heavy, so it loads on demand. It
+// arrives with the execution view and never weighs on the first load.
+const OperationTerminal = lazy(() =>
+  import('../components/OperationTerminal').then((m) => ({ default: m.OperationTerminal })),
+);
 
 /** A live indicator for the event stream connection. */
 function StreamIndicator({ status }: { status: StreamStatus }) {
@@ -304,7 +309,16 @@ export function OperationDetail() {
                   </Button>
                 ) : null}
               </div>
-              <OperationTerminal key={id} events={events} />
+              <Suspense
+                fallback={
+                  <div
+                    className="h-80 w-full animate-pulse rounded-md border border-border bg-app"
+                    aria-hidden
+                  />
+                }
+              >
+                <OperationTerminal key={id} events={events} />
+              </Suspense>
               {actionError ? (
                 <p role="alert" className="mt-3 text-sm text-danger">
                   {actionError}

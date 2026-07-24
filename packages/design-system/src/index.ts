@@ -1,5 +1,12 @@
 export { cn } from './lib/cn';
 export {
+  readCssVar,
+  chartColorFromToken,
+  resolveChartPalette,
+  prefersReducedMotion,
+  type ChartPalette,
+} from './lib/tokens';
+export {
   ThemeProvider,
   useTheme,
   type ThemeName,

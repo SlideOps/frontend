@@ -46,6 +46,39 @@ export {
 } from './nodes';
 export { listCapabilities, getCapability } from './capabilities';
 export {
+  getOverview,
+  listOperators,
+  getOperator,
+  suspendOperator,
+  unsuspendOperator,
+  listAdminOperations,
+  getAnalytics,
+  listAudit,
+  pauseExecutions,
+  resumeExecutions,
+  getEmergencyStatus,
+  type Overview,
+  type OperatorStatus,
+  type AdminOperator,
+  type AdminOperation,
+  type AdminOperatorDetail,
+  type OperationsOverTimePoint,
+  type CapabilityUsage,
+  type Analytics,
+  type AuditEntry,
+  type EmergencyStatus,
+  type AdminOperationFilter,
+  type AuditFilter,
+} from './admin';
+export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
+export {
+  getReport,
+  type Report,
+  type ReportType,
+  type ReportSection,
+  type ReportRow,
+} from './reports';
+export {
   createOperation,
   listOperations,
   getOperation,

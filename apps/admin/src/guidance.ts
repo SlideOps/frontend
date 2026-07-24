@@ -16,6 +16,74 @@ export const guidance: GuidanceRegistry = {
     label: 'Operators',
     summary: 'The Operators on the platform. Cross-tenant read is limited to oversight and support.',
   },
+  'overview.nodes': {
+    label: 'Nodes',
+    summary: 'Every Node connected across all tenants, counted for oversight.',
+  },
+  'overview.active': {
+    label: 'Active Operations',
+    summary: 'Operations executing right now across every tenant.',
+  },
+  'overview.failures': {
+    label: 'Failures in the last day',
+    summary: 'Operations that failed in the last 24 hours, a quick read on platform trouble.',
+  },
+  'overview.suspended': {
+    label: 'Suspended Operators',
+    summary: 'Operators who cannot approve or execute Operations until they are unsuspended.',
+    detail:
+      'Suspending an Operator sets their account to suspended. While suspended, the approve endpoint refuses and the worker skips their queued Operations. Unsuspend restores normal behavior. Every change is audited.',
+  },
+  'operators.roster': {
+    label: 'Operator roster',
+    summary: 'Every Operator with their status, Node and Operation counts, and last activity.',
+    detail:
+      'The roster reads across tenants for oversight only. Open an Operator to see their recent Operations and to suspend or unsuspend them behind a confirmation. Nothing here acts on an Operator Node.',
+  },
+  'operations.record': {
+    label: 'Operation record',
+    summary: 'A read-only record of one Operation, read across tenants for oversight.',
+    detail:
+      'The control plane observes Operations, it does not act on them. This record shows the Operator, the Node, the Capability, and the status, without any approve, cancel, or run action.',
+  },
+  'operations.filter': {
+    label: 'Filters',
+    summary: 'Narrow the cross-tenant list by status or by a single Operator.',
+  },
+  'analytics.over_time': {
+    label: 'Operations over time',
+    summary: 'How many Operations ran per day across the platform.',
+  },
+  'analytics.status': {
+    label: 'Status breakdown',
+    summary: 'The share of Operations in each status, a read on outcomes at a glance.',
+  },
+  'analytics.capabilities': {
+    label: 'Capability usage',
+    summary: 'Which Capabilities Operators reach for most across the platform.',
+  },
+  'analytics.success': {
+    label: 'Success rate',
+    summary: 'The share of Operations that completed and verified across the platform.',
+  },
+  'audit.trail': {
+    label: 'Audit trail',
+    summary: 'An immutable record of every admin and system action, newest first.',
+    detail:
+      'Every mutation on the control plane, every suspension, and every emergency switch is written here with the actor, the action, the target, and the source address. The trail is append only and cannot be edited.',
+  },
+  'emergency.pause': {
+    label: 'Pausing executions',
+    summary: 'Holds every new execution platform wide. Nothing queued is lost.',
+    detail:
+      'While paused, the worker starts no new executions. Operators can still create and approve Operations; those wait with a clear event line that executions are paused, and run when you resume. Use this to stop the platform acting during an incident.',
+  },
+  'emergency.resume': {
+    label: 'Resuming executions',
+    summary: 'Lifts the pause so held Operations run again across every tenant.',
+    detail:
+      'Resuming clears the platform-wide hold. Every Operation that was waiting begins running in order. Like pausing, resuming is confirmed and written to the audit trail.',
+  },
   'overview.emergency': {
     label: 'Emergency controls',
     summary: 'Pause or resume executions platform wide. Every action is confirmed and fully audited.',

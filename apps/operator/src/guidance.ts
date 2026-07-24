@@ -88,6 +88,26 @@ export const guidance: GuidanceRegistry = {
     label: 'Available Capabilities',
     summary: 'The Capabilities that apply to this Node. Start one to plan an Operation.',
   },
+  'node.health': {
+    label: 'Health',
+    summary: 'A read-only look at this Node right now: CPU load, memory, disk, uptime, and services.',
+    detail:
+      'Health connects read only over SSH and reads the current metrics, and a recent history when the monitoring log is present. It never changes the Node. Enable the monitoring Capability to keep a history you can chart here.',
+  },
+  'node.health.history': {
+    label: 'Recent history',
+    summary: 'Memory, disk, and CPU load over the recent readings from the monitoring log.',
+  },
+  'reports.overview': {
+    label: 'Reports',
+    summary: 'Generate a readable report from your Operations, verifications, discoveries, and metrics.',
+    detail:
+      'A report is generated on read from what SlideOps already holds. Pick a type, scope it to a Node if you like, and print it when you need a record. Nothing is changed to produce a report.',
+  },
+  'reports.scope': {
+    label: 'Scope',
+    summary: 'Limit the report to a single Node, or leave it across all your Nodes.',
+  },
   'capability.search': {
     label: 'Search by outcome',
     summary: 'Search for what you want to achieve, not the technology behind it.',

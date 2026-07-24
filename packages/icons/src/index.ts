@@ -45,6 +45,7 @@ export {
   Package,
   Play,
   Plus,
+  Printer,
   RefreshCw,
   Rocket,
   Search,

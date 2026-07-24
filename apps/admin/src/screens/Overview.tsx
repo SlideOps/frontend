@@ -1,70 +1,151 @@
-import { Card, Text } from '@slideops/design-system';
-import { Activity, Gauge, ListChecks, ShieldCheck, Users } from '@slideops/icons';
+import { getAnalytics, getOverview } from '@slideops/api-client';
+import { Card, Text, type ChartPalette } from '@slideops/design-system';
 import { Guidance } from '@slideops/tooltips';
-import { AppShell, PageHeader, type NavItem } from '@slideops/ui';
-import { LogoutButton } from '../components/LogoutButton';
+import { PageHeader } from '@slideops/ui';
+import { useCallback } from 'react';
+import { AdminShell } from '../components/AdminShell';
+import { ErrorNote, Loading } from '../components/Feedback';
+import { LazyChart } from '../components/LazyChart';
+import { StatTile } from '../components/StatTile';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { capabilityUsageOption, operationsOverTimeOption, statusBreakdownOption } from '../charts/options';
 
-const nav: NavItem[] = [
-  { key: 'overview', label: 'Overview', icon: Gauge, active: true },
-  { key: 'operators', label: 'Operators', icon: Users },
-  { key: 'operations', label: 'Operations', icon: Activity },
-  { key: 'audit', label: 'Audit log', icon: ListChecks },
-];
-
-interface Metric {
-  label: string;
-  value: string;
-  guidanceKey: string;
-}
-
-const metrics: Metric[] = [
-  { label: 'Platform health', value: 'Nominal', guidanceKey: 'overview.health' },
-  { label: 'Active Operations', value: '0', guidanceKey: 'overview.operations' },
-  { label: 'Operators', value: '0', guidanceKey: 'overview.operators' },
-  { label: 'Executions paused', value: 'No', guidanceKey: 'overview.emergency' },
-];
-
-/** Placeholder Admin overview. Denser and calmer than the Operator surface. */
+/** The Admin overview: headline numbers, a status breakdown, and two charts. */
 export function Overview() {
+  const overview = useAsyncData((signal) => getOverview(signal), []);
+  const analytics = useAsyncData((signal) => getAnalytics(signal), []);
+
+  const overTime = analytics.state.status === 'ready' ? analytics.state.data.operations_over_time : [];
+  const usage = analytics.state.status === 'ready' ? analytics.state.data.capability_usage : [];
+  const byStatus = overview.state.status === 'ready' ? overview.state.data.operations_by_status : {};
+
+  const buildOverTime = useCallback(
+    (palette: ChartPalette) => operationsOverTimeOption(palette, overTime),
+    [overTime],
+  );
+  const buildUsage = useCallback(
+    (palette: ChartPalette) => capabilityUsageOption(palette, usage),
+    [usage],
+  );
+  const buildStatus = useCallback(
+    (palette: ChartPalette) => statusBreakdownOption(palette, byStatus),
+    [byStatus],
+  );
+
   return (
-    <AppShell surface="Admin" nav={nav} dense actions={<LogoutButton />}>
+    <AdminShell active="overview">
       <PageHeader
         title="Overview"
         description="A calm read on the whole platform. Oversight and analytics across every tenant, with emergency controls kept close but deliberate."
         guidanceKey="overview.health"
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <Card key={metric.label} className="p-4">
-            <div className="flex items-center justify-between">
-              <Text variant="caption" tone="secondary">
-                {metric.label}
+      {overview.state.status === 'loading' ? <Loading label="Reading the platform" /> : null}
+      {overview.state.status === 'error' ? <ErrorNote error={overview.state.error} /> : null}
+      {overview.state.status === 'ready' ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <StatTile
+              label="Operators"
+              value={overview.state.data.operators_total}
+              guidanceKey="overview.operators"
+            />
+            <StatTile label="Nodes" value={overview.state.data.nodes_total} guidanceKey="overview.nodes" />
+            <StatTile
+              label="Operations"
+              value={overview.state.data.operations_total}
+              guidanceKey="overview.operations"
+            />
+            <StatTile
+              label="Active now"
+              value={overview.state.data.active_operations}
+              guidanceKey="overview.active"
+              tone={overview.state.data.active_operations > 0 ? 'warning' : 'primary'}
+            />
+            <StatTile
+              label="Failures, 24h"
+              value={overview.state.data.failures_last_24h}
+              guidanceKey="overview.failures"
+              tone={overview.state.data.failures_last_24h > 0 ? 'danger' : 'primary'}
+            />
+            <StatTile
+              label="Suspended Operators"
+              value={overview.state.data.operators_suspended}
+              guidanceKey="overview.suspended"
+              tone={overview.state.data.operators_suspended > 0 ? 'danger' : 'primary'}
+            />
+          </div>
+
+          <Card
+            className={`mt-4 flex items-center justify-between gap-3 p-4 ${
+              overview.state.data.executions_paused ? 'border-danger' : ''
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Text variant="body-sm" className="font-medium">
+                Executions are{' '}
+                {overview.state.data.executions_paused ? 'paused platform wide' : 'running normally'}
               </Text>
-              <Guidance for={metric.guidanceKey} />
+              <Guidance for="overview.emergency" />
             </div>
-            <Text variant="h3" className="mt-2">
-              {metric.value}
-            </Text>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium ${
+                overview.state.data.executions_paused
+                  ? 'bg-subtle text-danger'
+                  : 'bg-subtle text-success'
+              }`}
+            >
+              {overview.state.data.executions_paused ? 'Paused' : 'Live'}
+            </span>
           </Card>
-        ))}
+        </>
+      ) : null}
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <div className="mb-3 flex items-center gap-2">
+            <Text variant="h4">Operations over time</Text>
+            <Guidance for="analytics.over_time" />
+          </div>
+          {analytics.state.status === 'loading' ? (
+            <Loading label="Loading analytics" />
+          ) : (
+            <LazyChart ariaLabel="Operations run per day" build={buildOverTime} height={240} />
+          )}
+        </Card>
+        <Card>
+          <div className="mb-3 flex items-center gap-2">
+            <Text variant="h4">Status breakdown</Text>
+            <Guidance for="analytics.status" />
+          </div>
+          {overview.state.status === 'loading' ? (
+            <Loading label="Loading status" />
+          ) : (
+            <LazyChart ariaLabel="Operations by status" build={buildStatus} height={240} />
+          )}
+        </Card>
+        <Card className="lg:col-span-2">
+          <div className="mb-3 flex items-center gap-2">
+            <Text variant="h4">Capability usage</Text>
+            <Guidance for="analytics.capabilities" />
+          </div>
+          {analytics.state.status === 'loading' ? (
+            <Loading label="Loading analytics" />
+          ) : (
+            <LazyChart
+              ariaLabel="Capability usage"
+              build={buildUsage}
+              height={Math.max(200, usage.length * 34)}
+            />
+          )}
+        </Card>
       </div>
 
-      <Card className="mt-6 flex items-start gap-3 p-4">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <ShieldCheck width={18} height={18} aria-hidden />
-        </span>
-        <div>
-          <Text variant="h4">Emergency controls</Text>
-          <Text variant="body-sm" tone="secondary" className="mt-1">
-            Pause or resume executions platform wide. Every action is confirmed and written to the
-            immutable audit trail.
-          </Text>
+      {analytics.state.status === 'error' ? (
+        <div className="mt-4">
+          <ErrorNote error={analytics.state.error} />
         </div>
-        <div className="ml-auto">
-          <Guidance for="overview.emergency" placement="left" />
-        </div>
-      </Card>
-    </AppShell>
+      ) : null}
+    </AdminShell>
   );
 }
