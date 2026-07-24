@@ -86,6 +86,54 @@
     will-change: opacity, transform;
   }
 
+  /* The hero-world: a deliberate warm-dark surface used in both app themes, the
+     video's opening beat. Text and hairline colors are scoped here from the
+     Everlasting Beauty neutrals so copy stays legible on the fixed warm dark,
+     and the grain tint switches to the warm-light value so the tactile noise
+     reads on the dark in either theme. All values come from palette tokens. */
+  .so-hero-world {
+    background-color: var(--so-marketing-ink);
+    color: var(--so-neutral-50);
+    --so-hero-ink: var(--so-neutral-50);
+    --so-hero-ink-soft: var(--so-neutral-300);
+    --so-hero-ink-faint: var(--so-neutral-400);
+    --so-hero-hairline: var(--so-neutral-800);
+    --so-hero-panel: var(--so-marketing-ink-raised);
+    /* The grain reads as a faint warm-light tint on the dark, matching the dark
+       theme's own grain value, so the hero stays tactile in both themes. */
+    --so-grain-color: 247, 236, 232;
+  }
+
+  /* Key headline words warm into the embers as they arrive: Capabilities into
+     cognac, Confidence into peach, both palette primitives. A soft warm halo
+     lifts them off the dark without touching the large-text contrast. */
+  .so-hero-word-cognac {
+    color: var(--so-cognac);
+    text-shadow: 0 0 24px var(--so-glow-warm);
+  }
+
+  .so-hero-word-peach {
+    color: var(--so-peach);
+    text-shadow: 0 0 26px var(--so-glow-ember);
+  }
+
+  /* The core mark breathes on a slow, seamless loop. Transform only, so it costs
+     nothing per frame; the global reduce-motion query halts it to a still mark. */
+  @keyframes so-core-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  .so-core-breathe {
+    animation: so-core-breathe 7s var(--so-ease-standard) infinite;
+    will-change: transform;
+  }
+
   /* A notification toast eases in and settles, never a jarring pop. It plays
      once when the toast mounts, respecting reduced motion like everything else. */
   @keyframes so-toast-in {
