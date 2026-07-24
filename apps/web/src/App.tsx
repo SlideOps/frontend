@@ -34,6 +34,13 @@ const NodeRegister = lazy(() =>
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
 );
+const Services = lazy(() => import('./app/screens/Services').then((m) => ({ default: m.Services })));
+const ServiceDeploy = lazy(() =>
+  import('./app/screens/ServiceDeploy').then((m) => ({ default: m.ServiceDeploy })),
+);
+const ServiceDetail = lazy(() =>
+  import('./app/screens/ServiceDetail').then((m) => ({ default: m.ServiceDetail })),
+);
 const Capabilities = lazy(() =>
   import('./app/screens/Capabilities').then((m) => ({ default: m.Capabilities })),
 );
@@ -123,6 +130,9 @@ export function App() {
           <Route path="nodes" element={<Nodes />} />
           <Route path="nodes/new" element={<NodeRegister />} />
           <Route path="nodes/:id" element={<NodeDetail />} />
+          <Route path="services" element={<Services />} />
+          <Route path="services/new" element={<ServiceDeploy />} />
+          <Route path="services/:id" element={<ServiceDetail />} />
           <Route path="capabilities" element={<Capabilities />} />
           <Route path="capabilities/matrix" element={<CapabilityMatrix />} />
           <Route path="capabilities/:key" element={<CapabilityDetail />} />

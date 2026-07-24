@@ -3,7 +3,9 @@ import {
   suspendOperator,
   unsuspendOperator,
   setOperatorRole,
+  adminSetTier,
   ApiError,
+  type TierName,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
 import { ArrowLeft, ShieldCheck, Users } from '@slideops/icons';
@@ -17,6 +19,18 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+const TIERS: TierName[] = ['free', 'starter', 'pro', 'enterprise'];
+
+const tierLabel: Record<TierName, string> = {
+  free: 'Free',
+  starter: 'Starter',
+  pro: 'Pro',
+  enterprise: 'Enterprise',
+};
+
+const selectClass =
+  'h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
@@ -35,11 +49,30 @@ export function OperatorDetail() {
 
   const [confirming, setConfirming] = useState(false);
   const [roleConfirming, setRoleConfirming] = useState(false);
+  const [pendingTier, setPendingTier] = useState<TierName | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const operator = state.status === 'ready' ? state.data : null;
   const isSuspended = operator?.status === 'suspended';
   const isAdmin = operator?.role === 'admin';
+  const currentTier = operator?.tier ?? null;
+
+  const runTierAction = async () => {
+    if (!operator || !pendingTier) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await adminSetTier(operator.id, pendingTier);
+      setPendingTier(null);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That action did not go through. Try again.',
+      );
+      setPendingTier(null);
+    }
+  };
 
   const runRoleAction = async () => {
     if (!operator) {
@@ -94,7 +127,33 @@ export function OperatorDetail() {
             title={operator.email}
             description="One Operator, read across tenants for oversight. Suspending stops them approving or executing Operations."
             actions={
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1.5">
+                  <span className="sr-only">Tier</span>
+                  <select
+                    className={selectClass}
+                    aria-label="Set this Operator's tier"
+                    value={currentTier ?? ''}
+                    onChange={(event) => {
+                      const next = event.target.value as TierName;
+                      if (next && next !== currentTier) {
+                        setPendingTier(next);
+                      }
+                    }}
+                  >
+                    {currentTier ? null : (
+                      <option value="" disabled>
+                        Set tier
+                      </option>
+                    )}
+                    {TIERS.map((tier) => (
+                      <option key={tier} value={tier}>
+                        {tierLabel[tier]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Guidance for="operators.tier" />
                 <Button variant="secondary" onClick={() => setRoleConfirming(true)}>
                   {isAdmin ? 'Revoke admin' : 'Make admin'}
                 </Button>
@@ -127,6 +186,10 @@ export function OperatorDetail() {
               <dl className="divide-y divide-border">
                 <SummaryRow label="Status" value={operator.status === 'suspended' ? 'Suspended' : 'Active'} />
                 <SummaryRow label="Role" value={isAdmin ? 'Administrator' : 'Operator'} />
+                <SummaryRow
+                  label="Tier"
+                  value={currentTier ? tierLabel[currentTier] : 'Not set'}
+                />
                 <SummaryRow label="Nodes" value={String(operator.node_count)} />
                 <SummaryRow label="Operations" value={String(operator.operation_count)} />
                 <SummaryRow
@@ -193,6 +256,20 @@ export function OperatorDetail() {
         confirmVariant={isSuspended ? 'primary' : 'danger'}
         onConfirm={runAction}
         onCancel={() => setConfirming(false)}
+      />
+
+      <ConfirmDialog
+        open={pendingTier !== null}
+        title="Change this Operator's tier?"
+        description={
+          pendingTier
+            ? `This moves the Operator to the ${tierLabel[pendingTier]} tier, changing the Nodes, Projects, Services, vCPU, and memory they may run. This is written to the audit trail.`
+            : ''
+        }
+        confirmLabel="Change tier"
+        confirmVariant="primary"
+        onConfirm={runTierAction}
+        onCancel={() => setPendingTier(null)}
       />
 
       <ConfirmDialog

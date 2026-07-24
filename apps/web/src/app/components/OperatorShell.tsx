@@ -2,6 +2,7 @@ import {
   Activity,
   Boxes,
   Clock,
+  Container,
   FileText,
   LayoutDashboard,
   Layers,
@@ -23,6 +24,7 @@ import { LogoutButton } from './LogoutButton';
 export type ActiveKey =
   | 'home'
   | 'nodes'
+  | 'services'
   | 'capabilities'
   | 'marketplace'
   | 'automations'
@@ -107,6 +109,13 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Server,
       active: active === 'nodes',
       onSelect: () => navigate('/app/nodes'),
+    },
+    {
+      key: 'services',
+      label: 'Services',
+      icon: Container,
+      active: active === 'services',
+      onSelect: () => navigate('/app/services'),
     },
     {
       key: 'capabilities',

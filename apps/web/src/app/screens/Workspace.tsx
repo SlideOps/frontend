@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { TierPanel } from '../components/TierPanel';
 import { NodeRow } from './Nodes';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -127,6 +128,8 @@ export function Workspace() {
             />
             <HealthCard operations={state.data.operations} />
           </div>
+
+          <TierPanel />
 
           {state.data.nodes.length === 0 ? (
             <EmptyState

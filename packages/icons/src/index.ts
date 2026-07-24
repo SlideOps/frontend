@@ -56,6 +56,7 @@ export {
   Shield,
   ShieldCheck,
   Sparkles,
+  Square,
   Sun,
   Terminal,
   Trash2,

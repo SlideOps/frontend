@@ -1,4 +1,5 @@
 import { apiRequest } from './http';
+import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
 
 /*
@@ -34,6 +35,8 @@ export interface AdminOperator {
   role: OperatorRole;
   created_at: string;
   status: OperatorStatus;
+  /** The tier this Operator sits on, when the backend includes it. */
+  tier?: TierName;
   node_count: number;
   operation_count: number;
   last_active: string | null;

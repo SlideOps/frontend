@@ -1,5 +1,5 @@
 import { cn } from '@slideops/design-system';
-import type { Capability, OperationStatus, RiskLevel } from '@slideops/api-client';
+import type { Capability, OperationStatus, RiskLevel, ServiceStatus } from '@slideops/api-client';
 import { Boxes, ShieldCheck } from '@slideops/icons';
 
 /*
@@ -51,6 +51,27 @@ const statusLabel: Record<OperationStatus, string> = {
 export function StatusBadge({ status }: { status: OperationStatus }) {
   const tone = statusTone[status] ?? 'neutral';
   return <span className={cn(badgeBase, toneClass[tone])}>{statusLabel[status] ?? status}</span>;
+}
+
+const serviceTone: Record<ServiceStatus, Tone> = {
+  deploying: 'info',
+  running: 'success',
+  stopped: 'neutral',
+  failed: 'danger',
+  removed: 'neutral',
+};
+
+const serviceLabel: Record<ServiceStatus, string> = {
+  deploying: 'Deploying',
+  running: 'Running',
+  stopped: 'Stopped',
+  failed: 'Failed',
+  removed: 'Removed',
+};
+
+export function ServiceStatusBadge({ status }: { status: ServiceStatus }) {
+  const tone = serviceTone[status] ?? 'neutral';
+  return <span className={cn(badgeBase, toneClass[tone])}>{serviceLabel[status] ?? status}</span>;
 }
 
 const riskTone: Record<RiskLevel, Tone> = {

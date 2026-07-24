@@ -316,6 +316,97 @@ export const guidance: GuidanceRegistry = {
       'The matrix is generated from the Provider registry, not hand maintained, so it always reflects what will actually run. A check means a Capability is supported on that platform.',
   },
 
+  'tier.panel': {
+    label: 'Tier and usage',
+    summary: 'Your tier fixes how much you can run. Each meter shows what you are using against the limit.',
+    detail:
+      'Every Operator sits on a tier that sets hard ceilings on Nodes, Projects, Services, and the total vCPU and memory your Services may allocate. This panel reads your current usage against those ceilings so you can see your headroom. When a meter is close to full, remove something or ask an admin to raise your tier.',
+  },
+  'services.overview': {
+    label: 'Services',
+    summary: 'A Service is one solution running on a Node under hard resource limits your tier allows.',
+    detail:
+      'A Service is a deployed solution: a container or a systemd unit running on one of your Nodes inside a Project, with hard CPU, memory, and process limits. Deploying is your explicit intent, so it is not routed through the Operation approval gate, but it still streams progress and always verifies the workload is actually running.',
+  },
+  'services.deploy': {
+    label: 'Deploy a Service',
+    summary: 'Choose a Project and Node, a source, a runtime, and limits within your remaining quota.',
+    detail:
+      'A deploy runs one workload on a Node under the limits you set. The CPU and memory limits are constrained to what your tier leaves. SlideOps runs the workload with those limits applied and verifies it is up before marking it running.',
+  },
+  'services.quota': {
+    label: 'Remaining quota',
+    summary: 'How much of your tier is still free for a new Service: Services left, vCPU, and memory.',
+  },
+  'service.name': {
+    label: 'Name',
+    summary: 'A short name for this Service, in lowercase letters, numbers, and hyphens.',
+  },
+  'service.project': {
+    label: 'Project',
+    summary: 'The Project this Service belongs to. Projects group related Nodes and Services.',
+  },
+  'service.node': {
+    label: 'Node',
+    summary: 'The Node this Service runs on. The workload and its limits are applied there.',
+  },
+  'service.runtime': {
+    label: 'Runtime',
+    summary: 'How the Service runs: a container in Docker, or a command as a systemd unit.',
+    detail:
+      'The container runtime runs the workload in Docker with the CPU, memory, and process limits applied, and is the default. The systemd runtime writes a unit that runs your command with the limits set through the cgroup. Container needs Docker on the Node.',
+  },
+  'service.source': {
+    label: 'Source',
+    summary: 'Where the workload comes from: a prebuilt image, or a repository cloned and built first.',
+  },
+  'service.image': {
+    label: 'Image',
+    summary: 'The image to run, such as nginx:latest. It runs as is with your limits applied.',
+  },
+  'service.repository': {
+    label: 'Repository',
+    summary: 'The repository to clone and build before the workload runs.',
+  },
+  'service.command': {
+    label: 'Command',
+    summary: 'The command the workload runs. A systemd Service needs one; a container may override its entrypoint.',
+  },
+  'service.cpu': {
+    label: 'vCPU limit',
+    summary: 'The hard CPU ceiling, in vCPU, for example 0.5. It cannot exceed your remaining quota.',
+  },
+  'service.memory': {
+    label: 'Memory limit',
+    summary: 'The hard memory ceiling in MB. It cannot exceed your remaining quota.',
+  },
+  'service.pids': {
+    label: 'Process limit',
+    summary: 'An optional cap on how many processes the workload may run.',
+  },
+  'service.ports': {
+    label: 'Ports',
+    summary: 'Ports to publish, one per line, written host:container, for example 8080:80.',
+  },
+  'service.env': {
+    label: 'Environment',
+    summary: 'Environment variables, one per line as KEY=value. Secret values are stored encrypted and redacted.',
+  },
+  'service.metrics': {
+    label: 'Live usage',
+    summary: 'The current CPU and memory this Service is using against its limit, read live from the Node.',
+  },
+  'service.lifecycle': {
+    label: 'Actions',
+    summary: 'Start, stop, or restart the running workload, or remove the Service and free its allocation.',
+    detail:
+      'These act on the running workload on the Node. Stop halts it without removing it; start brings a stopped Service back; restart cycles it. Remove stops and removes the workload and frees the vCPU and memory it held.',
+  },
+  'service.logs': {
+    label: 'Logs',
+    summary: 'The recent output from this Service, read from the Node. Refresh to pull the latest.',
+  },
+
   // Admin control-plane guidance. Cross-tenant read for oversight only.
   'overview.health': {
     label: 'Platform health',
@@ -354,6 +445,12 @@ export const guidance: GuidanceRegistry = {
     summary: 'Every Operator with their status, Node and Operation counts, and last activity.',
     detail:
       'The roster reads across tenants for oversight only. Open an Operator to see their recent Operations and to suspend or unsuspend them behind a confirmation. Nothing here acts on an Operator Node.',
+  },
+  'operators.tier': {
+    label: 'Tier',
+    summary: 'Set the tier this Operator sits on, which fixes their Node, Project, Service, vCPU, and memory ceilings.',
+    detail:
+      'Each Operator sits on one of four tiers: free, starter, pro, or enterprise. The tier sets hard ceilings on how many Nodes, Projects, and Services they may run and the total vCPU and memory their Services may allocate. Changing it takes effect immediately and is written to the audit trail.',
   },
   'operations.record': {
     label: 'Operation record',

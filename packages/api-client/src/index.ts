@@ -108,6 +108,32 @@ export {
 } from './marketplace';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
 export {
+  getTier,
+  adminSetTier,
+  type TierName,
+  type TierInfo,
+  type TierLimits,
+  type TierUsage,
+} from './tier';
+export {
+  listServices,
+  getService,
+  deployService,
+  startService,
+  stopService,
+  restartService,
+  removeService,
+  getServiceLogs,
+  getServiceMetrics,
+  type Service,
+  type ServiceSource,
+  type ServicePort,
+  type ServiceRuntime,
+  type ServiceStatus,
+  type ServiceMetrics,
+  type DeployServiceInput,
+} from './services';
+export {
   getReport,
   type Report,
   type ReportType,
