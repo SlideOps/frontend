@@ -20,10 +20,13 @@ import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CapabilityCard } from '../components/CapabilityCard';
+import { CredentialRotation } from '../components/CredentialRotation';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { FactsView } from '../components/FactsView';
 import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
+import { SecureServer, ServerPosture } from '../components/SecureServer';
+import { ServerUsers } from '../components/ServerUsers';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -112,7 +115,7 @@ export function NodeDetail() {
     <OperatorShell active="nodes">
       <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/app/nodes')}>
         <ArrowLeft width={16} height={16} aria-hidden />
-        All Nodes
+        All servers
       </Button>
 
       {nodeResult.state.status === 'loading' ? <Loading label="Loading this Node" /> : null}
@@ -136,6 +139,7 @@ export function NodeDetail() {
           />
 
           <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
+            <div className="flex flex-col gap-6">
             <Card className="h-fit">
               <div className="mb-3 flex items-center gap-2">
                 <Server width={18} height={18} className="text-brand" aria-hidden />
@@ -162,7 +166,21 @@ export function NodeDetail() {
               </dl>
             </Card>
 
+            <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
+            </div>
+
             <div className="flex flex-col gap-6">
+              <SecureServer
+                nodeId={id}
+                onDiscover={runDiscovery}
+                discovering={discovering}
+                onRotate={() =>
+                  document
+                    .getElementById('server-settings')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+              />
+
               <NodeHealth nodeId={id} />
 
               <Card>
@@ -249,6 +267,20 @@ export function NodeDetail() {
               </div>
             </div>
           </div>
+
+          <section id="server-settings" className="mt-10 scroll-mt-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Text variant="h3">Server settings</Text>
+              <Guidance for="server.settings" />
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <CredentialRotation
+                node={nodeResult.state.data}
+                onRotated={() => nodeResult.reload()}
+              />
+              <ServerUsers nodeId={id} />
+            </div>
+          </section>
         </>
       ) : null}
     </OperatorShell>

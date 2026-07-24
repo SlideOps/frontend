@@ -105,7 +105,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'nodes',
-      label: 'Nodes',
+      label: 'Servers',
       icon: Server,
       active: active === 'nodes',
       onSelect: () => navigate('/app/nodes'),

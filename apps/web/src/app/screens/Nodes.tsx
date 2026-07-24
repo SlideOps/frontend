@@ -43,26 +43,26 @@ export function Nodes() {
   return (
     <OperatorShell active="nodes">
       <PageHeader
-        title="Nodes"
-        description="Every Linux machine you have connected over SSH."
+        title="Servers"
+        description="Every Linux server you have connected over SSH."
         guidanceKey="dashboard.nodes"
         actions={
           <Button onClick={() => navigate('/app/nodes/new')}>
             <Plus width={16} height={16} aria-hidden />
-            Connect a Node
+            Connect a server
           </Button>
         }
       />
 
-      {state.status === 'loading' ? <Loading label="Loading your Nodes" /> : null}
+      {state.status === 'loading' ? <Loading label="Loading your servers" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
         state.data.length === 0 ? (
           <EmptyState
             icon={Server}
-            title="No Nodes connected yet"
-            description="A Node is a Linux machine you reach over SSH. Connect one and SlideOps will discover its state without changing anything."
-            action={<Button onClick={() => navigate('/app/nodes/new')}>Connect your first Node</Button>}
+            title="No servers connected yet"
+            description="A server is a Linux machine you reach over SSH. Connect one and SlideOps will discover its state without changing anything."
+            action={<Button onClick={() => navigate('/app/nodes/new')}>Connect your first server</Button>}
           />
         ) : (
           <div className="flex flex-col gap-2">
