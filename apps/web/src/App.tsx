@@ -43,6 +43,12 @@ const CapabilityMatrix = lazy(() =>
 const CapabilityDetail = lazy(() =>
   import('./app/screens/CapabilityDetail').then((m) => ({ default: m.CapabilityDetail })),
 );
+const Marketplace = lazy(() =>
+  import('./app/screens/Marketplace').then((m) => ({ default: m.Marketplace })),
+);
+const PluginDetail = lazy(() =>
+  import('./app/screens/PluginDetail').then((m) => ({ default: m.PluginDetail })),
+);
 const Automations = lazy(() =>
   import('./app/screens/Automations').then((m) => ({ default: m.Automations })),
 );
@@ -120,6 +126,8 @@ export function App() {
           <Route path="capabilities" element={<Capabilities />} />
           <Route path="capabilities/matrix" element={<CapabilityMatrix />} />
           <Route path="capabilities/:key" element={<CapabilityDetail />} />
+          <Route path="marketplace" element={<Marketplace />} />
+          <Route path="marketplace/:id" element={<PluginDetail />} />
           <Route path="automations" element={<Automations />} />
           <Route path="automations/new" element={<AutomationNew />} />
           <Route path="automations/:id" element={<AutomationDetail />} />

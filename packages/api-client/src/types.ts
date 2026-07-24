@@ -107,6 +107,14 @@ export interface Capability {
   verification_strategy?: string;
   /** The inputs this Capability needs. Empty when it needs none. */
   parameters?: CapabilityParameter[];
+  /**
+   * The Plugin this Capability comes from. Core Capabilities carry no Plugin
+   * source (or report `core`); a Capability unlocked by an installed Plugin
+   * names it here so the catalog can show where it came from.
+   */
+  plugin_id?: string;
+  /** A plain-language name for the Plugin source, when the backend provides it. */
+  source?: string;
 }
 
 /** One step of a Plan: what it does, why, and how risky it is. */

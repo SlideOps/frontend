@@ -1,5 +1,6 @@
 import { cn } from '@slideops/design-system';
-import type { OperationStatus, RiskLevel } from '@slideops/api-client';
+import type { Capability, OperationStatus, RiskLevel } from '@slideops/api-client';
+import { Boxes, ShieldCheck } from '@slideops/icons';
 
 /*
  * Small status and risk badges. Every color is a semantic design token, so the
@@ -67,4 +68,33 @@ const riskLabel: Record<RiskLevel, string> = {
 export function RiskBadge({ risk }: { risk: RiskLevel }) {
   const tone = riskTone[risk] ?? 'neutral';
   return <span className={cn(badgeBase, toneClass[tone])}>{riskLabel[risk] ?? risk}</span>;
+}
+
+/** Whether a Capability comes from the pre-installed Core bundle. */
+function isCoreSource(capability: Pick<Capability, 'plugin_id' | 'source'>): boolean {
+  const id = (capability.plugin_id ?? capability.source ?? '').toLowerCase();
+  return id === '' || id === 'core';
+}
+
+/**
+ * A small badge naming where a Capability comes from: the Core bundle, or the
+ * Plugin that added it. It reads directly from the Capability metadata so the
+ * catalog shows the source without any extra lookup.
+ */
+export function PluginSourceBadge({ capability }: { capability: Capability }) {
+  const core = isCoreSource(capability);
+  const label = core ? 'Core' : capability.source || capability.plugin_id || 'Plugin';
+  return (
+    <span
+      className={cn(badgeBase, 'bg-subtle text-ink-muted')}
+      title={core ? 'Part of the pre-installed Core bundle' : `Added by the ${label} Plugin`}
+    >
+      {core ? (
+        <ShieldCheck width={12} height={12} aria-hidden />
+      ) : (
+        <Boxes width={12} height={12} aria-hidden />
+      )}
+      {label}
+    </span>
+  );
 }

@@ -6,7 +6,7 @@ import {
   type Node,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { Play } from '@slideops/icons';
+import { ArrowRight, Package, Play } from '@slideops/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -49,6 +49,9 @@ export function StartOperation({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When a Capability is not installed the backend refuses with this code, so we
+  // guide the Operator to the Plugin that unlocks it instead of a raw error.
+  const [notInstalled, setNotInstalled] = useState(false);
 
   const {
     register,
@@ -74,6 +77,7 @@ export function StartOperation({
     }
     setSubmitting(true);
     setError(null);
+    setNotInstalled(false);
     try {
       const cleaned = cleanParameterValues(values);
       const operation = await createOperation({
@@ -83,10 +87,22 @@ export function StartOperation({
       });
       navigate(`/app/operations/${operation.id}`);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'The Operation could not be started.');
+      if (cause instanceof ApiError && cause.code === 'capability_not_installed') {
+        setNotInstalled(true);
+      } else {
+        setError(cause instanceof ApiError ? cause.message : 'The Operation could not be started.');
+      }
       setSubmitting(false);
     }
   });
+
+  // The Plugin that unlocks this Capability, when the metadata names it. The
+  // Marketplace list is a good fallback when it does not.
+  const pluginId =
+    capability.plugin_id && capability.plugin_id.toLowerCase() !== 'core'
+      ? capability.plugin_id
+      : undefined;
+  const marketplaceHref = pluginId ? `/app/marketplace/${pluginId}` : '/app/marketplace';
 
   return (
     <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
@@ -124,6 +140,36 @@ export function StartOperation({
           You will review the plan before anything runs.
         </Text>
       </div>
+
+      {notInstalled ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-md border border-border bg-subtle p-4"
+        >
+          <div className="flex items-start gap-3">
+            <Package width={18} height={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+            <div>
+              <Text variant="body-sm" className="font-medium">
+                This Capability is not installed yet
+              </Text>
+              <Text variant="body-sm" tone="secondary" className="mt-0.5">
+                It comes from a Plugin you have not installed. Install its Plugin from the
+                Marketplace, then start this Operation again.
+              </Text>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="self-start"
+            onClick={() => navigate(marketplaceHref)}
+          >
+            <Package width={15} height={15} aria-hidden />
+            Open the Marketplace
+            <ArrowRight width={15} height={15} aria-hidden />
+          </Button>
+        </div>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-danger">

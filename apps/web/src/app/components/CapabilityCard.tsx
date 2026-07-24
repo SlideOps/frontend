@@ -3,7 +3,7 @@ import { Card, Text } from '@slideops/design-system';
 import { Layers } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
-import { RiskBadge } from './Badges';
+import { PluginSourceBadge, RiskBadge } from './Badges';
 
 /*
  * One Capability presented for what it achieves: its outcome name, its category,
@@ -27,11 +27,14 @@ export function CapabilityCard({
           <div className="flex items-center gap-2">
             <Text variant="h4">{capability.name}</Text>
           </div>
-          <div className="mt-0.5 flex items-center gap-1">
-            <Text variant="caption" tone="secondary">
-              {capability.category}
-            </Text>
-            <Guidance for="capability.category" size={14} />
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Text variant="caption" tone="secondary">
+                {capability.category}
+              </Text>
+              <Guidance for="capability.category" size={14} />
+            </div>
+            <PluginSourceBadge capability={capability} />
           </div>
         </div>
         <div className="flex items-center gap-1">

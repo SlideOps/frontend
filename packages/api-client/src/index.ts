@@ -92,6 +92,20 @@ export {
   type AdminOperationFilter,
   type AuditFilter,
 } from './admin';
+export {
+  listMarketplacePlugins,
+  getMarketplacePlugin,
+  listInstalledPlugins,
+  installPlugin,
+  updatePlugin,
+  uninstallPlugin,
+  type Plugin,
+  type PluginManifest,
+  type PluginConfigParameter,
+  type InstalledPlugin,
+  type InstallPluginInput,
+  type UpdatePluginInput,
+} from './marketplace';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
 export {
   getReport,

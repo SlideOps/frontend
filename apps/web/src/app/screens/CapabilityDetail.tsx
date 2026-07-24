@@ -10,7 +10,7 @@ import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { RiskBadge } from '../components/Badges';
+import { PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
@@ -76,11 +76,12 @@ export function CapabilityDetail() {
               </span>
               <div className="min-w-0">
                 <Text variant="h1">{capabilityResult.state.data.name}</Text>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   <Text variant="caption" tone="secondary">
                     {capabilityResult.state.data.category}
                   </Text>
                   <Guidance for="capability.category" size={14} />
+                  <PluginSourceBadge capability={capabilityResult.state.data} />
                 </div>
               </div>
             </div>

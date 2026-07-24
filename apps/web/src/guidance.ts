@@ -269,6 +269,46 @@ export const guidance: GuidanceRegistry = {
     label: 'Enabled',
     summary: 'Turn an Automation off to pause its scheduled runs without deleting it.',
   },
+  'marketplace.overview': {
+    label: 'Marketplace',
+    summary: 'Browse first-party Plugins and install the ones you need to unlock more Capabilities.',
+    detail:
+      'A Plugin is a first-party bundle of Capabilities and Providers behind one manifest. The ten Capabilities you start with are the pre-installed Core bundle; installing a Plugin adds its Capabilities to your catalog. Everything a Plugin adds runs inside the same discover, plan, approve, execute, and verify loop as the rest of SlideOps.',
+  },
+  'marketplace.search': {
+    label: 'Search by outcome',
+    summary: 'Search for the outcome you want, such as a database or a runtime, not the technology.',
+  },
+  'marketplace.manifest': {
+    label: 'What it does',
+    summary: 'The Plugin manifest in plain language: what it delivers and the version you would install.',
+  },
+  'marketplace.provides': {
+    label: 'Capabilities it adds',
+    summary: 'The Capabilities this Plugin unlocks. Once it is installed and enabled, each one runs like any other.',
+  },
+  'marketplace.permissions': {
+    label: 'Permissions',
+    summary: 'What this Plugin is allowed to do on your Nodes, stated plainly before you install it.',
+  },
+  'marketplace.install': {
+    label: 'Install',
+    summary: 'Install the Plugin for your account. If it needs configuration, you fill it in first.',
+    detail:
+      'Installing is per Operator: a Plugin you install unlocks its Capabilities only for you. When a Plugin needs configuration, the form here is generated from its manifest, each field validated the same way a Capability input is. Secret values are stored encrypted and redacted afterward.',
+  },
+  'marketplace.reconfigure': {
+    label: 'Reconfigure',
+    summary: 'Change this Plugin configuration. Secret values are redacted, so re-enter them to change them.',
+  },
+  'marketplace.enabled': {
+    label: 'Enable or disable',
+    summary: 'Disable a Plugin to hold back its Capabilities without uninstalling it. Enable it to bring them back.',
+  },
+  'capability.source': {
+    label: 'Source',
+    summary: 'Where this Capability comes from: the pre-installed Core bundle, or the Plugin that added it.',
+  },
   'capability.matrix': {
     label: 'Capability matrix',
     summary: 'Which Capabilities apply to which platforms, generated from the Providers behind each one.',

@@ -5,6 +5,7 @@ import {
   FileText,
   LayoutDashboard,
   Layers,
+  Package,
   Search,
   Server,
   Shield,
@@ -23,6 +24,7 @@ export type ActiveKey =
   | 'home'
   | 'nodes'
   | 'capabilities'
+  | 'marketplace'
   | 'automations'
   | 'operations'
   | 'reports'
@@ -112,6 +114,13 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Layers,
       active: active === 'capabilities',
       onSelect: () => navigate('/app/capabilities'),
+    },
+    {
+      key: 'marketplace',
+      label: 'Marketplace',
+      icon: Package,
+      active: active === 'marketplace',
+      onSelect: () => navigate('/app/marketplace'),
     },
     {
       key: 'automations',
