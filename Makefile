@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup dev dev-marketing dev-operator dev-admin build test lint typecheck fmt api-client docker-build docker-up docker-down
+.PHONY: help setup dev dev-web build test lint typecheck fmt api-client docker-build docker-up docker-down
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -7,19 +7,13 @@ help: ## List available targets
 setup: ## Install all workspace dependencies
 	pnpm install
 
-dev: ## Run all apps in dev mode via turbo
+dev: ## Run the app in dev mode via turbo
 	pnpm turbo run dev
 
-dev-marketing: ## Run just the marketing app
-	pnpm --filter @slideops/marketing dev
+dev-web: ## Run just the web app
+	pnpm --filter @slideops/web dev
 
-dev-operator: ## Run just the operator app
-	pnpm --filter @slideops/operator dev
-
-dev-admin: ## Run just the admin app
-	pnpm --filter @slideops/admin dev
-
-build: ## Build all apps and packages
+build: ## Build the app and packages
 	pnpm turbo run build
 
 test: ## Run unit and component tests
@@ -37,7 +31,7 @@ fmt: ## Format the whole repository
 api-client: ## Regenerate the typed API client from the backend openapi contract
 	pnpm --filter @slideops/api-client generate
 
-docker-build: ## Build production images for each app
+docker-build: ## Build the production image for the app
 	docker compose build
 
 docker-up: ## Run the local frontend stack

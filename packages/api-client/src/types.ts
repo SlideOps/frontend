@@ -6,23 +6,21 @@
  */
 
 /**
+ * The role an Operator account carries. Every account is an Operator; `admin`
+ * additionally grants access to the control-plane routes under /admin. There is
+ * no separate Admin account type anymore, only this role on the one account.
+ */
+export type OperatorRole = 'operator' | 'admin';
+
+/**
  * An Operator account, as returned by the auth endpoints. Field names mirror
- * the backend contract exactly so the wire shape and the type never drift.
+ * the backend contract exactly so the wire shape and the type never drift. The
+ * `role` distinguishes a plain Operator from one with admin access.
  */
 export interface Operator {
   id: string;
   email: string;
-  mfa_enabled: boolean;
-  created_at: string;
-}
-
-/**
- * An Admin account. Admins sign in through the separate control-plane surface
- * and cannot self register. The shape mirrors the backend contract.
- */
-export interface Admin {
-  id: string;
-  email: string;
+  role: OperatorRole;
   mfa_enabled: boolean;
   created_at: string;
 }

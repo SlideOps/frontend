@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg-app);
+    color: var(--color-text-primary);
+    font-family:
+      Inter,
+      system-ui,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  /* A gentle, easeful rise used to bring marketing sections in. It plays once
+     and settles, never loops, so the page feels calm rather than busy. */
+  @keyframes so-rise {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .so-rise {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+  }
+
+  .so-rise-2 {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+    animation-delay: 90ms;
+  }
+
+  .so-rise-3 {
+    animation: so-rise var(--so-duration-slow) var(--so-ease-entrance) both;
+    animation-delay: 180ms;
+  }
+
+  /* A slow, seamless wash behind the hero. Position only, so it drifts softly. */
+  @keyframes so-drift {
+    0% {
+      transform: translate3d(-4%, -2%, 0);
+    }
+    50% {
+      transform: translate3d(4%, 2%, 0);
+    }
+    100% {
+      transform: translate3d(-4%, -2%, 0);
+    }
+  }
+
+  .so-drift {
+    animation: so-drift 22s var(--so-ease-standard) infinite;
+  }
+
+  /* A notification toast eases in and settles, never a jarring pop. It plays
+     once when the toast mounts, respecting reduced motion like everything else. */
+  @keyframes so-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .so-toast {
+    animation: so-toast-in var(--so-duration-base) var(--so-ease-entrance) both;
+  }
+}
+
+/* Documentation styling for markdown rendered by react-markdown. Every value is
+   a design token, so the docs read correctly in both themes and never hard-code
+   a color. */
+.so-prose > :first-child {
+  margin-top: 0;
+}
+
+.so-prose h2 {
+  font-family: Poppins, Inter, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  margin-top: var(--so-space-8);
+  margin-bottom: var(--so-space-4);
+}
+
+.so-prose h3 {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: var(--color-text-primary);
+  margin-top: var(--so-space-8);
+  margin-bottom: var(--so-space-3);
+}
+
+.so-prose p {
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--so-space-4);
+}
+
+.so-prose ul,
+.so-prose ol {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--so-space-4);
+  padding-left: var(--so-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--so-space-2);
+}
+
+.so-prose ul {
+  list-style: disc;
+}
+
+.so-prose ol {
+  list-style: decimal;
+}
+
+.so-prose li {
+  line-height: 1.7;
+}
+
+.so-prose strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.so-prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.so-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  padding: 0.1em 0.35em;
+  border-radius: var(--so-radius-sm);
+}
+
+/*
+ * Print stylesheet for Reports. It strips the app chrome so only the report
+ * prints, and forces the light-theme token mapping so a report generated in dark
+ * mode still prints as dark ink on white paper. Every value stays a design
+ * token; no color is hard-coded here.
+ */
+@media print {
+  :root,
+  :root[data-theme='dark'] {
+    --color-bg-app: var(--so-neutral-0);
+    --color-bg-surface: var(--so-neutral-0);
+    --color-bg-raised: var(--so-neutral-0);
+    --color-bg-subtle: var(--so-neutral-50);
+    --color-text-primary: var(--so-ink);
+    --color-text-secondary: var(--so-neutral-700);
+    --color-border: var(--so-neutral-300);
+    color-scheme: light;
+  }
+
+  aside,
+  header,
+  nav[aria-label] {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-surface {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

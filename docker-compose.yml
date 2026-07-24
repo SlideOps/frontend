@@ -3,34 +3,12 @@
 name: slideops-frontend
 
 services:
-  marketing:
+  web:
     image: node:22-alpine
     working_dir: /workspace
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @slideops/marketing dev --host 0.0.0.0"
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @slideops/web dev --host 0.0.0.0"
     ports:
       - "4321:4321"
-    volumes:
-      - ./:/workspace
-    environment:
-      - NODE_ENV=development
-
-  operator:
-    image: node:22-alpine
-    working_dir: /workspace
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @slideops/operator dev --host 0.0.0.0"
-    ports:
-      - "4322:4322"
-    volumes:
-      - ./:/workspace
-    environment:
-      - NODE_ENV=development
-
-  admin:
-    image: node:22-alpine
-    working_dir: /workspace
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @slideops/admin dev --host 0.0.0.0"
-    ports:
-      - "4323:4323"
     volumes:
       - ./:/workspace
     environment:

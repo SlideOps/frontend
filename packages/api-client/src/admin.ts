@@ -1,10 +1,12 @@
 import { apiRequest } from './http';
-import type { OperationStatus } from './types';
+import type { OperationStatus, OperatorRole } from './types';
 
 /*
  * The Admin control-plane surface. Every path sits under /api/v1/admin and rides
- * the admin session cookie, which the shared request helper already sends. The
- * backend reads across every tenant for oversight only, and audits every
+ * the single Operator session cookie, which the shared request helper already
+ * sends. The backend requires the admin role for these routes and returns 403
+ * for a plain Operator. It reads across every tenant for oversight only, and
+ * audits every
  * mutation. Single resources come wrapped in a named envelope and lists in a
  * named array, matching the rest of the client; each function unwraps tolerantly
  * so a bare value is accepted when the envelope key is absent.
@@ -29,6 +31,7 @@ export type OperatorStatus = 'active' | 'suspended';
 export interface AdminOperator {
   id: string;
   email: string;
+  role: OperatorRole;
   created_at: string;
   status: OperatorStatus;
   node_count: number;
@@ -123,6 +126,11 @@ export function suspendOperator(id: string): Promise<void> {
 /** Lift a suspension and restore an Operator to normal. Audited. */
 export function unsuspendOperator(id: string): Promise<void> {
   return apiRequest<void>(`/admin/operators/${id}/unsuspend`, { method: 'POST' });
+}
+
+/** Grant or revoke the admin role on an Operator. Admin only, audited. */
+export function setOperatorRole(id: string, role: OperatorRole): Promise<void> {
+  return apiRequest<void>(`/admin/operators/${id}/role`, { method: 'POST', body: { role } });
 }
 
 export interface AdminOperationFilter {

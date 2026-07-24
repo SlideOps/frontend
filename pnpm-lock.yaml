@@ -30,7 +30,7 @@ importers:
         specifier: ^8.13.0
         version: 8.65.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3)
 
-  apps/admin:
+  apps/web:
     dependencies:
       '@hookform/resolvers':
         specifier: ^3.9.1
@@ -50,146 +50,6 @@ importers:
       '@slideops/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@slideops/utils-runtime':
-        specifier: workspace:*
-        version: link:../../packages/utils-runtime
-      echarts:
-        specifier: ^5.5.1
-        version: 5.6.0
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      react-hook-form:
-        specifier: ^7.53.2
-        version: 7.82.0(react@18.3.1)
-      react-router-dom:
-        specifier: ^6.28.0
-        version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      zod:
-        specifier: ^3.23.8
-        version: 3.25.76
-      zustand:
-        specifier: ^5.0.1
-        version: 5.0.14(@types/react@18.3.31)(react@18.3.1)
-    devDependencies:
-      '@slideops/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@types/react':
-        specifier: ^18.3.12
-        version: 18.3.31
-      '@types/react-dom':
-        specifier: ^18.3.1
-        version: 18.3.7(@types/react@18.3.31)
-      '@vitejs/plugin-react':
-        specifier: ^4.3.3
-        version: 4.7.0(vite@5.4.21(@types/node@22.20.1)(terser@5.49.0))
-      autoprefixer:
-        specifier: ^10.4.20
-        version: 10.5.4(postcss@8.5.22)
-      eslint:
-        specifier: ^9.14.0
-        version: 9.39.5(jiti@1.21.7)
-      postcss:
-        specifier: ^8.4.47
-        version: 8.5.22
-      tailwindcss:
-        specifier: ^3.4.14
-        version: 3.4.19
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.21(@types/node@22.20.1)(terser@5.49.0)
-      vite-plugin-pwa:
-        specifier: ^0.20.5
-        version: 0.20.5(vite@5.4.21(@types/node@22.20.1)(terser@5.49.0))(workbox-build@7.4.1(@types/babel__core@7.20.5))(workbox-window@7.4.1)
-      vitest:
-        specifier: ^2.1.4
-        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.49.0)
-
-  apps/marketing:
-    dependencies:
-      '@slideops/design-system':
-        specifier: workspace:*
-        version: link:../../packages/design-system
-      '@slideops/icons':
-        specifier: workspace:*
-        version: link:../../packages/icons
-      '@slideops/tooltips':
-        specifier: workspace:*
-        version: link:../../packages/tooltips
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      react-markdown:
-        specifier: ^9.0.1
-        version: 9.1.0(@types/react@18.3.31)(react@18.3.1)
-    devDependencies:
-      '@slideops/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@types/react':
-        specifier: ^18.3.12
-        version: 18.3.31
-      '@types/react-dom':
-        specifier: ^18.3.1
-        version: 18.3.7(@types/react@18.3.31)
-      '@vitejs/plugin-react':
-        specifier: ^4.3.3
-        version: 4.7.0(vite@5.4.21(@types/node@22.20.1)(terser@5.49.0))
-      autoprefixer:
-        specifier: ^10.4.20
-        version: 10.5.4(postcss@8.5.22)
-      eslint:
-        specifier: ^9.14.0
-        version: 9.39.5(jiti@1.21.7)
-      postcss:
-        specifier: ^8.4.47
-        version: 8.5.22
-      tailwindcss:
-        specifier: ^3.4.14
-        version: 3.4.19
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.10
-        version: 5.4.21(@types/node@22.20.1)(terser@5.49.0)
-      vitest:
-        specifier: ^2.1.4
-        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(terser@5.49.0)
-
-  apps/operator:
-    dependencies:
-      '@hookform/resolvers':
-        specifier: ^3.9.1
-        version: 3.10.0(react-hook-form@7.82.0(react@18.3.1))
-      '@slideops/api-client':
-        specifier: workspace:*
-        version: link:../../packages/api-client
-      '@slideops/design-system':
-        specifier: workspace:*
-        version: link:../../packages/design-system
-      '@slideops/icons':
-        specifier: workspace:*
-        version: link:../../packages/icons
-      '@slideops/tooltips':
-        specifier: workspace:*
-        version: link:../../packages/tooltips
-      '@slideops/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@slideops/utils-runtime':
-        specifier: workspace:*
-        version: link:../../packages/utils-runtime
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
@@ -208,6 +68,9 @@ importers:
       react-hook-form:
         specifier: ^7.53.2
         version: 7.82.0(react@18.3.1)
+      react-markdown:
+        specifier: ^9.0.1
+        version: 9.1.0(@types/react@18.3.31)(react@18.3.1)
       react-router-dom:
         specifier: ^6.28.0
         version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

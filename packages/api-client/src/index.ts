@@ -19,14 +19,9 @@ export {
   mfaSetup,
   mfaEnable,
   mfaDisable,
-  adminLogin,
-  adminMfaVerify,
-  adminLogout,
-  adminMe,
   type Credentials,
   type MfaSetup,
   type LoginResult,
-  type AdminLoginResult,
 } from './auth';
 export {
   listProjects,
@@ -77,6 +72,7 @@ export {
   getOperator,
   suspendOperator,
   unsuspendOperator,
+  setOperatorRole,
   listAdminOperations,
   getAnalytics,
   listAudit,
@@ -115,7 +111,7 @@ export {
 } from './operations';
 export type {
   Operator,
-  Admin,
+  OperatorRole,
   Project,
   Node,
   NodeAuthKind,

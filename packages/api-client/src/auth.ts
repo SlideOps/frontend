@@ -1,5 +1,5 @@
 import { ApiError, normalizeError } from './errors';
-import type { Admin, Operator } from './types';
+import type { Operator } from './types';
 
 /*
  * The typed authentication surface. Every request goes to the same origin under
@@ -77,18 +77,8 @@ export type LoginResult =
   | { kind: 'authenticated'; operator: Operator }
   | { kind: 'mfa_required'; challenge: string };
 
-export type AdminLoginResult =
-  | { kind: 'authenticated'; admin: Admin }
-  | { kind: 'mfa_required'; challenge: string };
-
 interface OperatorEnvelope {
   operator?: Operator;
-  mfa_required?: boolean;
-  challenge?: string;
-}
-
-interface AdminEnvelope {
-  admin?: Admin;
   mfa_required?: boolean;
   challenge?: string;
 }
@@ -175,50 +165,4 @@ export async function mfaDisable(input: { password: string }): Promise<Operator>
     throw new ApiError(200, 'unexpected_response', 'The response was not understood.');
   }
   return data.operator;
-}
-
-/* Admin endpoints. Separate surface, separate cookie, no self registration. */
-
-/** Sign in an Admin. Returns a discriminated result so the caller can branch on MFA. */
-export async function adminLogin(input: Credentials): Promise<AdminLoginResult> {
-  const data = await authRequest<AdminEnvelope>('/admin/auth/login', {
-    method: 'POST',
-    body: input,
-  });
-  if (data.mfa_required && typeof data.challenge === 'string') {
-    return { kind: 'mfa_required', challenge: data.challenge };
-  }
-  if (data.admin) {
-    return { kind: 'authenticated', admin: data.admin };
-  }
-  throw new ApiError(200, 'unexpected_response', 'The sign in response was not understood.');
-}
-
-/** Complete an Admin MFA challenge. */
-export async function adminMfaVerify(input: {
-  challenge: string;
-  code: string;
-}): Promise<Admin> {
-  const data = await authRequest<AdminEnvelope>('/admin/auth/mfa/verify', {
-    method: 'POST',
-    body: input,
-  });
-  if (!data.admin) {
-    throw new ApiError(200, 'unexpected_response', 'The verification response was not understood.');
-  }
-  return data.admin;
-}
-
-/** Sign the Admin out. */
-export async function adminLogout(): Promise<void> {
-  await authRequest<void>('/admin/auth/logout', { method: 'POST' });
-}
-
-/** Read the current Admin session, or throw a 401 ApiError when signed out. */
-export async function adminMe(): Promise<Admin> {
-  const data = await authRequest<AdminEnvelope>('/admin/auth/me');
-  if (!data.admin) {
-    throw new ApiError(200, 'unexpected_response', 'The session response was not understood.');
-  }
-  return data.admin;
 }

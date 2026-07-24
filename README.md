@@ -1,6 +1,6 @@
 # SlideOps Frontend
 
-The web surfaces for SlideOps: a marketing site, an Operator dashboard, and an Admin control plane, with the shared packages that keep them consistent.
+The web surface for SlideOps: one React application that carries the marketing site, the Operator dashboard, and the Admin control plane behind role-based routing, with the shared packages that keep every area consistent.
 
 ![React](https://img.shields.io/badge/React-18-informational)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)
@@ -14,7 +14,7 @@ The web surfaces for SlideOps: a marketing site, an Operator dashboard, and an A
 
 SlideOps is an Infrastructure Operations Platform. It helps Operators discover, configure, deploy, secure, verify, and monitor their own Linux infrastructure over SSH. It orchestrates and explains the tools an Operator already runs, and it never owns the infrastructure. The Operator does.
 
-This repository is the frontend monorepo. It is a pnpm workspace driven by Turborepo, holding three deployable applications and the shared packages they build on. The apps are independent to build and deploy, but they cannot drift apart because their look, their components, and their guidance all come from the same packages. Change a token once and every surface updates.
+This repository is the frontend monorepo. It is a pnpm workspace driven by Turborepo, holding one deployable application and the shared packages it builds on. The application serves three areas from a single origin and a single session: the public marketing site, the Operator area under `/app` for any signed-in account, and the Admin control plane under `/admin` for accounts with the admin role. Their look, their components, and their guidance all come from the same packages, so no area can drift. Change a token once and every surface updates.
 
 The backend lives in a separate repository and is reached only through a versioned HTTP contract, so the two sides stay decoupled.
 
@@ -27,26 +27,22 @@ pnpm install
 make dev
 ```
 
-`make dev` runs all three apps in parallel through Turborepo. Each app has its own port:
+`make dev` runs the app through Turborepo on a single port:
 
 | App | Port | What it is |
 |-----|------|------------|
-| marketing | 4321 | The public landing and marketing site |
-| operator | 4322 | The Operator dashboard, an installable PWA |
-| admin | 4323 | The Admin control plane, an installable PWA |
+| web | 4321 | The whole frontend: marketing at `/`, the Operator area at `/app`, the Admin control plane at `/admin` |
 
-Run a single app instead:
+Run it directly instead:
 
 ```bash
-make dev-marketing
-make dev-operator
-make dev-admin
+make dev-web
 ```
 
 Other common targets, listed in full by `make help`:
 
 ```bash
-make build       # build every app and package
+make build       # build the app and packages
 make typecheck   # typecheck the whole workspace
 make lint        # lint the whole workspace
 make test        # run unit and component tests
@@ -59,9 +55,7 @@ make api-client  # regenerate the typed client from the backend contract
 ```text
 frontend/
 ├── apps/
-│   ├── marketing/          the landing and marketing site
-│   ├── operator/           the Operator dashboard, a PWA
-│   └── admin/              the Admin control plane, a PWA
+│   └── web/                one React app: marketing, the Operator area, and the Admin control plane
 ├── packages/
 │   ├── design-system/      tokens, theme, Tailwind preset, primitives
 │   ├── ui/                 composed components built on the design system
@@ -77,11 +71,13 @@ frontend/
 └── package.json
 ```
 
-## The applications
+## The application
 
-- **marketing** sets the visual tone: the Everlasting Beauty palette, generous space, and motion that feels considered rather than busy. It is built to prerender to static HTML for speed and search.
-- **operator** is where the work happens. It shows the Workspace, Nodes, the Capability catalog searchable by outcome, and the Operation flow from plan review and approval through live execution to a verified result. It is installable, responsive from small phones to large desktops, with bottom navigation on phones and side navigation on wider screens.
-- **admin** is the control plane, deliberately calmer and denser, tuned for oversight rather than onboarding. It carries platform health, cross-tenant Operations oversight, analytics, the audit log, and audited emergency controls. It runs behind its own authentication.
+One app, three areas, one session cookie. A single auth store reads `GET /auth/me` on boot and exposes the Operator and its role. A `RequireAuth` guard gates the operator area; a `RequireAdmin` guard gates the admin area and sends a plain Operator back to the app with a clear notice. The shell adapts by area: a marketing header and footer on the public routes, side navigation on wide screens and bottom navigation on phones for the operator area, and the denser admin navigation for the control plane.
+
+- **Marketing** at `/` sets the visual tone: the Everlasting Beauty palette, generous space, and motion that feels considered rather than busy. The story, capability showcase, audience, docs from markdown, and pricing are each reachable as their own route.
+- **The Operator area** at `/app` is where the work happens. It shows the Workspace, Nodes, the Capability catalog searchable by outcome, automations, reports, history, security including MFA, extensions, the command palette, and the Operation flow from plan review and approval through live execution to a verified result. It is responsive from small phones to large desktops, with bottom navigation on phones and side navigation on wider screens.
+- **The Admin control plane** at `/admin` is deliberately calmer and denser, tuned for oversight rather than onboarding. It carries platform health, cross-tenant Operations oversight, analytics, the audit log, and audited emergency controls, plus operator suspension and role grants. It is reachable only from an account with the admin role.
 
 ## The packages
 

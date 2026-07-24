@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, normalizeError } from './errors';
-import { adminLogin, login, me } from './auth';
+import { login, me } from './auth';
 
 /** Build a Response-like stub for the mocked fetch. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -40,23 +40,49 @@ describe('normalizeError', () => {
 });
 
 describe('auth requests', () => {
-  it('sends cookies and returns the Operator on a plain login', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        jsonResponse(200, {
-          operator: { id: 'op_1', email: 'ops@example.com', mfa_enabled: false, created_at: 'now' },
-        }),
-      );
+  it('sends cookies and returns the Operator with its role on a plain login', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        operator: {
+          id: 'op_1',
+          email: 'ops@example.com',
+          role: 'operator',
+          mfa_enabled: false,
+          created_at: 'now',
+        },
+      }),
+    );
 
     const result = await login({ email: 'ops@example.com', password: 'a-strong-passphrase' });
 
     expect(result.kind).toBe('authenticated');
     if (result.kind === 'authenticated') {
       expect(result.operator.email).toBe('ops@example.com');
+      expect(result.operator.role).toBe('operator');
     }
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.credentials).toBe('include');
+  });
+
+  it('carries the admin role through login for an admin account', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        operator: {
+          id: 'op_2',
+          email: 'admin@example.com',
+          role: 'admin',
+          mfa_enabled: true,
+          created_at: 'now',
+        },
+      }),
+    );
+
+    const result = await login({ email: 'admin@example.com', password: 'a-strong-passphrase' });
+
+    expect(result.kind).toBe('authenticated');
+    if (result.kind === 'authenticated') {
+      expect(result.operator.role).toBe('admin');
+    }
   });
 
   it('returns the MFA challenge when the account requires it', async () => {
@@ -87,17 +113,4 @@ describe('auth requests', () => {
     });
   });
 
-  it('routes admin sign in to the admin endpoint', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, {
-        admin: { id: 'ad_1', email: 'admin@example.com', mfa_enabled: true, created_at: 'now' },
-      }),
-    );
-
-    const result = await adminLogin({ email: 'admin@example.com', password: 'a-strong-passphrase' });
-
-    expect(result.kind).toBe('authenticated');
-    const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
-    expect(calledUrl).toContain('/admin/auth/login');
-  });
 });
