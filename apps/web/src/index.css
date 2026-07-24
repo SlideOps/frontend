@@ -5,6 +5,10 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Never let a wide diagram, canvas, or glow push the page sideways. Set on
+       the root so it propagates to the viewport without turning any element into
+       a new scroll container, so the sticky marketing header keeps working. */
+    overflow-x: hidden;
   }
 
   body {
