@@ -1,4 +1,5 @@
 import { SectionFold } from './motion';
+import { AnyServer } from './sections/AnyServer';
 import { Audience } from './sections/Audience';
 import { CapabilitiesShowcase } from './sections/CapabilitiesShowcase';
 import { Docs } from './sections/Docs';
@@ -15,8 +16,11 @@ import { Story } from './sections/Story';
 
 /**
  * The full marketing home. The hero-world folds into the light how-it-works flow
- * (the story, then the lifecycle pipeline) through the paper-curl SectionFold,
- * then continues into capabilities, audience, docs, and pricing.
+ * (the story, then the lifecycle pipeline) through the paper-curl SectionFold.
+ * That light flow then folds back into the warm-dark globe beat (any Linux
+ * server, anywhere) and folds out again into the light capabilities-and-
+ * marketplace section, keeping the established dark/light rhythm, before
+ * continuing into audience, docs, and pricing.
  */
 export function MarketingHome() {
   return (
@@ -25,6 +29,9 @@ export function MarketingHome() {
       <SectionFold direction="dark-to-light" density="standard" />
       <Story />
       <Lifecycle />
+      <SectionFold direction="light-to-dark" density="standard" />
+      <AnyServer />
+      <SectionFold direction="dark-to-light" density="standard" />
       <CapabilitiesShowcase />
       <Audience />
       <Docs />
