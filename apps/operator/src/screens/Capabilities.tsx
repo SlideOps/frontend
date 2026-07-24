@@ -1,6 +1,6 @@
 import { listCapabilities, type Capability } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, Layers, Search } from '@slideops/icons';
+import { ArrowRight, Grid3x3, Layers, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
@@ -37,6 +37,12 @@ export function Capabilities() {
         title="Capabilities"
         description="Search for the outcome you want, not the technology behind it. Every Capability shows its risk, and nothing runs before you approve a plan."
         guidanceKey="node.capabilities"
+        actions={
+          <Button variant="secondary" onClick={() => navigate('/capabilities/matrix')}>
+            <Grid3x3 width={16} height={16} aria-hidden />
+            Capability matrix
+          </Button>
+        }
       />
 
       <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">

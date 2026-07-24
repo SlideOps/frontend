@@ -252,4 +252,26 @@ export const guidance: GuidanceRegistry = {
     detail:
       'Turn this on to receive a notification from your browser the moment an Operation completes or its verification result is in, so you do not have to watch the screen. Your browser asks for permission first, and you can turn it off at any time.',
   },
+  'automation.approval': {
+    label: 'Scheduled runs are auto-approved',
+    summary: 'Setting up an Automation is your standing approval for its runs, so scheduled Operations run without a fresh approval.',
+    detail:
+      'An Automation is a saved intent to run a Capability on a Node on a schedule. Creating it is your approval for those runs, so each scheduled Operation is auto-approved. It still runs the full lifecycle of discover, assess, plan, execute, and verify, always lands in History, and always respects emergency pause and Operator suspend.',
+  },
+  'automation.schedule': {
+    label: 'Schedule',
+    summary: 'How often this Automation runs. Times are in UTC so a run never shifts with your clock.',
+    detail:
+      'Choose hourly, daily, weekly, or monthly, and the time or day the run needs. SlideOps computes the next run from this and shows it back to you in plain language.',
+  },
+  'automation.enabled': {
+    label: 'Enabled',
+    summary: 'Turn an Automation off to pause its scheduled runs without deleting it.',
+  },
+  'capability.matrix': {
+    label: 'Capability matrix',
+    summary: 'Which Capabilities apply to which platforms, generated from the Providers behind each one.',
+    detail:
+      'The matrix is generated from the Provider registry, not hand maintained, so it always reflects what will actually run. A check means a Capability is supported on that platform.',
+  },
 };

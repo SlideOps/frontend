@@ -6,8 +6,7 @@ import {
   type Node,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { CircleHelp, Play } from '@slideops/icons';
-import { Tooltip } from '@slideops/tooltips';
+import { Play } from '@slideops/icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -17,29 +16,10 @@ import {
   cleanParameterValues,
   defaultParameterValues,
 } from '../parameter-schema';
+import { ParameterFields } from './ParameterFields';
 
-const controlClass =
-  'w-full rounded-md border bg-surface px-3 text-sm text-ink placeholder:text-ink-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
-const inputClass = `h-10 ${controlClass} border-border`;
-const textareaClass = `min-h-[7rem] py-2 ${controlClass} border-border font-mono`;
-const helpClass =
-  'inline-flex h-5 w-5 items-center justify-center rounded-pill text-ink-muted transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 const selectClass =
   'h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
-
-/** A plain-language help bubble for a generated field, sourced from metadata. */
-function FieldHelp({ text, label }: { text: string; label: string }) {
-  if (!text) {
-    return null;
-  }
-  return (
-    <Tooltip content={text}>
-      <button type="button" className={helpClass} aria-label={`About ${label}`}>
-        <CircleHelp width={14} height={14} aria-hidden />
-      </button>
-    </Tooltip>
-  );
-}
 
 /**
  * Start an Operation for a Capability on a Node. When the Capability declares
@@ -128,63 +108,12 @@ export function StartOperation({
         </select>
       </div>
 
-      {parameters.map((param) => {
-        const fieldId = `param-${capability.key}-${param.key}`;
-        const message = errors[param.key]?.message;
-        const errorText = typeof message === 'string' ? message : undefined;
-        return (
-          <div key={param.key} className="flex flex-col gap-2">
-            {param.type === 'boolean' ? (
-              <label htmlFor={fieldId} className="flex items-center gap-3">
-                <input
-                  id={fieldId}
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                  {...register(param.key)}
-                />
-                <span className="text-sm font-medium text-ink">{param.label}</span>
-                <FieldHelp text={param.help} label={param.label} />
-              </label>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <label htmlFor={fieldId} className="text-sm font-medium text-ink">
-                    {param.label}
-                    {param.required ? null : (
-                      <span className="ml-1 text-xs font-normal text-ink-muted">optional</span>
-                    )}
-                  </label>
-                  <FieldHelp text={param.help} label={param.label} />
-                </div>
-                {param.type === 'text' || param.type === 'public_key' ? (
-                  <textarea
-                    id={fieldId}
-                    className={textareaClass}
-                    placeholder={param.placeholder}
-                    aria-invalid={errorText ? true : undefined}
-                    {...register(param.key)}
-                  />
-                ) : (
-                  <input
-                    id={fieldId}
-                    type="text"
-                    inputMode={param.type === 'number' ? 'numeric' : undefined}
-                    className={inputClass}
-                    placeholder={param.placeholder}
-                    aria-invalid={errorText ? true : undefined}
-                    {...register(param.key)}
-                  />
-                )}
-              </>
-            )}
-            {errorText ? (
-              <p className="text-sm text-danger" role="alert">
-                {errorText}
-              </p>
-            ) : null}
-          </div>
-        );
-      })}
+      <ParameterFields
+        idPrefix={`param-${capability.key}`}
+        parameters={parameters}
+        register={register}
+        errors={errors}
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={submitting}>

@@ -1,6 +1,6 @@
 export { ApiClient, type ApiClientOptions, type RequestOptions } from './client';
 export { ApiError, normalizeError } from './errors';
-export { apiBase, apiRequest, type ResourceRequestOptions } from './http';
+export { apiBase, apiRequest, unwrap, type ResourceRequestOptions } from './http';
 export {
   openEventStream,
   openOperationStream,
@@ -44,7 +44,33 @@ export {
   type NodeAuth,
   type CreateNodeInput,
 } from './nodes';
-export { listCapabilities, getCapability } from './capabilities';
+export {
+  listCapabilities,
+  getCapability,
+  getMatrix,
+  type CapabilityMatrix,
+  type CapabilityMatrixRow,
+} from './capabilities';
+export {
+  listAutomations,
+  getAutomation,
+  createAutomation,
+  updateAutomation,
+  deleteAutomation,
+  runAutomation,
+  type Automation,
+  type Schedule,
+  type CreateAutomationInput,
+  type UpdateAutomationInput,
+} from './automations';
+export {
+  search,
+  type SearchResults,
+  type SearchNode,
+  type SearchProject,
+  type SearchCapability,
+  type SearchOperation,
+} from './search';
 export {
   getOverview,
   listOperators,

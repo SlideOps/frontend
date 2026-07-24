@@ -68,6 +68,19 @@ export async function apiRequest<TResponse>(
 }
 
 /**
+ * Unwrap the backend envelope tolerantly. The backend wraps a single resource in
+ * a named key and a list in a named array, so `{ automation: {...} }` or
+ * `{ automations: [...] }`. This accepts either the named key or the already bare
+ * value, so a client keeps working whether or not the envelope is present.
+ */
+export function unwrap<T>(value: unknown, key: string): T {
+  if (value !== null && typeof value === 'object' && key in (value as Record<string, unknown>)) {
+    return (value as Record<string, unknown>)[key] as T;
+  }
+  return value as T;
+}
+
+/**
  * A base for the URL constructor. When the API base is already absolute the
  * origin is ignored; when it is a same origin path (the default `/api/v1`) the
  * browser location supplies the origin. In non browser test environments a

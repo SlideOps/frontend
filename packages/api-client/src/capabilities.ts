@@ -16,3 +16,29 @@ export function getCapability(key: string, signal?: AbortSignal): Promise<Capabi
     (r) => r.capability,
   );
 }
+
+/** One row of the capability matrix: which platforms a Capability supports. */
+export interface CapabilityMatrixRow {
+  key: string;
+  name: string;
+  /** Platform id to whether the Capability supports it, for example { debian: true }. */
+  support: Record<string, boolean>;
+}
+
+/**
+ * The generated capability matrix: the platform columns and one row per
+ * Capability. It is produced from the Provider registry, so it stays correct as
+ * Providers change and is never hand-maintained.
+ */
+export interface CapabilityMatrix {
+  platforms: string[];
+  capabilities: CapabilityMatrixRow[];
+}
+
+/** Read the generated capability matrix of Capabilities by platform. */
+export function getMatrix(signal?: AbortSignal): Promise<CapabilityMatrix> {
+  return apiRequest<Partial<CapabilityMatrix>>('/capabilities/matrix', { signal }).then((r) => ({
+    platforms: r.platforms ?? [],
+    capabilities: r.capabilities ?? [],
+  }));
+}
