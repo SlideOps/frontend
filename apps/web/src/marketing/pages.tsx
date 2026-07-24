@@ -2,10 +2,13 @@ import { SectionFold } from './motion';
 import { AnyServer } from './sections/AnyServer';
 import { Audience } from './sections/Audience';
 import { CapabilitiesShowcase } from './sections/CapabilitiesShowcase';
+import { Contact } from './sections/Contact';
 import { Docs } from './sections/Docs';
+import { Faq } from './sections/Faq';
 import { Hero } from './sections/Hero';
 import { Lifecycle } from './sections/Lifecycle';
 import { Pricing } from './sections/Pricing';
+import { SecuritySection } from './sections/Security';
 import { ServersProjects } from './sections/ServersProjects';
 import { Story } from './sections/Story';
 
@@ -21,13 +24,15 @@ import { Story } from './sections/Story';
  * That light flow then folds back into the warm-dark globe beat (any Linux
  * server, anywhere) and folds out again into the light capabilities-and-
  * marketplace section, keeping the established dark/light rhythm, before
- * continuing into audience, docs, and pricing.
+ * continuing into servers-then-Projects, docs, and pricing.
  *
- * The narrative then reads what it is, how the two levels work, and the tiers:
- * the light Capabilities section folds into the warm-dark Servers-then-Projects
- * beat (the two-level model as a living diagram), folds back out into the light
- * audience and docs sections, and folds one last time into the warm-dark tiers
- * beat, keeping the alternating dark/light rhythm through to the footer.
+ * The page then closes in a deliberate arc. Pricing (warm dark) runs straight
+ * into the security-first beat, which shares the same warm-dark world so the two
+ * read as one continuous protective stretch, then folds out into the light
+ * who-it-is-for and FAQ sections, and folds one last time into the warm-dark
+ * contact horizon that settles into the footer. Folds only ever bridge a change
+ * of world (dark to light or back), so consecutive same-world beats flow on
+ * without a seam and no two worlds ever meet without a fold.
  */
 export function MarketingHome() {
   return (
@@ -43,10 +48,15 @@ export function MarketingHome() {
       <SectionFold direction="light-to-dark" density="standard" />
       <ServersProjects />
       <SectionFold direction="dark-to-light" density="standard" />
-      <Audience />
       <Docs />
       <SectionFold direction="light-to-dark" density="standard" />
       <Pricing />
+      <SecuritySection />
+      <SectionFold direction="dark-to-light" density="standard" />
+      <Audience />
+      <Faq />
+      <SectionFold direction="light-to-dark" density="bold" />
+      <Contact />
     </>
   );
 }
@@ -61,9 +71,19 @@ export function CapabilitiesPage() {
   return <CapabilitiesShowcase />;
 }
 
+/** The security-first beat, on its own route. */
+export function SecurityPage() {
+  return <SecuritySection />;
+}
+
 /** Who SlideOps is for, on its own route. */
 export function AudiencePage() {
   return <Audience />;
+}
+
+/** The FAQ, on its own route. */
+export function FaqPage() {
+  return <Faq />;
 }
 
 /** The docs rendered from markdown, on their own route. */
@@ -74,4 +94,9 @@ export function DocsPage() {
 /** Pricing, on its own route. */
 export function PricingPage() {
   return <Pricing />;
+}
+
+/** The contact-and-start horizon, on its own route. */
+export function ContactPage() {
+  return <Contact />;
 }

@@ -29,12 +29,19 @@ const StoryPage = lazy(() => import('./marketing/pages').then((m) => ({ default:
 const CapabilitiesPage = lazy(() =>
   import('./marketing/pages').then((m) => ({ default: m.CapabilitiesPage })),
 );
+const SecurityPage = lazy(() =>
+  import('./marketing/pages').then((m) => ({ default: m.SecurityPage })),
+);
 const AudiencePage = lazy(() =>
   import('./marketing/pages').then((m) => ({ default: m.AudiencePage })),
 );
+const FaqPage = lazy(() => import('./marketing/pages').then((m) => ({ default: m.FaqPage })));
 const DocsPage = lazy(() => import('./marketing/pages').then((m) => ({ default: m.DocsPage })));
 const PricingPage = lazy(() =>
   import('./marketing/pages').then((m) => ({ default: m.PricingPage })),
+);
+const ContactPage = lazy(() =>
+  import('./marketing/pages').then((m) => ({ default: m.ContactPage })),
 );
 
 // Operator area.
@@ -132,9 +139,12 @@ export function App() {
           <Route path="/" element={<MarketingHome />} />
           <Route path="/story" element={<StoryPage />} />
           <Route path="/capabilities" element={<CapabilitiesPage />} />
+          <Route path="/security" element={<SecurityPage />} />
           <Route path="/audience" element={<AudiencePage />} />
+          <Route path="/faq" element={<FaqPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/start" element={<ContactPage />} />
         </Route>
 
         {/* Unified sign in and sign up. */}
