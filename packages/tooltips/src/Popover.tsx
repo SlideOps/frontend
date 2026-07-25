@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Placement } from './Tooltip';
+import { useEdgeClamp } from './useEdgeClamp';
 
 export interface PopoverProps {
   /** Render the trigger. The provided props wire up the open state and a11y. */
@@ -39,6 +40,7 @@ export function Popover({ trigger, children, label, placement = 'bottom' }: Popo
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const containerRef = useRef<HTMLSpanElement>(null);
+  const clamp = useEdgeClamp<HTMLDivElement>(open);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -74,10 +76,12 @@ export function Popover({ trigger, children, label, placement = 'bottom' }: Popo
       })}
       {open ? (
         <div
+          ref={clamp.ref}
+          style={clamp.style}
           role="dialog"
           id={panelId}
           aria-label={label}
-          className={`absolute z-50 w-72 max-w-xs rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-ink shadow-lg ${placementClass[placement]}`}
+          className={`absolute z-50 w-72 max-w-[min(20rem,calc(100vw_-_1rem))] rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-ink shadow-lg ${placementClass[placement]}`}
         >
           {children}
         </div>

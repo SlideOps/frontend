@@ -21,6 +21,7 @@ import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
+import { ServicePreview } from '../components/ServicePreview';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -88,7 +89,7 @@ function LogView({ id }: { id: string }) {
           <pre
             role="log"
             aria-label="Recent Service logs"
-            className="max-h-80 overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
+            className="max-h-80 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
           >
             {logs}
           </pre>
@@ -196,7 +197,9 @@ export function ServiceDetail() {
           ) : null}
 
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            <div className="flex flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6">
+              <ServicePreview service={service} />
+
               <Card>
                 <div className="mb-3 flex items-center gap-2">
                   <Text variant="h4">Live usage</Text>
@@ -208,7 +211,7 @@ export function ServiceDetail() {
               <LogView id={service.id} />
             </div>
 
-            <div className="flex flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6">
               <Card className="h-fit">
                 <Text variant="h4">Summary</Text>
                 <dl className="mt-2 divide-y divide-border">

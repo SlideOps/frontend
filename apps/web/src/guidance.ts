@@ -559,6 +559,12 @@ export const guidance: GuidanceRegistry = {
     label: 'Logs',
     summary: 'The recent output from this Service, read from the Node. Refresh to pull the latest.',
   },
+  'service.preview': {
+    label: 'Preview',
+    summary: 'The live running Service, reached over the secure SSH tunnel so its port stays private.',
+    detail:
+      'This embeds the running app itself, proxied over the same SSH tunnel that reaches the Node, so nothing is exposed publicly. It appears once the Service is running and publishes a port. An app that relies on absolute asset paths may render imperfectly here; open it in a new tab for the full experience.',
+  },
 
   // Admin control-plane guidance. Cross-tenant read for oversight only.
   'overview.health': {

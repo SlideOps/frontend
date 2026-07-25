@@ -9,6 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { useEdgeClamp } from './useEdgeClamp';
 
 export type Placement = 'top' | 'bottom' | 'left' | 'right';
 
@@ -46,6 +47,7 @@ export function Tooltip({
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
+  const clamp = useEdgeClamp<HTMLSpanElement>(open);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -104,9 +106,11 @@ export function Tooltip({
       {trigger}
       {open ? (
         <span
+          ref={clamp.ref}
+          style={clamp.style}
           role="tooltip"
           id={tooltipId}
-          className={`pointer-events-none absolute z-50 w-max max-w-xs rounded-md bg-ink px-3 py-2 text-sm leading-snug text-surface shadow-md ${placementClass[placement]}`}
+          className={`pointer-events-none absolute z-50 w-max max-w-[min(20rem,calc(100vw_-_1rem))] rounded-md bg-ink px-3 py-2 text-sm leading-snug text-surface shadow-md ${placementClass[placement]}`}
         >
           {content}
         </span>

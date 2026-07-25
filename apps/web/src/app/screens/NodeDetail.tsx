@@ -100,7 +100,7 @@ export function NodeDetail() {
           />
 
           <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-            <div className="flex flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6">
             <Card className="h-fit">
               <div className="mb-3 flex items-center gap-2">
                 <Server width={18} height={18} className="text-brand" aria-hidden />
@@ -130,7 +130,7 @@ export function NodeDetail() {
             <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
             </div>
 
-            <div className="flex flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-6">
               <SecureServer
                 nodeId={id}
                 onDiscover={runDiscovery}

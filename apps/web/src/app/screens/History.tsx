@@ -21,7 +21,7 @@ function OperationRow({ operation, onOpen }: { operation: Operation; onOpen: () 
         <Activity width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <Text variant="body-sm" className="font-medium">
+        <Text variant="body-sm" className="truncate font-medium">
           {operation.capability_key}
         </Text>
         <Text variant="body-sm" tone="secondary" className="truncate">
