@@ -5,7 +5,6 @@ import {
   Cpu,
   FolderKanban,
   GitBranch,
-  Logo,
   Server,
   ShieldCheck,
   Terminal,
@@ -21,38 +20,41 @@ const assurances = [
 
 const families = ['Ubuntu', 'Debian', 'Fedora', 'Arch', 'Alpine', 'openSUSE'];
 
-/** The hero: the lockup, a confident line with a warm accent, the promise, the
- *  primary calls, and a layered, gently living product visual. Every color is a
- *  token, so the whole scene flips with the theme; motion is transform-only and
- *  the global reduced-motion guard stills it. No canvas, no network graph. */
+/** The hero. A large fox mark sits behind the colored ground like a mark behind
+ *  frosted glass, blinking, and it settles in first; the content then rises in,
+ *  one block after another, replaying on every load. Every color is a token (the
+ *  fox uses the palette variables), so the whole scene flips with the theme, and
+ *  the global reduced-motion guard stills all of it. */
 export function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden">
-      {/* Layered ambient depth, all from palette tokens */}
+    <section id="top" className="relative isolate overflow-hidden">
+      {/* Colored ground, the glass wall */}
       <div
         aria-hidden
-        className="so-drift pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-subtle via-app to-app opacity-80"
+        className="so-drift pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-subtle via-app to-app opacity-80"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-32 -top-40 -z-10 h-[30rem] w-[30rem] rounded-pill bg-highlight/40 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-40 top-1/3 -z-10 h-96 w-96 rounded-pill bg-brand/10 blur-3xl"
+        className="pointer-events-none absolute -left-40 top-1/3 z-0 h-96 w-96 rounded-pill bg-brand/10 blur-3xl"
       />
 
-      <div className="mx-auto grid max-w-6xl gap-14 px-6 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-32">
-        <div className="so-rise max-w-2xl">
-          <div className="mb-8">
-            <Logo size={44} />
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-pill border border-border bg-surface/80 px-3.5 py-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted backdrop-blur">
+      {/* The fox behind the glass */}
+      <FoxBackdrop />
+
+      <div className="relative z-10 mx-auto grid max-w-6xl gap-14 px-6 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-32">
+        <div className="max-w-2xl">
+          <span
+            className="so-rise inline-flex items-center gap-2 rounded-pill border border-border bg-surface/80 px-3.5 py-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted backdrop-blur"
+            style={{ animationDelay: '340ms' }}
+          >
             <ShieldCheck width={14} height={14} className="text-brand" aria-hidden />
             Infrastructure Operations, in plain language
           </span>
 
-          <h1 className="mt-7 text-balance font-display text-[2.55rem] font-semibold leading-[1.04] tracking-tight text-ink sm:text-5xl md:text-6xl lg:text-[4rem]">
+          <h1
+            className="so-rise mt-6 text-balance font-display text-[2.05rem] font-semibold leading-[1.06] tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-[3.25rem]"
+            style={{ animationDelay: '460ms' }}
+          >
             Run your own servers with the{' '}
             <span className="bg-gradient-to-r from-brand via-accent to-brand bg-clip-text text-transparent">
               confidence
@@ -60,13 +62,20 @@ export function Hero() {
             of a whole platform team.
           </h1>
 
-          <Text variant="body" tone="secondary" className="mt-6 max-w-xl text-lg">
-            SlideOps helps you discover, configure, deploy, secure, verify, and monitor your own
-            Linux servers over SSH. It orchestrates the tools you already run (Docker, systemd, apt,
-            NGINX, Git), and never owns your infrastructure. You do.
+          <Text
+            variant="body"
+            tone="secondary"
+            className="so-rise mt-5 max-w-md text-base"
+            style={{ animationDelay: '600ms' }}
+          >
+            Connect your Linux servers over SSH and operate them from one calm command center.
+            SlideOps drives the tools you already run, and never owns your infrastructure. You do.
           </Text>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div
+            className="so-rise mt-8 flex flex-wrap items-center gap-3"
+            style={{ animationDelay: '740ms' }}
+          >
             <Link to={signUpUrl}>
               <Button size="lg" className="group">
                 Get started
@@ -85,7 +94,10 @@ export function Hero() {
             </a>
           </div>
 
-          <ul className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-2.5">
+          <ul
+            className="so-rise mt-8 flex flex-wrap items-center gap-x-5 gap-y-2.5"
+            style={{ animationDelay: '860ms' }}
+          >
             {assurances.map((line, index) => (
               <li key={line} className="flex items-center gap-2">
                 {index > 0 ? (
@@ -99,7 +111,7 @@ export function Hero() {
             ))}
           </ul>
 
-          <div className="mt-9">
+          <div className="so-rise mt-8" style={{ animationDelay: '960ms' }}>
             <Text as="span" variant="caption" tone="secondary">
               Works across the major Linux families
             </Text>
@@ -116,9 +128,38 @@ export function Hero() {
           </div>
         </div>
 
-        <HeroVisual />
+        <div className="so-rise" style={{ animationDelay: '640ms' }}>
+          <HeroVisual />
+        </div>
       </div>
     </section>
+  );
+}
+
+/** The geometric fox mark, large, bleeding off the top-right, behind the glass.
+ *  Its fills are the palette variables so it stays on-brand in both themes, and
+ *  its eyes blink. Purely decorative. */
+function FoxBackdrop() {
+  return (
+    <div
+      aria-hidden
+      className="so-fox pointer-events-none absolute left-1/2 top-1/2 z-0 w-[86%] max-w-[1040px] -translate-x-1/2 -translate-y-1/2"
+    >
+      <svg viewBox="9 9 82 82" className="so-fade-in h-auto w-full">
+        <polygon points="50,31 41,31 16,15 28,45 21,51 35,73 50,86" style={{ fill: 'var(--so-marsala)' }} />
+        <polygon points="50,31 59,31 84,15 72,45 79,51 65,73 50,86" style={{ fill: 'var(--so-cognac)' }} />
+        <polygon points="37,53 50,59 63,53 50,84" style={{ fill: 'var(--so-peach)' }} />
+        <g className="so-fox-eye">
+          <polygon points="28,45 42,48 34,55" style={{ fill: 'var(--so-neutral-50)' }} />
+          <polygon points="33,48 39,50 35,53" style={{ fill: 'var(--so-ink)' }} />
+        </g>
+        <g className="so-fox-eye">
+          <polygon points="72,45 58,48 66,55" style={{ fill: 'var(--so-neutral-50)' }} />
+          <polygon points="67,48 61,50 65,53" style={{ fill: 'var(--so-ink)' }} />
+        </g>
+        <polygon points="46,64 54,64 50,70" style={{ fill: 'var(--so-ink)' }} />
+      </svg>
+    </div>
   );
 }
 
@@ -126,7 +167,7 @@ export function Hero() {
  *  server, framed by a Project chip and a live metrics chip. All tokens. */
 function HeroVisual() {
   return (
-    <div className="so-rise-2 relative mx-auto w-full max-w-md lg:mr-0 lg:max-w-none">
+    <div className="relative mx-auto w-full max-w-md lg:mr-0 lg:max-w-none">
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-6 -z-10 rounded-pill bg-gradient-to-br from-brand/15 via-highlight/10 to-highlight/25 blur-3xl"
@@ -246,7 +287,7 @@ function HeroVisual() {
           <span className="flex items-center gap-2">
             <Cpu width={14} height={14} className="text-accent" aria-hidden />
             <Text as="span" variant="caption" tone="secondary">
-              Live usage, capped
+              Live usage, on their server
             </Text>
           </span>
           <span>
@@ -255,11 +296,11 @@ function HeroVisual() {
                 CPU
               </Text>
               <Text as="span" variant="caption" tone="secondary">
-                1.4 / 2.0 vCPU
+                34%
               </Text>
             </span>
             <span className="mt-1 block h-1.5 overflow-hidden rounded-pill bg-border">
-              <span className="block h-full w-[70%] rounded-pill bg-brand" />
+              <span className="block h-full w-[34%] rounded-pill bg-brand" />
             </span>
           </span>
           <span>
@@ -268,11 +309,11 @@ function HeroVisual() {
                 Memory
               </Text>
               <Text as="span" variant="caption" tone="secondary">
-                2.6 / 4 GB
+                2.6 GB
               </Text>
             </span>
             <span className="mt-1 block h-1.5 overflow-hidden rounded-pill bg-border">
-              <span className="block h-full w-[65%] rounded-pill bg-accent" />
+              <span className="block h-full w-[52%] rounded-pill bg-accent" />
             </span>
           </span>
         </div>
