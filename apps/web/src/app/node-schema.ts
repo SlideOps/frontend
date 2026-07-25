@@ -3,8 +3,9 @@ import { z } from 'zod';
 /** The Node registration form. The credential is required but never echoed back. */
 export const nodeSchema = z.object({
   name: z.string().trim().min(1, 'Give this Node a name.'),
-  hostname: z.string().trim().min(1, 'Enter the hostname.'),
-  address: z.string().trim().min(1, 'Enter an address SlideOps can reach.'),
+  // Optional, a label for reference only. Address is what SlideOps connects to.
+  hostname: z.string().trim().optional(),
+  address: z.string().trim().min(1, 'Enter an address SlideOps can reach, an IP or a domain name.'),
   port: z.coerce
     .number({ invalid_type_error: 'Enter a port number.' })
     .int('Enter a whole number.')

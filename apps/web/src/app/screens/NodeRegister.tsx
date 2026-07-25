@@ -36,7 +36,7 @@ export function NodeRegister() {
     try {
       const node = await createNode({
         name: values.name,
-        hostname: values.hostname,
+        hostname: values.hostname ?? '',
         address: values.address,
         port: values.port,
         ssh_username: values.ssh_username,
@@ -69,8 +69,9 @@ export function NodeRegister() {
           />
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
-              label="Hostname"
-              placeholder="web-1.internal"
+              label="Hostname (optional)"
+              placeholder="A label, for example contabo-vps"
+              hint="Just a label for your reference. Leave it blank if you like."
               error={errors.hostname?.message}
               labelAdornment={<Guidance for="node.hostname" />}
               {...register('hostname')}
@@ -78,6 +79,7 @@ export function NodeRegister() {
             <Field
               label="Address"
               placeholder="203.0.113.10"
+              hint="The IP or domain SlideOps connects to over SSH."
               error={errors.address?.message}
               labelAdornment={<Guidance for="node.address" />}
               {...register('address')}

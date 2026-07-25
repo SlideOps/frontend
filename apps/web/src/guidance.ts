@@ -90,8 +90,9 @@ export const guidance: GuidanceRegistry = {
     summary: 'A friendly name you will recognize, such as web-1 or staging database.',
   },
   'node.hostname': {
-    label: 'Hostname',
-    summary: 'The host name of the machine, for example web-1.internal.',
+    label: 'Hostname (optional)',
+    summary:
+      'Just a label for your reference, not how SlideOps connects. Put the machine name, reuse the address, or leave it blank. Address is the field that must reach the server.',
   },
   'node.address': {
     label: 'Address',
