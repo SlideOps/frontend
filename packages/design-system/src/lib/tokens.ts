@@ -66,6 +66,8 @@ export interface ChartPalette {
   textOnBrand: string;
   /** Grid and axis lines. */
   border: string;
+  /** A raised card surface, for a tooltip background that reads in both themes. */
+  raised: string;
 }
 
 /**
@@ -91,6 +93,7 @@ export function resolveChartPalette(el?: Element | null): ChartPalette {
     textMuted: chartColorFromToken('--color-text-secondary', el),
     textOnBrand: chartColorFromToken('--color-text-on-brand', el),
     border: chartColorFromToken('--color-border', el),
+    raised: chartColorFromToken('--color-bg-raised', el),
     series: [brand, info, success, warning, accent, danger],
   };
 }

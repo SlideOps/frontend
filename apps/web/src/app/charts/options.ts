@@ -35,9 +35,10 @@ export function nodeHealthOption(palette: ChartPalette, history: NodeMetricSampl
     grid: { top: 28, right: 44, bottom: 28, left: 40 },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: palette.text,
-      borderWidth: 0,
-      textStyle: { color: palette.textOnBrand, fontSize: 12 },
+      backgroundColor: palette.raised,
+      borderColor: palette.border,
+      borderWidth: 1,
+      textStyle: { color: palette.text, fontSize: 12 },
     },
     legend: {
       top: 0,

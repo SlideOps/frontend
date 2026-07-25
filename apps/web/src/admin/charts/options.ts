@@ -24,9 +24,10 @@ function axisStyle(palette: ChartPalette) {
 
 function tooltipStyle(palette: ChartPalette) {
   return {
-    backgroundColor: palette.text,
-    borderWidth: 0,
-    textStyle: { color: palette.textOnBrand, fontSize: 12 },
+    backgroundColor: palette.raised,
+    borderColor: palette.border,
+    borderWidth: 1,
+    textStyle: { color: palette.text, fontSize: 12 },
   } as const;
 }
 
