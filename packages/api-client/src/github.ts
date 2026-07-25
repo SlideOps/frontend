@@ -42,11 +42,17 @@ export function getGitHubStatus(signal?: AbortSignal): Promise<GitHubStatus> {
  * returns the string to send `window.location` to rather than fetching it. It is
  * built from the same API base the other requests use.
  */
-export function githubAuthorizeUrl(): string {
+export function githubAuthorizeUrl(returnPath?: string): string {
   const base = apiBase();
   const origin =
     typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost';
-  return new URL(`${base}/github/authorize`, origin).toString();
+  const url = new URL(`${base}/github/authorize`, origin);
+  // Carry the in-app page to come back to, so the callback returns the Operator
+  // to where they connected from rather than the site root.
+  if (returnPath) {
+    url.searchParams.set('return', returnPath);
+  }
+  return url.toString();
 }
 
 /** Disconnect this Operator's GitHub account, sealing away the stored token. */

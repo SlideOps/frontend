@@ -42,8 +42,11 @@ export function ProjectGitHub() {
 
   const connect = () => {
     // The backend answers /github/authorize with a 302 to GitHub, so the browser
-    // must navigate there itself rather than fetch it.
-    window.location.href = githubAuthorizeUrl();
+    // must navigate there itself rather than fetch it. Pass the current in-app
+    // page so the callback returns here rather than the site root.
+    const returnPath =
+      typeof window !== 'undefined' ? window.location.pathname + window.location.search : undefined;
+    window.location.href = githubAuthorizeUrl(returnPath);
   };
 
   const runDisconnect = async () => {
