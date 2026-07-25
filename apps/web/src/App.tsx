@@ -3,8 +3,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Login } from './auth/Login';
 import { MfaVerify } from './auth/MfaVerify';
 import { Register } from './auth/Register';
+import { LogoLoader } from './components/LogoLoader';
 import { RequireAdmin } from './components/RequireAdmin';
-import { RequireAuth, Splash } from './components/RequireAuth';
+import { RequireAuth } from './components/RequireAuth';
 import { MarketingLayout } from './marketing/MarketingLayout';
 import {
   AudiencePage,
@@ -113,7 +114,7 @@ export function App() {
   }, [loadSession]);
 
   return (
-    <Suspense fallback={<Splash label="Loading" />}>
+    <Suspense fallback={<LogoLoader fullScreen label="Loading" />}>
       <Routes>
         {/* Public marketing. */}
         <Route element={<MarketingLayout />}>

@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { LogoLoader } from '../../components/LogoLoader';
 import type { ChartProps } from './Chart';
 
 /*
@@ -14,10 +15,11 @@ export function LazyChart(props: ChartProps) {
     <Suspense
       fallback={
         <div
-          className="animate-pulse rounded-md bg-subtle"
+          className="flex items-center justify-center rounded-md bg-subtle"
           style={{ height: props.height ?? 260 }}
-          aria-hidden
-        />
+        >
+          <LogoLoader size="sm" />
+        </div>
       }
     >
       <Chart {...props} />

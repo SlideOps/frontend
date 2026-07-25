@@ -1,17 +1,11 @@
 import type { ApiError } from '@slideops/api-client';
 import { Text } from '@slideops/design-system';
-import { AlertTriangle, Loader2 } from '@slideops/icons';
+import { AlertTriangle } from '@slideops/icons';
+import { LogoLoader } from '../../components/LogoLoader';
 
-/** A calm inline loading indicator with an accessible status role. */
+/** A calm inline loading indicator: the fox mark assembling above its label. */
 export function Loading({ label = 'Loading' }: { label?: string }) {
-  return (
-    <div className="flex items-center gap-2 py-8 text-ink-muted" role="status">
-      <Loader2 width={18} height={18} className="animate-spin" aria-hidden />
-      <Text variant="body-sm" tone="secondary">
-        {label}
-      </Text>
-    </div>
-  );
+  return <LogoLoader size="sm" label={label} />;
 }
 
 /** A quiet error panel that shows the backend message in plain language. */

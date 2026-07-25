@@ -1,17 +1,10 @@
-import { Logo } from '@slideops/icons';
 import { Navigate, Outlet } from 'react-router-dom';
+import { LogoLoader } from './LogoLoader';
 import { useAuthStore } from '../store/auth';
 
 /** A minimal splash shown while the session is being read on boot. */
 export function Splash({ label = 'Restoring your Workspace' }: { label?: string }) {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app text-ink">
-      <Logo size={36} />
-      <p className="text-sm text-ink-muted" role="status">
-        {label}
-      </p>
-    </div>
-  );
+  return <LogoLoader fullScreen label={label} />;
 }
 
 /**

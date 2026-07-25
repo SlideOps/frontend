@@ -15,6 +15,7 @@ import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { LogoLoader } from '../../components/LogoLoader';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { PlanReview } from '../components/PlanReview';
@@ -311,10 +312,9 @@ export function OperationDetail() {
               </div>
               <Suspense
                 fallback={
-                  <div
-                    className="h-80 w-full animate-pulse rounded-md border border-border bg-app"
-                    aria-hidden
-                  />
+                  <div className="flex h-80 w-full items-center justify-center rounded-md border border-border bg-app">
+                    <LogoLoader size="sm" />
+                  </div>
                 }
               >
                 <OperationTerminal key={id} events={events} />
