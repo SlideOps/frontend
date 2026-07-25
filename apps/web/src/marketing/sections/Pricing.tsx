@@ -6,65 +6,87 @@ import { useReveal } from '../useReveal';
 
 interface Tier {
   name: string;
+  price: string;
+  cadence?: string;
   blurb: string;
   highlight?: boolean;
-  quotas: { label: string; value: string }[];
+  cta: string;
+  includes?: string;
+  features: string[];
 }
 
-/** The four tiers, with the exact quotas that bound what an Operator can run. */
+/** The tiers meter only what SlideOps provides: the servers you connect, the
+ *  Projects you run, your team seats, and your support. They never cap the CPU,
+ *  memory, or disk on your own servers, that hardware is yours to use in full. */
 const tiers: Tier[] = [
   {
     name: 'Free',
-    blurb: 'Try the whole flow on one server.',
-    quotas: [
-      { label: 'Servers', value: '1' },
-      { label: 'Projects', value: '1' },
-      { label: 'Services', value: '1' },
-      { label: 'vCPU per Service', value: '1.0' },
-      { label: 'Memory per Service', value: '1 GB' },
-      { label: 'Disk per Service', value: '5 GB' },
+    price: '$0',
+    cadence: 'forever',
+    blurb: 'See the whole flow on one server.',
+    cta: 'Start free',
+    features: [
+      '1 server',
+      '1 Project',
+      '1 seat',
+      'Core security on every server',
+      'The full marketplace',
+      '7 days of history',
+      'Community support',
     ],
   },
   {
     name: 'Starter',
-    blurb: 'A few Projects on a small footprint.',
-    quotas: [
-      { label: 'Servers', value: '2' },
-      { label: 'Projects', value: '3' },
-      { label: 'Services', value: '5' },
-      { label: 'vCPU per Service', value: '2.0' },
-      { label: 'Memory per Service', value: '4 GB' },
-      { label: 'Disk per Service', value: '20 GB' },
+    price: '$19',
+    cadence: 'per month',
+    blurb: 'A few Projects across a couple of servers.',
+    cta: 'Get started',
+    includes: 'Everything in Free, plus',
+    features: [
+      '3 servers',
+      '5 Projects',
+      '2 seats',
+      'Automations and scheduling',
+      '30 days of history',
+      'Email support',
     ],
   },
   {
     name: 'Pro',
-    blurb: 'Room to run many Projects on one big server.',
+    price: '$49',
+    cadence: 'per month',
+    blurb: 'Run a real fleet, with your team.',
     highlight: true,
-    quotas: [
-      { label: 'Servers', value: '10' },
-      { label: 'Projects', value: '20' },
-      { label: 'Services', value: '50' },
-      { label: 'vCPU per Service', value: '8.0' },
-      { label: 'Memory per Service', value: '16 GB' },
-      { label: 'Disk per Service', value: '100 GB' },
+    cta: 'Get started',
+    includes: 'Everything in Starter, plus',
+    features: [
+      '15 servers',
+      '30 Projects',
+      '5 seats',
+      'Advanced monitoring and reports',
+      '1 year of history',
+      'Audit trail',
+      'Priority support',
     ],
   },
   {
     name: 'Enterprise',
-    blurb: 'Fleet-scale limits for a whole team.',
-    quotas: [
-      { label: 'Servers', value: '100' },
-      { label: 'Projects', value: '200' },
-      { label: 'Services', value: '500' },
-      { label: 'vCPU per Service', value: '64.0' },
-      { label: 'Memory per Service', value: '256 GB' },
-      { label: 'Disk per Service', value: '1000 GB' },
+    price: 'Custom',
+    blurb: 'For a whole team, at any scale.',
+    cta: 'Talk to us',
+    includes: 'Everything in Pro, plus',
+    features: [
+      'Unlimited servers and Projects',
+      'Unlimited seats',
+      'Single sign-on',
+      'A self-host option',
+      'An SLA and dedicated support',
     ],
   },
 ];
 
-/** Pricing: the four tiers and the exact quotas, with the shared-server story. */
+/** Pricing: we are a command center, not a host, so the tiers meter our service,
+ *  never your server's resources. */
 export function Pricing() {
   const { ref, shown } = useReveal<HTMLDivElement>();
   return (
@@ -72,15 +94,15 @@ export function Pricing() {
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
         <div className="so-rise max-w-2xl">
           <Text variant="caption" tone="accent">
-            Tiers and resource hosting
+            Pricing
           </Text>
           <Text as="h2" variant="h1" className="mt-3">
-            Run many Projects on one server, under hard limits
+            Priced for the command center, not your hardware
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
-            Your tier sets how many servers, Projects, and Services you run, and the CPU, memory, and
-            disk each Service may use. Because every Service runs under a fixed ceiling, several
-            Projects share one large server without fighting for resources.
+            Every Capability runs on your servers, never on ours, so we never cap the CPU, memory, or
+            disk you already own. You use all of it. Your plan sets only what SlideOps provides: the
+            servers you connect, the Projects you run, your team seats, and your support.
           </Text>
         </div>
 
@@ -92,9 +114,7 @@ export function Pricing() {
             <article
               key={tier.name}
               className={`so-stagger relative flex flex-col rounded-xl border p-6 transition-shadow duration-base ease-standard hover:shadow-lg ${
-                tier.highlight
-                  ? 'border-brand bg-app ring-1 ring-brand'
-                  : 'border-border bg-app'
+                tier.highlight ? 'border-brand bg-app ring-1 ring-brand' : 'border-border bg-app'
               }`}
             >
               {tier.highlight ? (
@@ -102,55 +122,68 @@ export function Pricing() {
                   Most popular
                 </span>
               ) : null}
-              <div className="flex items-center gap-2">
-                <Server
-                  width={18}
-                  height={18}
-                  className={tier.highlight ? 'text-brand' : 'text-accent'}
-                  aria-hidden
-                />
-                <Text variant="h3">{tier.name}</Text>
+
+              <Text variant="h3">{tier.name}</Text>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <Text as="span" variant="display" className="text-3xl">
+                  {tier.price}
+                </Text>
+                {tier.cadence ? (
+                  <Text as="span" variant="body-sm" tone="secondary">
+                    {tier.cadence}
+                  </Text>
+                ) : null}
               </div>
               <Text variant="body-sm" tone="secondary" className="mt-2 min-h-10">
                 {tier.blurb}
               </Text>
-              <dl className="mt-5 flex flex-col gap-2.5 border-t border-border pt-5">
-                {tier.quotas.map((quota) => (
-                  <div key={quota.label} className="flex items-baseline justify-between gap-3">
-                    <dt>
-                      <Text as="span" variant="body-sm" tone="secondary">
-                        {quota.label}
-                      </Text>
-                    </dt>
-                    <dd>
-                      <Text as="span" variant="body-sm" className="font-semibold">
-                        {quota.value}
-                      </Text>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <Link to={signUpUrl} className="mt-6 inline-flex">
+
+              <Link to={signUpUrl} className="mt-5 inline-flex">
                 <Button
                   size="md"
                   variant={tier.highlight ? 'primary' : 'secondary'}
                   className="w-full"
                 >
-                  Get started
+                  {tier.cta}
                   <ArrowRight width={16} height={16} aria-hidden />
                 </Button>
               </Link>
+
+              <div className="mt-6 border-t border-border pt-5">
+                {tier.includes ? (
+                  <Text variant="caption" tone="secondary" className="mb-3 block">
+                    {tier.includes}
+                  </Text>
+                ) : null}
+                <ul className="flex flex-col gap-2.5">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2.5">
+                      <Check
+                        width={16}
+                        height={16}
+                        className={`mt-0.5 shrink-0 ${tier.highlight ? 'text-brand' : 'text-accent'}`}
+                        aria-hidden
+                      />
+                      <Text as="span" variant="body-sm">
+                        {feature}
+                      </Text>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </article>
           ))}
         </div>
 
-        <div className="mt-8 flex items-center gap-3 rounded-lg border border-border bg-app p-4">
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-subtle text-success">
-            <Check width={16} height={16} aria-hidden />
+        <div className="mt-8 flex items-start gap-3 rounded-lg border border-border bg-app p-4">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-subtle text-accent">
+            <Server width={16} height={16} aria-hidden />
           </span>
           <Text variant="body-sm" tone="secondary">
-            Every tier includes the full lifecycle: plan, approve, execute, verify, and roll back,
-            with Core security on every server and the marketplace per Project.
+            Your server's resources are yours. If you want to keep Projects from crowding each other,
+            you can cap a Service's CPU and memory yourself, that is your choice on your own server,
+            never a limit we impose. Every plan includes the full lifecycle and Core security on
+            every server.
           </Text>
         </div>
       </div>
