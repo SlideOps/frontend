@@ -1,4 +1,4 @@
-import { listOperations, type Operation } from '@slideops/api-client';
+import { listOperations, type Operation, type OperationStatus } from '@slideops/api-client';
 import { Text } from '@slideops/design-system';
 import { Activity, ChevronRight } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
@@ -35,20 +35,30 @@ function OperationRow({ operation, onOpen }: { operation: Operation; onOpen: () 
 }
 
 /** Which slice of History the Operator is looking at. */
-type HistoryFilter = 'all' | 'required';
+type HistoryFilter = 'all' | 'required' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/** The filter tabs: a label and the Operation status each narrows to. */
+const FILTER_TABS: { key: HistoryFilter; label: string; status?: OperationStatus }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'required', label: 'Required actions', status: 'awaiting_approval' },
+  { key: 'running', label: 'Running', status: 'executing' },
+  { key: 'completed', label: 'Completed', status: 'completed' },
+  { key: 'failed', label: 'Failed', status: 'failed' },
+  { key: 'cancelled', label: 'Cancelled', status: 'cancelled' },
+];
 
 /**
  * History: every past Operation, newest first, each opening its full record.
- * The Required actions filter narrows the list to Operations that are waiting
- * for the Operator's approval, so a missed one is easy to find.
+ * The filter tabs narrow the list by status, so completed, failed, cancelled, or
+ * approval-waiting Operations are each easy to find.
  */
 export function History() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<HistoryFilter>('all');
+  const activeTab = FILTER_TABS.find((tab) => tab.key === filter) ?? { key: 'all', label: 'All' };
   // The load is keyed on the filter so switching it refetches the right slice.
   const { state } = useAsyncData(
-    (signal) =>
-      listOperations(filter === 'required' ? { status: 'awaiting_approval' } : {}, signal),
+    (signal) => listOperations(activeTab.status ? { status: activeTab.status } : {}, signal),
     [filter],
   );
 
@@ -73,37 +83,28 @@ export function History() {
       <div
         role="group"
         aria-label="Filter Operations"
-        className="mb-4 inline-flex gap-1 rounded-lg border border-border bg-surface p-1"
+        className="mb-4 flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1"
       >
-        <button
-          type="button"
-          aria-pressed={filter === 'all'}
-          onClick={() => setFilter('all')}
-          className={
-            filter === 'all'
-              ? `${tabBase} bg-subtle text-ink`
-              : `${tabBase} text-ink-muted hover:text-ink`
-          }
-        >
-          All
-        </button>
-        <button
-          type="button"
-          aria-pressed={filter === 'required'}
-          onClick={() => setFilter('required')}
-          className={
-            filter === 'required'
-              ? `${tabBase} bg-subtle text-ink`
-              : `${tabBase} text-ink-muted hover:text-ink`
-          }
-        >
-          Required actions
-          {requiredCount !== undefined && requiredCount > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-pill border border-warning bg-raised px-1.5 text-xs font-semibold text-warning">
-              {requiredCount}
-            </span>
-          ) : null}
-        </button>
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            aria-pressed={filter === tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={
+              filter === tab.key
+                ? `${tabBase} bg-subtle text-ink`
+                : `${tabBase} text-ink-muted hover:text-ink`
+            }
+          >
+            {tab.label}
+            {tab.key === 'required' && requiredCount !== undefined && requiredCount > 0 ? (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-pill border border-warning bg-raised px-1.5 text-xs font-semibold text-warning">
+                {requiredCount}
+              </span>
+            ) : null}
+          </button>
+        ))}
       </div>
 
       {state.status === 'loading' ? <Loading label="Loading your Operations" /> : null}
@@ -116,11 +117,17 @@ export function History() {
               title="Nothing needs your approval right now"
               description="When an Operation reaches its plan and waits for you, it appears here so you can review and approve it."
             />
-          ) : (
+          ) : filter === 'all' ? (
             <EmptyState
               icon={Activity}
               title="No Operations yet"
               description="When you run a Capability on a Node, it appears here with its status, its plan, and its verification."
+            />
+          ) : (
+            <EmptyState
+              icon={Activity}
+              title={`No ${activeTab.label.toLowerCase()} Operations`}
+              description="Try a different filter to see your other Operations."
             />
           )
         ) : (
