@@ -206,6 +206,10 @@ export function Credentials() {
     const projectById = new Map(data.projects.map((project) => [project.id, project] as const));
 
     return data.operations
+      // Only a completed Operation actually created its credential; a failed
+      // attempt left a sealed value but no usable result, so it must not appear
+      // (which is what showed a failed run as a duplicate of the real one).
+      .filter((operation) => operation.status === 'completed')
       .filter(hasStoredSecret)
       .map((operation) => {
         const node = nodeById.get(operation.node_id) ?? null;
