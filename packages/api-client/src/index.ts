@@ -42,10 +42,12 @@ export {
   discoverNode,
   rotateNodeCredential,
   listNodeUsers,
+  revealNodeCredential,
   type NodeAuth,
   type CreateNodeInput,
   type ServerUser,
   type RotateCredentialInput,
+  type NodeCredential,
 } from './nodes';
 export {
   listCapabilities,

@@ -218,7 +218,7 @@ export function NodeDetail() {
                 node={nodeResult.state.data}
                 onRotated={() => nodeResult.reload()}
               />
-              <ServerUsers nodeId={id} />
+              <ServerUsers nodeId={id} node={nodeResult.state.data} />
             </div>
           </section>
         </>

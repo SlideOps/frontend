@@ -90,3 +90,20 @@ export function rotateNodeCredential(id: string, input: RotateCredentialInput): 
 export function listNodeUsers(id: string, signal?: AbortSignal): Promise<ServerUser[]> {
   return apiRequest<{ users: ServerUser[] }>(`/nodes/${id}/users`, { signal }).then((r) => r.users);
 }
+
+/** The connection credential an Operator stored for a Node, revealed to its owner. */
+export interface NodeCredential {
+  /** Whether the credential is a password or a private_key. */
+  auth_kind: NodeAuthKind;
+  /** The password or the private key itself, for the Operator to use elsewhere. */
+  secret: string;
+}
+
+/**
+ * Reveal the connection credential the Operator stored for a Node, so they can
+ * read or download the very password or private key they gave SlideOps and use
+ * it in another tool. Owner scoped; the value is returned only in the response.
+ */
+export function revealNodeCredential(id: string): Promise<NodeCredential> {
+  return apiRequest<NodeCredential>(`/nodes/${id}/credential/reveal`, { method: 'POST' });
+}

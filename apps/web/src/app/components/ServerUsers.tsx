@@ -3,10 +3,11 @@ import {
   ApiError,
   createOperation,
   listNodeUsers,
+  type Node,
   type ServerUser,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { CheckCircle2, Lock, Trash2, Users } from '@slideops/icons';
+import { CheckCircle2, ChevronRight, Lock, Trash2, Users } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -15,6 +16,7 @@ import { z } from 'zod';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ServerAccountModal } from './ServerAccountModal';
 
 const schema = z.object({
   username: z.string().trim().min(1, 'Enter a username.'),
@@ -44,12 +46,13 @@ function AccessBadge({ level }: { level: ServerUser['access_level'] }) {
  * with is marked and can never be removed, so managing accounts never locks the
  * Operator out.
  */
-export function ServerUsers({ nodeId }: { nodeId: string }) {
+export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
   const navigate = useNavigate();
   const { state } = useAsyncData((signal) => listNodeUsers(nodeId, signal), [nodeId]);
 
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<ServerUser | null>(null);
 
   const {
     register,
@@ -122,20 +125,29 @@ export function ServerUsers({ nodeId }: { nodeId: string }) {
           <ul className="divide-y divide-border">
             {state.data.map((user) => (
               <li key={user.username} className="flex items-center gap-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-ink">{user.username}</span>
-                    {user.connection ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-success">
-                        <Lock width={12} height={12} aria-hidden />
-                        Connection account
-                      </span>
-                    ) : null}
-                    {user.system ? (
-                      <span className="text-xs text-ink-muted">System</span>
-                    ) : null}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAccount(user)}
+                  aria-label={`View details for ${user.username}`}
+                  className="group -my-1 flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <span className="truncate text-sm font-medium text-brand group-hover:text-ink">
+                    {user.username}
+                  </span>
+                  {user.connection ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-success">
+                      <Lock width={12} height={12} aria-hidden />
+                      Connection account
+                    </span>
+                  ) : null}
+                  {user.system ? <span className="text-xs text-ink-muted">System</span> : null}
+                  <ChevronRight
+                    width={14}
+                    height={14}
+                    className="text-ink-muted opacity-0 transition-opacity duration-fast ease-standard group-hover:opacity-100"
+                    aria-hidden
+                  />
+                </button>
                 <AccessBadge level={user.access_level} />
                 {user.connection || user.system ? (
                   <span className="w-9" aria-hidden />
@@ -236,6 +248,13 @@ export function ServerUsers({ nodeId }: { nodeId: string }) {
         confirmVariant="danger"
         onConfirm={runRemove}
         onCancel={() => setPendingRemove(null)}
+      />
+
+      <ServerAccountModal
+        open={selectedAccount !== null}
+        account={selectedAccount}
+        node={node}
+        onClose={() => setSelectedAccount(null)}
       />
     </Card>
   );

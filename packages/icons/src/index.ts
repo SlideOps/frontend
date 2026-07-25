@@ -13,6 +13,7 @@ export {
   Check,
   CheckCheck,
   CheckCircle2,
+  Download,
   History,
   RotateCcw,
   ChevronDown,
