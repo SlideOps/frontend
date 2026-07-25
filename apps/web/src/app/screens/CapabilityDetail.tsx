@@ -10,12 +10,24 @@ import {
   type Operation,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ArrowRight, History, Layers, ListChecks, Play, Server, ShieldCheck } from '@slideops/icons';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Database,
+  History,
+  KeyRound,
+  Layers,
+  ListChecks,
+  Play,
+  Server,
+  ShieldCheck,
+} from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { completedHint, completionLabel } from '../capability-completion';
+import { databaseManageStep } from '../database-credentials';
 import { CompletionBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -120,6 +132,62 @@ function CapabilityHere({
 }
 
 /**
+ * The next step after a database server is installed. Installing a database
+ * starts the server but creates no application database, account, or password, so
+ * an Operator has no credential and no obvious way forward. This calm callout
+ * points at the manage Capability that creates that database, account, and
+ * password. It shows only when this install is done on the server in context and
+ * its manage step is not yet done there; once the manage step is done, the
+ * credentials appear on their own and this steps aside. It renders nothing when
+ * the Capability is not a database install, so a non-database page is untouched.
+ */
+function CreateDatabaseCredentials({
+  capabilityKey,
+  states,
+  nodeId,
+  projectId,
+}: {
+  capabilityKey: string;
+  states: Record<string, CapabilityState>;
+  nodeId: string;
+  projectId?: string;
+}) {
+  const navigate = useNavigate();
+  const step = databaseManageStep(capabilityKey);
+  if (!step) {
+    return null;
+  }
+  const installDone = Boolean(states[capabilityKey]);
+  const manageDone = Boolean(states[step.manageKey]);
+  if (!installDone || manageDone) {
+    return null;
+  }
+
+  const manageHref = `/app/capabilities/${step.manageKey}?node=${nodeId}${
+    projectId ? `&project=${projectId}` : ''
+  }`;
+
+  return (
+    <Card className="flex flex-col gap-4 border-brand">
+      <div className="flex items-center gap-2">
+        <Database width={18} height={18} className="text-brand" aria-hidden />
+        <Text variant="h4">One more step for a credential</Text>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        {step.name} is installed and running. Create a database and account to get connection
+        credentials, including a password, that you can use in your app.
+      </Text>
+      <div>
+        <Button size="sm" onClick={() => navigate(manageHref)}>
+          <KeyRound width={15} height={15} aria-hidden />
+          Create database and account
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The Capability detail: the outcome it delivers, the intent behind it, its
  * risk, the platforms it supports, and how verification proves it worked. When
  * the Operator arrives with a server in context, it also shows whether the
@@ -150,7 +218,11 @@ export function CapabilityDetail() {
         : Promise.resolve({}),
     [preselectedNode, preselectedProject],
   );
-  const done = statesResult.state.status === 'ready' ? statesResult.state.data[key] : undefined;
+  // The done-state of every Capability on the server in context, so a done
+  // install can tell whether its matching manage step has been done too. While it
+  // loads or if it fails, this stays empty and any nudge it would drive is hidden.
+  const states = statesResult.state.status === 'ready' ? statesResult.state.data : {};
+  const done = states[key];
 
   return (
     <OperatorShell active="capabilities">
@@ -198,6 +270,14 @@ export function CapabilityDetail() {
                   capabilityKey={key}
                   done={done}
                   nodes={nodes}
+                />
+              ) : null}
+              {preselectedNode ? (
+                <CreateDatabaseCredentials
+                  capabilityKey={key}
+                  states={states}
+                  nodeId={preselectedNode}
+                  projectId={preselectedProject}
                 />
               ) : null}
               {capabilityResult.state.data.requirements &&
