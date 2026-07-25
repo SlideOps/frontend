@@ -110,7 +110,8 @@ export function ProjectGitHub() {
               <Text variant="body-sm" tone="secondary">
                 Connected as{' '}
                 <span className="font-medium text-ink">{state.data.status.login ?? 'your account'}</span>.
-                Deploys can pull from the repositories below.
+                Deploys can pull from the{' '}
+                {state.data.repos.length > 0 ? `${state.data.repos.length} ` : ''}repositories below.
               </Text>
               <Button variant="ghost" size="sm" onClick={() => setConfirmDisconnect(true)}>
                 Disconnect
@@ -118,9 +119,10 @@ export function ProjectGitHub() {
             </div>
 
             {state.data.repos.length > 0 ? (
-              <ul className="divide-y divide-border">
-                {state.data.repos.map((repo) => (
-                  <li key={repo.full_name} className="flex items-center gap-3 py-2.5">
+              <div className="max-h-80 overflow-y-auto rounded-md border border-border">
+                <ul className="divide-y divide-border">
+                  {state.data.repos.map((repo) => (
+                    <li key={repo.full_name} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm font-medium text-ink">{repo.full_name}</span>
@@ -144,9 +146,10 @@ export function ProjectGitHub() {
                       Open
                       <ArrowUpRight width={14} height={14} aria-hidden />
                     </a>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : (
               <Text variant="body-sm" tone="secondary">
                 No repositories are visible to this GitHub account yet.
