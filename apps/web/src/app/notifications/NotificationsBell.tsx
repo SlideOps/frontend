@@ -1,8 +1,17 @@
 import { cn } from '@slideops/design-system';
-import { Bell, BellRing, CheckCheck, CheckCircle2, Info, XCircle } from '@slideops/icons';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  BellRing,
+  CheckCheck,
+  CheckCircle2,
+  Info,
+  XCircle,
+} from '@slideops/icons';
 import { Guidance, Popover } from '@slideops/tooltips';
 import { useNavigate } from 'react-router-dom';
-import type { NotificationTone } from './store';
+import type { AppNotification, NotificationTone } from './store';
 import { useNotificationsStore } from './store';
 
 const toneIcon: Record<NotificationTone, typeof CheckCircle2> = {
@@ -16,6 +25,14 @@ const toneColor: Record<NotificationTone, string> = {
   danger: 'text-danger',
   info: 'text-info',
 };
+
+/** A pending action reads with its own warning-toned mark; other results follow their tone. */
+function notificationIcon(item: AppNotification): { Icon: typeof CheckCircle2; color: string } {
+  if (item.kind === 'action_required') {
+    return { Icon: AlertTriangle, color: 'text-warning' };
+  }
+  return { Icon: toneIcon[item.tone], color: toneColor[item.tone] };
+}
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -146,22 +163,32 @@ export function NotificationsBell() {
         ) : (
           <ul className="mt-2 flex max-h-80 flex-col divide-y divide-border overflow-y-auto">
             {items.slice(0, 12).map((item) => {
-              const Icon = toneIcon[item.tone];
+              const { Icon, color } = notificationIcon(item);
+              const target = item.href ?? `/app/operations/${item.operationId}`;
+              const pending = item.kind === 'action_required';
               return (
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => navigate(`/app/operations/${item.operationId}`)}
+                    onClick={() => navigate(target)}
                     className={cn(
                       'flex w-full items-start gap-2 py-2 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                       item.read ? undefined : 'font-medium',
                     )}
                   >
-                    <Icon width={16} height={16} className={cn('mt-0.5 shrink-0', toneColor[item.tone])} aria-hidden />
+                    <Icon width={16} height={16} className={cn('mt-0.5 shrink-0', color)} aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-ink">{item.title}</span>
                       <span className="mt-0.5 block truncate text-xs text-ink-muted">{item.body}</span>
-                      <span className="mt-0.5 block text-[11px] text-ink-muted">{relativeTime(item.at)}</span>
+                      <span className="mt-0.5 flex items-center gap-2">
+                        <span className="text-[11px] text-ink-muted">{relativeTime(item.at)}</span>
+                        {pending ? (
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-warning">
+                            Review
+                            <ArrowRight width={12} height={12} aria-hidden />
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                   </button>
                 </li>

@@ -17,10 +17,31 @@ function event(over: Partial<OperationEvent>): OperationEvent {
 }
 
 describe('notificationFromEvent', () => {
-  it('ignores logs, steps, and status ticks', () => {
+  it('ignores logs, steps, and status ticks other than awaiting_approval', () => {
     expect(notificationFromEvent(event({ type: 'operation.log' }))).toBeNull();
     expect(notificationFromEvent(event({ type: 'operation.step' }))).toBeNull();
     expect(notificationFromEvent(event({ type: 'operation.status' }))).toBeNull();
+    expect(
+      notificationFromEvent(event({ type: 'operation.status', data: { status: 'executing' } })),
+    ).toBeNull();
+  });
+
+  it('turns an awaiting_approval status into a persistent action_required notification', () => {
+    const result = notificationFromEvent(
+      event({
+        type: 'operation.status',
+        operation_id: 'op_42',
+        data: { status: 'awaiting_approval' },
+        message: 'The plan is ready for your approval.',
+      }),
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe('action_required');
+    expect(result?.tone).toBe('info');
+    expect(result?.persistent).toBe(true);
+    expect(result?.href).toBe('/app/operations/op_42');
+    expect(result?.body).toBe('The plan is ready for your approval.');
   });
 
   it('turns a passed verification into a success notification', () => {

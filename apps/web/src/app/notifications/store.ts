@@ -16,12 +16,16 @@ export interface AppNotification {
   /** Stable id from the Operation and event seq, so a replayed event never doubles. */
   id: string;
   operationId: string;
-  kind: 'completion' | 'verification';
+  kind: 'completion' | 'verification' | 'action_required';
   tone: NotificationTone;
   title: string;
   body: string;
   at: string;
   read: boolean;
+  /** Where the Operator should go to act, when the notification asks for one. */
+  href?: string;
+  /** A notification that waits until it is acted on rather than easing away. */
+  persistent?: boolean;
 }
 
 /** Read a string field from an event's open data bag, or undefined. */
@@ -32,8 +36,9 @@ function readString(data: Record<string, unknown>, key: string): string | undefi
 
 /**
  * Turn one Operation event into a notification, or null when the event is not
- * one an Operator needs to be told about. Only completion and verification
- * events become notifications; logs, steps, and status ticks do not.
+ * one an Operator needs to be told about. Completion, verification, and the
+ * awaiting_approval status become notifications; logs, steps, and every other
+ * status tick do not.
  */
 export function notificationFromEvent(event: OperationEvent): AppNotification | null {
   const base = {
@@ -42,6 +47,20 @@ export function notificationFromEvent(event: OperationEvent): AppNotification | 
     at: event.at,
     read: false,
   };
+
+  // A plan reaching approval is the one status tick that demands the Operator.
+  // It waits on screen until acted on and links straight to the Operation.
+  if (event.type === 'operation.status' && readString(event.data, 'status') === 'awaiting_approval') {
+    return {
+      ...base,
+      kind: 'action_required',
+      tone: 'info',
+      title: 'Action required',
+      body: event.message || 'A plan is ready for your approval.',
+      href: `/app/operations/${event.operation_id}`,
+      persistent: true,
+    };
+  }
 
   if (event.type === 'operation.verification') {
     const passed = event.data.passed === true || event.level === 'info';
