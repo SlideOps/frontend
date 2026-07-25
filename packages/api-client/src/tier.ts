@@ -1,4 +1,4 @@
-import { apiRequest, unwrap } from './http';
+import { apiRequest } from './http';
 
 /*
  * The Tier surface. Every Operator sits on one of four tiers, and each tier
@@ -40,7 +40,10 @@ export interface TierInfo {
 
 /** Read the Operator's tier, its limits, and current usage. */
 export function getTier(signal?: AbortSignal): Promise<TierInfo> {
-  return apiRequest<unknown>('/tier', { signal }).then((r) => unwrap<TierInfo>(r, 'tier'));
+  // The tier read is a flat object: tier is the plan name, alongside limits and
+  // usage. It is not wrapped under a "tier" key, so it is returned as is (a bare
+  // envelope value would still be this shape).
+  return apiRequest<TierInfo>('/tier', { signal });
 }
 
 /** Move an Operator to a tier. Admin only, audited by the backend. */

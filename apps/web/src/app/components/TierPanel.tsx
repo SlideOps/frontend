@@ -61,7 +61,18 @@ function Feature({ label, on }: { label: string; on: boolean }) {
 }
 
 function TierQuotas({ tier }: { tier: TierInfo }) {
-  const { limits, usage } = tier;
+  // Defend against a partial payload so a shape surprise never takes down the
+  // whole Workspace; a real read always carries both.
+  const limits = tier.limits ?? {
+    nodes: 0,
+    projects: 0,
+    seats: 0,
+    history_days: 0,
+    automations: false,
+    advanced_monitoring: false,
+    audit_trail: false,
+  };
+  const usage = tier.usage ?? { nodes: 0, projects: 0 };
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
