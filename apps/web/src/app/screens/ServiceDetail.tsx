@@ -21,6 +21,7 @@ import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
+import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface DetailData {
@@ -245,6 +246,8 @@ export function ServiceDetail() {
                   </SummaryRow>
                 </dl>
               </Card>
+
+              <ServiceUpdatePanel service={service} onDeployed={reload} />
 
               <Card className="h-fit">
                 <div className="flex items-center gap-2">

@@ -55,8 +55,29 @@ export interface Service {
   ports?: ServicePort[];
   status: ServiceStatus;
   container_ref?: string;
+  /**
+   * The full git SHA the Service last deployed from a repository source. Empty
+   * before the first repository deploy, and unset for an image source.
+   */
+  deployed_commit?: string;
   created_at: string;
   updated_at?: string;
+}
+
+/**
+ * The result of checking whether a repository backed Service is behind its
+ * branch. `update_available` is true when the remote branch head differs from
+ * the deployed commit; `reason` explains a false or edge result (for example an
+ * image source, or no deployed commit recorded yet). Field names mirror the
+ * backend contract exactly.
+ */
+export interface ServiceUpdate {
+  source: string;
+  branch: string;
+  deployed_commit: string;
+  latest_commit: string;
+  update_available: boolean;
+  reason: string;
 }
 
 /** Live resource usage for one Service, read over SSH. */
@@ -179,5 +200,27 @@ export async function getServiceLogs(id: string, tail = 200, signal?: AbortSigna
 export function getServiceMetrics(id: string, signal?: AbortSignal): Promise<ServiceMetrics> {
   return apiRequest<unknown>(`/services/${id}/metrics`, { signal }).then((r) =>
     unwrap<ServiceMetrics>(r, 'metrics'),
+  );
+}
+
+/**
+ * Check whether a Service's repository has a newer commit than the one it is
+ * running. This only observes; it never changes the Service. An image source
+ * comes back with update_available false and a reason naming why.
+ */
+export function checkServiceUpdate(id: string, signal?: AbortSignal): Promise<ServiceUpdate> {
+  return apiRequest<unknown>(`/services/${id}/update-check`, { signal }).then((r) =>
+    unwrap<ServiceUpdate>(r, 'update'),
+  );
+}
+
+/**
+ * Redeploy a Service to the latest commit on its branch: pull, rebuild, and
+ * rerun. Returns the Service at status deploying. The backend maps a missing
+ * Service to 404 and an already removed one to 409, both surfaced as ApiError.
+ */
+export function redeployService(id: string): Promise<Service> {
+  return apiRequest<unknown>(`/services/${id}/redeploy`, { method: 'POST' }).then((r) =>
+    unwrap<Service>(r, 'service'),
   );
 }

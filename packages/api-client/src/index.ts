@@ -164,12 +164,15 @@ export {
   removeService,
   getServiceLogs,
   getServiceMetrics,
+  checkServiceUpdate,
+  redeployService,
   type Service,
   type ServiceSource,
   type ServicePort,
   type ServiceRuntime,
   type ServiceStatus,
   type ServiceMetrics,
+  type ServiceUpdate,
   type DeployServiceInput,
 } from './services';
 export {

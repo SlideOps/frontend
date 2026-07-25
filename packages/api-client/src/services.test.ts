@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  checkServiceUpdate,
   deployService,
   getServiceLogs,
   getServiceMetrics,
   listServices,
+  redeployService,
   removeService,
   startService,
 } from './services';
@@ -152,5 +154,56 @@ describe('services requests', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(textResponse(200, 'plain log text'));
     const logs = await getServiceLogs('sv_1');
     expect(logs).toBe('plain log text');
+  });
+
+  it('checks for an update over the same origin with cookies and unwraps the envelope', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        update: {
+          source: 'repository',
+          branch: 'main',
+          deployed_commit: 'aaaaaaa',
+          latest_commit: 'bbbbbbb',
+          update_available: true,
+          reason: '',
+        },
+      }),
+    );
+
+    const update = await checkServiceUpdate('sv_1');
+
+    expect(update.update_available).toBe(true);
+    expect(update.latest_commit).toBe('bbbbbbb');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method ?? 'GET').toBe('GET');
+    expect(init?.credentials).toBe('include');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/update-check');
+  });
+
+  it('redeploys a Service and returns it at status deploying', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(202, {
+        service: { id: 'sv_1', name: 'web', status: 'deploying', runtime: 'container' },
+      }),
+    );
+
+    const service = await redeployService('sv_1');
+
+    expect(service.id).toBe('sv_1');
+    expect(service.status).toBe('deploying');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/redeploy');
+  });
+
+  it('surfaces a typed error when a redeploy target is already removed', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(409, {
+        error: { code: 'conflict', message: 'This Service was already removed.' },
+      }),
+    );
+
+    await expect(redeployService('sv_1')).rejects.toMatchObject({ name: 'ApiError', status: 409 });
   });
 });
