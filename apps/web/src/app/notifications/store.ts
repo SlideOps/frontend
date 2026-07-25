@@ -97,6 +97,22 @@ export function notificationFromEvent(event: OperationEvent): AppNotification | 
   return null;
 }
 
+/**
+ * Whether an event means its Operation is no longer awaiting the Operator's
+ * approval, so a pending action-required notification for it should be cleared.
+ * It is true once the Operation is approved, running, verifying, or finished.
+ */
+export function isPastApproval(event: OperationEvent): boolean {
+  if (event.type === 'operation.completed' || event.type === 'operation.verification') {
+    return true;
+  }
+  if (event.type === 'operation.status') {
+    const status = readString(event.data, 'status');
+    return status !== undefined && status !== 'awaiting_approval';
+  }
+  return false;
+}
+
 export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported';
 
 interface NotificationsState {
@@ -110,6 +126,12 @@ interface NotificationsState {
   push: (notification: AppNotification) => void;
   markAllRead: () => void;
   dismiss: (id: string) => void;
+  /**
+   * Clear any pending action-required notification for an Operation once it is no
+   * longer awaiting approval, so a popup never lingers saying an action is needed
+   * after the Operation has already been approved or has moved on.
+   */
+  resolveAction: (operationId: string) => void;
   clear: () => void;
   /** Reflect the current browser permission into the store. */
   syncPushPermission: () => void;
@@ -154,6 +176,17 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   dismiss(id) {
     set((state) => {
       const items = state.items.filter((item) => item.id !== id);
+      return { items, unread: unreadCount(items) };
+    });
+  },
+  resolveAction(operationId) {
+    set((state) => {
+      const items = state.items.filter(
+        (item) => !(item.kind === 'action_required' && item.operationId === operationId),
+      );
+      if (items.length === state.items.length) {
+        return state;
+      }
       return { items, unread: unreadCount(items) };
     });
   },

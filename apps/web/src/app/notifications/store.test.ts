@@ -1,6 +1,6 @@
 import type { OperationEvent } from '@slideops/api-client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { notificationFromEvent, useNotificationsStore } from './store';
+import { isPastApproval, notificationFromEvent, useNotificationsStore } from './store';
 
 /** Build an Operation event with sensible defaults for a notification test. */
 function event(over: Partial<OperationEvent>): OperationEvent {
@@ -42,6 +42,34 @@ describe('notificationFromEvent', () => {
     expect(result?.persistent).toBe(true);
     expect(result?.href).toBe('/app/operations/op_42');
     expect(result?.body).toBe('The plan is ready for your approval.');
+  });
+
+  it('detects when an Operation has moved past awaiting approval', () => {
+    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'awaiting_approval' } }))).toBe(
+      false,
+    );
+    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'approved' } }))).toBe(true);
+    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'executing' } }))).toBe(true);
+    expect(isPastApproval(event({ type: 'operation.completed' }))).toBe(true);
+    expect(isPastApproval(event({ type: 'operation.log' }))).toBe(false);
+  });
+
+  it('resolveAction clears a pending action-required popup once the Operation advances', () => {
+    const store = useNotificationsStore.getState();
+    store.clear();
+    const pending = notificationFromEvent(
+      event({ type: 'operation.status', operation_id: 'op_9', data: { status: 'awaiting_approval' } }),
+    );
+    store.push(pending!);
+    expect(useNotificationsStore.getState().items).toHaveLength(1);
+
+    // An unrelated Operation advancing leaves it in place.
+    useNotificationsStore.getState().resolveAction('op_other');
+    expect(useNotificationsStore.getState().items).toHaveLength(1);
+
+    // The same Operation advancing clears it.
+    useNotificationsStore.getState().resolveAction('op_9');
+    expect(useNotificationsStore.getState().items).toHaveLength(0);
   });
 
   it('turns a passed verification into a success notification', () => {

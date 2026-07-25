@@ -1,7 +1,7 @@
 import { openOperationStream } from '@slideops/api-client';
 import { useEffect, type ReactNode } from 'react';
 import { useAuthStore } from '../../store/auth';
-import { notificationFromEvent, useNotificationsStore } from './store';
+import { isPastApproval, notificationFromEvent, useNotificationsStore } from './store';
 import { Toaster } from './Toaster';
 
 /**
@@ -24,6 +24,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     const handle = openOperationStream({
       onEvent: (event) => {
+        // Once an Operation is approved or moves on, clear any pending
+        // action-required popup for it, so it never lingers demanding an action
+        // that is already done.
+        if (isPastApproval(event)) {
+          useNotificationsStore.getState().resolveAction(event.operation_id);
+        }
         const notification = notificationFromEvent(event);
         if (!notification) {
           return;
