@@ -15,6 +15,7 @@ import { CapabilityCard } from '../components/CapabilityCard';
 import { CredentialRotation } from '../components/CredentialRotation';
 import { DiscoveryScan } from '../components/DiscoveryScan';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { NodeCapacity } from '../components/NodeCapacity';
 import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
 import { RevealValue } from '../components/RevealValue';
@@ -126,6 +127,8 @@ export function NodeDetail() {
                 <SummaryRow label="Status" value={nodeResult.state.data.status} />
               </dl>
             </Card>
+
+            <NodeCapacity nodeId={id} />
 
             <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
             </div>

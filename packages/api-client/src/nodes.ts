@@ -1,5 +1,5 @@
 import { apiRequest } from './http';
-import type { DiscoveryResult, Node, NodeAuthKind } from './types';
+import type { Assessment, DiscoveryResult, Facts, Node, NodeAuthKind } from './types';
 
 /** The Nodes surface. A Node is one Linux machine reached over SSH. */
 
@@ -71,6 +71,28 @@ export function removeNode(id: string): Promise<void> {
  */
 export function discoverNode(id: string, signal?: AbortSignal): Promise<DiscoveryResult> {
   return apiRequest<DiscoveryResult>(`/nodes/${id}/discover`, { method: 'POST', signal });
+}
+
+/**
+ * The most recent Discovery already saved for a Node, read back with no SSH
+ * re-run. `found` is false when the Node has never been discovered, in which case
+ * the Facts and Assessment are absent. `at` is when that Discovery was saved.
+ */
+export interface SavedDiscovery {
+  found: boolean;
+  facts?: Facts;
+  assessment?: Assessment;
+  at?: string;
+}
+
+/**
+ * Read the last saved Discovery for a Node without connecting to it. Unlike
+ * discoverNode this never touches the server over SSH; it returns whatever
+ * Discovery last recorded, so the capacity view can render on load. When the Node
+ * has never been discovered `found` is false and no Facts come back.
+ */
+export function getSavedDiscovery(id: string, signal?: AbortSignal): Promise<SavedDiscovery> {
+  return apiRequest<SavedDiscovery>(`/nodes/${id}/discovery`, { signal });
 }
 
 /**

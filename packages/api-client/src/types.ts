@@ -254,9 +254,30 @@ export interface Facts {
   services?: string[];
   listening_ports?: string[];
   cpu?: { model?: string; cores?: number };
-  memory?: { total?: string; used?: string };
+  /**
+   * The installed memory. `total_kb` is the machine-readable size Discovery
+   * saves; `total`/`used` are the older human strings. Kept side by side so the
+   * capacity view can read the number without breaking any existing reader.
+   */
+  memory?: { total?: string; used?: string; total_kb?: number };
   disk?: { total?: string; used?: string };
-  disks?: Array<{ device?: string; total?: string; used?: string; mount?: string }>;
+  /**
+   * Each mounted filesystem. `size_kb`/`used_kb`/`avail_kb`/`use_percent` are the
+   * machine-readable fields Discovery saves (mirroring df), added beside the
+   * older `device`/`total`/`used`/`mount` strings so no existing reader breaks.
+   */
+  disks?: Array<{
+    device?: string;
+    total?: string;
+    used?: string;
+    mount?: string;
+    filesystem?: string;
+    mount_point?: string;
+    size_kb?: number;
+    used_kb?: number;
+    avail_kb?: number;
+    use_percent?: number | string;
+  }>;
   containers?: { docker_present?: boolean; runtime?: string };
   firewall?: { backend?: string; active?: boolean };
   web_servers?: { caddy_present?: boolean; nginx_present?: boolean };

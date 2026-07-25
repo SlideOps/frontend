@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createNode,
   discoverNode,
+  getSavedDiscovery,
   listNodeUsers,
   listNodes,
   rotateNodeCredential,
@@ -82,6 +83,38 @@ describe('nodes requests', () => {
 
     expect(result.facts.os?.id).toBe('debian');
     expect(result.assessment.recommendations[0]?.capability_key).toBe('secure-ssh');
+  });
+
+  it('reads the saved discovery over the same origin with cookies, no SSH re-run', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        found: true,
+        at: '2026-07-20T10:00:00Z',
+        facts: { cpu: { cores: 4 }, memory: { total_kb: 8_192_000 } },
+        assessment: { summary: 'Ready.', findings: [], recommendations: [] },
+      }),
+    );
+
+    const saved = await getSavedDiscovery('nd_1');
+
+    expect(saved.found).toBe(true);
+    expect(saved.facts?.cpu?.cores).toBe(4);
+    expect(saved.facts?.memory?.total_kb).toBe(8_192_000);
+    expect(saved.at).toBe('2026-07-20T10:00:00Z');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method ?? 'GET').toBe('GET');
+    expect(init?.credentials).toBe('include');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/nodes/nd_1/discovery');
+  });
+
+  it('reports found:false for a Node that has never been discovered', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { found: false }));
+
+    const saved = await getSavedDiscovery('nd_2');
+
+    expect(saved.found).toBe(false);
+    expect(saved.facts).toBeUndefined();
+    expect(saved.assessment).toBeUndefined();
   });
 
   it('throws a typed ApiError carrying the backend message on failure', async () => {
