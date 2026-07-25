@@ -75,6 +75,9 @@ const AutomationDetail = lazy(() =>
 const Extensions = lazy(() =>
   import('./app/screens/Extensions').then((m) => ({ default: m.Extensions })),
 );
+const Credentials = lazy(() =>
+  import('./app/screens/Credentials').then((m) => ({ default: m.Credentials })),
+);
 const History = lazy(() => import('./app/screens/History').then((m) => ({ default: m.History })));
 const OperationDetail = lazy(() =>
   import('./app/screens/OperationDetail').then((m) => ({ default: m.OperationDetail })),
@@ -157,6 +160,7 @@ export function App() {
           <Route path="extensions" element={<Extensions />} />
           <Route path="operations" element={<History />} />
           <Route path="operations/:id" element={<OperationDetail />} />
+          <Route path="credentials" element={<Credentials />} />
           <Route path="reports" element={<Reports />} />
           <Route path="billing" element={<Billing />} />
           <Route path="security" element={<Security />} />

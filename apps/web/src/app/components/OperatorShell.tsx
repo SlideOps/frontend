@@ -6,6 +6,7 @@ import {
   CreditCard,
   FileText,
   FolderKanban,
+  KeyRound,
   LayoutDashboard,
   Layers,
   Package,
@@ -32,6 +33,7 @@ export type ActiveKey =
   | 'marketplace'
   | 'automations'
   | 'operations'
+  | 'credentials'
   | 'reports'
   | 'billing'
   | 'security'
@@ -155,6 +157,13 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Activity,
       active: active === 'operations',
       onSelect: () => navigate('/app/operations'),
+    },
+    {
+      key: 'credentials',
+      label: 'Credentials',
+      icon: KeyRound,
+      active: active === 'credentials',
+      onSelect: () => navigate('/app/credentials'),
     },
     {
       key: 'reports',
