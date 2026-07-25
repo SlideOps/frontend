@@ -111,6 +111,60 @@
   .so-toast {
     animation: so-toast-in var(--so-duration-base) var(--so-ease-entrance) both;
   }
+
+  /* Gentle ambient float for the hero cluster and its chips. Transform only, so
+     it is cheap, and the global reduced-motion guard halts it. */
+  @keyframes so-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  .so-float {
+    animation: so-float 6s var(--so-ease-standard) infinite;
+  }
+  .so-float-slow {
+    animation: so-float 9s var(--so-ease-standard) infinite;
+  }
+  .so-float-delay {
+    animation-delay: -3.5s;
+  }
+
+  /* A terminal caret blink and a soft posture pulse, decoration only. */
+  @keyframes so-blink {
+    0%,
+    45% {
+      opacity: 1;
+    }
+    50%,
+    95% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  .so-blink {
+    animation: so-blink 1.2s steps(1, end) infinite;
+  }
+
+  @keyframes so-pulse-soft {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.4);
+    }
+  }
+  .so-pulse-soft {
+    animation: so-pulse-soft 2.6s var(--so-ease-standard) infinite;
+  }
 }
 
 /* Documentation styling for markdown rendered by react-markdown. Every value is
