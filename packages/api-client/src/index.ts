@@ -128,6 +128,7 @@ export {
   type UpdatePluginInput,
 } from './marketplace';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
+export { getSampleApp, type SampleApp } from './sample-app';
 export {
   getSubscription,
   startCheckout,
