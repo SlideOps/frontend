@@ -9,7 +9,7 @@ import {
   type Operation,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, History, Layers, Play, Server, ShieldCheck } from '@slideops/icons';
+import { ArrowLeft, ArrowRight, History, Layers, ListChecks, Play, Server, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import type { ReactNode } from 'react';
@@ -170,6 +170,51 @@ export function CapabilityDetail() {
                   done={done}
                 />
               ) : null}
+              {capabilityResult.state.data.requirements &&
+              capabilityResult.state.data.requirements.length > 0 ? (
+                <Card className="flex flex-col gap-4 border-warning">
+                  <div className="flex items-center gap-2">
+                    <ListChecks width={18} height={18} className="text-warning" aria-hidden />
+                    <Text variant="h4">Before you start</Text>
+                  </div>
+                  <Text variant="body-sm" tone="secondary">
+                    Set these up first so this Capability works the way you expect.
+                  </Text>
+                  <div className="flex flex-col gap-3">
+                    {capabilityResult.state.data.requirements.map((requirement) => (
+                      <div key={requirement.kind} className="rounded-md border border-border bg-subtle p-4">
+                        <Text variant="body-sm" className="font-medium text-ink">
+                          {requirement.title}
+                        </Text>
+                        <Text variant="body-sm" tone="secondary" className="mt-1">
+                          {requirement.description}
+                        </Text>
+                        <Text variant="body-sm" tone="secondary" className="mt-2">
+                          <span className="font-medium text-ink">How: </span>
+                          {requirement.how_to}
+                        </Text>
+                        {requirement.setup_capability_key || requirement.setup_path ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                requirement.setup_capability_key
+                                  ? `/app/capabilities/${requirement.setup_capability_key}`
+                                  : (requirement.setup_path ?? '/app'),
+                              )
+                            }
+                            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          >
+                            Set this up
+                            <ArrowRight width={15} height={15} aria-hidden />
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
+
               <Card className="flex flex-col gap-5">
                 <Section title="Outcome" guidanceKey="capability.outcome">
                   <Text variant="body" tone="secondary">

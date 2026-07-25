@@ -98,6 +98,21 @@ export interface CapabilityParameter {
 }
 
 /**
+ * A configuration prerequisite a Capability needs before it works: a connected
+ * account, a domain, a destination. It is not another Capability; it names
+ * something the Operator sets up, why, and how, with an optional Capability or
+ * app path that sets it up.
+ */
+export interface CapabilityRequirement {
+  kind: string;
+  title: string;
+  description: string;
+  how_to: string;
+  setup_capability_key?: string;
+  setup_path?: string;
+}
+
+/**
  * A Capability is technology independent metadata: what outcome it delivers,
  * where it applies, how risky it is, and any inputs it needs. The catalog
  * exposes these.
@@ -113,6 +128,8 @@ export interface Capability {
   verification_strategy?: string;
   /** The inputs this Capability needs. Empty when it needs none. */
   parameters?: CapabilityParameter[];
+  /** Configuration prerequisites to set up before this works. Empty when none. */
+  requirements?: CapabilityRequirement[];
   /**
    * The Plugin this Capability comes from. Core Capabilities carry no Plugin
    * source (or report `core`); a Capability unlocked by an installed Plugin

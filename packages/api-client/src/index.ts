@@ -205,6 +205,7 @@ export type {
   Capability,
   CapabilityParameter,
   CapabilityParameterType,
+  CapabilityRequirement,
   PlanStep,
   Plan,
   VerificationCheck,
