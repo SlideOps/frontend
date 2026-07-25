@@ -222,15 +222,34 @@ export interface Operation {
  * staying open to extra keys so new Facts never break rendering.
  */
 export interface Facts {
-  os?: { id?: string; version?: string; pretty_name?: string };
+  os?: { id?: string; version?: string; version_id?: string; name?: string; pretty_name?: string };
   kernel?: string;
   package_manager?: string;
+  service_manager?: string;
+  pending_updates?: number;
   packages?: string[];
   services?: string[];
   listening_ports?: string[];
   cpu?: { model?: string; cores?: number };
   memory?: { total?: string; used?: string };
   disk?: { total?: string; used?: string };
+  disks?: Array<{ device?: string; total?: string; used?: string; mount?: string }>;
+  containers?: { docker_present?: boolean; runtime?: string };
+  firewall?: { backend?: string; active?: boolean };
+  web_servers?: { caddy_present?: boolean; nginx_present?: boolean };
+  git?: { present?: boolean; version?: string };
+  databases?: Array<{ engine?: string; version?: string; running?: boolean }>;
+  tls?: { lets_encrypt_present?: boolean; certificate_names?: string[] };
+  human_accounts?: number;
+  ssh?: {
+    connected_auth_kind?: string;
+    permit_root_login?: string;
+    password_authentication?: boolean;
+    x11_forwarding?: boolean;
+    max_auth_tries?: number;
+    effective_config?: Record<string, string>;
+    [key: string]: unknown;
+  };
   sshd_config?: Record<string, string>;
   ssh_posture?: {
     permit_root_login?: string;
@@ -250,12 +269,20 @@ export interface AssessmentFinding {
 /** A Capability recommended by Assessment, with the reason it applies. */
 export interface AssessmentRecommendation {
   capability_key: string;
+  title?: string;
   reason: string;
+}
+
+/** One plain-language line of what the Node already has, grouped by category. */
+export interface AssessmentInventoryItem {
+  category: string;
+  detail: string;
 }
 
 /** Assessment interprets Facts into plain-language findings and recommendations. */
 export interface Assessment {
   summary: string;
+  inventory?: AssessmentInventoryItem[];
   findings: AssessmentFinding[];
   recommendations: AssessmentRecommendation[];
 }

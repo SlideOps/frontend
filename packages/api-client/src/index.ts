@@ -185,9 +185,12 @@ export {
   getOperation,
   approveOperation,
   cancelOperation,
+  revealOperationSecret,
   type CreateOperationInput,
   type OperationFilter,
+  type RevealedSecret,
 } from './operations';
+export { getCapabilityStates, type CapabilityState } from './capability-states';
 export type {
   Operator,
   OperatorRole,
@@ -210,6 +213,7 @@ export type {
   Facts,
   AssessmentFinding,
   AssessmentRecommendation,
+  AssessmentInventoryItem,
   Assessment,
   DiscoveryResult,
 } from './types';

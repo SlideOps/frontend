@@ -1,6 +1,6 @@
 import { cn } from '@slideops/design-system';
 import type { Capability, OperationStatus, RiskLevel, ServiceStatus } from '@slideops/api-client';
-import { Boxes, ShieldCheck } from '@slideops/icons';
+import { Boxes, CheckCircle2, ShieldCheck } from '@slideops/icons';
 
 /*
  * Small status and risk badges. Every color is a semantic design token, so the
@@ -89,6 +89,21 @@ const riskLabel: Record<RiskLevel, string> = {
 export function RiskBadge({ risk }: { risk: RiskLevel }) {
   const tone = riskTone[risk] ?? 'neutral';
   return <span className={cn(badgeBase, toneClass[tone])}>{riskLabel[risk] ?? risk}</span>;
+}
+
+/**
+ * A badge marking a Capability that has already been carried out on the Node,
+ * the way an app store marks an app as installed. The label is the outcome word
+ * (Installed, Enabled, Configured, Secured, or Done); the success tone and check
+ * icon read the same in both themes.
+ */
+export function CompletionBadge({ label }: { label: string }) {
+  return (
+    <span className={cn(badgeBase, toneClass.success)}>
+      <CheckCircle2 width={12} height={12} aria-hidden />
+      {label}
+    </span>
+  );
 }
 
 /** Whether a Capability comes from the pre-installed Core bundle. */

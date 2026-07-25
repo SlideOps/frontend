@@ -8,7 +8,7 @@ import { Text } from '@slideops/design-system';
  * extra keys so a new Fact shows up without a code change.
  */
 
-function humanize(key: string): string {
+export function humanize(key: string): string {
   const spaced = key.replace(/_/g, ' ').trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
@@ -47,7 +47,7 @@ function isScalar(value: unknown): value is string | number | boolean {
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
-function FactValue({ value }: { value: unknown }) {
+export function FactValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
     return (
       <Text variant="body-sm" tone="secondary">

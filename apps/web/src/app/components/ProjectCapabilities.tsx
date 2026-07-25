@@ -1,11 +1,20 @@
-import { listCapabilities, listProjectNodes, type Capability, type Node } from '@slideops/api-client';
+import {
+  getCapabilityStates,
+  listCapabilities,
+  listProjectNodes,
+  type Capability,
+  type CapabilityState,
+  type Node,
+} from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, Layers, Server } from '@slideops/icons';
+import { ArrowRight, History, Layers, RotateCcw, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { completedHint, completionLabel, RE_RUN_LABEL } from '../capability-completion';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { CompletionBadge } from './Badges';
 import { CapabilityCard } from './CapabilityCard';
 import { ErrorNote, Loading } from './Feedback';
 
@@ -46,9 +55,50 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
   const nodes = ready?.nodes ?? [];
   const chosen = serverId || nodes[0]?.id || '';
 
+  // Which Capabilities are already done on the chosen server, from History, so a
+  // done Capability reads as done and links back to where it happened. It never
+  // blocks the list: while it loads or if it fails, the map stays empty and the
+  // cards simply render without a done badge.
+  const statesResult = useAsyncData<Record<string, CapabilityState>>(
+    (signal) => (chosen ? getCapabilityStates(chosen, projectId, signal) : Promise.resolve({})),
+    [chosen, projectId],
+  );
+  const states = statesResult.state.status === 'ready' ? statesResult.state.data : {};
+
   const startHref = (capability: Capability): string => {
     const base = `/app/capabilities/${capability.key}?node=${chosen}`;
     return isPluginCapability(capability) ? `${base}&project=${projectId}` : base;
+  };
+
+  // A done Capability leads back to its record in History and offers a quieter
+  // Re-run, so it never reads like a fresh first-time action. An undone one keeps
+  // the plain start action.
+  const capabilityFooter = (capability: Capability, done: CapabilityState | undefined) => {
+    if (!done) {
+      return (
+        <Button size="sm" onClick={() => navigate(startHref(capability))}>
+          Start an Operation
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2">
+        <Text variant="caption" tone="secondary">
+          {completedHint(capability.key, done.last_completed_at)}
+        </Text>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => navigate(`/app/operations/${done.last_operation_id}`)}>
+            <History width={15} height={15} aria-hidden />
+            View in History
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => navigate(startHref(capability))}>
+            <RotateCcw width={15} height={15} aria-hidden />
+            {RE_RUN_LABEL}
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -92,19 +142,18 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
                 ))}
               </select>
             </div>
-            <div className="grid gap-4">
-              {ready.capabilities.map((capability) => (
-                <CapabilityCard
-                  key={capability.key}
-                  capability={capability}
-                  footer={
-                    <Button size="sm" onClick={() => navigate(startHref(capability))}>
-                      Start an Operation
-                      <ArrowRight width={15} height={15} aria-hidden />
-                    </Button>
-                  }
-                />
-              ))}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {ready.capabilities.map((capability) => {
+                const done = states[capability.key];
+                return (
+                  <CapabilityCard
+                    key={capability.key}
+                    capability={capability}
+                    badge={done ? <CompletionBadge label={completionLabel(capability.key)} /> : undefined}
+                    footer={capabilityFooter(capability, done)}
+                  />
+                );
+              })}
             </div>
           </>
         )

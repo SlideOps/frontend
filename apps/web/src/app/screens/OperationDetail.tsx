@@ -18,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { LogoLoader } from '../../components/LogoLoader';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { CredentialsCard } from '../components/CredentialsCard';
 import { PlanReview } from '../components/PlanReview';
 import { StepTimeline } from '../components/StepTimeline';
 import { VerificationView } from '../components/VerificationView';
@@ -329,6 +330,8 @@ export function OperationDetail() {
             {operation.verification ? (
               <VerificationView verification={operation.verification} />
             ) : null}
+
+            {status === 'completed' ? <CredentialsCard operation={operation} /> : null}
           </div>
         </div>
       ) : null}

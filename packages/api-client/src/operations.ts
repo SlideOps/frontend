@@ -57,3 +57,27 @@ export function approveOperation(id: string): Promise<void> {
 export function cancelOperation(id: string): Promise<void> {
   return apiRequest<void>(`/operations/${id}/cancel`, { method: 'POST' });
 }
+
+/** One revealed secret parameter: its key and its plaintext value. */
+export interface RevealedSecret {
+  parameter: string;
+  value: string;
+}
+
+/**
+ * Reveal the plaintext of one secret parameter for the Operation's owner. A
+ * parameter is secret exactly when its value in `operation.parameters` is the
+ * literal `"[stored securely]"`; the plaintext lives only behind this call and
+ * never in the Operation record. The session cookie authorizes it, like every
+ * secured call. Fails with a not_found or secret_not_found ApiError.
+ */
+export function revealOperationSecret(
+  operationId: string,
+  paramKey: string,
+  signal?: AbortSignal,
+): Promise<RevealedSecret> {
+  return apiRequest<RevealedSecret>(
+    `/operations/${encodeURIComponent(operationId)}/secrets/${encodeURIComponent(paramKey)}/reveal`,
+    { method: 'POST', signal },
+  );
+}

@@ -3,28 +3,21 @@ import {
   discoverNode,
   getNode,
   listCapabilities,
-  type Assessment,
   type DiscoveryResult,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  RefreshCw,
-  Server,
-  ShieldCheck,
-} from '@slideops/icons';
+import { ArrowLeft, ArrowRight, CheckCircle2, RefreshCw, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CapabilityCard } from '../components/CapabilityCard';
 import { CredentialRotation } from '../components/CredentialRotation';
+import { DiscoveryScan } from '../components/DiscoveryScan';
 import { ErrorNote, Loading } from '../components/Feedback';
-import { FactsView } from '../components/FactsView';
 import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
+import { RevealValue } from '../components/RevealValue';
 import { SecureServer, ServerPosture } from '../components/SecureServer';
 import { ServerUsers } from '../components/ServerUsers';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -38,45 +31,13 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AssessmentView({ assessment }: { assessment: Assessment }) {
+function AddressRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-4">
-      {assessment.summary ? (
-        <Text variant="body" tone="secondary">
-          {assessment.summary}
-        </Text>
-      ) : null}
-      {assessment.findings.length > 0 ? (
-        <ul className="flex flex-col gap-3">
-          {assessment.findings.map((finding, index) => (
-            <li key={index} className="flex items-start gap-3">
-              <ShieldCheck width={18} height={18} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-              <div>
-                <Text variant="body-sm" className="font-medium">
-                  {finding.title}
-                </Text>
-                <Text variant="body-sm" tone="secondary" className="mt-0.5">
-                  {finding.detail}
-                </Text>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {assessment.recommendations.length > 0 ? (
-        <div className="rounded-md border border-border bg-subtle p-4">
-          <Text variant="caption" tone="secondary">
-            Recommended
-          </Text>
-          <ul className="mt-2 flex flex-col gap-2">
-            {assessment.recommendations.map((recommendation, index) => (
-              <li key={index}>
-                <Text variant="body-sm">{recommendation.reason}</Text>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+    <div className="grid grid-cols-[8rem_1fr] items-center gap-3 py-2">
+      <dt className="text-xs font-medium text-ink-muted">{label}</dt>
+      <dd className="min-w-0">
+        <RevealValue value={value} label={label.toLowerCase()} sensitive />
+      </dd>
     </div>
   );
 }
@@ -147,7 +108,7 @@ export function NodeDetail() {
               </div>
               <dl className="divide-y divide-border">
                 <SummaryRow label="Hostname" value={nodeResult.state.data.hostname} />
-                <SummaryRow label="Address" value={nodeResult.state.data.address} />
+                <AddressRow label="Address" value={nodeResult.state.data.address} />
                 <SummaryRow label="Port" value={String(nodeResult.state.data.port)} />
                 <SummaryRow label="Username" value={nodeResult.state.data.ssh_username} />
                 <SummaryRow
@@ -200,28 +161,7 @@ export function NodeDetail() {
                     never changes anything.
                   </Text>
                 ) : null}
-                {discovery ? (
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Text variant="caption" tone="secondary">
-                          Assessment
-                        </Text>
-                        <Guidance for="node.assessment" />
-                      </div>
-                      <AssessmentView assessment={discovery.assessment} />
-                    </div>
-                    <div>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Text variant="caption" tone="secondary">
-                          Facts
-                        </Text>
-                        <Guidance for="node.facts" />
-                      </div>
-                      <FactsView facts={discovery.facts} />
-                    </div>
-                  </div>
-                ) : null}
+                {discovery ? <DiscoveryScan result={discovery} /> : null}
               </Card>
 
               <div>

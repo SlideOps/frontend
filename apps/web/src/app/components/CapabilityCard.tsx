@@ -13,9 +13,11 @@ import { PluginSourceBadge, RiskBadge } from './Badges';
 export function CapabilityCard({
   capability,
   footer,
+  badge,
 }: {
   capability: Capability;
   footer?: ReactNode;
+  badge?: ReactNode;
 }) {
   return (
     <Card className="flex flex-col gap-3">
@@ -37,9 +39,12 @@ export function CapabilityCard({
             <PluginSourceBadge capability={capability} />
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <RiskBadge risk={capability.risk_level} />
-          <Guidance for="capability.risk" size={14} />
+        <div className="flex flex-col items-end gap-1.5">
+          {badge ? badge : null}
+          <div className="flex items-center gap-1">
+            <RiskBadge risk={capability.risk_level} />
+            <Guidance for="capability.risk" size={14} />
+          </div>
         </div>
       </div>
       <Text variant="body-sm" tone="secondary">
