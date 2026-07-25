@@ -1,16 +1,22 @@
 import {
   getCapability,
+  getCapabilityStates,
+  getOperation,
   listNodes,
   type Capability,
+  type CapabilityState,
   type Node,
+  type Operation,
 } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
-import { ArrowLeft, Layers, Play, Server, ShieldCheck } from '@slideops/icons';
+import { Button, Card, Text } from '@slideops/design-system';
+import { ArrowLeft, History, Layers, Play, Server, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { PluginSourceBadge, RiskBadge } from '../components/Badges';
+import { completedHint, completionLabel } from '../capability-completion';
+import { CompletionBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
+import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
@@ -39,10 +45,58 @@ function Section({
 }
 
 /**
+ * The state of this Capability on the Node the Operator arrived with: that it is
+ * already done, when it last completed, a link back to that run in History, and
+ * any credentials it produced, revealed and copied from the owning Operation. It
+ * loads that Operation so a database password or similar is shown right here
+ * rather than only in History. It renders nothing until the Operation is loaded.
+ */
+function CapabilityHere({
+  capabilityName,
+  capabilityKey,
+  done,
+}: {
+  capabilityName: string;
+  capabilityKey: string;
+  done: CapabilityState;
+}) {
+  const navigate = useNavigate();
+  const operationResult = useAsyncData<Operation>(
+    (signal) => getOperation(done.last_operation_id, signal),
+    [done.last_operation_id],
+  );
+  const operation = operationResult.state.status === 'ready' ? operationResult.state.data : null;
+
+  return (
+    <Card className="flex flex-col gap-4 border-success">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <CompletionBadge label={completionLabel(capabilityKey)} />
+          <Text variant="body-sm" tone="secondary">
+            {completedHint(capabilityKey, done.last_completed_at)}
+          </Text>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => navigate(`/app/operations/${done.last_operation_id}`)}>
+          <History width={15} height={15} aria-hidden />
+          View in History
+        </Button>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        {capabilityName} is already done on this server. Its details and any credentials it created are
+        below; you can run it again from the panel on the right if you need to.
+      </Text>
+      {operation ? <CredentialsCard operation={operation} /> : null}
+    </Card>
+  );
+}
+
+/**
  * The Capability detail: the outcome it delivers, the intent behind it, its
- * risk, the platforms it supports, and how verification proves it worked. From
- * here an Operator starts an Operation on a chosen Node, filling in any inputs
- * the Capability declares through the generated form.
+ * risk, the platforms it supports, and how verification proves it worked. When
+ * the Operator arrives with a server in context, it also shows whether the
+ * Capability is already done there and the credentials it produced. From here an
+ * Operator starts an Operation on a chosen Node, filling in any inputs the
+ * Capability declares through the generated form.
  */
 export function CapabilityDetail() {
   const { key = '' } = useParams();
@@ -56,6 +110,18 @@ export function CapabilityDetail() {
   const capabilityResult = useAsyncData<Capability>((signal) => getCapability(key, signal), [key]);
   const nodesResult = useAsyncData<Node[]>((signal) => listNodes(signal), []);
   const nodes = nodesResult.state.status === 'ready' ? nodesResult.state.data : [];
+
+  // When the Operator arrived with a server in context, learn whether this
+  // Capability is already done there. Without a server there is no per-server
+  // state to show, so this resolves empty and the page reads as a fresh start.
+  const statesResult = useAsyncData<Record<string, CapabilityState>>(
+    (signal) =>
+      preselectedNode
+        ? getCapabilityStates(preselectedNode, preselectedProject, signal)
+        : Promise.resolve({}),
+    [preselectedNode, preselectedProject],
+  );
+  const done = statesResult.state.status === 'ready' ? statesResult.state.data[key] : undefined;
 
   return (
     <OperatorShell active="capabilities">
@@ -88,7 +154,8 @@ export function CapabilityDetail() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {done ? <CompletionBadge label={completionLabel(key)} /> : null}
               <RiskBadge risk={capabilityResult.state.data.risk_level} />
               <Guidance for="capability.risk" size={14} />
             </div>
@@ -96,6 +163,13 @@ export function CapabilityDetail() {
 
           <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
             <div className="flex flex-col gap-6">
+              {done ? (
+                <CapabilityHere
+                  capabilityName={capabilityResult.state.data.name}
+                  capabilityKey={key}
+                  done={done}
+                />
+              ) : null}
               <Card className="flex flex-col gap-5">
                 <Section title="Outcome" guidanceKey="capability.outcome">
                   <Text variant="body" tone="secondary">
@@ -144,7 +218,7 @@ export function CapabilityDetail() {
             <Card className="h-fit">
               <div className="mb-4 flex items-center gap-2">
                 <Play width={18} height={18} className="text-brand" aria-hidden />
-                <Text variant="h4">Start an Operation</Text>
+                <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
                 <Guidance for="capability.start" />
               </div>
               {nodesResult.state.status === 'loading' ? (
