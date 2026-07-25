@@ -3,29 +3,18 @@ import { z } from 'zod';
 
 /*
  * The deploy form schema. A Service needs a Project and a Node, a source (a
- * prebuilt image or a repository to build), a runtime, and hard CPU, memory, and
- * pids limits. The numeric limits are validated here and then constrained to the
- * Operator's remaining quota by the caller, which passes the headroom in so a
- * deploy that would exceed the tier is caught before it is sent. Ports and env
- * are entered as text and parsed into the wire shapes the backend expects.
+ * prebuilt image or a repository to build), a runtime, and the CPU, memory, and
+ * pids limits the Operator chooses to run it under on their own server. Those
+ * limits are the Operator's choice, not a tier cap, so the schema only holds them
+ * to a sane minimum. Ports and env are entered as text and parsed into the wire
+ * shapes the backend expects.
  */
 
-/** The remaining tier headroom the form validates the numeric limits against. */
-export interface QuotaHeadroom {
-  /** vCPU still available to allocate, at least zero. */
-  vcpu: number;
-  /** Memory in MB still available to allocate, at least zero. */
-  memory_mb: number;
-}
-
-const MIN_CPU = 0.1;
 const MIN_MEMORY_MB = 16;
 
-/** Build the deploy schema, constraining CPU and memory to the remaining quota. */
-export function buildServiceSchema(headroom: QuotaHeadroom) {
-  const cpuCeiling = Math.max(MIN_CPU, headroom.vcpu);
-  const memoryCeiling = Math.max(MIN_MEMORY_MB, headroom.memory_mb);
-
+/** Build the deploy schema. CPU and memory are the Operator's own choice on their
+ *  server, so only a sensible minimum is enforced, never a tier ceiling. */
+export function buildServiceSchema() {
   return z
     .object({
       project_id: z.string().trim().min(1, 'Choose a Project for this Service.'),
@@ -45,16 +34,11 @@ export function buildServiceSchema(headroom: QuotaHeadroom) {
       command: z.string().trim().optional(),
       cpu_limit: z.coerce
         .number({ invalid_type_error: 'Enter a vCPU limit.' })
-        .gt(0, 'Enter a vCPU limit above zero.')
-        .max(cpuCeiling, `Your tier leaves ${cpuCeiling} vCPU. Ask an admin to raise your tier for more.`),
+        .gt(0, 'Enter a vCPU limit above zero.'),
       memory_mb: z.coerce
         .number({ invalid_type_error: 'Enter a memory limit.' })
         .int('Enter memory as a whole number of MB.')
-        .min(MIN_MEMORY_MB, `Give the Service at least ${MIN_MEMORY_MB} MB.`)
-        .max(
-          memoryCeiling,
-          `Your tier leaves ${memoryCeiling} MB. Ask an admin to raise your tier for more.`,
-        ),
+        .min(MIN_MEMORY_MB, `Give the Service at least ${MIN_MEMORY_MB} MB.`),
       pids_limit: z
         .union([z.literal(''), z.coerce.number().int('Enter a whole number.').positive('Enter a positive number.')])
         .optional(),
@@ -94,7 +78,7 @@ export function buildServiceSchema(headroom: QuotaHeadroom) {
     });
 }
 
-/** The form value shape, inferred from a schema built with zero headroom. */
+/** The form value shape, inferred from the deploy schema. */
 export type ServiceFormValues = z.infer<ReturnType<typeof buildServiceSchema>>;
 
 /** Parse the ports textarea. Each line is host:container, both whole numbers. */

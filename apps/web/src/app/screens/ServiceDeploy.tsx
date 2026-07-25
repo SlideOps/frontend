@@ -3,7 +3,6 @@ import {
   ApiError,
   deployService,
   getGitHubStatus,
-  getTier,
   listGitHubRepos,
   listNodes,
   listProjects,
@@ -11,61 +10,45 @@ import {
   type GitHubStatus,
   type Node,
   type Project,
-  type TierInfo,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
 import { Container, GitBranch } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
-import { useMemo, useRef, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import {
-  buildServiceSchema,
-  toDeployInput,
-  type QuotaHeadroom,
-  type ServiceFormValues,
-} from '../service-schema';
+import { buildServiceSchema, toDeployInput, type ServiceFormValues } from '../service-schema';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface DeployData {
   projects: Project[];
   nodes: Node[];
-  tier: TierInfo;
   github: GitHubStatus;
   repos: GitHubRepo[];
 }
 
 async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
-  const [projects, nodes, tier, github] = await Promise.all([
+  const [projects, nodes, github] = await Promise.all([
     listProjects(signal),
     listNodes(signal),
-    getTier(signal),
     // GitHub is optional here, so a failure or an unconfigured platform must not
     // block the deploy form; fall back to an unconnected status.
     getGitHubStatus(signal).catch(() => ({ configured: false, connected: false }) as GitHubStatus),
   ]);
   const repos = github.connected ? await listGitHubRepos(signal).catch(() => []) : [];
-  return { projects, nodes, tier, github, repos };
+  return { projects, nodes, github, repos };
 }
 
 const inputClass =
   'h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink placeholder:text-ink-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
-function headroomFor(tier: TierInfo): QuotaHeadroom {
-  return {
-    vcpu: Math.max(0, tier.limits.vcpu - tier.usage.vcpu_allocated),
-    memory_mb: Math.max(0, tier.limits.memory_mb - tier.usage.memory_allocated_mb),
-  };
-}
-
-/** The deploy form, rendered once the Projects, Nodes, and tier are loaded. */
+/** The deploy form, rendered once the Projects and Nodes are loaded. */
 function DeployForm({ data, initialProjectId }: { data: DeployData; initialProjectId?: string }) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
-  const [quotaHit, setQuotaHit] = useState(false);
 
   // Preselect the Project only when it is one the Operator owns, so a stray
   // param never selects nothing.
@@ -74,17 +57,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
       ? initialProjectId
       : '';
 
-  const headroom = headroomFor(data.tier);
-  const headroomRef = useRef(headroom);
-  headroomRef.current = headroom;
-
-  // Resolve against the latest headroom every validation, so the CPU and memory
-  // ceilings always reflect the remaining quota read from the tier.
-  const resolver = useMemo<Resolver<ServiceFormValues>>(
-    () => (values, context, options) =>
-      zodResolver(buildServiceSchema(headroomRef.current))(values, context, options),
-    [],
-  );
+  const resolver = zodResolver(buildServiceSchema());
 
   const {
     register,
@@ -126,20 +99,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
     setValue('repository_url', repo.clone_url, { shouldValidate: true });
     setValue('branch', repo.default_branch, { shouldValidate: true });
   };
-  const servicesLeft = Math.max(0, data.tier.limits.services - data.tier.usage.services);
-
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    setQuotaHit(false);
     try {
       const service = await deployService(toDeployInput(values));
       navigate(`/app/services/${service.id}`, { replace: true });
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'quota_exceeded') {
-        setQuotaHit(true);
-        setFormError(error.message);
-        return;
-      }
       setFormError(
         error instanceof ApiError ? error.message : 'The Service could not be deployed. Try again.',
       );
@@ -150,8 +115,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
     <Card className="max-w-2xl">
       <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
         <span>
-          Remaining this tier: {servicesLeft} Service{servicesLeft === 1 ? '' : 's'}, {headroom.vcpu}{' '}
-          vCPU, {headroom.memory_mb} MB.
+          The CPU, memory, and process limits below run on your own server and are yours to set.
         </span>
         <Guidance for="services.quota" />
       </div>
@@ -410,16 +374,11 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
         {formError ? (
           <div role="alert" className="rounded-md border border-border bg-subtle px-4 py-3">
             <Text variant="body-sm" className="font-medium text-danger">
-              {quotaHit ? 'Over your tier quota' : 'That did not go through'}
+              That did not go through
             </Text>
             <Text variant="body-sm" tone="secondary" className="mt-0.5">
               {formError}
             </Text>
-            {quotaHit ? (
-              <Text variant="body-sm" tone="secondary" className="mt-1">
-                Remove a Service to free room, or ask an admin to raise your tier.
-              </Text>
-            ) : null}
           </div>
         ) : null}
 
@@ -448,7 +407,7 @@ export function ServiceDeploy() {
     <OperatorShell active="services">
       <PageHeader
         title="Deploy a Service"
-        description="Run one solution on a Node under hard CPU, memory, and process limits your tier allows. SlideOps deploys it and verifies it is running."
+        description="Run one solution on a Node under the CPU, memory, and process limits you choose on your own server. SlideOps deploys it and verifies it is running."
         guidanceKey="services.deploy"
       />
 

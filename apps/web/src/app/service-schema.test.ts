@@ -7,7 +7,7 @@ import {
   type ServiceFormValues,
 } from './service-schema';
 
-/** A complete, valid set of form values with generous headroom to override from. */
+/** A complete, valid set of form values to override from. */
 function values(over: Partial<ServiceFormValues> = {}): ServiceFormValues {
   return {
     project_id: 'pr_1',
@@ -29,53 +29,47 @@ function values(over: Partial<ServiceFormValues> = {}): ServiceFormValues {
 }
 
 describe('buildServiceSchema', () => {
-  it('accepts a valid image deploy within quota', () => {
-    const schema = buildServiceSchema({ vcpu: 2, memory_mb: 4096 });
-    expect(schema.safeParse(values()).success).toBe(true);
+  it('accepts a valid image deploy', () => {
+    expect(buildServiceSchema().safeParse(values()).success).toBe(true);
   });
 
-  it('rejects a CPU limit over the remaining quota', () => {
-    const schema = buildServiceSchema({ vcpu: 1, memory_mb: 4096 });
-    const result = schema.safeParse(values({ cpu_limit: 2 }));
-    expect(result.success).toBe(false);
+  it('accepts any CPU and memory the Operator chooses on their own server', () => {
+    // Resources are the Operator's, not a tier cap, so a large limit is valid.
+    expect(buildServiceSchema().safeParse(values({ cpu_limit: 32, memory_mb: 131072 })).success).toBe(
+      true,
+    );
   });
 
-  it('rejects a memory limit over the remaining quota', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 512 });
-    const result = schema.safeParse(values({ memory_mb: 1024 }));
-    expect(result.success).toBe(false);
+  it('still enforces a sane minimum on the limits', () => {
+    expect(buildServiceSchema().safeParse(values({ cpu_limit: 0 })).success).toBe(false);
+    expect(buildServiceSchema().safeParse(values({ memory_mb: 4 })).success).toBe(false);
   });
 
   it('requires an image when the source is an image', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 8192 });
-    const result = schema.safeParse(values({ source_type: 'image', image: '' }));
+    const result = buildServiceSchema().safeParse(values({ source_type: 'image', image: '' }));
     expect(result.success).toBe(false);
   });
 
   it('requires a repository url when the source is a repository', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 8192 });
-    const result = schema.safeParse(
+    const result = buildServiceSchema().safeParse(
       values({ source_type: 'repository', image: '', repository_url: '' }),
     );
     expect(result.success).toBe(false);
   });
 
   it('requires a command for a systemd runtime', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 8192 });
-    const result = schema.safeParse(values({ runtime: 'systemd', command: '' }));
+    const result = buildServiceSchema().safeParse(values({ runtime: 'systemd', command: '' }));
     expect(result.success).toBe(false);
   });
 
   it('rejects a name with invalid characters', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 8192 });
-    expect(schema.safeParse(values({ name: 'Web Service' })).success).toBe(false);
-    expect(schema.safeParse(values({ name: 'web-1' })).success).toBe(true);
+    expect(buildServiceSchema().safeParse(values({ name: 'Web Service' })).success).toBe(false);
+    expect(buildServiceSchema().safeParse(values({ name: 'web-1' })).success).toBe(true);
   });
 
   it('flags malformed port mappings', () => {
-    const schema = buildServiceSchema({ vcpu: 8, memory_mb: 8192 });
-    expect(schema.safeParse(values({ ports: '8080:80' })).success).toBe(true);
-    expect(schema.safeParse(values({ ports: 'not-a-port' })).success).toBe(false);
+    expect(buildServiceSchema().safeParse(values({ ports: '8080:80' })).success).toBe(true);
+    expect(buildServiceSchema().safeParse(values({ ports: 'not-a-port' })).success).toBe(false);
   });
 });
 

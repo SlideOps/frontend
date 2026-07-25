@@ -1,16 +1,17 @@
 import { getTier, type TierInfo, type TierName } from '@slideops/api-client';
 import { Card, Text } from '@slideops/design-system';
-import { Gauge } from '@slideops/icons';
+import { Check, Gauge, Minus } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { ErrorNote, Loading } from './Feedback';
 import { Meter } from './Meter';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
- * The tier and usage panel. It reads the Operator's tier once and shows each
- * quota with its current usage and a meter, so the headroom on Nodes, Projects,
- * Services, vCPU, and memory is obvious at a glance and a near-limit reading is
- * plain to see. Every value comes from the backend; nothing here mutates.
+ * The tier and usage panel. It reads the Operator's tier once and shows what the
+ * tier provides, the servers, Projects, and seats it allows, the history it
+ * keeps, and the features it includes, with usage where we track it. SlideOps
+ * meters only what it provides, never the server's own resources. Every value
+ * comes from the backend; nothing here mutates.
  */
 
 const tierLabel: Record<TierName, string> = {
@@ -20,54 +21,74 @@ const tierLabel: Record<TierName, string> = {
   enterprise: 'Enterprise',
 };
 
-/** Format a memory reading in MB, stepping up to GB once it is large. */
-function memory(mb: number): string {
-  if (mb >= 1024) {
-    const gb = mb / 1024;
-    return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
-  }
-  return `${mb} MB`;
+/** Render a limit, showing Unlimited for the -1 sentinel. */
+function limitText(value: number): string {
+  return value < 0 ? 'Unlimited' : String(value);
 }
 
-/** Round a vCPU reading to at most two decimals without trailing zeros. */
-function vcpu(value: number): string {
-  return `${Math.round(value * 100) / 100}`;
+/** A quota row: a meter when the limit is finite, a plain count when unlimited. */
+function Quota({ label, used, limit }: { label: string; used: number; limit: number }) {
+  if (limit < 0) {
+    return (
+      <div className="rounded-lg border border-border bg-app px-3 py-2.5">
+        <Text as="span" variant="caption" tone="secondary" className="block">
+          {label}
+        </Text>
+        <Text as="span" variant="body-sm" className="font-semibold">
+          {used}
+          <span className="font-normal text-ink-muted"> used, Unlimited</span>
+        </Text>
+      </div>
+    );
+  }
+  return <Meter label={label} used={used} limit={limit} valueText={`${used} / ${limit}`} />;
+}
+
+/** A feature row: included or not, read at a glance. */
+function Feature({ label, on }: { label: string; on: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      {on ? (
+        <Check width={15} height={15} className="text-accent" aria-hidden />
+      ) : (
+        <Minus width={15} height={15} className="text-ink-muted" aria-hidden />
+      )}
+      <Text as="span" variant="body-sm" tone={on ? undefined : 'secondary'}>
+        {label}
+      </Text>
+    </div>
+  );
 }
 
 function TierQuotas({ tier }: { tier: TierInfo }) {
   const { limits, usage } = tier;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      <Meter
-        label="Nodes"
-        used={usage.nodes}
-        limit={limits.nodes}
-        valueText={`${usage.nodes} / ${limits.nodes}`}
-      />
-      <Meter
-        label="Projects"
-        used={usage.projects}
-        limit={limits.projects}
-        valueText={`${usage.projects} / ${limits.projects}`}
-      />
-      <Meter
-        label="Services"
-        used={usage.services}
-        limit={limits.services}
-        valueText={`${usage.services} / ${limits.services}`}
-      />
-      <Meter
-        label="vCPU"
-        used={usage.vcpu_allocated}
-        limit={limits.vcpu}
-        valueText={`${vcpu(usage.vcpu_allocated)} / ${vcpu(limits.vcpu)}`}
-      />
-      <Meter
-        label="Memory"
-        used={usage.memory_allocated_mb}
-        limit={limits.memory_mb}
-        valueText={`${memory(usage.memory_allocated_mb)} / ${memory(limits.memory_mb)}`}
-      />
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Quota label="Servers" used={usage.nodes} limit={limits.nodes} />
+        <Quota label="Projects" used={usage.projects} limit={limits.projects} />
+        <div className="rounded-lg border border-border bg-app px-3 py-2.5">
+          <Text as="span" variant="caption" tone="secondary" className="block">
+            Team seats
+          </Text>
+          <Text as="span" variant="body-sm" className="font-semibold">
+            {limitText(limits.seats)}
+          </Text>
+        </div>
+        <div className="rounded-lg border border-border bg-app px-3 py-2.5">
+          <Text as="span" variant="caption" tone="secondary" className="block">
+            History
+          </Text>
+          <Text as="span" variant="body-sm" className="font-semibold">
+            {limits.history_days < 0 ? 'Unlimited' : `${limits.history_days} days`}
+          </Text>
+        </div>
+      </div>
+      <div className="grid gap-2.5 border-t border-border pt-4 sm:grid-cols-3">
+        <Feature label="Automations" on={limits.automations} />
+        <Feature label="Advanced monitoring" on={limits.advanced_monitoring} />
+        <Feature label="Audit trail" on={limits.audit_trail} />
+      </div>
     </div>
   );
 }
@@ -94,8 +115,9 @@ export function TierPanel() {
       {state.status === 'ready' ? (
         <div className="flex flex-col gap-4">
           <Text variant="body-sm" tone="secondary">
-            Your tier fixes how much you can run. When a meter is close to full, remove something or
-            ask an admin to raise your tier.
+            Your tier sets what SlideOps provides, the servers, Projects, and seats you can run, the
+            history it keeps, and the features it includes. Your servers' own resources are always
+            yours to use in full.
           </Text>
           <TierQuotas tier={state.data} />
         </div>

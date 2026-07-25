@@ -13,23 +13,22 @@ import { apiRequest, unwrap } from './http';
 /** The four tiers an Operator can sit on, cheapest to richest. */
 export type TierName = 'free' | 'starter' | 'pro' | 'enterprise';
 
-/** The hard ceilings a tier fixes. Memory and disk are whole numbers of MB and GB. */
+/** What a tier provides. We meter only what SlideOps provides, never the server's
+ *  own resources. A limit of -1 means unlimited. */
 export interface TierLimits {
   nodes: number;
   projects: number;
-  services: number;
-  vcpu: number;
-  memory_mb: number;
-  disk_gb: number;
+  seats: number;
+  history_days: number;
+  automations: boolean;
+  advanced_monitoring: boolean;
+  audit_trail: boolean;
 }
 
 /** What the Operator is using right now against their tier ceilings. */
 export interface TierUsage {
   nodes: number;
   projects: number;
-  services: number;
-  vcpu_allocated: number;
-  memory_allocated_mb: number;
 }
 
 /** The tier read: the name, the ceilings, and current usage in one shape. */
