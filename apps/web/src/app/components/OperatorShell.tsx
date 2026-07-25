@@ -3,6 +3,7 @@ import {
   Boxes,
   Clock,
   Container,
+  CreditCard,
   FileText,
   FolderKanban,
   LayoutDashboard,
@@ -32,6 +33,7 @@ export type ActiveKey =
   | 'automations'
   | 'operations'
   | 'reports'
+  | 'billing'
   | 'security'
   | 'extensions';
 
@@ -160,6 +162,13 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: FileText,
       active: active === 'reports',
       onSelect: () => navigate('/app/reports'),
+    },
+    {
+      key: 'billing',
+      label: 'Billing',
+      icon: CreditCard,
+      active: active === 'billing',
+      onSelect: () => navigate('/app/billing'),
     },
     {
       key: 'extensions',

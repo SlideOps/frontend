@@ -81,6 +81,7 @@ const OperationDetail = lazy(() =>
 );
 const Reports = lazy(() => import('./app/screens/Reports').then((m) => ({ default: m.Reports })));
 const Security = lazy(() => import('./app/screens/Security').then((m) => ({ default: m.Security })));
+const Billing = lazy(() => import('./app/screens/Billing').then((m) => ({ default: m.Billing })));
 
 // Admin control plane.
 const Overview = lazy(() => import('./admin/screens/Overview').then((m) => ({ default: m.Overview })));
@@ -100,6 +101,9 @@ const Analytics = lazy(() =>
   import('./admin/screens/Analytics').then((m) => ({ default: m.Analytics })),
 );
 const Audit = lazy(() => import('./admin/screens/Audit').then((m) => ({ default: m.Audit })));
+const PromoCodes = lazy(() =>
+  import('./admin/screens/PromoCodes').then((m) => ({ default: m.PromoCodes })),
+);
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
@@ -154,6 +158,7 @@ export function App() {
           <Route path="operations" element={<History />} />
           <Route path="operations/:id" element={<OperationDetail />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="billing" element={<Billing />} />
           <Route path="security" element={<Security />} />
         </Route>
 
@@ -166,6 +171,7 @@ export function App() {
           <Route path="operations/:id" element={<AdminOperationDetail />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="audit" element={<Audit />} />
+          <Route path="promo-codes" element={<PromoCodes />} />
           <Route path="emergency" element={<Emergency />} />
         </Route>
 

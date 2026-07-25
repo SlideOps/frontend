@@ -5,6 +5,7 @@ import {
   ListChecks,
   ShieldCheck,
   Sparkles,
+  TicketPercent,
   Users,
 } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
@@ -12,7 +13,14 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogoutButton } from './LogoutButton';
 
-export type ActiveKey = 'overview' | 'operators' | 'operations' | 'analytics' | 'audit' | 'emergency';
+export type ActiveKey =
+  | 'overview'
+  | 'operators'
+  | 'operations'
+  | 'analytics'
+  | 'audit'
+  | 'promo-codes'
+  | 'emergency';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -57,6 +65,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: ListChecks,
       active: active === 'audit',
       onSelect: () => navigate('/admin/audit'),
+    },
+    {
+      key: 'promo-codes',
+      label: 'Promo codes',
+      icon: TicketPercent,
+      active: active === 'promo-codes',
+      onSelect: () => navigate('/admin/promo-codes'),
     },
     {
       key: 'emergency',
