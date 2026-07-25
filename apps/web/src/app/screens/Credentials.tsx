@@ -75,6 +75,8 @@ interface CredentialContext {
   operation: Operation;
   title: string;
   nodeName: string | null;
+  /** The Node's address, so the card can form a real connection. */
+  host: string | null;
   projectName: string | null;
   completedAt: string | null;
 }
@@ -164,7 +166,7 @@ function CredentialSection({
           {downloading ? 'Preparing' : 'Download'}
         </Button>
       </div>
-      <CredentialsCard operation={context.operation} />
+      <CredentialsCard operation={context.operation} host={context.host ?? undefined} />
     </section>
   );
 }
@@ -218,6 +220,7 @@ export function Credentials() {
           operation,
           title: capabilityName(operation.capability_key),
           nodeName: node?.name ?? null,
+          host: node?.address ?? null,
           projectName: project?.name ?? null,
           completedAt: operation.completed_at
             ? new Date(operation.completed_at).toLocaleString()

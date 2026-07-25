@@ -1,6 +1,7 @@
 import {
   getCapability,
   getCapabilityStates,
+  getNode,
   getOperation,
   listNodes,
   type Capability,
@@ -12,7 +13,7 @@ import { Button, Card, Text } from '@slideops/design-system';
 import { ArrowLeft, ArrowRight, History, Layers, ListChecks, Play, Server, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { completedHint, completionLabel } from '../capability-completion';
 import { CompletionBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
@@ -55,10 +56,12 @@ function CapabilityHere({
   capabilityName,
   capabilityKey,
   done,
+  nodes,
 }: {
   capabilityName: string;
   capabilityKey: string;
   done: CapabilityState;
+  nodes: Node[];
 }) {
   const navigate = useNavigate();
   const operationResult = useAsyncData<Operation>(
@@ -66,6 +69,32 @@ function CapabilityHere({
     [done.last_operation_id],
   );
   const operation = operationResult.state.status === 'ready' ? operationResult.state.data : null;
+
+  // The Node address, so the credentials card can form a real connection. It
+  // comes from the already-loaded Nodes when present, and is fetched only as a
+  // fallback. It never blocks the card: an unresolved host just omits the host.
+  const nodeId = operation?.node_id;
+  const knownHost = nodeId ? nodes.find((node) => node.id === nodeId)?.address : undefined;
+  const [fetchedHost, setFetchedHost] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!nodeId || knownHost) {
+      return;
+    }
+    let active = true;
+    getNode(nodeId)
+      .then((node) => {
+        if (active) {
+          setFetchedHost(node.address);
+        }
+      })
+      .catch(() => {
+        // The host is a convenience; the card still works without it.
+      });
+    return () => {
+      active = false;
+    };
+  }, [nodeId, knownHost]);
+  const host = knownHost ?? fetchedHost;
 
   return (
     <Card className="flex flex-col gap-4 border-success">
@@ -85,7 +114,7 @@ function CapabilityHere({
         {capabilityName} is already done on this server. Its details and any credentials it created are
         below; you can run it again from the panel on the right if you need to.
       </Text>
-      {operation ? <CredentialsCard operation={operation} /> : null}
+      {operation ? <CredentialsCard operation={operation} host={host} /> : null}
     </Card>
   );
 }
@@ -168,6 +197,7 @@ export function CapabilityDetail() {
                   capabilityName={capabilityResult.state.data.name}
                   capabilityKey={key}
                   done={done}
+                  nodes={nodes}
                 />
               ) : null}
               {capabilityResult.state.data.requirements &&

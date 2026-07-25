@@ -2,6 +2,7 @@ import {
   ApiError,
   approveOperation,
   cancelOperation,
+  getNode,
   getOperation,
   openOperationStream,
   type Operation,
@@ -80,6 +81,10 @@ export function OperationDetail() {
   const clear = useOperationsStore((state) => state.clear);
 
   const [operation, setOperation] = useState<Operation | null>(null);
+  // The Node's address, resolved so the credentials card can form a real
+  // connection. It never blocks the page: if it cannot be fetched, the card
+  // simply shows no host.
+  const [nodeHost, setNodeHost] = useState<string | undefined>(undefined);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -126,6 +131,29 @@ export function OperationDetail() {
   }, [id, ingest]);
 
   useEffect(() => () => clear(id), [id, clear]);
+
+  // Resolve the Node address for the credentials card, lazily and without
+  // blocking the Operation view. A failure leaves the host unset, which the card
+  // handles by omitting the host row and the connection string.
+  const nodeId = operation?.node_id;
+  useEffect(() => {
+    if (!nodeId) {
+      return;
+    }
+    let active = true;
+    getNode(nodeId)
+      .then((node) => {
+        if (active) {
+          setNodeHost(node.address);
+        }
+      })
+      .catch(() => {
+        // The host is a convenience; if it cannot be resolved the card still works.
+      });
+    return () => {
+      active = false;
+    };
+  }, [nodeId]);
 
   const approve = async () => {
     setApproving(true);
@@ -331,7 +359,9 @@ export function OperationDetail() {
               <VerificationView verification={operation.verification} />
             ) : null}
 
-            {status === 'completed' ? <CredentialsCard operation={operation} /> : null}
+            {status === 'completed' ? (
+              <CredentialsCard operation={operation} host={nodeHost} />
+            ) : null}
           </div>
         </div>
       ) : null}
