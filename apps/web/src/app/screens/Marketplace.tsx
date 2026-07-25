@@ -5,6 +5,7 @@ import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Collapsible } from '../components/Collapsible';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -164,15 +165,24 @@ export function Marketplace() {
             description="Try a different outcome, or clear the search to see every Plugin available."
           />
         ) : (
-          <div className="flex flex-col gap-10">
-            {groupByCategory(filtered).map(([category, plugins]) => (
-              <section key={category}>
-                <div className="mb-4 flex items-center gap-2">
-                  <Text variant="h3">{category}</Text>
+          <div className="flex flex-col gap-3">
+            {groupByCategory(filtered).map(([category, plugins], index) => {
+              // Clean by default: only the first category opens; the Operator
+              // expands the rest. While searching, open every category so a match in
+              // any of them is visible. The search flag is in the key so toggling it
+              // remounts and re-applies the open state.
+              const searching = query.trim().length > 0;
+              return (
+              <Collapsible
+                key={`${category}-${searching}`}
+                title={category}
+                summary={
                   <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">
                     {plugins.length}
                   </span>
-                </div>
+                }
+                defaultOpen={index === 0 || searching}
+              >
                 <div className="grid gap-4 lg:grid-cols-2">
                   {plugins.map((plugin) => (
                     <PluginCard
@@ -182,8 +192,9 @@ export function Marketplace() {
                     />
                   ))}
                 </div>
-              </section>
-            ))}
+              </Collapsible>
+              );
+            })}
           </div>
         )
       ) : null}
