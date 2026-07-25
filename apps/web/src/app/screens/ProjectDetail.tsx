@@ -9,6 +9,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ProjectCapabilities } from '../components/ProjectCapabilities';
 import { ProjectGitHub } from '../components/ProjectGitHub';
+import { ProjectRouting } from '../components/ProjectRouting';
 import { ProjectServers } from '../components/ProjectServers';
 import { ProjectServices } from '../components/ProjectServices';
 import { ProjectStack } from '../components/ProjectStack';
@@ -75,6 +76,7 @@ export function ProjectDetail() {
               <ProjectServers projectId={id} />
               <ProjectGitHub />
             </div>
+            <ProjectRouting projectId={id} domain={state.data.domain} />
             <ProjectStack projectId={id} />
             <ProjectCapabilities projectId={id} />
             <ProjectServices projectId={id} />

@@ -4,6 +4,7 @@ import {
   createProject,
   listProjectNodes,
   listProjects,
+  setProjectRouting,
   unassignNodeFromProject,
 } from './projects';
 
@@ -91,6 +92,49 @@ describe('projects requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/nodes/nd_1');
+  });
+
+  it('sets a Project domain with PUT and cookies, and unwraps the returned Project', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        project: { id: 'pr_1', name: 'shop', domain: 'app.example.com' },
+      }),
+    );
+
+    const project = await setProjectRouting('pr_1', 'app.example.com');
+
+    expect(project.domain).toBe('app.example.com');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PUT');
+    expect(init?.credentials).toBe('include');
+    expect(JSON.parse(String(init?.body))).toEqual({ domain: 'app.example.com' });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/routing');
+  });
+
+  it('clears a Project domain by sending an empty string', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { project: { id: 'pr_1', name: 'shop', domain: '' } }),
+    );
+
+    const project = await setProjectRouting('pr_1', '');
+
+    expect(project.domain).toBe('');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(init?.body))).toEqual({ domain: '' });
+  });
+
+  it('surfaces a typed invalid_domain error when the domain is rejected', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(400, {
+        error: { code: 'invalid_domain', message: 'That does not look like a domain.' },
+      }),
+    );
+
+    await expect(setProjectRouting('pr_1', 'not a domain')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+      code: 'invalid_domain',
+    });
   });
 
   it('surfaces a typed ApiError when the Project or server is not found', async () => {

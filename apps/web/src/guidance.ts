@@ -85,6 +85,12 @@ export const guidance: GuidanceRegistry = {
     label: 'Services',
     summary: 'The Services deployed in this Project, each on one of its servers under hard resource limits.',
   },
+  'project.routing': {
+    label: 'Routing',
+    summary: "The domain requests reach this Project by, and the host ports its Services occupy on each server.",
+    detail:
+      "Give this Project a domain, then point that domain's DNS at this Project's server: an A record to the server address, and an AAAA record too if you use IPv6. Once DNS resolves, set up a reverse proxy to serve the domain and send its requests to one of this Project's Services. The host ports listed here show which Project reaches which service on a shared server, so two Projects never collide on the same port.",
+  },
   'node.name': {
     label: 'Name',
     summary: 'A friendly name you will recognize, such as web-1 or staging database.',

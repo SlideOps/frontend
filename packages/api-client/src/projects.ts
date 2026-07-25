@@ -30,6 +30,19 @@ export function removeProject(id: string): Promise<void> {
   return apiRequest<void>(`/projects/${id}`, { method: 'DELETE' });
 }
 
+/**
+ * Set or clear the domain requests reach this Project by, returning the updated
+ * Project. Pass a lowercase hostname like `app.example.com` to set it, or an
+ * empty string to clear it. An invalid domain surfaces as a 400 with code
+ * invalid_domain, an unknown Project as a 404, both typed as ApiError.
+ */
+export function setProjectRouting(projectId: string, domain: string): Promise<Project> {
+  return apiRequest<{ project: Project }>(`/projects/${projectId}/routing`, {
+    method: 'PUT',
+    body: { domain },
+  }).then((r) => r.project);
+}
+
 /** List the servers assigned to a Project, unwrapping the nodes array. */
 export function listProjectNodes(projectId: string, signal?: AbortSignal): Promise<Node[]> {
   return apiRequest<{ nodes: Node[] }>(`/projects/${projectId}/nodes`, { signal }).then(

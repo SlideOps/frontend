@@ -31,6 +31,7 @@ export {
   listProjectNodes,
   assignNodeToProject,
   unassignNodeFromProject,
+  setProjectRouting,
   type CreateProjectInput,
 } from './projects';
 export {

@@ -30,6 +30,12 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  /**
+   * The domain requests reach this Project by, a lowercase hostname like
+   * `app.example.com`. Empty when the Project has no domain set yet. Setting one
+   * lets the Operator point DNS at this Project's server and route by name.
+   */
+  domain: string;
   created_at: string;
   updated_at?: string;
 }
