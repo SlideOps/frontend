@@ -65,6 +65,17 @@ export interface Service {
 }
 
 /**
+ * The resource ceilings a running Service runs under: the vCPU limit, the memory
+ * limit in whole MB, and the maximum number of processes. Every value must be
+ * greater than zero. Field names mirror the backend contract exactly.
+ */
+export interface ServiceResources {
+  cpu_limit: number;
+  memory_mb: number;
+  pids_limit: number;
+}
+
+/**
  * The result of checking whether a repository backed Service is behind its
  * branch. `update_available` is true when the remote branch head differs from
  * the deployed commit; `reason` explains a false or edge result (for example an
@@ -223,4 +234,19 @@ export function redeployService(id: string): Promise<Service> {
   return apiRequest<unknown>(`/services/${id}/redeploy`, { method: 'POST' }).then((r) =>
     unwrap<Service>(r, 'service'),
   );
+}
+
+/**
+ * Resize a running Service's resource allocation in place: CPU, memory, and the
+ * process limit. The backend applies the new limits to the running workload with
+ * no rebuild or downtime (docker update or systemctl set-property) and returns
+ * the updated Service. A limit that is not greater than zero comes back as 400
+ * with code invalid_resources; a missing or unowned Service as 404. Both surface
+ * as a typed ApiError.
+ */
+export function updateServiceResources(id: string, resources: ServiceResources): Promise<Service> {
+  return apiRequest<unknown>(`/services/${id}/resources`, {
+    method: 'PATCH',
+    body: resources,
+  }).then((r) => unwrap<Service>(r, 'service'));
 }

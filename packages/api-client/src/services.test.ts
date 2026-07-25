@@ -8,6 +8,7 @@ import {
   redeployService,
   removeService,
   startService,
+  updateServiceResources,
 } from './services';
 
 /** Build a Response-like stub for the mocked fetch. */
@@ -205,5 +206,53 @@ describe('services requests', () => {
     );
 
     await expect(redeployService('sv_1')).rejects.toMatchObject({ name: 'ApiError', status: 409 });
+  });
+
+  it('patches resources over the same origin with cookies and unwraps the updated Service', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        service: {
+          id: 'sv_1',
+          name: 'web',
+          status: 'running',
+          runtime: 'container',
+          cpu_limit: 1,
+          memory_mb: 512,
+          pids_limit: 256,
+        },
+      }),
+    );
+
+    const service = await updateServiceResources('sv_1', {
+      cpu_limit: 1,
+      memory_mb: 512,
+      pids_limit: 256,
+    });
+
+    expect(service.cpu_limit).toBe(1);
+    expect(service.memory_mb).toBe(512);
+    expect(service.pids_limit).toBe(256);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PATCH');
+    expect(init?.credentials).toBe('include');
+    const sent = JSON.parse(String(init?.body)) as {
+      cpu_limit: number;
+      memory_mb: number;
+      pids_limit: number;
+    };
+    expect(sent).toEqual({ cpu_limit: 1, memory_mb: 512, pids_limit: 256 });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/resources');
+  });
+
+  it('surfaces a typed invalid_resources error when a limit is not above zero', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(400, {
+        error: { code: 'invalid_resources', message: 'Every limit must be greater than zero.' },
+      }),
+    );
+
+    await expect(
+      updateServiceResources('sv_1', { cpu_limit: 0, memory_mb: 512, pids_limit: 256 }),
+    ).rejects.toMatchObject({ name: 'ApiError', status: 400, code: 'invalid_resources' });
   });
 });

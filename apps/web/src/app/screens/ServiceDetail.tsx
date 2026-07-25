@@ -22,6 +22,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServicePreview } from '../components/ServicePreview';
+import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -112,8 +113,19 @@ export function ServiceDetail() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // A resize applies live, so reflect the new limits at once without a jarring
+  // full refetch. This override is cleared whenever the Service being viewed changes.
+  const [resized, setResized] = useState<Pick<
+    Service,
+    'cpu_limit' | 'memory_mb' | 'pids_limit'
+  > | null>(null);
 
-  const service = state.status === 'ready' ? state.data.service : null;
+  useEffect(() => {
+    setResized(null);
+  }, [id]);
+
+  const baseService = state.status === 'ready' ? state.data.service : null;
+  const service = baseService && resized ? { ...baseService, ...resized } : baseService;
   const status = service?.status;
 
   // While a Service is deploying, poll until it settles at running or failed.
@@ -249,6 +261,17 @@ export function ServiceDetail() {
                   </SummaryRow>
                 </dl>
               </Card>
+
+              <ServiceResourcesPanel
+                service={service}
+                onUpdated={(updated) =>
+                  setResized({
+                    cpu_limit: updated.cpu_limit,
+                    memory_mb: updated.memory_mb,
+                    pids_limit: updated.pids_limit,
+                  })
+                }
+              />
 
               <ServiceUpdatePanel service={service} onDeployed={reload} />
 
