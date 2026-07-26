@@ -1,6 +1,7 @@
 import {
   getCapabilityStates,
   listCapabilities,
+  listNodes,
   listProjectNodes,
   type Capability,
   type CapabilityState,
@@ -29,14 +30,23 @@ import { ErrorNote, Loading } from './Feedback';
 interface CapabilitiesData {
   capabilities: Capability[];
   nodes: Node[];
+  assignedIDs: Set<string>;
 }
 
 async function loadCapabilities(projectId: string, signal: AbortSignal): Promise<CapabilitiesData> {
-  const [capabilities, nodes] = await Promise.all([
+  const [capabilities, assigned, all] = await Promise.all([
     listCapabilities({ projectId }, signal),
     listProjectNodes(projectId, signal),
+    listNodes(signal).catch(() => [] as Node[]),
   ]);
-  return { capabilities, nodes };
+  // Every server the Operator owns can run these, with the Project's own servers
+  // offered first. Restricting this to assigned servers meant a Project with
+  // Plugins installed but no server assigned showed nothing at all, hiding the
+  // install completely -- while Services have always deployed to any server, so
+  // the two surfaces disagreed with each other.
+  const assignedIDs = new Set(assigned.map((node) => node.id));
+  const nodes = [...assigned, ...all.filter((node) => !assignedIDs.has(node.id))];
+  return { capabilities, nodes, assignedIDs };
 }
 
 /** Whether a Capability comes from a Plugin, so it must run with Project context. */
@@ -178,6 +188,7 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
                 {nodes.map((node) => (
                   <option key={node.id} value={node.id}>
                     {node.name}
+                    {ready && !ready.assignedIDs.has(node.id) ? ' — not assigned to this Project' : ''}
                   </option>
                 ))}
               </select>

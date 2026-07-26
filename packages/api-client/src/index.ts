@@ -186,6 +186,7 @@ export {
   checkServiceUpdate,
   redeployService,
   updateServiceResources,
+  updateServiceConfiguration,
   type Service,
   type ServiceSource,
   type ServicePort,

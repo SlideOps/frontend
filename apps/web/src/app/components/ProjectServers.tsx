@@ -25,9 +25,13 @@ async function loadServers(projectId: string, signal: AbortSignal): Promise<Serv
     listProjectNodes(projectId, signal),
     listNodes(signal),
   ]);
-  // A server can join a Project only when it belongs to no Project yet, so the
-  // pool is every server the Operator owns with an empty project_id.
-  const assignable = all.filter((node) => !node.project_id);
+  // Every server the Operator owns that is not already in THIS Project can be
+  // assigned here, including one currently in another Project -- assigning simply
+  // moves it. Offering only unassigned servers produced a dead end: an Operator
+  // with one server, already in a Project, was told "every server you own is
+  // already in a Project" with nothing they could do about it.
+  const assignedHere = new Set(assigned.map((node) => node.id));
+  const assignable = all.filter((node) => !assignedHere.has(node.id));
   return { assigned, assignable };
 }
 
@@ -143,7 +147,13 @@ export function ProjectServers({ projectId }: { projectId: string }) {
               <Guidance for="project.assign" />
             </div>
             {state.data.assignable.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col gap-2">
+                <Text variant="caption" tone="secondary">
+                  A server belongs to one Project at a time, so assigning one that is already in
+                  another Project moves it here. Services already deployed on it keep running either
+                  way.
+                </Text>
+                <div className="flex flex-wrap items-center gap-3">
                 <label htmlFor="assign-server" className="sr-only">
                   Choose a server to assign
                 </label>
@@ -159,6 +169,7 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                   {state.data.assignable.map((node) => (
                     <option key={node.id} value={node.id}>
                       {node.name} ({node.address})
+                      {node.project_id ? ' — currently in another Project' : ''}
                     </option>
                   ))}
                 </select>
@@ -166,11 +177,12 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                   <Plus width={15} height={15} aria-hidden />
                   {assigning ? 'Assigning' : 'Assign'}
                 </Button>
+                </div>
               </div>
             ) : (
               <Text variant="body-sm" tone="secondary">
-                Every server you own is already in a Project. Connect another server, or unassign one
-                from its Project first.
+                Every server you own is already assigned to this Project. Connect another server to
+                add more.
               </Text>
             )}
           </div>

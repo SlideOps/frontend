@@ -57,6 +57,11 @@ export interface Service {
   cpu_limit: number;
   memory_mb: number;
   pids_limit?: number;
+  /**
+   * The Service's environment as stored. A sealed value reads as the redaction
+   * marker rather than the value, since a secret is never returned.
+   */
+  env?: Record<string, string>;
   ports?: ServicePort[];
   status: ServiceStatus;
   container_ref?: string;
@@ -72,6 +77,16 @@ export interface Service {
    * management instead of tearing down something SlideOps never created.
    */
   adopted?: boolean;
+  /**
+   * Why the most recent deploy failed, empty once one succeeds. Kept so an
+   * Operator who was not watching the live stream can still find out.
+   */
+  last_error?: string;
+  /**
+   * When the command or environment was last edited. Present and later than the
+   * running workload means a redeploy is needed to apply it.
+   */
+  config_changed_at?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -282,5 +297,26 @@ export function updateServiceResources(id: string, resources: ServiceResources):
   return apiRequest<unknown>(`/services/${id}/resources`, {
     method: 'PATCH',
     body: resources,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/**
+ * Edit a deployed Service's command and environment variables.
+ *
+ * `env` **replaces** rather than merges, so send the complete set you want —
+ * leaving one out is how it is removed, and a previously sealed secret you do not
+ * resend is dropped for the same reason.
+ *
+ * The change is saved but **not yet live**: a container bakes its command and
+ * environment in when it is created, so `redeployService` is what applies it. The
+ * returned Service carries `config_changed_at` so a screen can say so.
+ */
+export function updateServiceConfiguration(
+  id: string,
+  configuration: { command: string; env: ServiceEnvVar[] },
+): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/configuration`, {
+    method: 'PATCH',
+    body: configuration,
   }).then((r) => unwrap<Service>(r, 'service'));
 }
