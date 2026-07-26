@@ -25,7 +25,7 @@ export function buildServiceSchema() {
         .min(1, 'Give this Service a name.')
         .max(63, 'Keep the name under 64 characters.')
         .regex(/^[a-z0-9][a-z0-9-]*$/, 'Use lowercase letters, numbers, and hyphens.'),
-      runtime: z.enum(['container', 'systemd']),
+      runtime: z.enum(['container', 'systemd', 'compose']),
       source_type: z.enum(['image', 'repository']),
       image: z.string().trim().optional(),
       repository_url: z.string().trim().optional(),

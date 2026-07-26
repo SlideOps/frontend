@@ -12,7 +12,14 @@ import { apiBase, apiRequest, unwrap } from './http';
  */
 
 /** How a Service runs on the Node: a container, or a systemd unit. */
-export type ServiceRuntime = 'container' | 'systemd';
+/**
+ * How a Service runs on the Node.
+ *
+ * `compose` runs a whole Docker Compose stack as the repository declares it.
+ * Compose creates the network, so a service named in the file resolves by that
+ * name -- which a single container on the default bridge cannot do.
+ */
+export type ServiceRuntime = 'container' | 'systemd' | 'compose';
 
 /** The lifecycle state of a Service. */
 export type ServiceStatus = 'deploying' | 'running' | 'stopped' | 'failed' | 'removed';

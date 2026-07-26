@@ -183,7 +183,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
             <legend className="text-sm font-medium text-ink">Runtime</legend>
             <Guidance for="service.runtime" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
               <input type="radio" value="container" className="mt-0.5 accent-brand" {...register('runtime')} />
               <span>
@@ -202,6 +202,17 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 </span>
               </span>
             </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+              <input type="radio" value="compose" className="mt-0.5 accent-brand" {...register('runtime')} />
+              <span>
+                <span className="font-medium text-ink">Compose stack</span>
+                <span className="mt-0.5 block text-ink-muted">
+                  Runs the whole docker-compose file in the repository. Choose this when the app
+                  needs a database or cache alongside it: compose makes the network, so the service
+                  names in the file resolve.
+                </span>
+              </span>
+            </label>
           </div>
         </fieldset>
 
@@ -210,7 +221,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
             <legend className="text-sm font-medium text-ink">Source</legend>
             <Guidance for="service.source" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
               <input type="radio" value="image" className="mt-0.5 accent-brand" {...register('source_type')} />
               <span>
