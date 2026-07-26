@@ -12,6 +12,7 @@ import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Refreshing } from '../components/Refreshing';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -95,7 +96,7 @@ export function History() {
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const activeTab = FILTER_TABS.find((tab) => tab.key === filter) ?? { key: 'all', label: 'All' };
   // The load is keyed on the filter so switching it refetches the right slice.
-  const { state, reload } = useAsyncData(
+  const { state, reload, refreshing } = useAsyncData(
     (signal) => listOperations(activeTab.status ? { status: activeTab.status } : {}, signal),
     [filter],
   );
@@ -176,12 +177,15 @@ export function History() {
         description="Every Operation you have run, newest first. Open one to see its full record, replayed and, if it is still running, live. Finished Operations can be deleted to keep this readable."
         guidanceKey="dashboard.operations"
         actions={
-          canClear && state.status === 'ready' && state.data.some((op) => isFinished(op.status)) ? (
+          <>
+            <Refreshing show={refreshing} />
+            {canClear && state.status === 'ready' && state.data.some((op) => isFinished(op.status)) ? (
             <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>
               <Trash2 width={16} height={16} aria-hidden />
               {clearableStatus ? `Clear ${activeTab.label.toLowerCase()}` : 'Clear finished'}
-            </Button>
-          ) : undefined
+              </Button>
+            ) : null}
+          </>
         }
       />
 

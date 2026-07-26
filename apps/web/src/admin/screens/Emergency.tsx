@@ -14,6 +14,7 @@ import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { AdminShell } from '../components/AdminShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Refreshing } from '../../app/components/Refreshing';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -80,7 +81,7 @@ function ControlCard({
 
 /** Emergency: one control per mutating path, plus lockdown and session revocation. */
 export function Emergency() {
-  const { state, reload } = useAsyncData((signal) => getEmergencyState(signal), []);
+  const { state, reload, refreshing } = useAsyncData((signal) => getEmergencyState(signal), []);
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -184,6 +185,7 @@ export function Emergency() {
       <PageHeader
         title="Emergency controls"
         description="One control per path by which the platform changes something, so you can stop what is misbehaving without halting everything else. Every action here affects every tenant and is written to the audit trail."
+        actions={<Refreshing show={refreshing} />}
       />
 
       {note ? (

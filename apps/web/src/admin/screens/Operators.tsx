@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminShell } from '../components/AdminShell';
 import { OperatorStatusBadge } from '../components/Badges';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Refreshing } from '../../app/components/Refreshing';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -46,7 +47,7 @@ function RoleBadge({ role }: { role: OperatorRole }) {
  */
 export function Operators() {
   const navigate = useNavigate();
-  const { state, reload } = useAsyncData((signal) => listOperators(signal), []);
+  const { state, reload, refreshing } = useAsyncData((signal) => listOperators(signal), []);
 
   // The signed-in admin, so this screen can refuse to let them revoke their own
   // access and lock themselves out of the control plane.
@@ -109,6 +110,7 @@ export function Operators() {
         title="Operators"
         description="Every Operator on the platform, with their role, their Node and Operation counts, and when they were last active. Change a role here, or open a row for tier, suspension, and their recent Operations."
         guidanceKey="operators.roster"
+        actions={<Refreshing show={refreshing} />}
       />
 
       {note ? (
