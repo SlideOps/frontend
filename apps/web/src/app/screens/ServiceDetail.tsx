@@ -62,6 +62,14 @@ function memory(mb: number): string {
 }
 
 function sourceText(service: Service): string {
+  // An adopted workload was already running when SlideOps found it, so there is
+  // no source it was built from here; the image is shown when the runtime
+  // reported one, and otherwise the plain fact.
+  if (service.source.type === 'adopted') {
+    return service.source.image
+      ? `${service.source.image} (already running when SlideOps found it)`
+      : 'Already running when SlideOps found it';
+  }
   if (service.source.type === 'image') {
     return service.source.image ?? 'Image';
   }
@@ -312,7 +320,9 @@ export function ServiceDetail() {
                     {confirmRemove ? (
                       <div className="flex flex-col gap-3">
                         <Text variant="body-sm" tone="secondary">
-                          Remove this Service? Its workload is stopped and removed, and the allocation is freed.
+                          {service.adopted
+                            ? 'Stop managing this Service? SlideOps did not create this workload, so it keeps running on your server exactly as it is; it simply disappears from here.'
+                            : 'Remove this Service? Its workload is stopped and removed, and the allocation is freed.'}
                         </Text>
                         <div className="flex items-center gap-2">
                           <Button
@@ -324,14 +334,14 @@ export function ServiceDetail() {
                             Keep it
                           </Button>
                           <Button variant="danger" size="sm" onClick={remove} disabled={working}>
-                            {working ? 'Removing' : 'Remove'}
+                            {working ? 'Working' : service.adopted ? 'Stop managing it' : 'Remove'}
                           </Button>
                         </div>
                       </div>
                     ) : (
                       <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(true)} disabled={working}>
                         <Trash2 width={15} height={15} aria-hidden />
-                        Remove this Service
+                        {service.adopted ? 'Stop managing this Service' : 'Remove this Service'}
                       </Button>
                     )}
                   </div>

@@ -6,7 +6,7 @@ import {
   type ServiceUpdate,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
-import { CheckCircle2, GitBranch, Info, Rocket } from '@slideops/icons';
+import { CheckCircle2, GitBranch, Info, Rocket, ScanSearch } from '@slideops/icons';
 import { useState } from 'react';
 import { ErrorNote, Loading } from './Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -109,19 +109,24 @@ export function ServiceUpdatePanel({ service, onDeployed }: ServiceUpdatePanelPr
   const { id, status } = service;
   const deployedCommit = service.deployed_commit ?? '';
   const isDeploying = status === 'deploying';
+  // An adopted workload was already running when SlideOps found it, so there is
+  // no repository behind it to check and nothing to rebuild it from. Saying so
+  // plainly is better than an update check that can only ever fail.
+  const isAdopted = service.adopted === true;
 
   const [redeployError, setRedeployError] = useState<string | null>(null);
   const [redeploying, setRedeploying] = useState(false);
 
   // Skip the check while the Service is deploying: the commit is in flux and the
-  // deploying note carries the state. Re-key on the commit and status so a
-  // settled redeploy re-checks against the new running commit.
+  // deploying note carries the state. Skip it entirely for an adopted workload,
+  // which has no repository to compare against. Re-key on the commit and status
+  // so a settled redeploy re-checks against the new running commit.
   const { state, reload } = useAsyncData(
     (signal) =>
-      isDeploying
+      isDeploying || isAdopted
         ? Promise.resolve<ServiceUpdate | null>(null)
         : checkServiceUpdate(id, signal),
-    [id, deployedCommit, status],
+    [id, deployedCommit, status, isAdopted],
   );
 
   const deployLatest = async () => {
@@ -137,6 +142,22 @@ export function ServiceUpdatePanel({ service, onDeployed }: ServiceUpdatePanelPr
       setRedeploying(false);
     }
   };
+
+  if (isAdopted) {
+    return (
+      <Card className="h-fit">
+        <div className="flex items-center gap-2">
+          <ScanSearch width={16} height={16} className="text-ink-muted" aria-hidden />
+          <Text variant="h4">Deployment</Text>
+        </div>
+        <Text variant="body-sm" tone="secondary" className="mt-3">
+          This was already running when SlideOps found it, so SlideOps has nothing to rebuild it from.
+          You can start, stop, restart, and watch it here; to deploy a new version, do it the way you
+          always have, or deploy it as a new Service from its repository.
+        </Text>
+      </Card>
+    );
+  }
 
   return (
     <Card className="h-fit">

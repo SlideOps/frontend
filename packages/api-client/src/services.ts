@@ -23,7 +23,12 @@ export type ServiceStatus = 'deploying' | 'running' | 'stopped' | 'failed' | 're
  * the entrypoint for a systemd unit or an override for a container.
  */
 export interface ServiceSource {
-  type: 'image' | 'repository';
+  /**
+   * `adopted` marks a workload that was already running when SlideOps found it,
+   * so there is no image or repository to rebuild it from; the image, where the
+   * runtime reports one, is kept for display only.
+   */
+  type: 'image' | 'repository' | 'adopted';
   image?: string;
   repository_url?: string;
   /** The branch to clone and pull for a repository source. Defaults to main. */
@@ -60,6 +65,13 @@ export interface Service {
    * before the first repository deploy, and unset for an image source.
    */
   deployed_commit?: string;
+  /**
+   * Whether this Service was already running on the server when SlideOps found
+   * it, rather than one SlideOps deployed. SlideOps did not build an adopted
+   * workload, so it is never redeployed, and removing it releases it from
+   * management instead of tearing down something SlideOps never created.
+   */
+  adopted?: boolean;
   created_at: string;
   updated_at?: string;
 }

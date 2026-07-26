@@ -1,6 +1,6 @@
 import { cn } from '@slideops/design-system';
 import type { Capability, OperationStatus, RiskLevel, ServiceStatus } from '@slideops/api-client';
-import { Boxes, CheckCircle2, ShieldCheck } from '@slideops/icons';
+import { Boxes, CheckCircle2, ScanSearch, ShieldCheck } from '@slideops/icons';
 
 /*
  * Small status and risk badges. Every color is a semantic design token, so the
@@ -102,6 +102,41 @@ export function CompletionBadge({ label }: { label: string }) {
     <span className={cn(badgeBase, toneClass.success)}>
       <CheckCircle2 width={12} height={12} aria-hidden />
       {label}
+    </span>
+  );
+}
+
+/**
+ * A badge marking a Capability whose outcome was already in place on the server
+ * when SlideOps looked, rather than one SlideOps carried out. It reads in the
+ * info tone rather than the success tone, because it is an observation about the
+ * Operator's server and not a record of work this platform did.
+ */
+export function DetectedBadge({ label }: { label: string }) {
+  return (
+    <span
+      className={cn(badgeBase, toneClass.info)}
+      title="Found already in place on this server, not carried out by SlideOps"
+    >
+      <ScanSearch width={12} height={12} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+/**
+ * A badge marking a Service that was already running on the server when SlideOps
+ * found it. It is a reminder that SlideOps did not build this workload, so it is
+ * never rebuilt and removing it only stops managing it.
+ */
+export function AdoptedBadge() {
+  return (
+    <span
+      className={cn(badgeBase, toneClass.info)}
+      title="Already running when SlideOps found it. SlideOps manages it but did not build it."
+    >
+      <ScanSearch width={12} height={12} aria-hidden />
+      Adopted
     </span>
   );
 }
