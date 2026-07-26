@@ -23,6 +23,7 @@ import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
+import { Refreshing } from '../components/Refreshing';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -79,7 +80,10 @@ function sourceText(service: Service): string {
 
 /** A simple, read-only log view. Preserves formatting and belongs to both themes. */
 function LogView({ id }: { id: string }) {
-  const { state, reload } = useAsyncData((signal) => getServiceLogs(id, 200, signal), [id]);
+  const { state, reload, refreshing, refreshError } = useAsyncData(
+    (signal) => getServiceLogs(id, 200, signal),
+    [id],
+  );
   const logs = state.status === 'ready' ? state.data.trim() : '';
 
   return (
@@ -87,13 +91,23 @@ function LogView({ id }: { id: string }) {
       <div className="mb-3 flex items-center gap-2">
         <Text variant="h4">Logs</Text>
         <Guidance for="service.logs" />
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={reload}>
-          <RefreshCw width={14} height={14} aria-hidden />
-          Refresh
-        </Button>
+        <span className="ml-auto flex items-center gap-3">
+          <Refreshing label="Reading" show={refreshing} />
+          <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
+            <RefreshCw width={14} height={14} aria-hidden />
+            Refresh
+          </Button>
+        </span>
       </div>
       {state.status === 'loading' ? <Loading label="Reading recent logs" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
+      {/* A failed refresh keeps the last logs on screen and says so, rather than
+          replacing readable output with an error panel. */}
+      {refreshError ? (
+        <p role="alert" className="mb-2 text-sm text-danger">
+          {refreshError.message}
+        </p>
+      ) : null}
       {state.status === 'ready' ? (
         logs ? (
           <pre
