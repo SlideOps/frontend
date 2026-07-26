@@ -342,3 +342,56 @@ export function cancelServiceDeploy(id: string): Promise<Service> {
     method: 'POST',
   }).then((r) => unwrap<Service>(r, 'service'));
 }
+
+/** What one step of a compose stack plan will do. */
+export interface StackStep {
+  kind: 'install' | 'provision' | 'deploy';
+  compose_service: string;
+  capability_key?: string;
+  title: string;
+  detail: string;
+  /** The inputs the step runs with. A secret's value is never included. */
+  parameters?: Record<string, string>;
+  /** Inputs whose values are sealed and deliberately withheld from the plan. */
+  secret_parameters?: string[];
+}
+
+/**
+ * One environment variable the application will be handed, and where it comes
+ * from. The shape is shown with the secret withheld, because a plan carrying a
+ * password is not safe to display and a plan you cannot check is not a plan.
+ */
+export interface StackEnvAssignment {
+  key: string;
+  from: string;
+  shape: string;
+}
+
+/** What SlideOps would do with a repository's compose file. Nothing has run yet. */
+export interface StackPlan {
+  compose_file: string;
+  steps: StackStep[];
+  environment: StackEnvAssignment[];
+  /** The compose services that are your own code, built from the repository. */
+  application: string[];
+  /** Services SlideOps has no Capability for. Named, never quietly dropped. */
+  unrecognised: string[];
+  warnings?: string[];
+}
+
+/**
+ * Ask what SlideOps would do with a repository's Docker Compose file.
+ *
+ * It plans and stops: nothing is installed, nothing is created, and nothing
+ * reaches your server. Safe to call as often as you like.
+ */
+export function planComposeStack(input: {
+  node_id: string;
+  repository_url: string;
+  branch?: string;
+  name?: string;
+}): Promise<StackPlan> {
+  return apiRequest<unknown>('/services/compose-plan', { method: 'POST', body: input }).then((r) =>
+    unwrap<StackPlan>(r, 'plan'),
+  );
+}
