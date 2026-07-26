@@ -89,14 +89,53 @@ describe('parsePorts', () => {
 });
 
 describe('parseEnv', () => {
-  it('parses KEY=value lines into an object', () => {
+  // An array, not a map: each entry carries its own secret flag, which is the
+  // shape the API has always taken. The map this used to produce was rejected
+  // outright, so every deploy that set a variable failed with "the request body
+  // was not valid" while deploys with none worked.
+  it('parses KEY=value lines into entries the API accepts', () => {
     expect(parseEnv('NODE_ENV=production\nPORT=80')).toEqual({
-      env: { NODE_ENV: 'production', PORT: '80' },
+      env: [
+        { key: 'NODE_ENV', value: 'production', secret: false },
+        { key: 'PORT', value: '80', secret: false },
+      ],
     });
+  });
+
+  it('seals a line prefixed with the secret marker', () => {
+    expect(parseEnv('DATABASE_URL=postgres://x\nsecret:SECRET_ENCRYPTION_KEY=abc')).toEqual({
+      env: [
+        { key: 'DATABASE_URL', value: 'postgres://x', secret: false },
+        { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: true },
+      ],
+    });
+  });
+
+  // Sealing is explicit. Guessing from the name would either miss a secret or
+  // silently make a value the Operator needs unreadable forever.
+  it('does not guess that a value is secret from its name', () => {
+    expect(parseEnv('SECRET_ENCRYPTION_KEY=abc').env).toEqual([
+      { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: false },
+    ]);
+  });
+
+  it('keeps a value containing an equals sign intact', () => {
+    expect(parseEnv('DSN=host=db user=api').env).toEqual([
+      { key: 'DSN', value: 'host=db user=api', secret: false },
+    ]);
   });
 
   it('rejects an invalid variable name', () => {
     expect(parseEnv('1BAD=value').error).toBeTruthy();
+  });
+
+  it('rejects the same variable set twice', () => {
+    expect(parseEnv('PORT=80\nPORT=443').error).toBeTruthy();
+  });
+
+  it('parses nothing from an empty field', () => {
+    expect(parseEnv('')).toEqual({ env: [] });
+    expect(parseEnv(undefined)).toEqual({ env: [] });
   });
 });
 
@@ -123,7 +162,10 @@ describe('toDeployInput', () => {
     expect(input.source.type).toBe('repository');
     expect(input.source.repository_url).toBe('https://example.com/app.git');
     expect(input.source.command).toBe('node server.js');
-    expect(input.env).toEqual({ NODE_ENV: 'production' });
+    // The array shape the API takes. This assertion previously encoded the map
+    // shape, which is how the mismatch went unnoticed: the test agreed with the
+    // client and neither agreed with the server.
+    expect(input.env).toEqual([{ key: 'NODE_ENV', value: 'production', secret: false }]);
     expect(input.pids_limit).toBe(128);
   });
 });
