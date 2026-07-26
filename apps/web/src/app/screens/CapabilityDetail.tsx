@@ -19,6 +19,7 @@ import {
   Layers,
   ListChecks,
   Play,
+  ScanSearch,
   Server,
   ShieldCheck,
 } from '@slideops/icons';
@@ -26,9 +27,15 @@ import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { completedHint, completionLabel } from '../capability-completion';
+import {
+  completedHint,
+  completionLabel,
+  detectedHint,
+  detectedLabel,
+  isDetected,
+} from '../capability-completion';
 import { databaseManageStep } from '../database-credentials';
-import { CompletionBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
+import { CompletionBadge, DetectedBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -58,6 +65,42 @@ function Section({
 }
 
 /**
+ * This Capability's outcome found already in place on the Node the Operator
+ * arrived with, rather than carried out by SlideOps. There is no Operation behind
+ * it, so there is nothing to link to and no credential to reveal: it states what
+ * was found on the server and when, and leaves the decision to run it anyway with
+ * the Operator. It never claims SlideOps did the work.
+ */
+function CapabilityAlreadyPresent({
+  capabilityName,
+  capabilityKey,
+  state,
+}: {
+  capabilityName: string;
+  capabilityKey: string;
+  state: CapabilityState;
+}) {
+  return (
+    <Card className="flex flex-col gap-4 border-info">
+      <div className="flex flex-wrap items-center gap-3">
+        <DetectedBadge label={detectedLabel(capabilityKey)} />
+        <div className="flex items-center gap-2">
+          <ScanSearch width={16} height={16} className="text-info" aria-hidden />
+          <Text variant="body-sm" tone="secondary">
+            {detectedHint(state)}
+          </Text>
+        </div>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        {capabilityName} is already in place on this server, so there is nothing to do here. SlideOps
+        did not carry this out, so there is no run to look back at and no credential it created. You
+        can still run it from the panel on the right if you want SlideOps to apply its own settings.
+      </Text>
+    </Card>
+  );
+}
+
+/**
  * The state of this Capability on the Node the Operator arrived with: that it is
  * already done, when it last completed, a link back to that run in History, and
  * any credentials it produced, revealed and copied from the owning Operation. It
@@ -77,7 +120,7 @@ function CapabilityHere({
 }) {
   const navigate = useNavigate();
   const operationResult = useAsyncData<Operation>(
-    (signal) => getOperation(done.last_operation_id, signal),
+    (signal) => getOperation(done.last_operation_id ?? '', signal),
     [done.last_operation_id],
   );
   const operation = operationResult.state.status === 'ready' ? operationResult.state.data : null;
@@ -114,10 +157,14 @@ function CapabilityHere({
         <div className="flex items-center gap-2">
           <CompletionBadge label={completionLabel(capabilityKey)} />
           <Text variant="body-sm" tone="secondary">
-            {completedHint(capabilityKey, done.last_completed_at)}
+            {completedHint(capabilityKey, done.last_completed_at ?? '')}
           </Text>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => navigate(`/app/operations/${done.last_operation_id}`)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => navigate(`/app/operations/${done.last_operation_id}`)}
+        >
           <History width={15} height={15} aria-hidden />
           View in History
         </Button>
@@ -256,7 +303,13 @@ export function CapabilityDetail() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {done ? <CompletionBadge label={completionLabel(key)} /> : null}
+              {done ? (
+                isDetected(done) ? (
+                  <DetectedBadge label={detectedLabel(key)} />
+                ) : (
+                  <CompletionBadge label={completionLabel(key)} />
+                )
+              ) : null}
               <RiskBadge risk={capabilityResult.state.data.risk_level} />
               <Guidance for="capability.risk" size={14} />
             </div>
@@ -264,7 +317,14 @@ export function CapabilityDetail() {
 
           <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
             <div className="flex min-w-0 flex-col gap-6">
-              {done ? (
+              {done && isDetected(done) ? (
+                <CapabilityAlreadyPresent
+                  capabilityName={capabilityResult.state.data.name}
+                  capabilityKey={key}
+                  state={done}
+                />
+              ) : null}
+              {done && !isDetected(done) ? (
                 <CapabilityHere
                   capabilityName={capabilityResult.state.data.name}
                   capabilityKey={key}

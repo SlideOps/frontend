@@ -7,10 +7,10 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ChevronRight, Container, Plus } from '@slideops/icons';
+import { ChevronRight, Container, Plus, ScanSearch } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
-import { ServiceStatusBadge } from '../components/Badges';
+import { AdoptedBadge, ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { SampleAppDeploy } from '../components/SampleAppDeploy';
@@ -67,6 +67,7 @@ function ServiceRow({
       <span className="hidden shrink-0 sm:block">
         <ServiceMetricsInline id={service.id} running={service.status === 'running'} />
       </span>
+      {service.adopted ? <AdoptedBadge /> : null}
       <ServiceStatusBadge status={service.status} />
       <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
     </button>
@@ -85,10 +86,16 @@ export function Services() {
         description="The solutions you have deployed on your Nodes, each under hard resource limits your tier allows."
         guidanceKey="services.overview"
         actions={
-          <Button onClick={() => navigate('/app/services/new')}>
-            <Plus width={16} height={16} aria-hidden />
-            Deploy a Service
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
+              <ScanSearch width={16} height={16} aria-hidden />
+              Import what is running
+            </Button>
+            <Button onClick={() => navigate('/app/services/new')}>
+              <Plus width={16} height={16} aria-hidden />
+              Deploy a Service
+            </Button>
+          </>
         }
       />
 
@@ -100,9 +107,16 @@ export function Services() {
           {state.data.services.length === 0 ? (
             <EmptyState
               icon={Container}
-              title="No Services deployed yet"
-              description="A Service is one solution running on a Node under hard resource limits. Deploy one from an image or a repository, and SlideOps verifies it is running."
-              action={<Button onClick={() => navigate('/app/services/new')}>Deploy your first Service</Button>}
+              title="No Services here yet"
+              description="A Service is one solution running on a Node under hard resource limits. Deploy one from an image or a repository, or import an app you were already running on a server before you found SlideOps."
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button onClick={() => navigate('/app/services/new')}>Deploy your first Service</Button>
+                  <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
+                    Import what is already running
+                  </Button>
+                </div>
+              }
             />
           ) : (
             <div className="flex flex-col gap-2">

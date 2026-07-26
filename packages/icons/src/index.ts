@@ -58,6 +58,7 @@ export {
   Printer,
   RefreshCw,
   Rocket,
+  ScanSearch,
   Search,
   Server,
   Settings,

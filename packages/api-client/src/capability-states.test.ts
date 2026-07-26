@@ -80,6 +80,42 @@ describe('capability states requests', () => {
     expect(states).toEqual({});
   });
 
+  it('carries a detected state with its evidence, so a server set up before SlideOps reads as set up', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        states: {
+          'enable-containers': {
+            status: 'detected',
+            source: 'existing',
+            evidence: 'Docker is already installed on this server and is running.',
+            running: true,
+            detected_at: '2026-07-25T09:00:00Z',
+          },
+          'secure-ssh': {
+            status: 'done',
+            source: 'slideops',
+            last_operation_id: 'op_3',
+            last_completed_at: '2026-07-24T09:00:00Z',
+          },
+        },
+      }),
+    );
+
+    const states = await getCapabilityStates('nd_1');
+
+    const detected = states['enable-containers'];
+    expect(detected?.status).toBe('detected');
+    expect(detected?.source).toBe('existing');
+    expect(detected?.evidence).toContain('Docker');
+    expect(detected?.running).toBe(true);
+    expect(detected?.detected_at).toBe('2026-07-25T09:00:00Z');
+    // A detected state has no Operation behind it, so nothing may link to History.
+    expect(detected?.last_operation_id).toBeUndefined();
+
+    expect(states['secure-ssh']?.source).toBe('slideops');
+    expect(states['secure-ssh']?.last_operation_id).toBe('op_3');
+  });
+
   it('throws a typed ApiError carrying the backend code on failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(404, { error: { code: 'not_found', message: 'That Node does not exist.' } }),

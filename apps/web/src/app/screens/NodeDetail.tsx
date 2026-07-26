@@ -1,16 +1,37 @@
 import {
   ApiError,
   discoverNode,
+  getCapabilityStates,
   getNode,
   listCapabilities,
+  type CapabilityState,
   type DiscoveryResult,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ArrowRight, CheckCircle2, RefreshCw, Server } from '@slideops/icons';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  History,
+  RefreshCw,
+  RotateCcw,
+  ScanSearch,
+  Server,
+} from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import {
+  completedHint,
+  completionLabel,
+  detectedHint,
+  detectedLabel,
+  isDetected,
+  RE_RUN_LABEL,
+  RUN_ANYWAY_LABEL,
+} from '../capability-completion';
+import { CompletionBadge, DetectedBadge } from '../components/Badges';
 import { CapabilityCard } from '../components/CapabilityCard';
 import { CredentialRotation } from '../components/CredentialRotation';
 import { DiscoveryScan } from '../components/DiscoveryScan';
@@ -55,10 +76,93 @@ export function NodeDetail() {
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
 
+  // What is already in place on this server: the Capabilities SlideOps carried
+  // out here, and the outcomes that were already there when SlideOps looked. An
+  // Operator returning to a server they set up themselves, or from another
+  // account, sees it as it is rather than as a blank slate. It re-reads after a
+  // Discovery, since a fresh reading is what the detected half is drawn from. It
+  // never blocks the list: while it loads or if it fails, the map stays empty and
+  // the cards render as untouched.
+  const statesResult = useAsyncData<Record<string, CapabilityState>>(
+    (signal) => getCapabilityStates(id, undefined, signal),
+    [id],
+  );
+  const states = statesResult.state.status === 'ready' ? statesResult.state.data : {};
+
   const recommendedKeys = new Set<string>(
     discovery?.assessment.recommendations.map((recommendation) => recommendation.capability_key) ??
       [],
   );
+
+  // The badge that matches a Capability's state here: a completion SlideOps
+  // recorded, or an outcome found already in place on the server.
+  const capabilityBadge = (key: string, state: CapabilityState | undefined) => {
+    if (!state) {
+      return undefined;
+    }
+    return isDetected(state) ? (
+      <DetectedBadge label={detectedLabel(key)} />
+    ) : (
+      <CompletionBadge label={completionLabel(key)} />
+    );
+  };
+
+  // A Capability SlideOps carried out here links back to its run and offers a
+  // quieter Re-run. One found already in place says what was found and offers
+  // only the quiet action, since there is no run of ours to look back at. An
+  // untouched one keeps the plain start action, with the recommendation note when
+  // the Assessment suggests it.
+  const capabilityFooter = (key: string, state: CapabilityState | undefined) => {
+    const startHref = `/app/capabilities/${key}?node=${id}`;
+    if (state && isDetected(state)) {
+      return (
+        <div className="flex flex-col gap-2">
+          <Text variant="caption" tone="secondary">
+            {detectedHint(state)}
+          </Text>
+          <div>
+            <Button size="sm" variant="ghost" onClick={() => navigate(startHref)}>
+              <RotateCcw width={15} height={15} aria-hidden />
+              {RUN_ANYWAY_LABEL}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    if (state) {
+      return (
+        <div className="flex flex-col gap-2">
+          <Text variant="caption" tone="secondary">
+            {completedHint(key, state.last_completed_at ?? '')}
+          </Text>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}>
+              <History width={15} height={15} aria-hidden />
+              View in History
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate(startHref)}>
+              <RotateCcw width={15} height={15} aria-hidden />
+              {RE_RUN_LABEL}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-3">
+        <Button size="sm" onClick={() => navigate(startHref)}>
+          Start an Operation
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+        {recommendedKeys.has(key) ? (
+          <span className="inline-flex items-center gap-1 text-xs text-success">
+            <CheckCircle2 width={14} height={14} aria-hidden />
+            Recommended here
+          </span>
+        ) : null}
+      </div>
+    );
+  };
 
   const runDiscovery = async () => {
     setDiscovering(true);
@@ -66,6 +170,7 @@ export function NodeDetail() {
     try {
       setDiscovery(await discoverNode(id));
       nodeResult.reload();
+      statesResult.reload();
     } catch (error) {
       setDiscoverError(error instanceof ApiError ? error.message : 'Discovery did not complete.');
     } finally {
@@ -167,6 +272,28 @@ export function NodeDetail() {
                 {discovery ? <DiscoveryScan result={discovery} /> : null}
               </Card>
 
+              <Card>
+                <div className="mb-2 flex items-center gap-2">
+                  <ScanSearch width={18} height={18} className="text-brand" aria-hidden />
+                  <Text variant="h4">Already running here</Text>
+                </div>
+                <Text variant="body-sm" tone="secondary">
+                  Apps you were already running on this server, from before SlideOps or from another
+                  account, can be brought under management without redeploying them. They keep running
+                  exactly as they are.
+                </Text>
+                <div className="mt-4">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => navigate(`/app/services/import?node=${id}`)}
+                  >
+                    See what is running here
+                    <ArrowRight width={15} height={15} aria-hidden />
+                  </Button>
+                </div>
+              </Card>
+
               <div>
                 <div className="mb-3 flex items-center gap-2">
                   <Text variant="h3">Available Capabilities</Text>
@@ -184,25 +311,8 @@ export function NodeDetail() {
                       <CapabilityCard
                         key={capability.key}
                         capability={capability}
-                        footer={
-                          <div className="flex items-center gap-3">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                navigate(`/app/capabilities/${capability.key}?node=${id}`)
-                              }
-                            >
-                              Start an Operation
-                              <ArrowRight width={15} height={15} aria-hidden />
-                            </Button>
-                            {recommendedKeys.has(capability.key) ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-success">
-                                <CheckCircle2 width={14} height={14} aria-hidden />
-                                Recommended here
-                              </span>
-                            ) : null}
-                          </div>
-                        }
+                        badge={capabilityBadge(capability.key, states[capability.key])}
+                        footer={capabilityFooter(capability.key, states[capability.key])}
                       />
                     ))}
                   </div>

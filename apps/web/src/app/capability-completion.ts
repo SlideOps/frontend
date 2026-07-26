@@ -1,8 +1,16 @@
+import type { CapabilityState } from '@slideops/api-client';
+
 /*
- * The Operator-facing language for a Capability that has already been carried out
- * on a Node. It turns a raw completion into a clear label, a quieter re-run verb,
- * and a short "how long ago" phrase, so a done Capability reads as done and an
- * accidental repeat is discouraged rather than blocked.
+ * The Operator-facing language for a Capability whose outcome is already in
+ * place on a Node. It turns a raw state into a clear label, a quieter re-run
+ * verb, and a short "how long ago" phrase, so an outcome already in place reads
+ * that way and an accidental repeat is discouraged rather than blocked.
+ *
+ * The outcome can be in place for two reasons, and the words differ. SlideOps
+ * carried it out, and History holds the record; or it was already there when
+ * SlideOps looked, because the Operator set the server up before they found
+ * SlideOps, used another tool, or worked from a different account. The second is
+ * never described as something SlideOps did.
  */
 
 /**
@@ -70,3 +78,33 @@ export function completedHint(capabilityKey: string, iso: string, now: Date = ne
   const verb = label === 'done' ? 'done' : label;
   return ago ? `Already ${verb} ${ago}` : `Already ${verb}`;
 }
+
+/**
+ * Whether a state was read off the server rather than carried out by SlideOps.
+ * A detected state has no Operation behind it, so nothing may link to History.
+ */
+export function isDetected(state: CapabilityState | undefined): boolean {
+  return state?.status === 'detected';
+}
+
+/**
+ * The badge label for a Capability found already in place on the server, for
+ * example "Already installed". It never claims SlideOps did the work.
+ */
+export function detectedLabel(capabilityKey: string): string {
+  return `Already ${completionLabel(capabilityKey).toLowerCase()}`;
+}
+
+/**
+ * The one-line explanation under a detected Capability: the evidence read off
+ * the server, and when it was read. It falls back to a plain sentence when a
+ * state carries no evidence, so the card is never blank.
+ */
+export function detectedHint(state: CapabilityState, now: Date = new Date()): string {
+  const evidence = state.evidence?.trim() || 'This was already in place when SlideOps looked.';
+  const ago = state.detected_at ? completedAgo(state.detected_at, now) : '';
+  return ago ? `${evidence} Found ${ago}.` : evidence;
+}
+
+/** The action verb for a Capability already in place that SlideOps did not run. */
+export const RUN_ANYWAY_LABEL = 'Run it anyway';

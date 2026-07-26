@@ -12,9 +12,17 @@ import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { completedHint, completionLabel, RE_RUN_LABEL } from '../capability-completion';
+import {
+  completedHint,
+  completionLabel,
+  detectedHint,
+  detectedLabel,
+  isDetected,
+  RE_RUN_LABEL,
+  RUN_ANYWAY_LABEL,
+} from '../capability-completion';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { CompletionBadge } from './Badges';
+import { CompletionBadge, DetectedBadge } from './Badges';
 import { CapabilityCard } from './CapabilityCard';
 import { ErrorNote, Loading } from './Feedback';
 
@@ -55,10 +63,12 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
   const nodes = ready?.nodes ?? [];
   const chosen = serverId || nodes[0]?.id || '';
 
-  // Which Capabilities are already done on the chosen server, from History, so a
-  // done Capability reads as done and links back to where it happened. It never
-  // blocks the list: while it loads or if it fails, the map stays empty and the
-  // cards simply render without a done badge.
+  // Which Capabilities are already in place on the chosen server: the ones
+  // SlideOps carried out, from History, and the ones that were already there when
+  // SlideOps looked, from the server's own Discovery. Either way the card says so,
+  // so an Operator who set the server up before finding SlideOps is met where they
+  // are. It never blocks the list: while it loads or if it fails, the map stays
+  // empty and the cards simply render as untouched.
   const statesResult = useAsyncData<Record<string, CapabilityState>>(
     (signal) => (chosen ? getCapabilityStates(chosen, projectId, signal) : Promise.resolve({})),
     [chosen, projectId],
@@ -70,11 +80,13 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
     return isPluginCapability(capability) ? `${base}&project=${projectId}` : base;
   };
 
-  // A done Capability leads back to its record in History and offers a quieter
-  // Re-run, so it never reads like a fresh first-time action. An undone one keeps
+  // A Capability SlideOps carried out leads back to its record in History and
+  // offers a quieter Re-run, so it never reads like a fresh first-time action.
+  // One found already in place says what was found and offers only the quiet
+  // action, since there is no run of ours to look back at. An untouched one keeps
   // the plain start action.
-  const capabilityFooter = (capability: Capability, done: CapabilityState | undefined) => {
-    if (!done) {
+  const capabilityFooter = (capability: Capability, state: CapabilityState | undefined) => {
+    if (!state) {
       return (
         <Button size="sm" onClick={() => navigate(startHref(capability))}>
           Start an Operation
@@ -82,13 +94,28 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
         </Button>
       );
     }
+    if (isDetected(state)) {
+      return (
+        <div className="flex flex-col gap-2">
+          <Text variant="caption" tone="secondary">
+            {detectedHint(state)}
+          </Text>
+          <div>
+            <Button size="sm" variant="ghost" onClick={() => navigate(startHref(capability))}>
+              <RotateCcw width={15} height={15} aria-hidden />
+              {RUN_ANYWAY_LABEL}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-2">
         <Text variant="caption" tone="secondary">
-          {completedHint(capability.key, done.last_completed_at)}
+          {completedHint(capability.key, state.last_completed_at ?? '')}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => navigate(`/app/operations/${done.last_operation_id}`)}>
+          <Button size="sm" onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}>
             <History width={15} height={15} aria-hidden />
             View in History
           </Button>
@@ -98,6 +125,19 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
           </Button>
         </div>
       </div>
+    );
+  };
+
+  // The badge that matches the state: a completion SlideOps recorded, or an
+  // observation of the server as it already was.
+  const capabilityBadge = (capability: Capability, state: CapabilityState | undefined) => {
+    if (!state) {
+      return undefined;
+    }
+    return isDetected(state) ? (
+      <DetectedBadge label={detectedLabel(capability.key)} />
+    ) : (
+      <CompletionBadge label={completionLabel(capability.key)} />
     );
   };
 
@@ -144,13 +184,13 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {ready.capabilities.map((capability) => {
-                const done = states[capability.key];
+                const state = states[capability.key];
                 return (
                   <CapabilityCard
                     key={capability.key}
                     capability={capability}
-                    badge={done ? <CompletionBadge label={completionLabel(capability.key)} /> : undefined}
-                    footer={capabilityFooter(capability, done)}
+                    badge={capabilityBadge(capability, state)}
+                    footer={capabilityFooter(capability, state)}
                   />
                 );
               })}
