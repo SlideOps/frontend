@@ -32,10 +32,13 @@ describe('normalizeError', () => {
     expect(error.message).toBe('That email is in use.');
   });
 
-  it('produces a safe default for an unreadable body', () => {
+  it('produces a safe default for an unreadable body, naming what went wrong', () => {
     const error = normalizeError(500, null);
     expect(error.code).toBe('unknown_error');
-    expect(error.message).toBe('The request could not be completed.');
+    // The message is derived from the status rather than being one generic
+    // sentence, which repeatedly sent people hunting for a fault in their own
+    // input that was never there. See errors.test.ts for the full mapping.
+    expect(error.message).toMatch(/server/i);
   });
 });
 
