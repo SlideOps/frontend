@@ -1,6 +1,6 @@
 export { ApiClient, type ApiClientOptions, type RequestOptions } from './client';
 export { ApiError, normalizeError } from './errors';
-export { apiBase, apiRequest, unwrap, type ResourceRequestOptions } from './http';
+export { apiBase, apiIsCrossOrigin, apiRequest, unwrap, type ResourceRequestOptions } from './http';
 export {
   openEventStream,
   openOperationStream,
@@ -19,6 +19,9 @@ export {
   mfaSetup,
   mfaEnable,
   mfaDisable,
+  getAuthProviders,
+  githubSignInUrl,
+  type AuthProviders,
   type Credentials,
   type MfaSetup,
   type LoginResult,
@@ -102,6 +105,11 @@ export {
   getEmergencyStatus,
   listAdminTiers,
   updateAdminTier,
+  getEmergencyState,
+  setEmergencyControl,
+  emergencyLockdown,
+  emergencyReleaseAll,
+  revokeAllSessions,
   type Overview,
   type OperatorStatus,
   type AdminOperator,
@@ -115,6 +123,8 @@ export {
   type AdminOperationFilter,
   type AuditFilter,
   type AdminTier,
+  type EmergencyControl,
+  type EmergencyState,
 } from './admin';
 export {
   listMarketplacePlugins,
@@ -200,11 +210,25 @@ export {
   approveOperation,
   cancelOperation,
   revealOperationSecret,
+  deleteOperation,
+  clearOperations,
   type CreateOperationInput,
   type OperationFilter,
   type RevealedSecret,
 } from './operations';
-export { getCapabilityStates, type CapabilityState } from './capability-states';
+export {
+  getCapabilityStates,
+  type CapabilityState,
+  type CapabilityStateStatus,
+  type CapabilityStateSource,
+} from './capability-states';
+export {
+  listNodeWorkloads,
+  adoptWorkload,
+  moveServiceToProject,
+  type Workload,
+  type AdoptWorkloadInput,
+} from './workloads';
 export type {
   Operator,
   OperatorRole,

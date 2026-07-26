@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // One manifest and one service worker for the whole application. The theme and
@@ -9,7 +9,21 @@ import { VitePWA } from 'vite-plugin-pwa';
 const BRAND = '#743930';
 const APP_BACKGROUND = '#faf6f4';
 
-export default defineConfig({
+// Where the dev server forwards /api to. It is read from the environment so the
+// backend can run wherever you like — in docker compose on :8090, bare on :8080,
+// or on another machine entirely — without editing this file.
+//
+// Development only. In production the app either shares an origin with the API,
+// or points at it directly through VITE_API_BASE_URL, and no proxy is involved.
+const DEFAULT_DEV_API_TARGET = 'http://localhost:8090';
+
+export default defineConfig(({ mode }) => {
+  // loadEnv reads .env, .env.local, and the mode-specific files from the app
+  // directory, so the proxy target is configured the same way as everything else.
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  const devApiTarget = env.VITE_DEV_API_PROXY_TARGET || DEFAULT_DEV_API_TARGET;
+
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -57,18 +71,23 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 4321,
-    // Forward API calls to the backend during development so the single session
-    // cookie is same origin. In production the app is served from the same
-    // origin as the API, so no proxy is needed there.
+    port: Number(env.VITE_DEV_PORT) || 4321,
+    // Forward API calls to the backend during development, so the single session
+    // cookie stays same origin and none of the cross-origin machinery is needed
+    // just to work locally. In production the app is served from the same origin
+    // as the API, or points at it with VITE_API_BASE_URL.
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: devApiTarget,
         changeOrigin: true,
+        // Dev only: the app is proxied from the dev port to the API, so rewrite
+        // the WebSocket Origin to the API origin, which the backend accepts.
+        headers: { origin: devApiTarget },
         // Upgrade websocket connections too, so the /api/v1/stream event feed
         // works in development from the same origin as the session cookie.
         ws: true,
       },
     },
   },
+  };
 });
