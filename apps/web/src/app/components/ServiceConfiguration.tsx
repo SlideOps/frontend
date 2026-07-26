@@ -2,7 +2,14 @@ import { ApiError, redeployService, updateServiceConfiguration, type Service } f
 import { Button, Card, Text } from '@slideops/design-system';
 import { AlertTriangle, RefreshCw, Settings } from '@slideops/icons';
 import { useState } from 'react';
+import { RevealValue } from './RevealValue';
 import { parseEnv, SECRET_PREFIX } from '../service-schema';
+
+/**
+ * What the API returns in place of a sealed value. The plaintext lives only in the
+ * secret store, so this marker is all a read ever sees.
+ */
+const SEALED_MARKER = '[stored securely]';
 
 /*
  * Editing a deployed Service's command and environment.
@@ -29,9 +36,48 @@ function envToText(service: Service): string {
   const entries = Object.entries(service.env ?? {});
   return entries
     .map(([key, value]) =>
-      value === '[stored securely]' ? `${SECRET_PREFIX}${key}=` : `${key}=${value}`,
+      value === SEALED_MARKER ? `${SECRET_PREFIX}${key}=` : `${key}=${value}`,
     )
     .join('\n');
+}
+
+/**
+ * The current environment, one row per variable, each value masked behind a
+ * reveal. An environment holds database passwords and API keys, so it is masked
+ * on load rather than printed: an Operator reveals the one they need.
+ *
+ * A sealed value cannot be read back at all, so it says so instead of offering a
+ * reveal that could never work.
+ */
+function EnvList({ service }: { service: Service }) {
+  const entries = Object.entries(service.env ?? {});
+  if (entries.length === 0) {
+    return (
+      <Text variant="body-sm" tone="secondary">
+        No environment variables set. Choose Edit to add some.
+      </Text>
+    );
+  }
+  return (
+    <dl className="divide-y divide-border rounded-md border border-border">
+      {entries.map(([key, value]) => (
+        <div key={key} className="grid gap-2 px-3 py-2 sm:grid-cols-[16rem_1fr] sm:items-center">
+          <dt className="truncate font-mono text-xs text-ink-muted" title={key}>
+            {key}
+          </dt>
+          <dd className="min-w-0">
+            {value === SEALED_MARKER ? (
+              <Text variant="caption" tone="secondary">
+                Sealed — encrypted and never shown again
+              </Text>
+            ) : (
+              <RevealValue value={value} label={key} sensitive />
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** The command and environment editor, with the redeploy that applies it. */
@@ -44,6 +90,11 @@ export function ServiceConfiguration({
 }) {
   const [command, setCommand] = useState(service.source.command ?? '');
   const [envText, setEnvText] = useState(() => envToText(service));
+  // Values are masked by default. An environment is where the database password
+  // and the API keys live, so showing it in plain text on load is wrong: it is
+  // readable over a shoulder, in a screen share, and in a screenshot. The
+  // Operator reveals what they need, one value at a time.
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [redeploying, setRedeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,24 +173,44 @@ export function ServiceConfiguration({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="svc-env" className="text-sm font-medium text-ink">
-          Environment
-        </label>
-        <textarea
-          id="svc-env"
-          rows={6}
-          spellCheck={false}
-          className={`${inputClass} resize-y font-mono`}
-          placeholder={'DATABASE_URL=postgres://…\nsecret:SECRET_ENCRYPTION_KEY=…'}
-          value={envText}
-          onChange={(event) => setEnvText(event.target.value)}
-        />
-        <Text variant="caption" tone="secondary">
-          One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value — it
-          is encrypted and never shown again. This list <strong>replaces</strong> what is there, so
-          delete a line to remove that variable. A sealed value cannot be read back, so its line
-          shows empty; retype it to keep it, or it will be dropped.
-        </Text>
+        <div className="flex items-center gap-2">
+          <Text variant="body-sm" className="font-medium">
+            Environment
+          </Text>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() => setEditing((was) => !was)}
+          >
+            {editing ? 'Done editing' : 'Edit'}
+          </Button>
+        </div>
+
+        {editing ? (
+          <>
+            <label htmlFor="svc-env" className="sr-only">
+              Environment variables
+            </label>
+            <textarea
+              id="svc-env"
+              rows={6}
+              spellCheck={false}
+              className={`${inputClass} resize-y font-mono`}
+              placeholder={'DATABASE_URL=postgres://…\nsecret:SECRET_ENCRYPTION_KEY=…'}
+              value={envText}
+              onChange={(event) => setEnvText(event.target.value)}
+            />
+            <Text variant="caption" tone="secondary">
+              One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value —
+              it is encrypted and never shown again. This list <strong>replaces</strong> what is
+              there, so delete a line to remove that variable. A sealed value cannot be read back, so
+              its line shows empty; retype it to keep it, or it will be dropped.
+            </Text>
+          </>
+        ) : (
+          <EnvList service={service} />
+        )}
       </div>
 
       {error ? (
