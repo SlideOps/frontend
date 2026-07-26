@@ -1,36 +1,74 @@
-import { listOperations, type Operation, type OperationStatus } from '@slideops/api-client';
-import { Text } from '@slideops/design-system';
-import { Activity, ChevronRight } from '@slideops/icons';
+import {
+  ApiError,
+  clearOperations,
+  deleteOperation,
+  listOperations,
+  type Operation,
+  type OperationStatus,
+} from '@slideops/api-client';
+import { Button, Text } from '@slideops/design-system';
+import { Activity, ChevronRight, Trash2 } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
 
-function OperationRow({ operation, onOpen }: { operation: Operation; onOpen: () => void }) {
+/**
+ * Whether an Operation has finished and so may be deleted. One still planning,
+ * awaiting approval, or executing must stay: deleting it would orphan a change
+ * about to be written to a server.
+ */
+function isFinished(status: OperationStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function OperationRow({
+  operation,
+  onOpen,
+  onDelete,
+}: {
+  operation: Operation;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
   const when = operation.created_at ? new Date(operation.created_at).toLocaleString() : '';
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-    >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-        <Activity width={18} height={18} aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1">
-        <Text variant="body-sm" className="truncate font-medium">
-          {operation.capability_key}
-        </Text>
-        <Text variant="body-sm" tone="secondary" className="truncate">
-          {when}
-        </Text>
-      </span>
-      <StatusBadge status={operation.status} />
-      <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
-    </button>
+    <div className="flex w-full items-center gap-2 rounded-md border border-border bg-surface pr-2 transition-colors duration-fast ease-standard hover:bg-subtle">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      >
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+          <Activity width={18} height={18} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <Text variant="body-sm" className="truncate font-medium">
+            {operation.capability_key}
+          </Text>
+          <Text variant="body-sm" tone="secondary" className="truncate">
+            {when}
+          </Text>
+        </span>
+        <StatusBadge status={operation.status} />
+        <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
+      </button>
+      {isFinished(operation.status) ? (
+        <button
+          type="button"
+          aria-label={`Delete this ${operation.status} Operation from your History`}
+          title="Delete from History"
+          onClick={onDelete}
+          className="shrink-0 rounded-md p-2 text-ink-muted transition-colors duration-fast ease-standard hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <Trash2 width={16} height={16} aria-hidden />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -57,10 +95,69 @@ export function History() {
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const activeTab = FILTER_TABS.find((tab) => tab.key === filter) ?? { key: 'all', label: 'All' };
   // The load is keyed on the filter so switching it refetches the right slice.
-  const { state } = useAsyncData(
+  const { state, reload } = useAsyncData(
     (signal) => listOperations(activeTab.status ? { status: activeTab.status } : {}, signal),
     [filter],
   );
+
+  // Tidying History. Deleting a record never touches infrastructure: whatever an
+  // Operation did to a server stays done, and only the record of it goes.
+  const [pendingDelete, setPendingDelete] = useState<Operation | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const runDelete = async () => {
+    if (!pendingDelete) {
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    setNote(null);
+    try {
+      await deleteOperation(pendingDelete.id);
+      setNote('That Operation was removed from your History.');
+      setPendingDelete(null);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That Operation could not be deleted. Try again.',
+      );
+      setPendingDelete(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Clearing is scoped to whatever the Operator is currently looking at, so the
+  // action always matches what is on screen rather than quietly reaching wider.
+  // On the All tab that means every finished Operation.
+  const clearableStatus = activeTab.status && isFinished(activeTab.status) ? activeTab.status : null;
+  const canClear = filter === 'all' || clearableStatus !== null;
+
+  const runClear = async () => {
+    setBusy(true);
+    setActionError(null);
+    setNote(null);
+    try {
+      const deleted = await clearOperations(clearableStatus ? [clearableStatus] : []);
+      setNote(
+        deleted === 0
+          ? 'There was nothing finished to clear.'
+          : `Cleared ${deleted} Operation${deleted === 1 ? '' : 's'} from your History.`,
+      );
+      setClearing(false);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'History could not be cleared. Try again.',
+      );
+      setClearing(false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const requiredCount =
     state.status === 'ready'
@@ -76,9 +173,28 @@ export function History() {
     <OperatorShell active="operations">
       <PageHeader
         title="History"
-        description="Every Operation you have run, newest first. Open one to see its full record, replayed and, if it is still running, live."
+        description="Every Operation you have run, newest first. Open one to see its full record, replayed and, if it is still running, live. Finished Operations can be deleted to keep this readable."
         guidanceKey="dashboard.operations"
+        actions={
+          canClear && state.status === 'ready' && state.data.some((op) => isFinished(op.status)) ? (
+            <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>
+              <Trash2 width={16} height={16} aria-hidden />
+              {clearableStatus ? `Clear ${activeTab.label.toLowerCase()}` : 'Clear finished'}
+            </Button>
+          ) : undefined
+        }
       />
+
+      {note ? (
+        <p role="status" className="mb-4 text-sm text-success">
+          {note}
+        </p>
+      ) : null}
+      {actionError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {actionError}
+        </p>
+      ) : null}
 
       <div
         role="group"
@@ -137,11 +253,40 @@ export function History() {
                 key={operation.id}
                 operation={operation}
                 onOpen={() => navigate(`/app/operations/${operation.id}`)}
+                onDelete={() => setPendingDelete(operation)}
               />
             ))}
           </div>
         )
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete this Operation from your History?"
+        description={
+          pendingDelete === null
+            ? ''
+            : `This removes the record of "${pendingDelete.capability_key}" and its event log. It does not undo anything it did to your server — whatever it changed stays changed. The deletion itself is recorded in the audit trail.`
+        }
+        confirmLabel="Delete it"
+        confirmVariant="danger"
+        onConfirm={runDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={clearing}
+        title={clearableStatus ? `Clear every ${clearableStatus} Operation?` : 'Clear every finished Operation?'}
+        description={
+          clearableStatus
+            ? `This removes every ${clearableStatus} Operation from your History, along with its event log. Nothing still running or waiting on you is touched, and nothing on your servers changes.`
+            : 'This removes every completed, failed, and cancelled Operation from your History. Anything still planning, waiting on your approval, or executing is left exactly where it is, and nothing on your servers changes.'
+        }
+        confirmLabel="Clear them"
+        confirmVariant="danger"
+        onConfirm={runClear}
+        onCancel={() => setClearing(false)}
+      />
     </OperatorShell>
   );
 }
