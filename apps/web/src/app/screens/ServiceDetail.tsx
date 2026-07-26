@@ -1,9 +1,11 @@
 import {
   ApiError,
+  cancelServiceDeploy,
   getNode,
   getProject,
   getService,
   getServiceLogs,
+  redeployService,
   removeService,
   restartService,
   startService,
@@ -13,7 +15,7 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, Container, Play, RefreshCw, Server, Square, Trash2 } from '@slideops/icons';
+import { ArrowLeft, Container, Play, RefreshCw, Server, Square, Trash2, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -160,7 +162,9 @@ export function ServiceDetail() {
     return () => clearTimeout(timer);
   }, [status, reload]);
 
-  const runAction = async (action: (id: string) => Promise<void>, failure: string) => {
+  // Some actions answer with the updated Service and some with nothing; the
+  // caller only cares that the work finished, so the result is ignored here.
+  const runAction = async (action: (id: string) => Promise<unknown>, failure: string) => {
     setWorking(true);
     setActionError(null);
     try {
@@ -190,6 +194,9 @@ export function ServiceDetail() {
   const isRunning = status === 'running';
   const isStopped = status === 'stopped' || status === 'failed';
   const isDeploying = status === 'deploying';
+  // An adopted workload was already running when SlideOps found it, so there is
+  // nothing to rebuild it from and redeploying it is refused by the API.
+  const isAdopted = service?.adopted === true;
 
   return (
     <OperatorShell active="services">
@@ -316,6 +323,20 @@ export function ServiceDetail() {
                   <Guidance for="service.lifecycle" />
                 </div>
                 <div className="mt-4 flex flex-col gap-3">
+                  {/* While a deploy is running, stopping it is the only thing worth
+                      offering: the lifecycle actions have nothing settled to act on,
+                      and Remove tears down a Service the Operator only wanted to stop
+                      starting. */}
+                  {isDeploying ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => runAction(cancelServiceDeploy, 'The deploy could not be cancelled.')}
+                      disabled={working}
+                    >
+                      <XCircle width={15} height={15} aria-hidden />
+                      {working ? 'Cancelling' : 'Cancel this deploy'}
+                    </Button>
+                  ) : null}
                   {isStopped ? (
                     <Button onClick={() => runAction(startService, 'The Service could not start.')} disabled={working}>
                       <Play width={15} height={15} aria-hidden />
@@ -330,6 +351,19 @@ export function ServiceDetail() {
                     >
                       <Square width={15} height={15} aria-hidden />
                       Stop
+                    </Button>
+                  ) : null}
+                  {/* Redeploying belongs beside the other lifecycle actions, not only
+                      in the deployment panel: it is what applies a configuration
+                      change, and an Operator looking for "apply my edit" looks here. */}
+                  {!isDeploying && !isAdopted ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => runAction(redeployService, 'The redeploy could not be started.')}
+                      disabled={working}
+                    >
+                      <RefreshCw width={15} height={15} aria-hidden />
+                      Redeploy
                     </Button>
                   ) : null}
                   {isRunning || isStopped ? (
