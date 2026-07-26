@@ -123,9 +123,31 @@ export interface DeployServiceInput {
   memory_mb: number;
   /** The maximum number of processes, optional. */
   pids_limit?: number;
-  /** Environment variables. Secret values are sealed and redacted afterward. */
-  env?: Record<string, string>;
+  /**
+   * Environment variables, one entry each.
+   *
+   * An array rather than a map, because each variable carries its own `secret`
+   * flag and a map cannot express that. A secret entry is sealed in the secret
+   * store, replaced with a redaction marker everywhere it is stored or returned,
+   * and revealed only at deploy time. A non-secret entry is stored as given and
+   * stays readable.
+   */
+  env?: ServiceEnvVar[];
   ports?: ServicePort[];
+}
+
+/**
+ * One environment variable on a deploy.
+ *
+ * `secret: true` seals the value: it never appears in the database, in a
+ * response, or in a log, and it is revealed only to the deploy itself. That also
+ * means **you cannot read it back afterwards**, so mark what is genuinely
+ * sensitive and leave the rest plain.
+ */
+export interface ServiceEnvVar {
+  key: string;
+  value: string;
+  secret: boolean;
 }
 
 /** List the Operator's Services, with status and enough to show live usage. */

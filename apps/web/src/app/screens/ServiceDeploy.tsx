@@ -361,12 +361,15 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
             id="env"
             rows={3}
             spellCheck={false}
-            placeholder="NODE_ENV=production"
+            placeholder={'DATABASE_URL=postgres://user@host:5432/db\nsecret:SECRET_ENCRYPTION_KEY=…'}
             className={`resize-y py-2 font-mono ${inputClass.replace('h-10', '')} ${errors.env ? 'border-danger' : ''}`}
             {...register('env')}
           />
           <Text variant="body-sm" tone="secondary">
-            One variable per line, written KEY=value. Secret values are stored encrypted and redacted.
+            One variable per line, written <code>KEY=value</code>. Prefix a line with{' '}
+            <code>secret:</code> to seal that value — it is encrypted, never shown again, and revealed
+            only to the deploy itself. Anything unprefixed is stored as you typed it and stays
+            readable, so seal what is sensitive and leave the rest plain.
           </Text>
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>

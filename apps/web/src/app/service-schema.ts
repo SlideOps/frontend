@@ -1,4 +1,4 @@
-import type { DeployServiceInput, ServicePort } from '@slideops/api-client';
+import type { DeployServiceInput, ServiceEnvVar, ServicePort } from '@slideops/api-client';
 import { z } from 'zod';
 
 /*
@@ -104,26 +104,63 @@ export function parsePorts(text?: string): { ports: ServicePort[]; error?: strin
 }
 
 /** Parse the env textarea. Each line is KEY=value. */
-export function parseEnv(text?: string): { env: Record<string, string>; error?: string } {
-  const env: Record<string, string> = {};
+/**
+ * The marker that seals a variable. A line prefixed with it is stored in the
+ * secret store rather than in the clear:
+ *
+ *   DATABASE_URL=postgres://…            stored as given, readable later
+ *   secret:SECRET_ENCRYPTION_KEY=abc     sealed, never readable again
+ *
+ * Sealing is explicit rather than guessed from the name. Guessing would either
+ * leak something it failed to recognise, or silently make a value the Operator
+ * needs unreadable forever — and this is their infrastructure, so the choice is
+ * theirs to make knowingly.
+ */
+export const SECRET_PREFIX = 'secret:';
+
+/**
+ * Parse the environment textarea into the entries the API takes: one object per
+ * variable, each carrying whether it should be sealed.
+ *
+ * An array, not a map. The map this used to return could not express `secret`,
+ * and the API has always taken the array form — which meant every deploy that
+ * set a variable was rejected with "the request body was not valid" while
+ * deploys with no variables worked fine.
+ */
+export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string } {
+  const env: ServiceEnvVar[] = [];
+  const seen = new Set<string>();
   const lines = (text ?? '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
-  for (const line of lines) {
+
+  for (const raw of lines) {
+    let line = raw;
+    let secret = false;
+    if (line.toLowerCase().startsWith(SECRET_PREFIX)) {
+      secret = true;
+      line = line.slice(SECRET_PREFIX.length).trim();
+    }
+
     const eq = line.indexOf('=');
     if (eq <= 0) {
-      return { env: {}, error: `Write each variable as KEY=value. Got "${line}".` };
+      return { env: [], error: `Write each variable as KEY=value. Got "${raw}".` };
     }
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-      return { env: {}, error: `"${key}" is not a valid variable name.` };
+      return { env: [], error: `"${key}" is not a valid variable name.` };
     }
-    env[key] = value;
+    if (seen.has(key)) {
+      return { env: [], error: `"${key}" is set more than once.` };
+    }
+    seen.add(key);
+    env.push({ key, value, secret });
   }
   return { env };
 }
+
 
 /** Turn validated form values into the deploy input the backend expects. */
 export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
@@ -152,7 +189,7 @@ export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
     cpu_limit: values.cpu_limit,
     memory_mb: values.memory_mb,
     pids_limit: pids,
-    env: Object.keys(env).length > 0 ? env : undefined,
+    env: env.length > 0 ? env : undefined,
     ports: ports.length > 0 ? ports : undefined,
   };
 }

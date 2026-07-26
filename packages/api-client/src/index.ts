@@ -189,6 +189,7 @@ export {
   type Service,
   type ServiceSource,
   type ServicePort,
+  type ServiceEnvVar,
   type ServiceRuntime,
   type ServiceStatus,
   type ServiceMetrics,
