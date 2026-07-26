@@ -19,6 +19,38 @@ function metadataSummary(metadata: AuditEntry['metadata']): string {
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(', ');
 }
 
+/**
+ * Who performed an action. The email leads, because that is what answers "who did
+ * this"; the id sits underneath for when the name is ambiguous or the account has
+ * since been renamed.
+ *
+ * An entry whose actor has been deleted, or that was never an Operator, has no
+ * email — it falls back to the actor type and the id, so nothing renders blank.
+ */
+function ActorCell({ entry }: { entry: AuditEntry }) {
+  if (!entry.actor_email) {
+    return (
+      <>
+        <span className="font-medium capitalize">{entry.actor_type || 'Unknown'}</span>
+        {entry.actor_id ? (
+          <span className="block font-mono text-xs text-ink-muted">{entry.actor_id}</span>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="font-medium">{entry.actor_email}</span>
+      <span
+        className="block font-mono text-xs text-ink-muted"
+        title={`${entry.actor_type} ${entry.actor_id}`}
+      >
+        {entry.actor_id}
+      </span>
+    </>
+  );
+}
+
 /** Audit log: a paginated table of admin and system actions, newest first. */
 export function Audit() {
   const [page, setPage] = useState(0);
@@ -63,8 +95,7 @@ export function Audit() {
                       {new Date(entry.created_at).toLocaleString()}
                     </TD>
                     <TD className="whitespace-nowrap">
-                      <span className="font-medium">{entry.actor_type}</span>
-                      <span className="text-ink-muted"> {entry.actor_id}</span>
+                      <ActorCell entry={entry} />
                     </TD>
                     <TD className="whitespace-nowrap font-medium">{entry.action}</TD>
                     <TD className="text-ink-muted">{entry.target}</TD>

@@ -87,6 +87,15 @@ export interface AuditEntry {
   id: string;
   actor_type: string;
   actor_id: string;
+  /**
+   * Who acted, by email. An audit trail is read by a person judging whether an
+   * action was legitimate, and a bare uuid answers nothing; this is what makes an
+   * entry readable at a glance.
+   *
+   * Empty for a non-Operator actor and for an account since deleted. `actor_id`
+   * is always present, so an entry stays traceable even once the name is gone.
+   */
+  actor_email: string;
   action: string;
   target: string;
   metadata: Record<string, unknown>;
@@ -236,4 +245,68 @@ export function updateAdminTier(
   return apiRequest<unknown>(`/admin/tiers/${name}`, { method: 'PUT', body: input }).then((r) =>
     unwrap<AdminTier>(r, 'tier'),
   );
+}
+
+/** One emergency switch: what it is, what engaging it stops, and whether it is on. */
+export interface EmergencyControl {
+  /** The stable slug used to engage and release it. */
+  name: string;
+  /** The short human label. */
+  title: string;
+  /** What this switch stops, and what it deliberately leaves alone. */
+  description: string;
+  engaged: boolean;
+}
+
+/**
+ * The whole emergency switchboard. There is one control per mutating path,
+ * because holding Operation execution never held a Service deploy, a scheduled
+ * Automation, or a sign in.
+ */
+export interface EmergencyState {
+  controls: EmergencyControl[];
+  /** True when at least one control is on, for a platform-wide banner. */
+  any_engaged: boolean;
+  /** The executions control under its original name, for older clients. */
+  executions_paused: boolean;
+}
+
+/** Read every emergency control and its current state. */
+export function getEmergencyState(signal?: AbortSignal): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/status', { signal });
+}
+
+/** Engage or release one emergency control, and get the whole board back. */
+export function setEmergencyControl(name: string, engaged: boolean): Promise<EmergencyState> {
+  const action = engaged ? 'engage' : 'release';
+  return apiRequest<EmergencyState>(
+    `/admin/emergency/controls/${encodeURIComponent(name)}/${action}`,
+    { method: 'POST' },
+  );
+}
+
+/**
+ * Engage every control at once. It does not sign anyone out and does not stop
+ * work already executing, so you keep the control plane while you work.
+ */
+export function emergencyLockdown(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/lockdown', { method: 'POST' });
+}
+
+/** Release every control, returning the platform to normal service. */
+export function emergencyReleaseAll(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/release-all', { method: 'POST' });
+}
+
+/**
+ * End every open session on the platform, so a captured token stops working now
+ * rather than at the end of its life.
+ *
+ * **This signs you out too** — deliberately, since a revocation that spares the
+ * person pressing it is not a revocation. Sign back in afterwards.
+ */
+export function revokeAllSessions(): Promise<number> {
+  return apiRequest<{ sessions_revoked: number }>('/admin/emergency/revoke-sessions', {
+    method: 'POST',
+  }).then((r) => r.sessions_revoked ?? 0);
 }
