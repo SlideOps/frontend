@@ -23,6 +23,7 @@ import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
+import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -216,6 +217,17 @@ export function ServiceDetail() {
             </div>
           ) : null}
 
+          {service.last_error ? (
+            <div role="alert" className="mb-6 rounded-md border border-danger bg-subtle px-4 py-3">
+              <Text variant="body-sm" className="font-medium text-danger">
+                The last deploy failed
+              </Text>
+              <Text variant="body-sm" tone="secondary" className="mt-1 break-words font-mono">
+                {service.last_error}
+              </Text>
+            </div>
+          ) : null}
+
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
             <div className="flex min-w-0 flex-col gap-6">
               <ServicePreview service={service} />
@@ -228,6 +240,7 @@ export function ServiceDetail() {
                 <ServiceMetricsPanel id={service.id} running={isRunning} />
               </Card>
 
+              <ServiceConfiguration service={service} onChanged={reload} />
               <LogView id={service.id} />
             </div>
 
