@@ -185,6 +185,7 @@ export {
   getServiceMetrics,
   checkServiceUpdate,
   redeployService,
+  cancelServiceDeploy,
   updateServiceResources,
   updateServiceConfiguration,
   type Service,

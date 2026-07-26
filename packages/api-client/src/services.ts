@@ -327,3 +327,18 @@ export function updateServiceConfiguration(
     body: configuration,
   }).then((r) => unwrap<Service>(r, 'service'));
 }
+
+/**
+ * Stop a deploy that is still running and leave the Service in place.
+ *
+ * It stops the work; it does not undo it. A build that had begun is abandoned, and
+ * whatever the previous deploy left running is untouched — which is exactly why
+ * this is separate from removing the Service.
+ *
+ * It also clears a Service stranded at `deploying` by a restart.
+ */
+export function cancelServiceDeploy(id: string): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/cancel-deploy`, {
+    method: 'POST',
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
