@@ -1,157 +1,283 @@
 import {
-  getEmergencyStatus,
-  getOverview,
-  pauseExecutions,
-  resumeExecutions,
   ApiError,
+  emergencyLockdown,
+  emergencyReleaseAll,
+  getEmergencyState,
+  revokeAllSessions,
+  setEmergencyControl,
+  type EmergencyControl,
+  type EmergencyState,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { AlertTriangle, Play, ShieldCheck, Users } from '@slideops/icons';
-import { Guidance } from '@slideops/tooltips';
+import { AlertTriangle, Lock, LogOut, ShieldCheck } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AdminShell } from '../components/AdminShell';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 
-/** Emergency: the platform-wide execution pause, deliberate and audited. */
+/*
+ * The emergency control plane.
+ *
+ * One switch was never enough. Holding Operation execution left every other way
+ * the platform changes something running: a Service deploy skips the approval
+ * gate by design and so skipped the brake too, schedules kept firing, and anyone
+ * could still sign in mid-incident.
+ *
+ * Each control says what it stops AND what it leaves alone, because the moment
+ * someone reaches for one of these is the worst possible moment to be guessing.
+ */
+
+type Pending =
+  | { kind: 'control'; control: EmergencyControl }
+  | { kind: 'lockdown' }
+  | { kind: 'release-all' }
+  | { kind: 'revoke-sessions' };
+
+/** One switch, its explanation, and the action to flip it. */
+function ControlCard({
+  control,
+  busy,
+  onToggle,
+}: {
+  control: EmergencyControl;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Card className={control.engaged ? 'border-danger' : undefined}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Text variant="h4">{control.title}</Text>
+            {control.engaged ? (
+              <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-danger">
+                <AlertTriangle width={12} height={12} aria-hidden />
+                Held
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-success">
+                Running
+              </span>
+            )}
+          </div>
+          <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+            {control.description}
+          </Text>
+        </div>
+        <Button
+          variant={control.engaged ? 'primary' : 'danger'}
+          disabled={busy}
+          onClick={onToggle}
+        >
+          {control.engaged ? 'Release' : 'Hold'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Emergency: one control per mutating path, plus lockdown and session revocation. */
 export function Emergency() {
-  const navigate = useNavigate();
-  const status = useAsyncData((signal) => getEmergencyStatus(signal), []);
-  const overview = useAsyncData((signal) => getOverview(signal), []);
-
-  const [confirming, setConfirming] = useState(false);
+  const { state, reload } = useAsyncData((signal) => getEmergencyState(signal), []);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  const paused = status.state.status === 'ready' ? status.state.data.executions_paused : false;
-  const suspendedCount =
-    overview.state.status === 'ready' ? overview.state.data.operators_suspended : 0;
+  const board: EmergencyState | null = state.status === 'ready' ? state.data : null;
 
-  const runAction = async () => {
+  const run = async (work: () => Promise<unknown>, success: string) => {
+    setBusy(true);
     setActionError(null);
+    setNote(null);
     try {
-      if (paused) {
-        await resumeExecutions();
-      } else {
-        await pauseExecutions();
-      }
-      setConfirming(false);
-      status.reload();
+      await work();
+      setNote(success);
+      setPending(null);
+      reload();
     } catch (error) {
       setActionError(
         error instanceof ApiError ? error.message : 'That action did not go through. Try again.',
       );
-      setConfirming(false);
+      setPending(null);
+    } finally {
+      setBusy(false);
     }
   };
+
+  const confirm = () => {
+    if (!pending) {
+      return;
+    }
+    switch (pending.kind) {
+      case 'control': {
+        const { control } = pending;
+        return run(
+          () => setEmergencyControl(control.name, !control.engaged),
+          control.engaged ? `${control.title} is running again.` : `${control.title} is now held.`,
+        );
+      }
+      case 'lockdown':
+        return run(emergencyLockdown, 'Every control is engaged. The platform is locked down.');
+      case 'release-all':
+        return run(emergencyReleaseAll, 'Every control is released. The platform is running normally.');
+      case 'revoke-sessions':
+        return run(async () => {
+          const revoked = await revokeAllSessions();
+          // Our own session is gone too, so there is nothing to reload into.
+          window.location.assign(`/login?revoked=${revoked}`);
+        }, 'Every session was ended.');
+    }
+  };
+
+  const dialog = (): { title: string; description: string; label: string; danger: boolean } => {
+    switch (pending?.kind) {
+      case 'control':
+        return pending.control.engaged
+          ? {
+              title: `Release ${pending.control.title.toLowerCase()}?`,
+              description: `This path returns to normal service for every tenant immediately. ${pending.control.description}`,
+              label: 'Release',
+              danger: false,
+            }
+          : {
+              title: `Hold ${pending.control.title.toLowerCase()}?`,
+              description: `This takes effect immediately, for every tenant. ${pending.control.description} This is written to the audit trail.`,
+              label: 'Hold it',
+              danger: true,
+            };
+      case 'lockdown':
+        return {
+          title: 'Lock the platform down?',
+          description:
+            'Engages every control at once: Operation executions, Service deploys, scheduled Automations, new sign ins, and new registrations. It does NOT sign anyone out, and it does not stop work already executing — so you keep the control plane while you work out what happened. This is written to the audit trail.',
+          label: 'Lock everything down',
+          danger: true,
+        };
+      case 'release-all':
+        return {
+          title: 'Release every control?',
+          description:
+            'Returns the whole platform to normal service. Held Operations resume being drained, deploys are accepted again, and schedules fire. This is written to the audit trail.',
+          label: 'Release everything',
+          danger: false,
+        };
+      case 'revoke-sessions':
+        return {
+          title: 'Sign every Operator out?',
+          description:
+            'Ends every open session on the platform, so a captured token stops working now rather than at the end of its life. This signs YOU out too — deliberately, because a revocation that spares the person pressing it is not a revocation. You will be returned to the sign in page. If you have also held new sign ins, release that first or you will not be able to get back in.',
+          label: 'Sign everyone out',
+          danger: true,
+        };
+      default:
+        return { title: '', description: '', label: '', danger: false };
+    }
+  };
+
+  const d = dialog();
 
   return (
     <AdminShell active="emergency">
       <PageHeader
         title="Emergency controls"
-        description="Pause or resume every execution platform wide. Queued Operations wait and run when you resume, so nothing is lost. Each switch is confirmed and written to the audit trail."
-        guidanceKey="overview.emergency"
+        description="One control per path by which the platform changes something, so you can stop what is misbehaving without halting everything else. Every action here affects every tenant and is written to the audit trail."
       />
 
-      {status.state.status === 'loading' ? <Loading label="Reading the current state" /> : null}
-      {status.state.status === 'error' ? <ErrorNote error={status.state.error} /> : null}
+      {note ? (
+        <p role="status" className="mb-4 text-sm text-success">
+          {note}
+        </p>
+      ) : null}
+      {actionError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {actionError}
+        </p>
+      ) : null}
 
-      {status.state.status === 'ready' ? (
-        <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-          <Card
-            raised
-            className={`flex flex-col gap-4 ${paused ? 'border-danger' : 'border-border'}`}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${
-                  paused ? 'bg-subtle text-danger' : 'bg-subtle text-success'
-                }`}
+      {state.status === 'loading' ? <Loading label="Reading the emergency controls" /> : null}
+      {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
+
+      {board ? (
+        <div className="flex flex-col gap-6">
+          {board.any_engaged ? (
+            <Card className="border-danger">
+              <div className="flex items-center gap-2">
+                <AlertTriangle width={18} height={18} className="text-danger" aria-hidden />
+                <Text variant="h4">The platform is partly held</Text>
+              </div>
+              <Text variant="body-sm" tone="secondary" className="mt-2">
+                At least one control is engaged, so some work is being refused across every tenant.
+                Release what you no longer need held.
+              </Text>
+            </Card>
+          ) : null}
+
+          <div className="flex flex-col gap-3">
+            {board.controls.map((control) => (
+              <ControlCard
+                key={control.name}
+                control={control}
+                busy={busy}
+                onToggle={() => setPending({ kind: 'control', control })}
+              />
+            ))}
+          </div>
+
+          <Card>
+            <Text variant="h4">Everything at once</Text>
+            <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+              For when the answer is to stop the platform and work out what happened afterwards.
+              Lockdown engages every control above; it does not sign anyone out and does not stop work
+              already executing.
+            </Text>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button variant="danger" disabled={busy} onClick={() => setPending({ kind: 'lockdown' })}>
+                <Lock width={16} height={16} aria-hidden />
+                Lockdown
+              </Button>
+              <Button
+                variant="primary"
+                disabled={busy || !board.any_engaged}
+                onClick={() => setPending({ kind: 'release-all' })}
               >
-                {paused ? (
-                  <AlertTriangle width={22} height={22} aria-hidden />
-                ) : (
-                  <ShieldCheck width={22} height={22} aria-hidden />
-                )}
-              </span>
-              <div>
-                <Text variant="h3">
-                  {paused ? 'Executions are paused' : 'Executions are running'}
-                </Text>
-                <Text variant="body-sm" tone="secondary" className="mt-1">
-                  {paused
-                    ? 'New executions are held platform wide. Creating and approving still works; approved Operations wait and will run when you resume.'
-                    : 'The worker is starting executions normally across every tenant.'}
-                </Text>
-              </div>
-              <div className="ml-auto">
-                <Guidance for="emergency.pause" placement="left" />
-              </div>
+                <ShieldCheck width={16} height={16} aria-hidden />
+                Release everything
+              </Button>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-              {paused ? (
-                <Button variant="primary" size="lg" onClick={() => setConfirming(true)}>
-                  <Play width={18} height={18} aria-hidden />
-                  Resume executions
-                </Button>
-              ) : (
-                <Button variant="danger" size="lg" onClick={() => setConfirming(true)}>
-                  <AlertTriangle width={18} height={18} aria-hidden />
-                  Pause all executions
-                </Button>
-              )}
-              <Guidance for="emergency.resume" />
-            </div>
-
-            {actionError ? (
-              <p role="alert" className="text-sm text-danger">
-                {actionError}
-              </p>
-            ) : null}
           </Card>
 
-          <Card className="h-fit">
-            <div className="mb-1 flex items-center gap-2">
-              <Users width={18} height={18} className="text-brand" aria-hidden />
-              <Text variant="h4">Suspended Operators</Text>
-              <div className="ml-auto">
-                <Guidance for="overview.suspended" />
-              </div>
-            </div>
-            <p className={`mt-2 text-3xl font-semibold ${suspendedCount > 0 ? 'text-danger' : 'text-ink'}`}>
-              {suspendedCount}
-            </p>
-            <Text variant="body-sm" tone="secondary" className="mt-2">
-              A suspended Operator cannot approve or execute Operations, and the worker skips their
-              queued Operations.
+          <Card className="border-warning">
+            <Text variant="h4">System users</Text>
+            <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+              Ending every session is the control for a credential incident — the one thing no path
+              switch can reach. It signs you out along with everyone else, which is the point. Pair it
+              with holding new sign ins only if you are certain you can release that afterwards.
             </Text>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-4"
-              onClick={() => navigate('/admin/operators')}
-            >
-              Manage Operators
-            </Button>
+            <div className="mt-4">
+              <Button
+                variant="danger"
+                disabled={busy}
+                onClick={() => setPending({ kind: 'revoke-sessions' })}
+              >
+                <LogOut width={16} height={16} aria-hidden />
+                Sign every Operator out
+              </Button>
+            </div>
           </Card>
         </div>
       ) : null}
 
       <ConfirmDialog
-        open={confirming}
-        title={paused ? 'Resume all executions?' : 'Pause all executions?'}
-        description={
-          paused
-            ? 'Held Operations will begin running again across every tenant. This is written to the audit trail.'
-            : 'Every execution is held platform wide until you resume. Nothing is lost: queued and approved Operations wait and run on resume. This is written to the audit trail.'
-        }
-        confirmLabel={paused ? 'Resume executions' : 'Pause all executions'}
-        confirmVariant={paused ? 'primary' : 'danger'}
-        onConfirm={runAction}
-        onCancel={() => setConfirming(false)}
+        open={pending !== null}
+        title={d.title}
+        description={d.description}
+        confirmLabel={d.label}
+        confirmVariant={d.danger ? 'danger' : 'primary'}
+        onConfirm={confirm}
+        onCancel={() => setPending(null)}
       />
     </AdminShell>
   );
