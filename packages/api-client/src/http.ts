@@ -7,10 +7,35 @@ import { ApiError, normalizeError } from './errors';
  * normalized into a typed ApiError so callers branch on one predictable shape.
  */
 
-/** Resolve the API base once per call so tests can vary the environment. */
+/**
+ * Resolve the API base once per call, so a test can vary the environment.
+ *
+ * Two shapes are accepted, and which you use decides the deployment:
+ *
+ * - **A path** such as `/api/v1`, the default. The app and the API share one
+ *   origin, the session cookie is same-site, and nothing else is needed. This is
+ *   the ordinary deployment and the one to prefer.
+ * - **An absolute URL** such as `https://api.example.com/api/v1`. The backend
+ *   lives somewhere else entirely. That works, but the backend must name this
+ *   app's origin in `CORS_ALLOWED_ORIGINS`, which also switches its session
+ *   cookie to SameSite=None with Secure so the browser will actually send it.
+ *   Both sides must be HTTPS for that cookie to be honoured.
+ *
+ * `VITE_API_BASE_URL` is the name to reach for; `VITE_API_BASE` is kept as an
+ * alias so an existing deployment keeps working unchanged.
+ */
 export function apiBase(): string {
-  const configured = import.meta.env.VITE_API_BASE;
+  const configured = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_BASE;
   return (configured ?? '/api/v1').replace(/\/$/, '');
+}
+
+/**
+ * Whether the API lives on another origin, which is true exactly when the base
+ * is an absolute URL. The stream reads it to build a websocket URL that points
+ * at the API rather than at wherever this page happens to be served from.
+ */
+export function apiIsCrossOrigin(): boolean {
+  return /^https?:\/\//i.test(apiBase());
 }
 
 export interface ResourceRequestOptions {

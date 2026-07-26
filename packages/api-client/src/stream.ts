@@ -1,3 +1,4 @@
+import { apiBase, apiIsCrossOrigin } from './http';
 import type { OperationEvent } from './types';
 
 export interface StreamHandlers<TEvent> {
@@ -39,16 +40,32 @@ export function openEventStream<TEvent>(
 }
 
 /**
- * Derive the websocket URL for the Operator event stream from the current
- * location: wss when the page is served over https, ws otherwise, always on the
- * same origin at /api/v1/stream so the session cookie is sent with the upgrade.
+ * Derive the websocket URL for the Operator event stream.
+ *
+ * It follows the API base rather than the page's own location, so a backend
+ * deployed on another origin gets its stream opened against the backend and not
+ * against wherever this page happens to be served from. When the base is a path,
+ * which is the ordinary same-origin deployment, this resolves to the page origin
+ * exactly as before.
+ *
+ * The scheme is upgraded alongside: wss for https, ws otherwise. The session
+ * cookie rides the upgrade request, which is what authenticates the stream.
  */
 export function operationStreamUrl(): string {
+  const base = apiBase();
+
+  if (apiIsCrossOrigin()) {
+    const url = new URL(base);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/stream`;
+    return url.toString();
+  }
+
   if (typeof window === 'undefined' || !window.location) {
-    return 'ws://localhost/api/v1/stream';
+    return `ws://localhost${base}/stream`;
   }
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}/api/v1/stream`;
+  return `${scheme}://${window.location.host}${base}/stream`;
 }
 
 export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
