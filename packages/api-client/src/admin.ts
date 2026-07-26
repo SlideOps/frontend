@@ -1,4 +1,4 @@
-import { apiRequest } from './http';
+import { apiRequest, unwrap } from './http';
 import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
 
@@ -194,4 +194,46 @@ export function getEmergencyStatus(signal?: AbortSignal): Promise<EmergencyStatu
     '/admin/emergency/status',
     { signal },
   ).then((r) => r.status ?? (r as EmergencyStatus));
+}
+
+/**
+ * One tier's editable definition: the quotas Operators receive, the feature
+ * flags, and the price. Counts and windows use -1 to mean Unlimited (the
+ * enterprise tier today). `amount_minor` is the price in the smallest currency
+ * unit, so NGN 7,500.00 is 750000 kobo. Field names mirror the backend contract
+ * exactly so the wire shape and the type never drift.
+ */
+export interface AdminTier {
+  name: string;
+  nodes: number;
+  projects: number;
+  seats: number;
+  history_days: number;
+  automations: boolean;
+  advanced_monitoring: boolean;
+  audit_trail: boolean;
+  amount_minor: number;
+  currency: string;
+  purchasable: boolean;
+}
+
+/** List every tier and its current definition, for the Admin tier editor. */
+export function listAdminTiers(signal?: AbortSignal): Promise<AdminTier[]> {
+  return apiRequest<unknown>('/admin/tiers', { signal }).then((r) =>
+    unwrap<AdminTier[]>(r, 'tiers'),
+  );
+}
+
+/**
+ * Update one tier's quotas, feature flags, and price by name. Applied live with
+ * no restart, and audited by the backend. A 400 with an `invalid_...` code marks
+ * an out-of-range value (counts must be >= -1, amount >= 0).
+ */
+export function updateAdminTier(
+  name: string,
+  input: Omit<AdminTier, 'name'>,
+): Promise<AdminTier> {
+  return apiRequest<unknown>(`/admin/tiers/${name}`, { method: 'PUT', body: input }).then((r) =>
+    unwrap<AdminTier>(r, 'tier'),
+  );
 }

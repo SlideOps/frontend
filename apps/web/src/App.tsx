@@ -107,6 +107,7 @@ const Audit = lazy(() => import('./admin/screens/Audit').then((m) => ({ default:
 const PromoCodes = lazy(() =>
   import('./admin/screens/PromoCodes').then((m) => ({ default: m.PromoCodes })),
 );
+const Tiers = lazy(() => import('./admin/screens/Tiers').then((m) => ({ default: m.Tiers })));
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
@@ -176,6 +177,7 @@ export function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="audit" element={<Audit />} />
           <Route path="promo-codes" element={<PromoCodes />} />
+          <Route path="tiers" element={<Tiers />} />
           <Route path="emergency" element={<Emergency />} />
         </Route>
 

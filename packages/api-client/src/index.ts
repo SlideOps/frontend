@@ -100,6 +100,8 @@ export {
   pauseExecutions,
   resumeExecutions,
   getEmergencyStatus,
+  listAdminTiers,
+  updateAdminTier,
   type Overview,
   type OperatorStatus,
   type AdminOperator,
@@ -112,6 +114,7 @@ export {
   type EmergencyStatus,
   type AdminOperationFilter,
   type AuditFilter,
+  type AdminTier,
 } from './admin';
 export {
   listMarketplacePlugins,

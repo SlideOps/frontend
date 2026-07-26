@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getOverview, listAdminOperations, suspendOperator } from './admin';
+import { ApiError } from './errors';
+import {
+  getOverview,
+  listAdminOperations,
+  listAdminTiers,
+  suspendOperator,
+  updateAdminTier,
+} from './admin';
 
 /** Build a Response-like stub for the mocked fetch. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -80,5 +87,131 @@ describe('admin requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/admin/operators/op_3/suspend');
+  });
+
+  it('lists tiers over the admin path with cookies and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        tiers: [
+          {
+            name: 'pro',
+            nodes: 10,
+            projects: 5,
+            seats: 3,
+            history_days: 90,
+            automations: true,
+            advanced_monitoring: true,
+            audit_trail: true,
+            amount_minor: 750000,
+            currency: 'NGN',
+            purchasable: true,
+          },
+          {
+            name: 'enterprise',
+            nodes: -1,
+            projects: -1,
+            seats: -1,
+            history_days: -1,
+            automations: true,
+            advanced_monitoring: true,
+            audit_trail: true,
+            amount_minor: 0,
+            currency: 'NGN',
+            purchasable: false,
+          },
+        ],
+      }),
+    );
+
+    const tiers = await listAdminTiers();
+
+    expect(tiers).toHaveLength(2);
+    expect(tiers[0]?.name).toBe('pro');
+    expect(tiers[0]?.amount_minor).toBe(750000);
+    expect(tiers[1]?.nodes).toBe(-1);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.credentials).toBe('include');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/admin/tiers');
+  });
+
+  it('puts a tier update to the named path and unwraps the returned tier', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        tier: {
+          name: 'starter',
+          nodes: 3,
+          projects: 2,
+          seats: 1,
+          history_days: 30,
+          automations: false,
+          advanced_monitoring: false,
+          audit_trail: false,
+          amount_minor: 250000,
+          currency: 'NGN',
+          purchasable: true,
+        },
+      }),
+    );
+
+    const updated = await updateAdminTier('starter', {
+      nodes: 3,
+      projects: 2,
+      seats: 1,
+      history_days: 30,
+      automations: false,
+      advanced_monitoring: false,
+      audit_trail: false,
+      amount_minor: 250000,
+      currency: 'NGN',
+      purchasable: true,
+    });
+
+    expect(updated.name).toBe('starter');
+    expect(updated.amount_minor).toBe(250000);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PUT');
+    expect(init?.credentials).toBe('include');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/admin/tiers/starter');
+    const sent = JSON.parse(String(init?.body)) as { nodes: number; amount_minor: number };
+    expect(sent.nodes).toBe(3);
+    expect(sent.amount_minor).toBe(250000);
+  });
+
+  it('surfaces a 400 invalid value when updating a tier', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(400, {
+        error: { code: 'invalid_nodes', message: 'nodes must be at least -1' },
+      }),
+    );
+
+    await expect(
+      updateAdminTier('pro', {
+        nodes: -5,
+        projects: 5,
+        seats: 3,
+        history_days: 90,
+        automations: true,
+        advanced_monitoring: true,
+        audit_trail: true,
+        amount_minor: 750000,
+        currency: 'NGN',
+        purchasable: true,
+      }),
+    ).rejects.toMatchObject({ status: 400, code: 'invalid_nodes' });
+
+    await expect(
+      updateAdminTier('pro', {
+        nodes: -5,
+        projects: 5,
+        seats: 3,
+        history_days: 90,
+        automations: true,
+        advanced_monitoring: true,
+        audit_trail: true,
+        amount_minor: 750000,
+        currency: 'NGN',
+        purchasable: true,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

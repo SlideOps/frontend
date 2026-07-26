@@ -1,6 +1,7 @@
 import {
   Activity,
   Gauge,
+  Layers,
   LayoutDashboard,
   ListChecks,
   ShieldCheck,
@@ -20,6 +21,7 @@ export type ActiveKey =
   | 'analytics'
   | 'audit'
   | 'promo-codes'
+  | 'tiers'
   | 'emergency';
 
 /**
@@ -72,6 +74,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: TicketPercent,
       active: active === 'promo-codes',
       onSelect: () => navigate('/admin/promo-codes'),
+    },
+    {
+      key: 'tiers',
+      label: 'Tiers',
+      icon: Layers,
+      active: active === 'tiers',
+      onSelect: () => navigate('/admin/tiers'),
     },
     {
       key: 'emergency',
