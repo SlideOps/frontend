@@ -1,4 +1,5 @@
 import { ApiError, normalizeError } from './errors';
+import { apiBase } from './http';
 import type { Operator } from './types';
 
 /*
@@ -7,12 +8,6 @@ import type { Operator } from './types';
  * HttpOnly cookie. The frontend therefore never reads or stores a token itself:
  * it relies on the cookie and on the `me` endpoints to know if it is signed in.
  */
-
-/** Resolve the API base once per call so tests can vary the environment. */
-function apiBase(): string {
-  const configured = import.meta.env.VITE_API_BASE;
-  return (configured ?? '/api/v1').replace(/\/$/, '');
-}
 
 interface AuthRequestOptions {
   method?: 'GET' | 'POST';
@@ -165,4 +160,43 @@ export async function mfaDisable(input: { password: string }): Promise<Operator>
     throw new ApiError(200, 'unexpected_response', 'The response was not understood.');
   }
   return data.operator;
+}
+
+/**
+ * Which ways in this deployment offers. `password` is always true; `github` is
+ * true only when the backend has a GitHub OAuth app configured.
+ *
+ * A sign in screen reads it so it shows the options that will actually work,
+ * rather than a GitHub button that could only ever fail. It needs no session,
+ * which is the point: a caller asking has none yet.
+ */
+export interface AuthProviders {
+  password: boolean;
+  github: boolean;
+}
+
+/**
+ * Read which sign in methods are available on this deployment. It never throws
+ * for a caller that just wants to render a screen: a failure resolves to password
+ * only, so the sign in form always works even if this call does not.
+ */
+export function getAuthProviders(signal?: AbortSignal): Promise<AuthProviders> {
+  return authRequest<AuthProviders>('/auth/providers', { signal }).catch(() => ({
+    password: true,
+    github: false,
+  }));
+}
+
+/**
+ * The URL that starts signing in with GitHub. Navigate the browser to it — do
+ * not fetch it — since the response is a redirect to github.com and the whole
+ * round trip is a top-level navigation that ends with a session cookie being set.
+ *
+ * `returnPath` is where to land afterwards; it must be an in-app path beginning
+ * with `/app/`, which the backend enforces so this can never become an open
+ * redirect.
+ */
+export function githubSignInUrl(returnPath?: string): string {
+  const base = `${apiBase()}/auth/github/authorize`;
+  return returnPath ? `${base}?return=${encodeURIComponent(returnPath)}` : base;
 }

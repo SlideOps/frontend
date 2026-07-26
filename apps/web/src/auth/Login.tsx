@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
+import { GitHubSignIn } from '../components/GitHubSignIn';
 import { loginSchema, type LoginValues } from '../auth-schemas';
 import { useAuthStore } from '../store/auth';
 
@@ -56,6 +57,8 @@ export function Login() {
         </Text>
       }
     >
+      <GitHubSignIn label="Continue with GitHub" />
+
       <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
         <Field
           label="Email"

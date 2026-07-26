@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, normalizeError } from './errors';
-import { login, me } from './auth';
+import { getAuthProviders, githubSignInUrl, login, me } from './auth';
 
 /** Build a Response-like stub for the mocked fetch. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -113,4 +113,30 @@ describe('auth requests', () => {
     });
   });
 
+});
+
+describe('sign in providers and the GitHub entry point', () => {
+  it('reads which ways in this deployment offers', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { password: true, github: true }));
+
+    const providers = await getAuthProviders();
+
+    expect(providers).toEqual({ password: true, github: true });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/auth/providers');
+  });
+
+  // A sign in screen must render even when this call fails, so a failure resolves
+  // to password only rather than rejecting.
+  it('falls back to password only when the call fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+
+    await expect(getAuthProviders()).resolves.toEqual({ password: true, github: false });
+  });
+
+  it('builds the GitHub sign in URL against the API base, with the return path', () => {
+    expect(githubSignInUrl()).toBe('/api/v1/auth/github/authorize');
+    expect(githubSignInUrl('/app')).toBe('/api/v1/auth/github/authorize?return=%2Fapp');
+  });
 });

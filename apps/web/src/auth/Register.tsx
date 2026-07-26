@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
+import { GitHubSignIn } from '../components/GitHubSignIn';
 import { registerSchema, type RegisterValues } from '../auth-schemas';
 import { useAuthStore } from '../store/auth';
 
@@ -55,6 +56,8 @@ export function Register() {
         </Text>
       }
     >
+      <GitHubSignIn label="Sign up with GitHub" />
+
       <form className="flex flex-col gap-4" onSubmit={onSubmit} noValidate>
         <Field
           label="Email"
