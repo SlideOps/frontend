@@ -81,3 +81,33 @@ export function revealOperationSecret(
     { method: 'POST', signal },
   );
 }
+
+/**
+ * Delete one finished Operation from your History, so a failed experiment or a
+ * cancelled run does not clutter the record you rely on.
+ *
+ * Only a finished Operation may go. One still planning, awaiting approval, or
+ * executing is refused with `409 operation_running` — cancel it first.
+ *
+ * This removes SlideOps' record of the run. It does **not** undo whatever the
+ * Operation already did to your server: deleting the receipt does not undo the
+ * purchase. The deletion itself is written to the audit trail.
+ */
+export function deleteOperation(id: string): Promise<void> {
+  return apiRequest<void>(`/operations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/**
+ * Clear every finished Operation at the given statuses in one go, and get back
+ * how many went.
+ *
+ * With no statuses the whole finished History is cleared, so pass them
+ * deliberately. Work that has not finished is always left alone, whatever you
+ * ask for, so a bulk clear can never sweep up something mid-flight.
+ */
+export function clearOperations(statuses: OperationStatus[] = []): Promise<number> {
+  const query = statuses.map((status) => `status=${encodeURIComponent(status)}`).join('&');
+  return apiRequest<{ deleted: number }>(`/operations${query ? `?${query}` : ''}`, {
+    method: 'DELETE',
+  }).then((r) => r.deleted ?? 0);
+}
