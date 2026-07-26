@@ -18,6 +18,7 @@ import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ComposeStackPlan } from '../components/ComposeStackPlan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { buildServiceSchema, toDeployInput, type ServiceFormValues } from '../service-schema';
@@ -88,6 +89,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
 
   const sourceType = watch('source_type');
   const runtime = watch('runtime');
+  // The plan reads the repository on the chosen server, so both must be picked
+  // before it can say anything.
+  const plannedNode = watch('node_id');
+  const plannedRepo = watch('repository_url');
+  const plannedName = watch('name');
+  const plannedBranch = watch('branch');
 
   // Filling in a repository from the connected GitHub account sets the clone URL
   // and defaults the branch to that repository's default branch.
@@ -384,6 +391,18 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           </Text>
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
+
+      {sourceType === 'repository' ? (
+        <div className="mt-6">
+          <ComposeStackPlan
+            nodeID={plannedNode ?? ''}
+            repositoryURL={plannedRepo ?? ''}
+            branch={plannedBranch}
+            name={plannedName}
+          />
+        </div>
+      ) : null}
+
 
         {formError ? (
           <div role="alert" className="rounded-md border border-border bg-subtle px-4 py-3">
