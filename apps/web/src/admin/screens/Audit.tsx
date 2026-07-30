@@ -25,7 +25,7 @@ function metadataSummary(metadata: AuditEntry['metadata']): string {
  * since been renamed.
  *
  * An entry whose actor has been deleted, or that was never an Operator, has no
- * email — it falls back to the actor type and the id, so nothing renders blank.
+ * email: it falls back to the actor type and the id, so nothing renders blank.
  */
 function ActorCell({ entry }: { entry: AuditEntry }) {
   if (!entry.actor_email) {

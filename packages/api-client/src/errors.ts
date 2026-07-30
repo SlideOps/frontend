@@ -37,7 +37,7 @@ function unparseableMessage(status: number): string {
     return 'The server could not be reached. Check it is running and that the API address is correct.';
   }
   if (status === 404) {
-    return 'The server does not have this endpoint. It is most likely running an older build than this app — rebuild and restart the API.';
+    return 'The server does not have this endpoint. It is most likely running an older build than this app: rebuild and restart the API.';
   }
   if (status === 502 || status === 503 || status === 504) {
     return 'The server is not answering right now. It may be restarting; try again in a moment.';

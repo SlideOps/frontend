@@ -187,8 +187,8 @@ export function getAuthProviders(signal?: AbortSignal): Promise<AuthProviders> {
 }
 
 /**
- * The URL that starts signing in with GitHub. Navigate the browser to it — do
- * not fetch it — since the response is a redirect to github.com and the whole
+ * The URL that starts signing in with GitHub. Navigate the browser to it: do
+ * not fetch it, since the response is a redirect to github.com and the whole
  * round trip is a top-level navigation that ends with a session cookie being set.
  *
  * `returnPath` is where to land afterwards; it must be an in-app path beginning

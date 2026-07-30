@@ -152,7 +152,7 @@ export function Emergency() {
         return {
           title: 'Lock the platform down?',
           description:
-            'Engages every control at once: Operation executions, Service deploys, scheduled Automations, new sign ins, and new registrations. It does NOT sign anyone out, and it does not stop work already executing — so you keep the control plane while you work out what happened. This is written to the audit trail.',
+            'Engages every control at once: Operation executions, Service deploys, scheduled Automations, new sign ins, and new registrations. It does NOT sign anyone out, and it does not stop work already executing, so you keep the control plane while you work out what happened. This is written to the audit trail.',
           label: 'Lock everything down',
           danger: true,
         };
@@ -168,7 +168,7 @@ export function Emergency() {
         return {
           title: 'Sign every Operator out?',
           description:
-            'Ends every open session on the platform, so a captured token stops working now rather than at the end of its life. This signs YOU out too — deliberately, because a revocation that spares the person pressing it is not a revocation. You will be returned to the sign in page. If you have also held new sign ins, release that first or you will not be able to get back in.',
+            'Ends every open session on the platform, so a captured token stops working now rather than at the end of its life. This signs YOU out too: deliberately, because a revocation that spares the person pressing it is not a revocation. You will be returned to the sign in page. If you have also held new sign ins, release that first or you will not be able to get back in.',
           label: 'Sign everyone out',
           danger: true,
         };
@@ -257,7 +257,7 @@ export function Emergency() {
           <Card className="border-warning">
             <Text variant="h4">System users</Text>
             <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
-              Ending every session is the control for a credential incident — the one thing no path
+              Ending every session is the control for a credential incident: the one thing no path
               switch can reach. It signs you out along with everyone else, which is the point. Pair
               it with holding new sign ins only if you are certain you can release that afterwards.
             </Text>

@@ -42,7 +42,7 @@ function RoleBadge({ role }: { role: OperatorRole }) {
  * Operators: the cross-tenant roster.
  *
  * Role is both shown and changed here. It was previously only on the detail page,
- * which meant an admin had to open every row to find out who else held the role —
+ * which meant an admin had to open every row to find out who else held the role ,
  * exactly the question this screen should answer at a glance.
  */
 export function Operators() {

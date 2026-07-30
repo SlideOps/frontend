@@ -73,7 +73,7 @@ function EnvList({ service }: { service: Service }) {
           <dd className="min-w-0">
             {value === SEALED_MARKER ? (
               <Text variant="caption" tone="secondary">
-                Sealed — encrypted and never shown again
+                Sealed: encrypted and never shown again
               </Text>
             ) : (
               <RevealValue value={value} label={key} sensitive />
@@ -212,7 +212,7 @@ export function ServiceConfiguration({
             />
             <Text variant="caption" tone="secondary">
               One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value
-              — it is encrypted and never shown again. This list <strong>replaces</strong> what is
+              : it is encrypted and never shown again. This list <strong>replaces</strong> what is
               there, so delete a line to remove that variable. A sealed value cannot be read back,
               so its line shows empty; retype it to keep it, or it will be dropped.
             </Text>

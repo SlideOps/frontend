@@ -87,7 +87,7 @@ export function revealOperationSecret(
  * cancelled run does not clutter the record you rely on.
  *
  * Only a finished Operation may go. One still planning, awaiting approval, or
- * executing is refused with `409 operation_running` — cancel it first.
+ * executing is refused with `409 operation_running`: cancel it first.
  *
  * This removes SlideOps' record of the run. It does **not** undo whatever the
  * Operation already did to your server: deleting the receipt does not undo the
