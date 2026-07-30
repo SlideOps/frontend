@@ -91,7 +91,7 @@ export function Services() {
     <OperatorShell active="services">
       <PageHeader
         title="Services"
-        description="The solutions you have deployed on your Nodes, each under hard resource limits your tier allows."
+        description="Everything you have deployed, and the address each one answers on. Several can share one server: SlideOps gives each its own port and its own web address, so they cannot take each other's."
         guidanceKey="services.overview"
         actions={
           <>
