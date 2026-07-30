@@ -191,7 +191,7 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
                   <option key={node.id} value={node.id}>
                     {node.name}
                     {ready && !ready.assignedIDs.has(node.id)
-                      ? ' — not assigned to this Project'
+                      ? ', not assigned to this Project'
                       : ''}
                   </option>
                 ))}

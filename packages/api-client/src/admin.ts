@@ -302,7 +302,7 @@ export function emergencyReleaseAll(): Promise<EmergencyState> {
  * End every open session on the platform, so a captured token stops working now
  * rather than at the end of its life.
  *
- * **This signs you out too** — deliberately, since a revocation that spares the
+ * **This signs you out too**: deliberately, since a revocation that spares the
  * person pressing it is not a revocation. Sign back in afterwards.
  */
 export function revokeAllSessions(): Promise<number> {

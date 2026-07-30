@@ -10,8 +10,8 @@ const BRAND = '#743930';
 const APP_BACKGROUND = '#faf6f4';
 
 // Where the dev server forwards /api to. It is read from the environment so the
-// backend can run wherever you like — in docker compose on :8090, bare on :8080,
-// or on another machine entirely — without editing this file.
+// backend can run wherever you like: in docker compose on :8090, bare on :8080,
+// or on another machine entirely: without editing this file.
 //
 // Development only. In production the app either shares an origin with the API,
 // or points at it directly through VITE_API_BASE_URL, and no proxy is involved.

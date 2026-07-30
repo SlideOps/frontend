@@ -275,7 +275,7 @@ export function History() {
         description={
           pendingDelete === null
             ? ''
-            : `This removes the record of "${pendingDelete.capability_key}" and its event log. It does not undo anything it did to your server — whatever it changed stays changed. The deletion itself is recorded in the audit trail.`
+            : `This removes the record of "${pendingDelete.capability_key}" and its event log. It does not undo anything it did to your server: whatever it changed stays changed. The deletion itself is recorded in the audit trail.`
         }
         confirmLabel="Delete it"
         confirmVariant="danger"

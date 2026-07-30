@@ -175,7 +175,7 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                     {state.data.assignable.map((node) => (
                       <option key={node.id} value={node.id}>
                         {node.name} ({node.address})
-                        {node.project_id ? ' — currently in another Project' : ''}
+                        {node.project_id ? ': currently in another Project' : ''}
                       </option>
                     ))}
                   </select>

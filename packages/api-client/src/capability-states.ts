@@ -44,7 +44,7 @@ export interface CapabilityState {
  * key, so a screen can mark them and keep an Operator from delivering the same
  * outcome twice. A key is present when SlideOps carried the Capability out there
  * (`done`) or when its outcome was already on the server when SlideOps looked
- * (`detected`) — a server set up before the Operator found SlideOps, or from a
+ * (`detected`): a server set up before the Operator found SlideOps, or from a
  * different account, reads as already set up rather than as a blank slate. An
  * absent key means the Capability is still available and renders exactly as it
  * does untouched. With a Project id the map also carries that Project's Plugin
