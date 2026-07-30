@@ -197,13 +197,16 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
                 ))}
               </select>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {/* One list, not a grid of cards. A grid of near identical boxes is
+                harder to scan than a list, and it was three times taller. */}
+            <div className="rounded-md border border-border bg-surface px-3">
               {ready.capabilities.map((capability) => {
                 const state = states[capability.key];
                 return (
                   <CapabilityCard
                     key={capability.key}
                     capability={capability}
+                    inPlace={Boolean(state)}
                     badge={capabilityBadge(capability, state)}
                     footer={capabilityFooter(capability, state)}
                   />
