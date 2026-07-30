@@ -5,7 +5,7 @@ import {
   listProjects,
   type Workload,
 } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { Boxes, Check } from '@slideops/icons';
 import { useState } from 'react';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -108,12 +108,10 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Boxes width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">Already running here</Text>
-      </div>
-
+    <Section
+      title="Already running here"
+      adornment={<Boxes width={16} height={16} className="text-brand" aria-hidden />}
+    >
       {workloads.state.status === 'loading' ? <Loading label="Reading the server" /> : null}
       {workloads.state.status === 'error' ? <ErrorNote error={workloads.state.error} /> : null}
 
@@ -193,6 +191,6 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
           </>
         )
       ) : null}
-    </div>
+    </Section>
   );
 }

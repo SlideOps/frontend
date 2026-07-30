@@ -1,6 +1,6 @@
 import { apiBase, type Service } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
-import { ArrowUpRight, Eye } from '@slideops/icons';
+import { Section, Text } from '@slideops/design-system';
+import { ArrowUpRight } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 
 /*
@@ -33,12 +33,11 @@ export function ServicePreview({ service }: { service: Service }) {
   const url = previewUrl(service.id);
 
   return (
-    <Card>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Eye width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">Preview</Text>
-        <Guidance for="service.preview" />
-        {isRunning && hasPort ? (
+    <Section
+      title="Preview"
+      adornment={<Guidance for="service.preview" />}
+      action={
+        isRunning && hasPort ? (
           <a
             href={url}
             target="_blank"
@@ -48,9 +47,9 @@ export function ServicePreview({ service }: { service: Service }) {
             Open in new tab
             <ArrowUpRight width={15} height={15} aria-hidden />
           </a>
-        ) : null}
-      </div>
-
+        ) : null
+      }
+    >
       {isRunning && hasPort ? (
         <>
           <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border bg-app">
@@ -70,6 +69,6 @@ export function ServicePreview({ service }: { service: Service }) {
       ) : (
         <PreviewNote>A preview appears here once the Service is running.</PreviewNote>
       )}
-    </Card>
+    </Section>
   );
 }

@@ -1,5 +1,5 @@
 import { getReadiness, type ReadinessMeasure, type ReadinessSeverity } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { Check, ChevronRight, ShieldCheck } from '@slideops/icons';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -119,17 +119,15 @@ export function ServerReadiness({ nodeId }: { nodeId: string }) {
   const percent = total === 0 ? 0 : Math.round((inPlace / total) * 100);
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <ShieldCheck width={18} height={18} className="text-brand" aria-hidden />
-          <Text variant="h4">Server readiness</Text>
-        </div>
+    <Section
+      title="Server readiness"
+      adornment={<ShieldCheck width={16} height={16} className="text-brand" aria-hidden />}
+      action={
         <Text variant="caption" tone="secondary" className="tabular-nums">
           {discovered ? `${inPlace} of ${total} in place` : 'Not read yet'}
         </Text>
-      </div>
-
+      }
+    >
       {/* One meter instead of eight boxes. Green for what is there, and the bar
           is the only chart on the page because a percentage does not need one. */}
       {discovered ? (
@@ -180,6 +178,6 @@ export function ServerReadiness({ nodeId }: { nodeId: string }) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </Section>
   );
 }

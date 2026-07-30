@@ -8,7 +8,7 @@ import {
   type CapabilityState,
   type DiscoveryResult,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Card, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
   ArrowRight,
@@ -212,7 +212,7 @@ export function NodeDetail() {
           />
 
           <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-8">
               <Card className="h-fit">
                 <div className="mb-3 flex items-center gap-2">
                   <Server width={18} height={18} className="text-brand" aria-hidden />
@@ -246,7 +246,7 @@ export function NodeDetail() {
               <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-8">
               <SecureServer
                 nodeId={id}
                 onDiscover={runDiscovery}
@@ -258,16 +258,11 @@ export function NodeDetail() {
                 }
               />
 
-              <Card>
-                <ServerReadiness nodeId={id} />
-              </Card>
+              <ServerReadiness nodeId={id} />
 
               <NodeHealth nodeId={id} />
 
-              <Card>
-                <div className="mb-2 flex items-center gap-2">
-                  <Text variant="h4">Terminal</Text>
-                </div>
+              <Section title="Terminal">
                 <ShellTerminal
                   urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
                   scopeLabel="This whole server"
@@ -278,13 +273,9 @@ export function NodeDetail() {
                       : undefined
                   }
                 />
-              </Card>
+              </Section>
 
-              <Card>
-                <div className="mb-4 flex items-center gap-2">
-                  <Text variant="h4">Discovery</Text>
-                  <Guidance for="node.discover" />
-                </div>
+              <Section title="Discovery" adornment={<Guidance for="node.discover" />}>
                 {discovering ? <Loading label="Reading the Node, read only" /> : null}
                 {discoverError ? (
                   <p role="alert" className="text-sm text-danger">
@@ -298,11 +289,9 @@ export function NodeDetail() {
                   </Text>
                 ) : null}
                 {discovery ? <DiscoveryScan result={discovery} /> : null}
-              </Card>
+              </Section>
 
-              <Card>
-                <RunningHere nodeId={id} />
-              </Card>
+              <RunningHere nodeId={id} />
 
               <div>
                 <div className="mb-3 flex items-center gap-2">

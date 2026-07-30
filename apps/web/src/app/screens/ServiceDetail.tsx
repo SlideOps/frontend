@@ -15,7 +15,7 @@ import {
   type Project,
   type Service,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Card, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
   Container,
@@ -101,18 +101,19 @@ function LogView({ id }: { id: string }) {
   const logs = state.status === 'ready' ? state.data.trim() : '';
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center gap-2">
-        <Text variant="h4">Logs</Text>
-        <Guidance for="service.logs" />
-        <span className="ml-auto flex items-center gap-3">
+    <Section
+      title="Logs"
+      adornment={<Guidance for="service.logs" />}
+      action={
+        <span className="flex items-center gap-3">
           <Refreshing label="Reading" show={refreshing} />
           <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
             <RefreshCw width={14} height={14} aria-hidden />
             Refresh
           </Button>
         </span>
-      </div>
+      }
+    >
       {state.status === 'loading' ? <Loading label="Reading recent logs" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {/* A failed refresh keeps the last logs on screen and says so, rather than
@@ -137,7 +138,7 @@ function LogView({ id }: { id: string }) {
           </Text>
         )
       ) : null}
-    </Card>
+    </Section>
   );
 }
 
@@ -266,16 +267,16 @@ export function ServiceDetail() {
           ) : null}
 
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            <div className="flex min-w-0 flex-col gap-6">
+            {/* One column of sections, separated by space and a hairline. These
+                are parts of one page about one Service, and a frame around each
+                said they were five separate things. */}
+            <div className="flex min-w-0 flex-col gap-8">
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
               <ServiceEndpoint service={service} onChanged={reload} />
 
-              <Card>
-                <div className="mb-2 flex items-center gap-2">
-                  <Text variant="h4">Shell</Text>
-                </div>
+              <Section title="Shell" flush={false}>
                 <ShellTerminal
                   urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
                   scopeLabel={
@@ -294,16 +295,13 @@ export function ServiceDetail() {
                       : `This Service is ${service.status}, so there is nothing running to open a shell in.`
                   }
                 />
-              </Card>
+              </Section>
+
               <ServicePreview service={service} />
 
-              <Card>
-                <div className="mb-3 flex items-center gap-2">
-                  <Text variant="h4">Live usage</Text>
-                  <Guidance for="service.metrics" />
-                </div>
+              <Section title="Live usage" adornment={<Guidance for="service.metrics" />}>
                 <ServiceMetricsPanel id={service.id} running={isRunning} />
-              </Card>
+              </Section>
 
               <ServiceConfiguration service={service} onChanged={reload} />
               <LogView id={service.id} />

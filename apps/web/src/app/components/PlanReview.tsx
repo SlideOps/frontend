@@ -1,6 +1,6 @@
 import type { Plan } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
-import { AlertTriangle, ListChecks, RefreshCw, ShieldCheck } from '@slideops/icons';
+import { Section, Text } from '@slideops/design-system';
+import { AlertTriangle, RefreshCw, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { RiskBadge } from './Badges';
 
@@ -12,13 +12,8 @@ import { RiskBadge } from './Badges';
  */
 export function PlanReview({ plan }: { plan: Plan }) {
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <div className="mb-4 flex items-center gap-2">
-          <ListChecks width={18} height={18} className="text-brand" aria-hidden />
-          <Text variant="h4">Steps</Text>
-          <Guidance for="operation.steps" />
-        </div>
+    <div className="flex flex-col gap-8">
+      <Section title="Steps" flush adornment={<Guidance for="operation.steps" />}>
         <ol className="flex flex-col gap-4">
           {plan.steps.map((step, index) => (
             <li key={step.id} className="flex gap-3">
@@ -44,16 +39,16 @@ export function PlanReview({ plan }: { plan: Plan }) {
             </li>
           ))}
         </ol>
-      </Card>
+      </Section>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         {plan.risks.length > 0 ? (
-          <Card>
-            <div className="mb-3 flex items-center gap-2">
-              <AlertTriangle width={18} height={18} className="text-warning" aria-hidden />
-              <Text variant="h4">Risks</Text>
-              <Guidance for="operation.risks" />
-            </div>
+          <Section
+            title="Risks"
+            adornment={
+              <AlertTriangle width={16} height={16} className="text-warning" aria-hidden />
+            }
+          >
             <ul className="flex list-disc flex-col gap-2 pl-5">
               {plan.risks.map((risk, index) => (
                 <li key={index}>
@@ -63,31 +58,27 @@ export function PlanReview({ plan }: { plan: Plan }) {
                 </li>
               ))}
             </ul>
-          </Card>
+          </Section>
         ) : null}
 
-        <Card>
-          <div className="mb-3 flex items-center gap-2">
-            <RefreshCw width={18} height={18} className="text-info" aria-hidden />
-            <Text variant="h4">Rollback</Text>
-            <Guidance for="operation.rollback" />
-          </div>
+        <Section
+          title="Rollback"
+          adornment={<RefreshCw width={16} height={16} className="text-info" aria-hidden />}
+        >
           <Text variant="body-sm" tone="secondary">
             {plan.rollback}
           </Text>
-        </Card>
+        </Section>
       </div>
 
-      <Card>
-        <div className="mb-3 flex items-center gap-2">
-          <ShieldCheck width={18} height={18} className="text-brand" aria-hidden />
-          <Text variant="h4">How it is verified</Text>
-          <Guidance for="operation.verificationStrategy" />
-        </div>
+      <Section
+        title="How it is verified"
+        adornment={<ShieldCheck width={16} height={16} className="text-brand" aria-hidden />}
+      >
         <Text variant="body-sm" tone="secondary">
           {plan.verification_strategy}
         </Text>
-      </Card>
+      </Section>
     </div>
   );
 }

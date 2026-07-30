@@ -8,7 +8,7 @@ import {
   type Operation,
   type Project,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Text } from '@slideops/design-system';
 import { ArrowRight, CheckCircle2, Layers, Plus, Server, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
@@ -37,7 +37,15 @@ async function loadWorkspace(signal: AbortSignal): Promise<WorkspaceData> {
   return { projects, nodes, operations, capabilities };
 }
 
-function StatCard({
+/*
+ * One figure in the headline strip.
+ *
+ * These were four bordered, shadowed cards in a grid, which gave four numbers the
+ * visual weight of four documents and pushed everything else below the fold. They
+ * are one strip now, divided by hairlines: the numbers are still the first thing
+ * read, and they take a quarter of the height.
+ */
+function Stat({
   label,
   value,
   guidanceKey,
@@ -47,17 +55,17 @@ function StatCard({
   guidanceKey: string;
 }) {
   return (
-    <Card>
-      <div className="flex items-center justify-between">
+    <div className="flex-1 px-5 py-4 first:pl-0">
+      <div className="flex items-center gap-1.5">
         <Text variant="caption" tone="secondary">
           {label}
         </Text>
-        <Guidance for={guidanceKey} />
+        <Guidance for={guidanceKey} size={14} />
       </div>
-      <Text variant="h1" className="mt-2">
+      <Text variant="h2" className="mt-1 block tabular-nums">
         {String(value)}
       </Text>
-    </Card>
+    </div>
   );
 }
 
@@ -69,14 +77,14 @@ function HealthCard({ operations }: { operations: Operation[] }) {
   ).length;
 
   return (
-    <Card>
-      <div className="flex items-center justify-between">
+    <div className="flex-1 px-5 py-4">
+      <div className="flex items-center gap-1.5">
         <Text variant="caption" tone="secondary">
           Health at a glance
         </Text>
-        <Guidance for="dashboard.health" />
+        <Guidance for="dashboard.health" size={14} />
       </div>
-      <div className="mt-3 flex flex-col gap-2">
+      <div className="mt-1.5 flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <CheckCircle2 width={16} height={16} className="text-success" aria-hidden />
           <Text variant="body-sm">{completed} verified</Text>
@@ -89,7 +97,7 @@ function HealthCard({ operations }: { operations: Operation[] }) {
           {running > 0 ? `${running} running now` : 'Nothing running now'}
         </Text>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -116,14 +124,16 @@ export function Workspace() {
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
         <div className="flex flex-col gap-8">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard
+          {/* One strip, divided by hairlines, rather than four framed boxes for
+              four numbers. */}
+          <div className="flex flex-col divide-y divide-border border-b border-border sm:flex-row sm:divide-x sm:divide-y-0">
+            <Stat
               label="Projects"
               value={state.data.projects.length}
               guidanceKey="dashboard.projects"
             />
-            <StatCard label="Nodes" value={state.data.nodes.length} guidanceKey="dashboard.nodes" />
-            <StatCard
+            <Stat label="Nodes" value={state.data.nodes.length} guidanceKey="dashboard.nodes" />
+            <Stat
               label="Operations"
               value={state.data.operations.length}
               guidanceKey="dashboard.operations"
@@ -176,11 +186,9 @@ export function Workspace() {
                   </Button>
                 </div>
                 {state.data.operations.length === 0 ? (
-                  <Card>
-                    <Text variant="body-sm" tone="secondary">
-                      No Operations yet. Open a Node, run Discovery, and start one.
-                    </Text>
-                  </Card>
+                  <Text variant="body-sm" tone="secondary">
+                    No Operations yet. Open a Node, run Discovery, and start one.
+                  </Text>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {state.data.operations.slice(0, 5).map((operation) => (
@@ -208,15 +216,23 @@ export function Workspace() {
                 <Text variant="h3">Recommendations</Text>
                 <Guidance for="dashboard.recommendations" />
               </div>
-              <div className="grid gap-4 lg:grid-cols-2">
+              {/* Rows, like every other list of Capabilities, so the same thing
+                  looks the same wherever it appears. */}
+              <div className="flex flex-col divide-y divide-border border-y border-border">
                 {state.data.capabilities.slice(0, 2).map((capability) => (
-                  <Card key={capability.key} className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Layers width={18} height={18} aria-hidden />
+                  <div key={capability.key} className="flex items-start gap-3 py-3.5">
+                    <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+                      <Layers width={15} height={15} aria-hidden />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <Text variant="h4">{capability.name}</Text>
-                      <Text variant="body-sm" tone="secondary" className="mt-1">
+                      <Text variant="body-sm" className="font-medium">
+                        {capability.name}
+                      </Text>
+                      <Text
+                        variant="caption"
+                        tone="secondary"
+                        className="mt-0.5 line-clamp-2 block"
+                      >
                         Recommended for your Nodes. {capability.description}
                       </Text>
                       <Button
@@ -229,7 +245,7 @@ export function Workspace() {
                         <ArrowRight width={15} height={15} aria-hidden />
                       </Button>
                     </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
             </section>
