@@ -268,7 +268,7 @@ export function ServiceDetail() {
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
-              <ServiceEndpoint service={service} />
+              <ServiceEndpoint service={service} onChanged={reload} />
               <ServicePreview service={service} />
 
               <Card>
