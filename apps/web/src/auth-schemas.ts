@@ -33,3 +33,28 @@ export const passwordConfirmSchema = z.object({
   password: z.string().min(1, 'Enter your password.'),
 });
 export type PasswordConfirmValues = z.infer<typeof passwordConfirmSchema>;
+
+/*
+ * Changing a password.
+ *
+ * The current password is only ever checked for presence here. Its rule lives on
+ * the server, and applying today's length rule to a password set under an older
+ * one would lock someone out of the very screen that lets them fix it.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password.'),
+    newPassword: passwordRule,
+    confirmPassword: z.string().min(1, 'Re-enter your new password.'),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'The passwords do not match.',
+  })
+  // Caught here as well as on the server, so the answer is immediate rather than
+  // a round trip that comes back saying nothing happened.
+  .refine((values) => values.newPassword !== values.currentPassword, {
+    path: ['newPassword'],
+    message: 'Choose a password different from your current one.',
+  });
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
