@@ -21,7 +21,7 @@ const items: Item[] = [
   {
     question: 'What is Core versus the marketplace?',
     answer:
-      'Only security is Core, pre-installed on every server: Secure SSH, the host Firewall, Create Application User, and Manage Packages and updates. Everything else, from containers and reverse proxies to databases and runtimes, is a marketplace Plugin you install per Project.',
+      'Seven Capabilities are Core, on every server with nothing to install: Secure SSH, Configure firewall, Create application user, Manage server user, Remove server user, Manage packages, and Enable monitoring. The other 89, from containers and reverse proxies to databases, runtimes, message queues and private networking, are marketplace Plugins you install per Project.',
   },
   {
     question: 'How does deploying from GitHub work?',

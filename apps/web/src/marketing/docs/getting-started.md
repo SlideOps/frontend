@@ -26,7 +26,7 @@ SlideOps never operates a server as root once it is connected. Securing a server
 - **Harden SSH.** Root can no longer sign in directly over SSH, so the only way in is the account you just created.
 - **Switch the connection.** SlideOps points its stored credential at the non-root account. It signs in with the new account first and only switches if that succeeds, so you are never locked out.
 
-From that point every action runs as the non-root sudo account, never as root. These four security outcomes (Secure SSH, the host Firewall, Create Application User, and Manage Packages and updates) are Core: they are on every server with nothing to install. Later, a server settings page lets you rotate the connection credential and manage the accounts on the server.
+From that point every action runs as the non-root sudo account, never as root. Seven Capabilities are Core, on every server with nothing to install: Secure SSH, Configure firewall, Create application user, Manage server user, Remove server user, Manage packages, and Enable monitoring. Later, a server settings page lets you rotate the connection credential and manage the accounts on the server.
 
 ### 5. Connect GitHub, optionally
 
