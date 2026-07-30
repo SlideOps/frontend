@@ -10,7 +10,7 @@ import {
   type Node,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { Clock, Play, Plus, Trash2 } from '@slideops/icons';
+import { AlertTriangle, Check, Clock, Play, Plus, Trash2 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
@@ -35,6 +35,43 @@ function nextRunText(automation: Automation): string {
     return 'Not scheduled yet';
   }
   return `Next run ${new Date(automation.next_run_at).toLocaleString()}`;
+}
+
+/**
+ * How the last run went, which is the point of the screen.
+ *
+ * An Automation runs while nobody is watching. This list used to show only when
+ * the next run is due, so one that had failed every night for a week looked
+ * exactly like one that had worked every night, and the only way to find out was
+ * to open the Operation. Whether it worked leads now, and a failure says so
+ * where it cannot be missed.
+ */
+function LastRun({ automation }: { automation: Automation }) {
+  if (!automation.last_run_at) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
+        <Clock width={13} height={13} aria-hidden />
+        Not run yet
+      </span>
+    );
+  }
+  const ran = new Date(automation.last_run_at).toLocaleString();
+  const failed = automation.last_run_status === 'failed';
+  const finished = automation.last_run_status === 'completed';
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs ${failed ? 'text-danger' : 'text-ink-muted'}`}
+    >
+      {failed ? (
+        <AlertTriangle width={13} height={13} aria-hidden />
+      ) : finished ? (
+        <Check width={13} height={13} className="text-success" aria-hidden />
+      ) : (
+        <Clock width={13} height={13} aria-hidden />
+      )}
+      {failed ? `Last run failed, ${ran}` : finished ? `Last ran ${ran}` : `Running since ${ran}`}
+    </span>
+  );
 }
 
 function AutomationRow({
@@ -106,6 +143,11 @@ function AutomationRow({
           <Text variant="body-sm" tone="secondary" className="truncate">
             {nodeName} · {scheduleToText(automation.schedule)}
           </Text>
+          {/* Under the name, where it is read on every row rather than only on
+              the wide screens the next run is kept to. */}
+          <span className="mt-0.5 block">
+            <LastRun automation={automation} />
+          </span>
         </button>
 
         <span className="hidden shrink-0 text-xs text-ink-muted lg:block">

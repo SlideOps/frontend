@@ -1,6 +1,6 @@
 import type { Schedule } from '@slideops/api-client';
 import { describe, expect, it } from 'vitest';
-import { defaultSchedule, scheduleToText, weekdayName } from './schedule';
+import { defaultSchedule, scheduleToClause, scheduleToText, weekdayName } from './schedule';
 
 describe('scheduleToText', () => {
   it('describes an hourly schedule without a time', () => {
@@ -45,5 +45,20 @@ describe('defaultSchedule', () => {
     expect(defaultSchedule('hourly')).toEqual({ frequency: 'hourly' });
     expect(defaultSchedule('weekly')).toMatchObject({ frequency: 'weekly', weekday: 1 });
     expect(defaultSchedule('monthly')).toMatchObject({ frequency: 'monthly', day_of_month: 1 });
+  });
+});
+
+describe('scheduleToClause', () => {
+  // The builder used to lowercase the whole phrase to fit it into a sentence,
+  // which produced "every monday at 04:00 utc". Only the first letter belongs in
+  // lower case; the weekday and the timezone are names.
+  it('lowers only the first letter, keeping the weekday and the timezone as names', () => {
+    expect(scheduleToClause({ frequency: 'weekly', weekday: 1, time: '04:00' })).toBe(
+      'every Monday at 04:00 UTC',
+    );
+    expect(scheduleToClause({ frequency: 'daily', time: '03:30' })).toBe('every day at 03:30 UTC');
+    expect(scheduleToClause({ frequency: 'monthly', day_of_month: 1, time: '02:00' })).toBe(
+      'on the 1st of each month at 02:00 UTC',
+    );
   });
 });

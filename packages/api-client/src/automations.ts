@@ -1,4 +1,5 @@
 import { apiRequest, unwrap } from './http';
+import type { OperationStatus } from './types';
 
 /*
  * The Automations surface. An Automation is a saved intent to run a Capability
@@ -35,6 +36,12 @@ export interface Automation {
   last_run_at: string | null;
   next_run_at: string | null;
   last_operation_id: string | null;
+  /**
+   * How the last run ended, read from the Operation it produced. An Automation
+   * runs while nobody is watching, so this is what separates one that is working
+   * from one that has been failing every night unnoticed.
+   */
+  last_run_status: OperationStatus | null;
   created_at: string;
   updated_at?: string;
 }

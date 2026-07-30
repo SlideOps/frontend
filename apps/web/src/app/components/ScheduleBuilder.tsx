@@ -6,7 +6,7 @@ import {
   FREQUENCY_LABEL,
   WEEKDAYS,
   defaultSchedule,
-  scheduleToText,
+  scheduleToClause,
 } from '../schedule';
 
 /*
@@ -113,7 +113,7 @@ export function ScheduleBuilder({ value, onChange }: ScheduleBuilderProps) {
 
       <div className="rounded-md border border-border bg-subtle px-3 py-2">
         <Text variant="body-sm" tone="secondary">
-          This Automation will run {scheduleToText(value).toLowerCase()}.
+          This Automation will run {scheduleToClause(value)}.
         </Text>
       </div>
     </div>

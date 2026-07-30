@@ -76,6 +76,18 @@ export function scheduleToText(schedule: Schedule): string {
   }
 }
 
+/**
+ * The same description as a clause inside a sentence, for "will run ...".
+ *
+ * Only the first letter is lowered. Lowercasing the whole phrase turned Monday
+ * into monday and UTC into utc, which reads as a typo and, in the case of the
+ * timezone, as a different word.
+ */
+export function scheduleToClause(schedule: Schedule): string {
+  const text = scheduleToText(schedule);
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 /** A sensible starting schedule for a frequency, so the builder is never blank. */
 export function defaultSchedule(frequency: Schedule['frequency']): Schedule {
   switch (frequency) {
