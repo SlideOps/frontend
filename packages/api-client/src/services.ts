@@ -94,6 +94,17 @@ export interface Service {
    * running workload means a redeploy is needed to apply it.
    */
   config_changed_at?: string;
+  /**
+   * The addresses this Service answers on from outside the server, one per
+   * published port as `http://<node-address>:<host-port>`. Computed from the Node
+   * address on every read rather than stored, so it stays correct if the server's
+   * address changes, and empty when nothing is published.
+   *
+   * This is the base URL another program calls: a frontend, a mobile app, or a
+   * second Service. The published port is opened on the host firewall as part of
+   * the deploy, so it answers with no domain set up first.
+   */
+  public_urls?: string[];
   created_at: string;
   updated_at?: string;
 }
