@@ -84,6 +84,15 @@ importers:
       '@slideops/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@testing-library/jest-dom':
+        specifier: ^6.10.0
+        version: 6.10.0(@testing-library/dom@10.4.1)
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@testing-library/user-event':
+        specifier: ^14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.31
@@ -99,6 +108,9 @@ importers:
       eslint:
         specifier: ^9.14.0
         version: 9.39.5(jiti@1.21.7)
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       postcss:
         specifier: ^8.4.47
         version: 8.5.22
