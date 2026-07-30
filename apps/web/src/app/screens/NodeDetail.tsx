@@ -16,11 +16,11 @@ import {
   History,
   RefreshCw,
   RotateCcw,
-  ScanSearch,
   Server,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
+import { RunningHere } from '../components/RunningHere';
 import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { useState } from 'react';
@@ -301,25 +301,7 @@ export function NodeDetail() {
               </Card>
 
               <Card>
-                <div className="mb-2 flex items-center gap-2">
-                  <ScanSearch width={18} height={18} className="text-brand" aria-hidden />
-                  <Text variant="h4">Already running here</Text>
-                </div>
-                <Text variant="body-sm" tone="secondary">
-                  Apps you were already running on this server, from before SlideOps or from another
-                  account, can be brought under management without redeploying them. They keep
-                  running exactly as they are.
-                </Text>
-                <div className="mt-4">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => navigate(`/app/services/import?node=${id}`)}
-                  >
-                    See what is running here
-                    <ArrowRight width={15} height={15} aria-hidden />
-                  </Button>
-                </div>
+                <RunningHere nodeId={id} />
               </Card>
 
               <div>
