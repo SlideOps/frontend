@@ -1,5 +1,6 @@
 import {
   Activity,
+  CreditCard,
   Gauge,
   Layers,
   LayoutDashboard,
@@ -22,6 +23,7 @@ export type ActiveKey =
   | 'audit'
   | 'promo-codes'
   | 'tiers'
+  | 'subscribers'
   | 'emergency';
 
 /**
@@ -46,6 +48,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: Users,
       active: active === 'operators',
       onSelect: () => navigate('/admin/operators'),
+    },
+    {
+      key: 'subscribers',
+      label: 'Subscribers',
+      icon: CreditCard,
+      active: active === 'subscribers',
+      onSelect: () => navigate('/admin/subscribers'),
     },
     {
       key: 'operations',

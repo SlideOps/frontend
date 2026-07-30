@@ -310,3 +310,101 @@ export function revokeAllSessions(): Promise<number> {
     method: 'POST',
   }).then((r) => r.sessions_revoked ?? 0);
 }
+
+/*
+ * Billing oversight. Read only: changing what somebody pays belongs to the
+ * payment provider, and where SlideOps must intervene it moves their tier, which
+ * is audited and does not pretend to have taken money.
+ */
+
+/** One row of the subscribers table. */
+export interface AdminSubscriber {
+  operator_id: string;
+  email: string;
+  /**
+   * The tier the account is on right now. It can legitimately differ from
+   * `subscription_tier`: an Admin granted tier moves the account without touching
+   * the subscription, and a lapsed subscription returns the account to Free while
+   * the row stays for the record.
+   */
+  account_tier: string;
+  /** Empty when this Operator has only ever attempted a payment. */
+  status?: string;
+  subscription_tier?: string;
+  provider?: string;
+  current_period_end?: string;
+  started_at?: string;
+  /** Every attempt. `paid_minor` counts only the successful ones. */
+  payments: number;
+  paid_minor: number;
+  currency?: string;
+  last_paid_at?: string;
+}
+
+/** One payment attempt, successful or not. */
+export interface AdminPayment {
+  id: string;
+  provider: string;
+  /** The provider's own reference, needed to find the same transaction in theirs. */
+  reference: string;
+  tier: string;
+  amount_minor: number;
+  currency: string;
+  status: 'pending' | 'success' | 'failed';
+  promo_code?: string;
+  term_months: number;
+  created_at: string;
+}
+
+/** A subscriber with their payment history. */
+export interface AdminSubscriberDetail extends AdminSubscriber {
+  payment_history: AdminPayment[];
+}
+
+/** The headline above the subscribers table. */
+export interface AdminSubscriberTotals {
+  active: number;
+  canceled: number;
+  expired: number;
+  /** Active subscriptions whose paid period ends within thirty days. */
+  expiring_within_30_days: number;
+  paid_minor: number;
+  currency?: string;
+  /** Unsuccessful attempts. A rise looks identical to nobody trying if only
+   *  successful payments are counted. */
+  failed_payments: number;
+}
+
+/**
+ * List everyone who has ever paid or tried to, with the platform headline.
+ *
+ * Lapsed and cancelled accounts are included, and so are Operators who only ever
+ * attempted a payment and failed. A list that shows active subscribers alone
+ * cannot answer why revenue moved.
+ */
+export function listSubscribers(
+  signal?: AbortSignal,
+): Promise<{ subscribers: AdminSubscriber[]; totals: AdminSubscriberTotals }> {
+  return apiRequest<{ subscribers?: AdminSubscriber[]; totals?: AdminSubscriberTotals }>(
+    '/admin/subscribers',
+    { signal },
+  ).then((r) => ({
+    subscribers: r.subscribers ?? [],
+    totals: r.totals ?? {
+      active: 0,
+      canceled: 0,
+      expired: 0,
+      expiring_within_30_days: 0,
+      paid_minor: 0,
+      failed_payments: 0,
+    },
+  }));
+}
+
+/** Read one subscriber and every payment attempt behind them. */
+export function getSubscriber(id: string, signal?: AbortSignal): Promise<AdminSubscriberDetail> {
+  return apiRequest<{ subscriber?: AdminSubscriberDetail } & Partial<AdminSubscriberDetail>>(
+    `/admin/subscribers/${encodeURIComponent(id)}`,
+    { signal },
+  ).then((r) => r.subscriber ?? (r as AdminSubscriberDetail));
+}

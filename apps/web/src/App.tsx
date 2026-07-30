@@ -119,6 +119,12 @@ const PromoCodes = lazy(() =>
   import('./admin/screens/PromoCodes').then((m) => ({ default: m.PromoCodes })),
 );
 const Tiers = lazy(() => import('./admin/screens/Tiers').then((m) => ({ default: m.Tiers })));
+const Subscribers = lazy(() =>
+  import('./admin/screens/Subscribers').then((m) => ({ default: m.Subscribers })),
+);
+const SubscriberDetail = lazy(() =>
+  import('./admin/screens/SubscriberDetail').then((m) => ({ default: m.SubscriberDetail })),
+);
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
@@ -190,6 +196,8 @@ export function App() {
           <Route path="audit" element={<Audit />} />
           <Route path="promo-codes" element={<PromoCodes />} />
           <Route path="tiers" element={<Tiers />} />
+          <Route path="subscribers" element={<Subscribers />} />
+          <Route path="subscribers/:id" element={<SubscriberDetail />} />
           <Route path="emergency" element={<Emergency />} />
         </Route>
 
