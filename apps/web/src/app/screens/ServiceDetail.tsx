@@ -23,6 +23,7 @@ import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
+import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { Refreshing } from '../components/Refreshing';
@@ -251,6 +252,10 @@ export function ServiceDetail() {
 
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
             <div className="flex min-w-0 flex-col gap-6">
+              {/* The address comes before the Preview on purpose. A Service that
+                  serves an API has nothing to show in an iframe, and its address is
+                  the whole answer; a Service that renders a page has both. */}
+              <ServiceEndpoint service={service} />
               <ServicePreview service={service} />
 
               <Card>

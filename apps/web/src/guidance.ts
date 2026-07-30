@@ -559,6 +559,13 @@ export const guidance: GuidanceRegistry = {
     label: 'Logs',
     summary: 'The recent output from this Service, read from the Node. Refresh to pull the latest.',
   },
+  'service.endpoint': {
+    label: 'Reach it from anywhere',
+    summary:
+      'The base URL this Service answers on from outside the server, one per published port.',
+    detail:
+      'This is the address another program calls: a frontend, a mobile app, or a second Service. It is built from the Node address and each published host port, and the port was opened on the host firewall as part of the deploy, so it answers with no domain set up first. Two limits are worth knowing: a page served over HTTPS cannot call an http:// address, so a browser frontend on a secure origin needs the Configure HTTPS Capability and a domain in front of this; and a cross origin call has to be allowed by your own application, since SlideOps does not add CORS headers to what you deployed.',
+  },
   'service.preview': {
     label: 'Preview',
     summary: 'The live running Service, reached over the secure SSH tunnel so its port stays private.',
