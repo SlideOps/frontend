@@ -310,7 +310,7 @@ export function updateServiceResources(id: string, resources: ServiceResources):
 /**
  * Edit a deployed Service's command and environment variables.
  *
- * `env` **replaces** rather than merges, so send the complete set you want —
+ * `env` **replaces** rather than merges, so send the complete set you want:
  * leaving one out is how it is removed, and a previously sealed secret you do not
  * resend is dropped for the same reason.
  *
@@ -332,7 +332,7 @@ export function updateServiceConfiguration(
  * Stop a deploy that is still running and leave the Service in place.
  *
  * It stops the work; it does not undo it. A build that had begun is abandoned, and
- * whatever the previous deploy left running is untouched — which is exactly why
+ * whatever the previous deploy left running is untouched, which is exactly why
  * this is separate from removing the Service.
  *
  * It also clears a Service stranded at `deploying` by a restart.
@@ -394,4 +394,37 @@ export function planComposeStack(input: {
   return apiRequest<unknown>('/services/compose-plan', { method: 'POST', body: input }).then((r) =>
     unwrap<StackPlan>(r, 'plan'),
   );
+}
+
+/**
+ * Approve a compose plan and run it end to end: install each backing engine as a
+ * managed Capability, create the database and account your application needs with
+ * a generated password, then build and deploy your application with those
+ * credentials already in its environment.
+ *
+ * Every Capability runs as a real Operation: planned, approved, executed,
+ * verified, recorded in History. Calling this is the approval that authorises them.
+ *
+ * It returns immediately with the Service at `deploying`. Cancelling that deploy
+ * cancels the provisioning too. If a step fails, what already succeeded is left in
+ * place and named in the failure; every step is idempotent, so running the plan
+ * again completes what is missing.
+ */
+export function deployComposeStack(input: {
+  node_id: string;
+  project_id: string;
+  repository_url: string;
+  branch?: string;
+  name?: string;
+  cpu_limit: number;
+  memory_mb: number;
+  ports?: ServicePort[];
+  env?: ServiceEnvVar[];
+  build?: string;
+  command?: string;
+}): Promise<Service> {
+  return apiRequest<unknown>('/services/compose-plan/deploy', {
+    method: 'POST',
+    body: input,
+  }).then((r) => unwrap<Service>(r, 'service'));
 }

@@ -1,4 +1,12 @@
-import { ApiError, planComposeStack, type StackPlan, type StackStep } from '@slideops/api-client';
+import {
+  ApiError,
+  deployComposeStack,
+  planComposeStack,
+  type ServiceEnvVar,
+  type ServicePort,
+  type StackPlan,
+  type StackStep,
+} from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
 import { AlertTriangle, ArrowRight, Boxes, Database, Rocket, ScanSearch } from '@slideops/icons';
 import { useState } from 'react';
@@ -8,7 +16,7 @@ import { Loading } from './Feedback';
  * Planning a compose file as Capabilities.
  *
  * A compose file already says what the Operator wants. `image: postgres:16` means
- * a PostgreSQL server with a database and an account for their app — so rather
+ * a PostgreSQL server with a database and an account for their app, so rather
  * than making them install it by hand and copy a password into the environment,
  * this shows the plan that does all three and wires the credentials through.
  *
@@ -53,7 +61,7 @@ function PlanStep({ step, index }: { step: StackStep; index: number }) {
         </Text>
         {step.secret_parameters && step.secret_parameters.length > 0 ? (
           <Text variant="caption" tone="secondary" className="mt-1 block">
-            {step.secret_parameters.join(', ')} is generated and sealed — never shown in this plan,
+            {step.secret_parameters.join(', ')} is generated and sealed: never shown in this plan,
             and revealable from the Operation afterwards.
           </Text>
         ) : null}
@@ -65,22 +73,46 @@ function PlanStep({ step, index }: { step: StackStep; index: number }) {
 /**
  * Read a repository's compose file and show what SlideOps would do with it.
  *
- * `onApprove` is where execution would begin. It is deliberately separate from
- * planning: the plan is safe to run as often as you like, and only approval acts.
+ * Approving is deliberately separate from planning: the plan is safe to run as
+ * often as you like, and only approval acts.
  */
 export function ComposeStackPlan({
   nodeID,
+  projectID,
   repositoryURL,
   branch,
   name,
+  cpuLimit,
+  memoryMB,
+  build,
+  command,
+  ports,
+  env,
+  issues,
+  onDeployed,
 }: {
   nodeID: string;
+  projectID: string;
   repositoryURL: string;
   branch?: string;
   name?: string;
+  cpuLimit: number;
+  memoryMB: number;
+  build?: string;
+  command?: string;
+  /** The application's own published ports, as entered on the deploy form. */
+  ports?: ServicePort[];
+  /** Any environment the Operator set themselves. The provisioned credentials are
+   *  added to these, not instead of them. */
+  env?: ServiceEnvVar[];
+  /** Anything else about the form that must be put right first, in the Operator's
+   *  words. The form owns those messages, so they are not repeated here. */
+  issues?: string[];
+  onDeployed: (serviceID: string) => void;
 }) {
   const [plan, setPlan] = useState<StackPlan | null>(null);
   const [planning, setPlanning] = useState(false);
+  const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
@@ -97,7 +129,53 @@ export function ComposeStackPlan({
     }
   };
 
+  const approve = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      const created = await deployComposeStack({
+        node_id: nodeID,
+        project_id: projectID,
+        repository_url: repositoryURL,
+        branch,
+        name,
+        cpu_limit: cpuLimit,
+        memory_mb: memoryMB,
+        build,
+        command,
+        // Sent only when set, so an empty box is absent rather than an empty list.
+        ports: ports && ports.length > 0 ? ports : undefined,
+        env: env && env.length > 0 ? env : undefined,
+      });
+      onDeployed(created.id);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.message : 'The stack could not be started. Try again.',
+      );
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const ready = Boolean(nodeID && repositoryURL);
+
+  // Approving deploys the application too, so it needs everything an ordinary
+  // deploy needs. Saying which field is missing beats letting the request fail
+  // and reporting it as a server error.
+  const blocking = [...(issues ?? [])];
+  if (!projectID) {
+    blocking.push('Choose a Project, so the resulting Service has somewhere to live.');
+  }
+  if (!name) {
+    blocking.push('Give the Service a name.');
+  }
+  if (!(cpuLimit > 0)) {
+    blocking.push('Set a vCPU limit above zero.');
+  }
+  if (!(memoryMB > 0)) {
+    blocking.push('Set a memory limit.');
+  }
+  const canApprove = ready && blocking.length === 0 && plan !== null && plan.steps.length > 0;
 
   return (
     <Card className="flex flex-col gap-4">
@@ -109,7 +187,7 @@ export function ComposeStackPlan({
       <Text variant="body-sm" tone="secondary">
         Your compose file already says what you want. SlideOps can read it and install the databases
         and caches it names as managed Capabilities, create the database and account your app needs,
-        and hand it the credentials — instead of you doing all three by hand. Nothing runs until you
+        and hand it the credentials, instead of you doing all three by hand. Nothing runs until you
         approve it.
       </Text>
 
@@ -186,11 +264,35 @@ export function ComposeStackPlan({
             </div>
           ) : null}
 
-          <Text variant="caption" tone="secondary">
-            Approving and running this plan is not built yet. For now, run the steps above as
-            Capabilities from the server page, then deploy your application with the environment
-            shown here — or use the Compose stack runtime to run the file exactly as written.
-          </Text>
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <Text variant="body-sm" tone="secondary">
+              Approving runs every step above in order. Each Capability runs as a real Operation, so
+              it is planned, verified, and recorded in History exactly as if you had run it yourself.
+              You can cancel it at any point from the Service.
+            </Text>
+            <div>
+              <Button onClick={approve} disabled={!canApprove || running}>
+                <Rocket width={15} height={15} aria-hidden />
+                {running ? 'Starting the stack' : 'Approve and run this plan'}
+              </Button>
+            </div>
+            {blocking.length > 0 ? (
+              <div>
+                <Text variant="caption" tone="secondary" className="block">
+                  Before approving:
+                </Text>
+                <ul className="mt-1 flex list-disc flex-col gap-1 pl-5">
+                  {blocking.map((item) => (
+                    <li key={item}>
+                      <Text variant="caption" tone="secondary">
+                        {item}
+                      </Text>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </Card>
