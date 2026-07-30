@@ -22,6 +22,12 @@ export interface Operator {
   email: string;
   role: OperatorRole;
   mfa_enabled: boolean;
+  /**
+   * Whether this account can sign in with a password at all. An account created
+   * through GitHub has none, so it has no password to change and must not be
+   * offered a form that could never succeed.
+   */
+  has_password: boolean;
   created_at: string;
 }
 

@@ -186,6 +186,34 @@ export function getAuthProviders(signal?: AbortSignal): Promise<AuthProviders> {
   }));
 }
 
+/** What a password change reports back: it happened, and what it cost. */
+export interface PasswordChanged {
+  changed: boolean;
+  /**
+   * How many other sessions the change ended. Worth surfacing: it is the proof
+   * that anyone else holding the old password has been signed out, and it turns
+   * an abstract reassurance into a number.
+   */
+  sessions_ended: number;
+}
+
+/**
+ * Change the account password.
+ *
+ * The current password is required by the server, because a live session is not
+ * proof of identity on its own. Every other session for the account is ended;
+ * this one stays signed in.
+ */
+export async function changePassword(input: {
+  current_password: string;
+  new_password: string;
+}): Promise<PasswordChanged> {
+  return authRequest<PasswordChanged>('/auth/password', {
+    method: 'POST',
+    body: input,
+  });
+}
+
 /**
  * The URL that starts signing in with GitHub. Navigate the browser to it: do
  * not fetch it, since the response is a redirect to github.com and the whole

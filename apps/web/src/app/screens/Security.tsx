@@ -1,14 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ApiError, mfaDisable, mfaEnable, mfaSetup, type MfaSetup } from '@slideops/api-client';
-import { Button, Card, Field, Text } from '@slideops/design-system';
+import {
+  ApiError,
+  changePassword,
+  mfaDisable,
+  mfaEnable,
+  mfaSetup,
+  type MfaSetup,
+  type PasswordChanged,
+} from '@slideops/api-client';
+import { Button, Field, Section, Text } from '@slideops/design-system';
 import { KeyRound, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
+  changePasswordSchema,
   codeSchema,
   passwordConfirmSchema,
+  type ChangePasswordValues,
   type CodeValues,
   type PasswordConfirmValues,
 } from '../../auth-schemas';
@@ -166,7 +176,115 @@ function DisableMfa() {
   );
 }
 
-/** The Operator security settings: two step verification setup and removal. */
+/**
+ * Change the account password.
+ *
+ * The current password is asked for because a signed-in session is not proof of
+ * identity on its own: sessions outlive the moment they were created, so a
+ * borrowed laptop must not be enough to take an account over. That is worth
+ * saying on screen, since being asked for a password you have just typed to get
+ * here otherwise reads as the form being awkward.
+ *
+ * An account that signs in through GitHub has no password, so this offers
+ * nothing to change and says why.
+ */
+function ChangePassword() {
+  const operator = useAuthStore((state) => state.operator);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [done, setDone] = useState<PasswordChanged | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ChangePasswordValues>({ resolver: zodResolver(changePasswordSchema) });
+
+  const onSubmit = handleSubmit(async (values) => {
+    setFormError(null);
+    setDone(null);
+    try {
+      setDone(
+        await changePassword({
+          current_password: values.currentPassword,
+          new_password: values.newPassword,
+        }),
+      );
+      reset();
+    } catch (error) {
+      setFormError(
+        error instanceof ApiError
+          ? error.message
+          : 'Your password could not be changed. Try again.',
+      );
+    }
+  });
+
+  if (operator?.has_password === false) {
+    return (
+      <Text variant="body-sm" tone="secondary">
+        You sign in through GitHub, so this account has no password to change. Your GitHub account
+        controls access.
+      </Text>
+    );
+  }
+
+  return (
+    <form className="flex max-w-xl flex-col gap-4" onSubmit={onSubmit} noValidate>
+      <Text variant="body-sm" tone="secondary">
+        Confirm the password you use now, then choose a new one. Being signed in is not enough on
+        its own, which is what stops someone on a machine you left open from taking the account.
+      </Text>
+
+      <Field
+        label="Current password"
+        type="password"
+        autoComplete="current-password"
+        error={errors.currentPassword?.message}
+        {...register('currentPassword')}
+      />
+      <Field
+        label="New password"
+        type="password"
+        autoComplete="new-password"
+        hint="At least 12 characters. Length protects an account better than punctuation does."
+        error={errors.newPassword?.message}
+        {...register('newPassword')}
+      />
+      <Field
+        label="Confirm new password"
+        type="password"
+        autoComplete="new-password"
+        error={errors.confirmPassword?.message}
+        {...register('confirmPassword')}
+      />
+
+      {formError ? (
+        <p role="alert" className="text-sm text-danger">
+          {formError}
+        </p>
+      ) : null}
+      {done ? (
+        <p role="status" className="text-sm text-success">
+          {/* The count is the point: it says in plain numbers that anyone else
+              holding the old password has been signed out. */}
+          Your password has been changed.{' '}
+          {done.sessions_ended > 0
+            ? `${done.sessions_ended} other ${done.sessions_ended === 1 ? 'session was' : 'sessions were'} signed out. You are still signed in here.`
+            : 'There were no other sessions to sign out.'}
+        </p>
+      ) : null}
+
+      <div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Changing your password' : 'Change password'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** The Operator security settings: the account password, and two step verification. */
 export function Security() {
   const operator = useAuthStore((state) => state.operator);
   const enabled = operator?.mfa_enabled ?? false;
@@ -175,28 +293,33 @@ export function Security() {
     <OperatorShell active="security">
       <PageHeader
         title="Security"
-        description="Protect your Workspace with two step verification. It adds a short code from an authenticator app on top of your password."
+        description="How you prove this account is yours: the password you sign in with, and a second step on top of it."
         guidanceKey="security.mfa"
       />
 
-      <Card className="max-w-xl">
-        <div className="mb-4 flex items-start gap-3">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-            {enabled ? (
-              <ShieldCheck width={18} height={18} aria-hidden />
+      <div className="flex flex-col gap-8">
+        <Section title="Password" flush>
+          <ChangePassword />
+        </Section>
+
+        <Section
+          title="Two step verification"
+          description={
+            enabled
+              ? 'On for this account. Signing in asks for a code from your authenticator app as well as your password.'
+              : 'Off for this account. Turning it on adds a short code from an authenticator app on top of your password.'
+          }
+          adornment={
+            enabled ? (
+              <ShieldCheck width={16} height={16} className="text-success" aria-hidden />
             ) : (
-              <KeyRound width={18} height={18} aria-hidden />
-            )}
-          </span>
-          <div>
-            <Text variant="h4">Two step verification</Text>
-            <Text variant="body-sm" tone="secondary" className="mt-1">
-              {enabled ? 'On for this account.' : 'Off for this account.'}
-            </Text>
-          </div>
-        </div>
-        {enabled ? <DisableMfa /> : <EnableMfa />}
-      </Card>
+              <KeyRound width={16} height={16} className="text-ink-muted" aria-hidden />
+            )
+          }
+        >
+          <div className="max-w-xl">{enabled ? <DisableMfa /> : <EnableMfa />}</div>
+        </Section>
+      </div>
     </OperatorShell>
   );
 }

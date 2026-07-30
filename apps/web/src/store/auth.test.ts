@@ -14,6 +14,7 @@ const operator = {
   email: 'ops@example.com',
   role: 'operator' as const,
   mfa_enabled: false,
+  has_password: true,
   created_at: 'now',
 };
 
@@ -22,6 +23,7 @@ const admin = {
   email: 'admin@example.com',
   role: 'admin' as const,
   mfa_enabled: true,
+  has_password: true,
   created_at: 'now',
 };
 
