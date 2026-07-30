@@ -11,6 +11,7 @@ import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { reportSections, reportTitle } from '../report-view';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -18,18 +19,25 @@ interface ReportChoice {
   type: ReportType;
   label: string;
   blurb: string;
+  /** Health is about one machine, so it cannot be answered across all of them. */
+  needsNode?: boolean;
 }
 
 const REPORT_TYPES: ReportChoice[] = [
-  { type: 'health', label: 'Health', blurb: 'Current and recent Node metrics.' },
+  { type: 'operations', label: 'Operations', blurb: 'A history summary with counts and outcomes.' },
   {
     type: 'verification',
     label: 'Verification',
-    blurb: 'Recent verification results and evidence.',
+    blurb: 'Recent verification results and the evidence behind them.',
   },
   { type: 'inventory', label: 'Inventory', blurb: 'Nodes with their OS, distro, and key facts.' },
-  { type: 'operations', label: 'Operations', blurb: 'A history summary with counts and outcomes.' },
   { type: 'security', label: 'Security', blurb: 'The SSH and firewall posture per Node.' },
+  {
+    type: 'health',
+    label: 'Health',
+    blurb: 'Current and recent metrics for one server.',
+    needsNode: true,
+  },
 ];
 
 const selectClass =
@@ -103,13 +111,16 @@ function SectionView({ section }: { section: ReportSection }) {
   );
 }
 
-/** The whole report, rendered from its structured sections with a readable fallback. */
+/** The whole report, rendered from the sections its payload is read into. */
 function ReportView({ report }: { report: Report }) {
-  const hasSections = report.sections && report.sections.length > 0;
+  // The API sends typed data, not sections, so the payload is read into sections
+  // here. Rendering report.sections directly is what made every report show
+  // "no content" on a backend returning kilobytes of it.
+  const sections = reportSections(report);
   return (
     <Card className="print-surface">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Text variant="h3">{report.title ?? `${report.type} report`}</Text>
+        <Text variant="h3">{reportTitle(report)}</Text>
         {report.generated_at ? (
           <Text variant="body-sm" tone="secondary">
             Generated {new Date(report.generated_at).toLocaleString()}
@@ -123,8 +134,8 @@ function ReportView({ report }: { report: Report }) {
       ) : null}
 
       <div className="mt-4 flex flex-col gap-4">
-        {hasSections ? (
-          report.sections?.map((section, index) => <SectionView key={index} section={section} />)
+        {sections.length > 0 ? (
+          sections.map((section, index) => <SectionView key={index} section={section} />)
         ) : report.text ? (
           <Text variant="body-sm" as="pre" className="whitespace-pre-wrap font-mono">
             {report.text}
@@ -141,14 +152,29 @@ function ReportView({ report }: { report: Report }) {
 
 /** Reports: pick a type and optional Node, then read the generated report or print it. */
 export function Reports() {
-  const [type, setType] = useState<ReportType>('health');
+  // Operations first, because it answers without needing anything chosen. The
+  // screen used to open on Health with no Node selected, which the API refuses
+  // outright, so the first thing anybody saw on this page was an error.
+  const [type, setType] = useState<ReportType>('operations');
   const [nodeId, setNodeId] = useState<string>('');
 
   const nodes = useAsyncData((signal) => listNodes(signal), []);
-  const params = useMemo(() => ({ type, nodeId: nodeId || undefined }), [type, nodeId]);
+  const available = nodes.state.status === 'ready' ? nodes.state.data : [];
+  const choice = REPORT_TYPES.find((entry) => entry.type === type);
+
+  // Health is about one machine. Rather than refusing, it falls back to the
+  // first server, which is the answer somebody asking for health on a single
+  // server account wanted anyway.
+  const effectiveNode = choice?.needsNode ? nodeId || (available[0]?.id ?? '') : nodeId;
+  const blocked = Boolean(choice?.needsNode) && effectiveNode === '';
+
+  const params = useMemo(
+    () => ({ type, nodeId: effectiveNode || undefined }),
+    [type, effectiveNode],
+  );
   const { state } = useAsyncData(
-    (signal) => getReport(params.type, params.nodeId, signal),
-    [params],
+    (signal) => (blocked ? Promise.resolve(null) : getReport(params.type, params.nodeId, signal)),
+    [params, blocked],
   );
 
   return (
@@ -192,14 +218,16 @@ export function Reports() {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-ink-muted">
-            <span>Node</span>
+            <span>{choice?.needsNode ? 'Server' : 'Node'}</span>
             <select
               className={selectClass}
               value={nodeId}
               onChange={(event) => setNodeId(event.target.value)}
               aria-label="Scope the report to a Node"
             >
-              <option value="">All Nodes</option>
+              {/* A report about one machine cannot be run across all of them, so
+                  the option that cannot work is not offered. */}
+              {choice?.needsNode ? null : <option value="">All Nodes</option>}
               {nodes.state.status === 'ready'
                 ? nodes.state.data.map((node) => (
                     <option key={node.id} value={node.id}>
@@ -213,13 +241,19 @@ export function Reports() {
         </div>
       </div>
 
-      {state.status === 'loading' ? <Loading label="Generating the report" /> : null}
+      {blocked ? (
+        <Text variant="body-sm" tone="secondary">
+          A health report is about one server, and none are connected yet. Connect a server and it
+          will have something to report on.
+        </Text>
+      ) : null}
+      {!blocked && state.status === 'loading' ? <Loading label="Generating the report" /> : null}
       {state.status === 'error' ? (
         <div className="print-hide">
           <ErrorNote error={state.error} />
         </div>
       ) : null}
-      {state.status === 'ready' ? (
+      {state.status === 'ready' && state.data ? (
         <>
           <div className="print-only mb-4 hidden">
             <div className="flex items-center gap-2">
