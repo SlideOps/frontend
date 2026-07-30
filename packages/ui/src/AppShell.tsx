@@ -1,6 +1,6 @@
 import { cn, useTheme } from '@slideops/design-system';
 import { Logo, Moon, Sun, type LucideIcon } from '@slideops/icons';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 export interface NavItem {
   key: string;
@@ -8,6 +8,17 @@ export interface NavItem {
   icon: LucideIcon;
   active?: boolean;
   onSelect?: () => void;
+  /**
+   * The section this entry belongs to, shown as a heading above the first entry
+   * carrying it. A flat list of a dozen equally weighted destinations makes an
+   * Operator read all of them to find one; grouping says what each part of the
+   * product is for before they have to guess.
+   *
+   * Entries are rendered in the order given, so items sharing a group must be
+   * adjacent. An entry with no group renders with no heading, which is what the
+   * first, most used entry wants.
+   */
+  group?: string;
 }
 
 export interface AppShellProps {
@@ -72,9 +83,22 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
           <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{surface}</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1" aria-label={`${surface} navigation`}>
-          {nav.map((item) => (
-            <NavButton key={item.key} item={item} dense={dense} />
-          ))}
+          {nav.map((item, index) => {
+            // A heading appears the first time a group is seen. Comparing against
+            // the previous entry keeps the grouping in the caller's ordering rather
+            // than reordering their navigation behind their back.
+            const heading = item.group && item.group !== nav[index - 1]?.group ? item.group : null;
+            return (
+              <Fragment key={item.key}>
+                {heading ? (
+                  <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                    {heading}
+                  </div>
+                ) : null}
+                <NavButton item={item} dense={dense} />
+              </Fragment>
+            );
+          })}
         </nav>
       </aside>
 
@@ -97,7 +121,10 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
 
       <nav
         aria-label={`${surface} navigation`}
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        // Scrolls rather than dividing the screen by however many destinations
+        // exist. Squeezing a dozen into a phone's width left every label truncated
+        // to a few characters, which is not a navigation bar, it is a puzzle.
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 overflow-x-auto border-t border-border bg-surface px-1 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {nav.map((item) => {
           const Icon = item.icon;
@@ -108,7 +135,7 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
               onClick={item.onSelect}
               aria-current={item.active ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium',
+                'flex w-[4.5rem] shrink-0 flex-col items-center gap-1 py-2 text-xs font-medium',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                 item.active ? 'text-brand' : 'text-ink-muted',
               )}

@@ -1,4 +1,4 @@
-import type { DeployServiceInput, ServiceEnvVar, ServicePort } from '@slideops/api-client';
+import { AUTO_HOST_PORT, type DeployServiceInput, type ServiceEnvVar, type ServicePort } from '@slideops/api-client';
 import { z } from 'zod';
 
 /*
@@ -81,7 +81,18 @@ export function buildServiceSchema() {
 /** The form value shape, inferred from the deploy schema. */
 export type ServiceFormValues = z.infer<ReturnType<typeof buildServiceSchema>>;
 
-/** Parse the ports textarea. Each line is host:container, both whole numbers. */
+/**
+ * Parse the ports textarea.
+ *
+ * A line is either the port the application listens on inside its container, on
+ * its own, or `host:container` to pin the public port yourself.
+ *
+ * The bare form is the one to reach for, and it is what the form offers by
+ * default. Choosing a public port by hand is how two applications on one server
+ * end up fighting over the same one, and it is a decision SlideOps can make
+ * correctly without asking: it knows every port it has handed out on that server
+ * and can see what the server already has listening.
+ */
 export function parsePorts(text?: string): { ports: ServicePort[]; error?: string } {
   const ports: ServicePort[] = [];
   const lines = (text ?? '')
@@ -90,9 +101,22 @@ export function parsePorts(text?: string): { ports: ServicePort[]; error?: strin
     .filter(Boolean);
   for (const line of lines) {
     const parts = line.split(':').map((part) => part.trim());
-    if (parts.length !== 2) {
-      return { ports: [], error: `Write each port as host:container, for example 8080:80. Got "${line}".` };
+    if (parts.length > 2) {
+      return {
+        ports: [],
+        error: `Write a port as 80, or as host:container to choose the public port yourself. Got "${line}".`,
+      };
     }
+
+    if (parts.length === 1) {
+      const container = Number(parts[0]);
+      if (!Number.isInteger(container) || container <= 0) {
+        return { ports: [], error: `A port must be a whole number above zero. Got "${line}".` };
+      }
+      ports.push({ host: AUTO_HOST_PORT, container });
+      continue;
+    }
+
     const host = Number(parts[0]);
     const container = Number(parts[1]);
     if (!Number.isInteger(host) || !Number.isInteger(container) || host <= 0 || container <= 0) {
@@ -113,7 +137,7 @@ export function parsePorts(text?: string): { ports: ServicePort[]; error?: strin
  *
  * Sealing is explicit rather than guessed from the name. Guessing would either
  * leak something it failed to recognise, or silently make a value the Operator
- * needs unreadable forever — and this is their infrastructure, so the choice is
+ * needs unreadable forever, and this is their infrastructure, so the choice is
  * theirs to make knowingly.
  */
 export const SECRET_PREFIX = 'secret:';
@@ -123,7 +147,7 @@ export const SECRET_PREFIX = 'secret:';
  * variable, each carrying whether it should be sealed.
  *
  * An array, not a map. The map this used to return could not express `secret`,
- * and the API has always taken the array form — which meant every deploy that
+ * and the API has always taken the array form, which meant every deploy that
  * set a variable was rejected with "the request body was not valid" while
  * deploys with no variables worked fine.
  */

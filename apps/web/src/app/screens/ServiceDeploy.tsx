@@ -89,7 +89,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
       memory_mb: 256,
       pids_limit: '',
       env: '',
-      ports: '',
+      ports: '80',
     },
   });
 
@@ -371,7 +371,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <label htmlFor="ports" className="text-sm font-medium text-ink">
-              Ports (optional)
+              Port your app listens on
             </label>
             <Guidance for="service.ports" />
           </div>
@@ -379,12 +379,16 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
             id="ports"
             rows={2}
             spellCheck={false}
-            placeholder="8080:80"
+            placeholder="80"
             className={`resize-y py-2 font-mono ${inputClass.replace('h-10', '')} ${errors.ports ? 'border-danger' : ''}`}
             {...register('ports')}
           />
           <Text variant="body-sm" tone="secondary">
-            One mapping per line, written host:container.
+            The port your application listens on inside its container, one per line.{' '}
+            <strong className="font-medium text-ink">SlideOps picks the public port</strong> and gives
+            this Service its own web address, so two applications on one server can never take each
+            other&apos;s port. To choose the public port yourself, write it as{' '}
+            <code>host:container</code>.
           </Text>
           {errors.ports ? <p className="text-sm text-danger">{errors.ports.message}</p> : null}
         </div>

@@ -46,26 +46,37 @@ export function ServiceEndpoint({ service }: { service: Service }) {
         <div className="flex flex-col gap-3">
           <Text variant="body-sm" tone="secondary">
             The base URL to call this Service from outside the server. Give it to a frontend, a
-            mobile app, or another Service. The published port was opened on the host firewall as
-            part of the deploy, so it answers as it stands, with no domain to set up first.
+            mobile app, or another Service.
           </Text>
 
-          <ul className="flex flex-col gap-2">
-            {state.urls.map((url) => (
-              <li key={url} className="flex min-w-0 flex-wrap items-center gap-2">
-                <RevealValue value={url} sensitive={false} label="address" />
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md text-sm text-ink-muted transition-colors duration-fast ease-standard hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  Open
-                  <ArrowUpRight width={15} height={15} aria-hidden />
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <RevealValue value={state.primary} sensitive={false} label="address" />
+            <a
+              href={state.primary}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md text-sm text-ink-muted transition-colors duration-fast ease-standard hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              Open
+              <ArrowUpRight width={15} height={15} aria-hidden />
+            </a>
+          </div>
+
+          {state.alternates.length > 0 ? (
+            <div>
+              <Text variant="caption" tone="secondary" className="block">
+                Also reachable directly on the server, which is useful for a quick check but not the
+                address to build against: it has no certificate, and it changes if the port does.
+              </Text>
+              <ul className="mt-2 flex flex-col gap-2">
+                {state.alternates.map((url) => (
+                  <li key={url} className="flex min-w-0 flex-wrap items-center gap-2">
+                    <RevealValue value={url} sensitive={false} label="address" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {!state.answering ? (
             <EndpointNote>
@@ -75,17 +86,20 @@ export function ServiceEndpoint({ service }: { service: Service }) {
           ) : null}
 
           <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+            {state.primary.startsWith('https://') ? (
+              <Text variant="caption" tone="secondary">
+                This address is served over HTTPS, so a browser frontend on a secure origin can call
+                it. The certificate renews itself.
+              </Text>
+            ) : (
+              <Text variant="caption" tone="secondary">
+                This address is not yet served over HTTPS, so a page on a secure origin cannot call
+                it. Run the Configure HTTPS Capability on this Node to give it a certificate.
+              </Text>
+            )}
             <Text variant="caption" tone="secondary">
-              Two things worth knowing before you wire a frontend to it:
-            </Text>
-            <Text variant="caption" tone="secondary">
-              A page served over HTTPS cannot call an <code>http://</code> address, so a browser
-              frontend on a secure origin needs a domain and a certificate in front of this. Run the
-              Configure HTTPS Capability on this Node and call that address instead.
-            </Text>
-            <Text variant="caption" tone="secondary">
-              A call from a different origin has to be allowed by your application itself. SlideOps
-              does not add CORS headers to what you deployed.
+              A call from a different origin still has to be allowed by your application itself.
+              SlideOps does not add CORS headers to what you deployed.
             </Text>
           </div>
         </div>
