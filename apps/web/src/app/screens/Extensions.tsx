@@ -59,7 +59,8 @@ const BUILT_INS: BuiltIn[] = [
   {
     name: 'Firewall',
     icon: ShieldCheck,
-    summary: 'Sets network rules to the intent an Operator approves, with verification that they hold.',
+    summary:
+      'Sets network rules to the intent an Operator approves, with verification that they hold.',
     platforms: 'All supported platforms',
   },
   {

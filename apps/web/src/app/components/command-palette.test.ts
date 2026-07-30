@@ -35,7 +35,9 @@ describe('flattenResults', () => {
   it('keeps the flat list in the same reading order as the groups', () => {
     const grouped = results({
       nodes: [{ id: 'nd_1', name: 'web-1', hostname: 'web-1' }],
-      operations: [{ id: 'op_1', capability_key: 'secure-ssh', status: 'completed', node_id: 'nd_1' }],
+      operations: [
+        { id: 'op_1', capability_key: 'secure-ssh', status: 'completed', node_id: 'nd_1' },
+      ],
     });
 
     const { items } = flattenResults(grouped);

@@ -84,7 +84,9 @@ export function CredentialRotation({
         );
       } else {
         setFormError(
-          error instanceof ApiError ? error.message : 'The credential could not be changed. Try again.',
+          error instanceof ApiError
+            ? error.message
+            : 'The credential could not be changed. Try again.',
         );
       }
     }
@@ -98,9 +100,8 @@ export function CredentialRotation({
         <Guidance for="server.credential" />
       </div>
       <Text variant="body-sm" tone="secondary" className="mb-4">
-        SlideOps signs in as{' '}
-        <span className="font-medium text-ink">{node.ssh_username}</span> with a{' '}
-        {node.auth_kind === 'private_key' ? 'private key' : 'password'}. It verifies the new
+        SlideOps signs in as <span className="font-medium text-ink">{node.ssh_username}</span> with
+        a {node.auth_kind === 'private_key' ? 'private key' : 'password'}. It verifies the new
         credential can sign in before switching, so a wrong one changes nothing and you are never
         locked out.
       </Text>

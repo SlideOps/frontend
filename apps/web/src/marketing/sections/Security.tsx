@@ -73,8 +73,8 @@ export function Security() {
               <Server width={22} height={22} aria-hidden />
             </span>
             <Text variant="body-sm">
-              You always own the infrastructure. SlideOps operates it with least privilege and leaves
-              a full, readable record of every change.
+              You always own the infrastructure. SlideOps operates it with least privilege and
+              leaves a full, readable record of every change.
             </Text>
           </div>
         </div>

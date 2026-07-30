@@ -13,7 +13,11 @@ import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 const schema = z.object({
-  name: z.string().trim().min(1, 'Give this Project a name.').max(80, 'Keep the name under 80 characters.'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Give this Project a name.')
+    .max(80, 'Keep the name under 80 characters.'),
   description: z.string().trim().max(500, 'Keep the description under 500 characters.').optional(),
 });
 
@@ -46,7 +50,13 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
 }
 
 /** The inline create form, shown when the Operator chooses to add a Project. */
-function CreateProjectForm({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
+function CreateProjectForm({
+  onCreated,
+  onCancel,
+}: {
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
   const [quotaHit, setQuotaHit] = useState(false);

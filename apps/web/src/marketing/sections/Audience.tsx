@@ -1,13 +1,5 @@
 import { Text } from '@slideops/design-system';
-import {
-  Cpu,
-  Home,
-  Layers,
-  Rocket,
-  Terminal,
-  Users,
-  type LucideIcon,
-} from '@slideops/icons';
+import { Cpu, Home, Layers, Rocket, Terminal, Users, type LucideIcon } from '@slideops/icons';
 import { useReveal } from '../useReveal';
 
 interface Audience {

@@ -176,10 +176,17 @@ export function NotificationsBell() {
                       item.read ? undefined : 'font-medium',
                     )}
                   >
-                    <Icon width={16} height={16} className={cn('mt-0.5 shrink-0', color)} aria-hidden />
+                    <Icon
+                      width={16}
+                      height={16}
+                      className={cn('mt-0.5 shrink-0', color)}
+                      aria-hidden
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-ink">{item.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-ink-muted">{item.body}</span>
+                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                        {item.body}
+                      </span>
                       <span className="mt-0.5 flex items-center gap-2">
                         <span className="text-[11px] text-ink-muted">{relativeTime(item.at)}</span>
                         {pending ? (

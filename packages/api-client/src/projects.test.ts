@@ -112,9 +112,9 @@ describe('projects requests', () => {
   });
 
   it('clears a Project domain by sending an empty string', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { project: { id: 'pr_1', name: 'shop', domain: '' } }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { project: { id: 'pr_1', name: 'shop', domain: '' } }));
 
     const project = await setProjectRouting('pr_1', '');
 

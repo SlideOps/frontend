@@ -46,7 +46,10 @@ export function StartOperation({
   initialProjectId?: string;
 }) {
   const navigate = useNavigate();
-  const parameters = useMemo<CapabilityParameter[]>(() => capability.parameters ?? [], [capability]);
+  const parameters = useMemo<CapabilityParameter[]>(
+    () => capability.parameters ?? [],
+    [capability],
+  );
   const schema = useMemo(() => buildParameterSchema(parameters), [parameters]);
 
   const [nodeId, setNodeId] = useState<string>(

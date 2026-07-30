@@ -26,7 +26,12 @@ export function VerificationView({ verification }: { verification: Verification 
         {verification.checks.map((check, index) => (
           <li key={index} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
             {check.passed ? (
-              <CheckCircle2 width={18} height={18} className="mt-0.5 shrink-0 text-success" aria-hidden />
+              <CheckCircle2
+                width={18}
+                height={18}
+                className="mt-0.5 shrink-0 text-success"
+                aria-hidden
+              />
             ) : (
               <XCircle width={18} height={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
             )}

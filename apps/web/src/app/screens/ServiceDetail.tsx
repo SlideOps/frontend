@@ -15,7 +15,16 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, Container, Play, RefreshCw, Server, Square, Trash2, XCircle } from '@slideops/icons';
+import {
+  ArrowLeft,
+  Container,
+  Play,
+  RefreshCw,
+  Server,
+  Square,
+  Trash2,
+  XCircle,
+} from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -222,8 +231,8 @@ export function ServiceDetail() {
               <div className="min-w-0">
                 <Text variant="h1">{service.name}</Text>
                 <Text variant="body-sm" tone="secondary" className="mt-1">
-                  {state.status === 'ready' ? state.data.project?.name ?? 'Unknown Project' : ''} ·{' '}
-                  {state.status === 'ready' ? state.data.node?.name ?? 'Unknown Node' : ''}
+                  {state.status === 'ready' ? (state.data.project?.name ?? 'Unknown Project') : ''}{' '}
+                  · {state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}
                 </Text>
               </div>
             </div>
@@ -231,10 +240,14 @@ export function ServiceDetail() {
           </div>
 
           {isDeploying ? (
-            <div role="status" className="mb-6 flex items-center gap-3 rounded-md border border-border bg-subtle px-4 py-3">
+            <div
+              role="status"
+              className="mb-6 flex items-center gap-3 rounded-md border border-border bg-subtle px-4 py-3"
+            >
               <RefreshCw width={16} height={16} className="animate-spin text-brand" aria-hidden />
               <Text variant="body-sm" tone="secondary">
-                Deploying and verifying the workload. This updates on its own as the Service comes up.
+                Deploying and verifying the workload. This updates on its own as the Service comes
+                up.
               </Text>
             </div>
           ) : null}
@@ -286,7 +299,7 @@ export function ServiceDetail() {
                       className="inline-flex items-center gap-1.5 text-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:text-ink-muted"
                     >
                       <Server width={14} height={14} aria-hidden />
-                      {state.status === 'ready' ? state.data.node?.name ?? 'Unknown Node' : ''}
+                      {state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}
                     </button>
                   </SummaryRow>
                   <SummaryRow label="Runtime">
@@ -335,7 +348,9 @@ export function ServiceDetail() {
                   {isDeploying ? (
                     <Button
                       variant="danger"
-                      onClick={() => runAction(cancelServiceDeploy, 'The deploy could not be cancelled.')}
+                      onClick={() =>
+                        runAction(cancelServiceDeploy, 'The deploy could not be cancelled.')
+                      }
                       disabled={working}
                     >
                       <XCircle width={15} height={15} aria-hidden />
@@ -343,7 +358,10 @@ export function ServiceDetail() {
                     </Button>
                   ) : null}
                   {isStopped ? (
-                    <Button onClick={() => runAction(startService, 'The Service could not start.')} disabled={working}>
+                    <Button
+                      onClick={() => runAction(startService, 'The Service could not start.')}
+                      disabled={working}
+                    >
                       <Play width={15} height={15} aria-hidden />
                       Start
                     </Button>
@@ -364,7 +382,9 @@ export function ServiceDetail() {
                   {!isDeploying && !isAdopted ? (
                     <Button
                       variant="secondary"
-                      onClick={() => runAction(redeployService, 'The redeploy could not be started.')}
+                      onClick={() =>
+                        runAction(redeployService, 'The redeploy could not be started.')
+                      }
                       disabled={working}
                     >
                       <RefreshCw width={15} height={15} aria-hidden />
@@ -405,7 +425,12 @@ export function ServiceDetail() {
                         </div>
                       </div>
                     ) : (
-                      <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(true)} disabled={working}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmRemove(true)}
+                        disabled={working}
+                      >
                         <Trash2 width={15} height={15} aria-hidden />
                         {service.adopted ? 'Stop managing this Service' : 'Remove this Service'}
                       </Button>

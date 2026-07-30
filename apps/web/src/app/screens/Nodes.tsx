@@ -26,7 +26,9 @@ function NodeRow({ node, onOpen }: { node: Node; onOpen: () => void }) {
         </Text>
         <Text variant="body-sm" tone="secondary" className="truncate">
           {node.ssh_username}@{node.address}:{node.port}
-          {node.distro ? ` · ${node.distro}${node.distro_version ? ` ${node.distro_version}` : ''}` : ''}
+          {node.distro
+            ? ` · ${node.distro}${node.distro_version ? ` ${node.distro_version}` : ''}`
+            : ''}
         </Text>
       </span>
       <span className="hidden shrink-0 text-xs text-ink-muted sm:block">{discovered}</span>
@@ -62,7 +64,9 @@ export function Nodes() {
             icon={Server}
             title="No servers connected yet"
             description="A server is a Linux machine you reach over SSH. Connect one and SlideOps will discover its state without changing anything."
-            action={<Button onClick={() => navigate('/app/nodes/new')}>Connect your first server</Button>}
+            action={
+              <Button onClick={() => navigate('/app/nodes/new')}>Connect your first server</Button>
+            }
           />
         ) : (
           <div className="flex flex-col gap-2">

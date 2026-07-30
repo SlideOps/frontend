@@ -57,7 +57,11 @@ describe('serviceEndpointState', () => {
 
   it('ignores a blank address rather than offering an unusable one', () => {
     expect(
-      serviceEndpointState({ public_urls: ['', '   '], ports: [{ host: 8080, container: 80 }], status: 'running' }),
+      serviceEndpointState({
+        public_urls: ['', '   '],
+        ports: [{ host: 8080, container: 80 }],
+        status: 'running',
+      }),
     ).toEqual({ kind: 'no-node-address' });
   });
 });

@@ -82,7 +82,8 @@ export function CapabilityMatrix() {
           <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">
-                Capabilities by platform. A check means the Capability is supported on that platform.
+                Capabilities by platform. A check means the Capability is supported on that
+                platform.
               </caption>
               <thead>
                 <tr className="bg-subtle">
@@ -108,7 +109,10 @@ export function CapabilityMatrix() {
               </thead>
               <tbody>
                 {state.data.capabilities.map((row) => (
-                  <tr key={row.key} className="transition-colors duration-fast ease-standard hover:bg-subtle">
+                  <tr
+                    key={row.key}
+                    className="transition-colors duration-fast ease-standard hover:bg-subtle"
+                  >
                     <th
                       scope="row"
                       className="sticky left-0 z-10 border-b border-border bg-surface px-4 py-2 text-left font-medium text-ink"

@@ -100,9 +100,9 @@ export function Pricing() {
             Priced for the command center, not your hardware
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
-            Every Capability runs on your servers, never on ours, so we never cap the CPU, memory, or
-            disk you already own. You use all of it. Your plan sets only what SlideOps provides: the
-            servers you connect, the Projects you run, your team seats, and your support.
+            Every Capability runs on your servers, never on ours, so we never cap the CPU, memory,
+            or disk you already own. You use all of it. Your plan sets only what SlideOps provides:
+            the servers you connect, the Projects you run, your team seats, and your support.
           </Text>
         </div>
 
@@ -180,10 +180,10 @@ export function Pricing() {
             <Server width={16} height={16} aria-hidden />
           </span>
           <Text variant="body-sm" tone="secondary">
-            Your server's resources are yours. If you want to keep Projects from crowding each other,
-            you can cap a Service's CPU and memory yourself, that is your choice on your own server,
-            never a limit we impose. Every plan includes the full lifecycle and Core security on
-            every server.
+            Your server's resources are yours. If you want to keep Projects from crowding each
+            other, you can cap a Service's CPU and memory yourself, that is your choice on your own
+            server, never a limit we impose. Every plan includes the full lifecycle and Core
+            security on every server.
           </Text>
         </div>
       </div>

@@ -84,7 +84,9 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
       navigate(`/app/operations/${operation.id}`);
     } catch (error) {
       setActionError(
-        error instanceof ApiError ? error.message : 'That account could not be prepared. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That account could not be prepared. Try again.',
       );
     }
   });
@@ -199,14 +201,24 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
             <legend className="mb-1 text-sm font-medium text-ink">Access level</legend>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input type="radio" value="limited" className="mt-0.5 accent-brand" {...register('access')} />
+                <input
+                  type="radio"
+                  value="limited"
+                  className="mt-0.5 accent-brand"
+                  {...register('access')}
+                />
                 <span>
                   <span className="font-medium text-ink">Limited</span>
                   <span className="mt-0.5 block text-ink-muted">A plain account with no sudo.</span>
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input type="radio" value="admin" className="mt-0.5 accent-brand" {...register('access')} />
+                <input
+                  type="radio"
+                  value="admin"
+                  className="mt-0.5 accent-brand"
+                  {...register('access')}
+                />
                 <span>
                   <span className="font-medium text-ink">Administrator</span>
                   <span className="mt-0.5 block text-ink-muted">Full sudo, can act as root.</span>
@@ -239,9 +251,9 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
         description={
           <>
             This prepares an Operation to remove{' '}
-            <span className="font-medium text-ink">{pendingRemove}</span> and its home directory from
-            the server. The connection account, root, and system accounts are protected and cannot be
-            removed. You review and approve the Operation before it runs.
+            <span className="font-medium text-ink">{pendingRemove}</span> and its home directory
+            from the server. The connection account, root, and system accounts are protected and
+            cannot be removed. You review and approve the Operation before it runs.
           </>
         }
         confirmLabel="Prepare removal"

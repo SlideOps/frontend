@@ -193,7 +193,13 @@ export function RevealValue({
         </button>
 
         <span aria-live="polite" className="sr-only">
-          {copied ? `Copied ${name}` : loading ? `Revealing ${name}` : revealed ? `${name} revealed` : ''}
+          {copied
+            ? `Copied ${name}`
+            : loading
+              ? `Revealing ${name}`
+              : revealed
+                ? `${name} revealed`
+                : ''}
         </span>
       </span>
 

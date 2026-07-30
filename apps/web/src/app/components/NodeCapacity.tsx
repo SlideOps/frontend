@@ -51,15 +51,7 @@ function primaryDisk(facts: Facts): NonNullable<Facts['disks']>[number] | undefi
   );
 }
 
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Cpu;
-  label: string;
-  value: string;
-}) {
+function Stat({ icon: Icon, label, value }: { icon: typeof Cpu; label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md border border-border bg-surface p-3">
       <div className="flex items-center gap-2 text-ink-muted">
@@ -165,10 +157,15 @@ export function NodeCapacity({ nodeId }: { nodeId: string }) {
           })()
         ) : (
           <div className="flex items-start gap-3 rounded-md border border-dashed border-border bg-subtle/40 px-4 py-3">
-            <HardDrive width={18} height={18} className="mt-0.5 shrink-0 text-ink-muted" aria-hidden />
+            <HardDrive
+              width={18}
+              height={18}
+              className="mt-0.5 shrink-0 text-ink-muted"
+              aria-hidden
+            />
             <Text variant="body-sm" tone="secondary">
-              Run Discovery to see this server's capacity. It reads the cores, memory, and disks over
-              SSH, and nothing here changes until you do.
+              Run Discovery to see this server's capacity. It reads the cores, memory, and disks
+              over SSH, and nothing here changes until you do.
             </Text>
           </div>
         )

@@ -185,11 +185,9 @@ const selectClass =
 export function Credentials() {
   const { state } = useAsyncData(
     (signal) =>
-      Promise.all([
-        listOperations({}, signal),
-        listNodes(signal),
-        listProjects(signal),
-      ]).then(([operations, nodes, projects]) => ({ operations, nodes, projects })),
+      Promise.all([listOperations({}, signal), listNodes(signal), listProjects(signal)]).then(
+        ([operations, nodes, projects]) => ({ operations, nodes, projects }),
+      ),
     [],
   );
 
@@ -207,31 +205,33 @@ export function Credentials() {
     const nodeById = new Map(data.nodes.map((node) => [node.id, node] as const));
     const projectById = new Map(data.projects.map((project) => [project.id, project] as const));
 
-    return data.operations
-      // Only a completed Operation actually created its credential; a failed
-      // attempt left a sealed value but no usable result, so it must not appear
-      // (which is what showed a failed run as a duplicate of the real one).
-      .filter((operation) => operation.status === 'completed')
-      .filter(hasStoredSecret)
-      .map((operation) => {
-        const node = nodeById.get(operation.node_id) ?? null;
-        const project = node?.project_id ? projectById.get(node.project_id) ?? null : null;
-        return {
-          operation,
-          title: capabilityName(operation.capability_key),
-          nodeName: node?.name ?? null,
-          host: node?.address ?? null,
-          projectName: project?.name ?? null,
-          completedAt: operation.completed_at
-            ? new Date(operation.completed_at).toLocaleString()
-            : null,
-        };
-      })
-      .sort((a, b) => {
-        const at = a.operation.completed_at ?? a.operation.created_at ?? '';
-        const bt = b.operation.completed_at ?? b.operation.created_at ?? '';
-        return bt.localeCompare(at);
-      });
+    return (
+      data.operations
+        // Only a completed Operation actually created its credential; a failed
+        // attempt left a sealed value but no usable result, so it must not appear
+        // (which is what showed a failed run as a duplicate of the real one).
+        .filter((operation) => operation.status === 'completed')
+        .filter(hasStoredSecret)
+        .map((operation) => {
+          const node = nodeById.get(operation.node_id) ?? null;
+          const project = node?.project_id ? (projectById.get(node.project_id) ?? null) : null;
+          return {
+            operation,
+            title: capabilityName(operation.capability_key),
+            nodeName: node?.name ?? null,
+            host: node?.address ?? null,
+            projectName: project?.name ?? null,
+            completedAt: operation.completed_at
+              ? new Date(operation.completed_at).toLocaleString()
+              : null,
+          };
+        })
+        .sort((a, b) => {
+          const at = a.operation.completed_at ?? a.operation.created_at ?? '';
+          const bt = b.operation.completed_at ?? b.operation.created_at ?? '';
+          return bt.localeCompare(at);
+        })
+    );
   }, [data]);
 
   const visible = useMemo(() => {

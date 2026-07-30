@@ -92,9 +92,10 @@ function CapabilityAlreadyPresent({
         </div>
       </div>
       <Text variant="body-sm" tone="secondary">
-        {capabilityName} is already in place on this server, so there is nothing to do here. SlideOps
-        did not carry this out, so there is no run to look back at and no credential it created. You
-        can still run it from the panel on the right if you want SlideOps to apply its own settings.
+        {capabilityName} is already in place on this server, so there is nothing to do here.
+        SlideOps did not carry this out, so there is no run to look back at and no credential it
+        created. You can still run it from the panel on the right if you want SlideOps to apply its
+        own settings.
       </Text>
     </Card>
   );
@@ -170,8 +171,8 @@ function CapabilityHere({
         </Button>
       </div>
       <Text variant="body-sm" tone="secondary">
-        {capabilityName} is already done on this server. Its details and any credentials it created are
-        below; you can run it again from the panel on the right if you need to.
+        {capabilityName} is already done on this server. Its details and any credentials it created
+        are below; you can run it again from the panel on the right if you need to.
       </Text>
       {operation ? <CredentialsCard operation={operation} host={host} /> : null}
     </Card>
@@ -282,8 +283,12 @@ export function CapabilityDetail() {
         All Capabilities
       </button>
 
-      {capabilityResult.state.status === 'loading' ? <Loading label="Loading this Capability" /> : null}
-      {capabilityResult.state.status === 'error' ? <ErrorNote error={capabilityResult.state.error} /> : null}
+      {capabilityResult.state.status === 'loading' ? (
+        <Loading label="Loading this Capability" />
+      ) : null}
+      {capabilityResult.state.status === 'error' ? (
+        <ErrorNote error={capabilityResult.state.error} />
+      ) : null}
       {capabilityResult.state.status === 'ready' ? (
         <>
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -352,7 +357,10 @@ export function CapabilityDetail() {
                   </Text>
                   <div className="flex flex-col gap-3">
                     {capabilityResult.state.data.requirements.map((requirement) => (
-                      <div key={requirement.kind} className="rounded-md border border-border bg-subtle p-4">
+                      <div
+                        key={requirement.kind}
+                        className="rounded-md border border-border bg-subtle p-4"
+                      >
                         <Text variant="body-sm" className="font-medium text-ink">
                           {requirement.title}
                         </Text>
@@ -420,7 +428,12 @@ export function CapabilityDetail() {
                 {capabilityResult.state.data.verification_strategy ? (
                   <Section title="How verification proves it" guidanceKey="capability.verification">
                     <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
-                      <ShieldCheck width={18} height={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+                      <ShieldCheck
+                        width={18}
+                        height={18}
+                        className="mt-0.5 shrink-0 text-brand"
+                        aria-hidden
+                      />
                       <Text variant="body-sm" tone="secondary">
                         {capabilityResult.state.data.verification_strategy}
                       </Text>

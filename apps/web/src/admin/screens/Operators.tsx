@@ -93,7 +93,9 @@ export function Operators() {
       reload();
     } catch (error) {
       setActionError(
-        error instanceof ApiError ? error.message : 'That role change did not go through. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That role change did not go through. Try again.',
       );
       setPending(null);
     } finally {
@@ -204,9 +206,10 @@ export function Operators() {
       />
 
       <Text variant="caption" tone="secondary" className="mt-6 block max-w-3xl">
-        An address named in this deployment&apos;s <code>ADMIN_EMAILS</code> is granted admin again on
-        its next sign in. Revoking such an account here takes effect immediately but will not stick;
-        remove the address from <code>ADMIN_EMAILS</code> and restart the API to revoke it for good.
+        An address named in this deployment&apos;s <code>ADMIN_EMAILS</code> is granted admin again
+        on its next sign in. Revoking such an account here takes effect immediately but will not
+        stick; remove the address from <code>ADMIN_EMAILS</code> and restart the API to revoke it
+        for good.
       </Text>
     </AdminShell>
   );

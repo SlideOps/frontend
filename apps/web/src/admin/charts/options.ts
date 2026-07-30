@@ -1,8 +1,5 @@
 import type { ChartPalette } from '@slideops/design-system';
-import type {
-  CapabilityUsage,
-  OperationsOverTimePoint,
-} from '@slideops/api-client';
+import type { CapabilityUsage, OperationsOverTimePoint } from '@slideops/api-client';
 import type { EChartsOption } from 'echarts';
 
 /*

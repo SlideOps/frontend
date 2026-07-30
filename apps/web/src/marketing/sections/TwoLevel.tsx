@@ -15,7 +15,11 @@ import { useReveal } from '../useReveal';
 const serverSteps = [
   { icon: Server, label: 'Connect over SSH', note: 'Host key trusted on first use.' },
   { icon: Search, label: 'Run the quick check', note: 'Read-only Discovery and Assessment.' },
-  { icon: ShieldCheck, label: 'Secure with No Root', note: 'Non-root sudo, root sign-in disabled.' },
+  {
+    icon: ShieldCheck,
+    label: 'Secure with No Root',
+    note: 'Non-root sudo, root sign-in disabled.',
+  },
 ];
 
 const projectStack = [

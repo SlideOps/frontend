@@ -66,9 +66,7 @@ export function Docs() {
                 aria-current={selected ? 'true' : undefined}
                 onClick={() => setActiveSlug(doc.slug)}
                 className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                  selected
-                    ? 'border-border bg-subtle'
-                    : 'border-border bg-surface hover:bg-subtle'
+                  selected ? 'border-border bg-subtle' : 'border-border bg-surface hover:bg-subtle'
                 }`}
               >
                 <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-app text-brand">

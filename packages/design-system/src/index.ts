@@ -16,9 +16,4 @@ export {
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './primitives/Button';
 export { Card, type CardProps } from './primitives/Card';
 export { Field, type FieldProps } from './primitives/Field';
-export {
-  Text,
-  type TextProps,
-  type TextVariant,
-  type TextTone,
-} from './primitives/Text';
+export { Text, type TextProps, type TextVariant, type TextTone } from './primitives/Text';

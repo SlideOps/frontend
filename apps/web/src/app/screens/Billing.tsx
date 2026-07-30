@@ -458,7 +458,12 @@ export function Billing() {
           {admin ? (
             <Card>
               <div className="flex items-start gap-3">
-                <Sparkles width={18} height={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+                <Sparkles
+                  width={18}
+                  height={18}
+                  className="mt-0.5 shrink-0 text-brand"
+                  aria-hidden
+                />
                 <div>
                   <Text variant="h4">Administrators are unlimited</Text>
                   <Text variant="body-sm" tone="secondary" className="mt-1">
@@ -505,8 +510,8 @@ export function Billing() {
             <Card>
               <Text variant="h4">Complete your upgrade</Text>
               <Text variant="body-sm" tone="secondary" className="mt-1">
-                You are subscribing to the{' '}
-                {tierLabel[selectedTier]} plan. Choose how you would like to pay.
+                You are subscribing to the {tierLabel[selectedTier]} plan. Choose how you would like
+                to pay.
               </Text>
 
               <fieldset className="mt-5">
@@ -535,14 +540,22 @@ export function Billing() {
                         <Icon
                           width={18}
                           height={18}
-                          className={cn('mt-0.5 shrink-0', active ? 'text-brand' : 'text-ink-muted')}
+                          className={cn(
+                            'mt-0.5 shrink-0',
+                            active ? 'text-brand' : 'text-ink-muted',
+                          )}
                           aria-hidden
                         />
                         <span>
                           <Text as="span" variant="body-sm" className="block font-medium">
                             {entry.name}
                           </Text>
-                          <Text as="span" variant="body-sm" tone="secondary" className="mt-0.5 block">
+                          <Text
+                            as="span"
+                            variant="body-sm"
+                            tone="secondary"
+                            className="mt-0.5 block"
+                          >
                             {entry.helper}
                           </Text>
                         </span>

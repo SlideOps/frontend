@@ -143,7 +143,9 @@ describe('admin promo-code requests', () => {
 
   it('creates a promo code and unwraps the created envelope', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(201, { promo_code: { id: 'pc_2', code: 'LAUNCH', enabled: true, effects: [] } }),
+      jsonResponse(201, {
+        promo_code: { id: 'pc_2', code: 'LAUNCH', enabled: true, effects: [] },
+      }),
     );
 
     const created = await createPromoCode({
@@ -167,7 +169,9 @@ describe('admin promo-code requests', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST');
 
     await setPromoCodeEnabled('pc_3', false);
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('/api/v1/admin/promo-codes/pc_3/disable');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+      '/api/v1/admin/promo-codes/pc_3/disable',
+    );
   });
 
   it('deletes a promo code as a DELETE', async () => {

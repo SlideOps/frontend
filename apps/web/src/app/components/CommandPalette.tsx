@@ -226,7 +226,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                         role="option"
                         aria-selected={active}
                         onMouseMove={() =>
-                          active ? undefined : dispatch({ type: 'move', delta: index - state.activeIndex })
+                          active
+                            ? undefined
+                            : dispatch({ type: 'move', delta: index - state.activeIndex })
                         }
                         onClick={() => openItem(item)}
                         className={`mx-2 flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2 ${

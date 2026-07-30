@@ -111,8 +111,8 @@ export function ServiceEndpoint({ service }: { service: Service }) {
       ) : (
         <EndpointNote>
           Nothing is published, so this Service is reachable only from the server itself, and from
-          anything sharing its network. Publish a port to give it an address: edit the Service, add a
-          mapping written host:container, then redeploy to apply it.
+          anything sharing its network. Publish a port to give it an address: edit the Service, add
+          a mapping written host:container, then redeploy to apply it.
         </EndpointNote>
       )}
     </Card>

@@ -27,12 +27,7 @@ function matches(plugin: Plugin, query: string): boolean {
   if (!query) {
     return true;
   }
-  const haystack = [
-    plugin.name,
-    plugin.category,
-    plugin.description,
-    ...(plugin.provides ?? []),
-  ]
+  const haystack = [plugin.name, plugin.category, plugin.description, ...(plugin.provides ?? [])]
     .join(' ')
     .toLowerCase();
   return haystack.includes(query.toLowerCase());
@@ -131,8 +126,8 @@ export function Marketplace() {
               <Guidance for="marketplace.perProject" />
             </div>
             <Text variant="body-sm" tone="secondary" className="mt-1 block">
-              The Core security bundle is on every server. Every other Plugin installs into a Project,
-              so each Project carries only the stack it needs. Open a Project to install.
+              The Core security bundle is on every server. Every other Plugin installs into a
+              Project, so each Project carries only the stack it needs. Open a Project to install.
             </Text>
           </div>
         </div>
@@ -173,26 +168,26 @@ export function Marketplace() {
               // remounts and re-applies the open state.
               const searching = query.trim().length > 0;
               return (
-              <Collapsible
-                key={`${category}-${searching}`}
-                title={category}
-                summary={
-                  <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">
-                    {plugins.length}
-                  </span>
-                }
-                defaultOpen={index === 0 || searching}
-              >
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {plugins.map((plugin) => (
-                    <PluginCard
-                      key={plugin.id}
-                      plugin={plugin}
-                      onOpen={() => navigate(`/app/marketplace/${plugin.id}`)}
-                    />
-                  ))}
-                </div>
-              </Collapsible>
+                <Collapsible
+                  key={`${category}-${searching}`}
+                  title={category}
+                  summary={
+                    <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">
+                      {plugins.length}
+                    </span>
+                  }
+                  defaultOpen={index === 0 || searching}
+                >
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {plugins.map((plugin) => (
+                      <PluginCard
+                        key={plugin.id}
+                        plugin={plugin}
+                        onOpen={() => navigate(`/app/marketplace/${plugin.id}`)}
+                      />
+                    ))}
+                  </div>
+                </Collapsible>
               );
             })}
           </div>

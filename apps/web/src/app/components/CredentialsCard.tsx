@@ -235,7 +235,11 @@ function EndpointConnection({
         <Text variant="body-sm" tone="secondary">
           Sign in over SSH with this account, then enter the password revealed above.
         </Text>
-        <RevealValue value={buildSshSignIn(endpoint, host)} label="sign in command" sensitive={false} />
+        <RevealValue
+          value={buildSshSignIn(endpoint, host)}
+          label="sign in command"
+          sensitive={false}
+        />
       </div>
     );
   }
@@ -355,7 +359,11 @@ export function CredentialsCard({ operation, host }: { operation: Operation; hos
         ))}
       </dl>
       {showConnection && endpoint ? (
-        <EndpointConnection operation={operation} endpoint={endpoint} secretKey={connectionSecretKey} />
+        <EndpointConnection
+          operation={operation}
+          endpoint={endpoint}
+          secretKey={connectionSecretKey}
+        />
       ) : null}
     </Card>
   );

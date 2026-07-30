@@ -142,7 +142,9 @@ export function ServiceImport() {
       setWorkloads(await listNodeWorkloads(id));
     } catch (caught) {
       setWorkloads(null);
-      setError(message(caught, 'This server could not be read. Check it is reachable and try again.'));
+      setError(
+        message(caught, 'This server could not be read. Check it is reachable and try again.'),
+      );
     } finally {
       setScanning(false);
     }
@@ -197,7 +199,11 @@ export function ServiceImport() {
         title="Import what is already running"
         description="Apps you were already running on a server, before SlideOps or from another account. Import one and SlideOps manages it from now on. Nothing is restarted or rebuilt: it keeps running exactly as it is."
         actions={
-          <Button variant="secondary" onClick={() => void scan(chosenNode)} disabled={!chosenNode || scanning}>
+          <Button
+            variant="secondary"
+            onClick={() => void scan(chosenNode)}
+            disabled={!chosenNode || scanning}
+          >
             <RefreshCw width={16} height={16} aria-hidden />
             {scanning ? 'Reading the server…' : 'Read again'}
           </Button>
@@ -274,14 +280,20 @@ export function ServiceImport() {
               </p>
             ) : null}
 
-            {scanning && !workloads ? <Loading label="Reading what is running on this server" /> : null}
+            {scanning && !workloads ? (
+              <Loading label="Reading what is running on this server" />
+            ) : null}
 
             {workloads && importable.length === 0 && managed.length === 0 ? (
               <EmptyState
                 icon={ScanSearch}
                 title="Nothing to import from this server"
                 description="SlideOps found no application containers or service units of your own here. Databases and web servers are not listed: those show up as Capabilities already in place on the server's page."
-                action={<Button onClick={() => navigate('/app/services/new')}>Deploy a Service instead</Button>}
+                action={
+                  <Button onClick={() => navigate('/app/services/new')}>
+                    Deploy a Service instead
+                  </Button>
+                }
               />
             ) : null}
 
@@ -323,7 +335,9 @@ export function ServiceImport() {
                       busy={false}
                       onAdopt={() => undefined}
                       onOpen={() =>
-                        workload.service_id ? navigate(`/app/services/${workload.service_id}`) : undefined
+                        workload.service_id
+                          ? navigate(`/app/services/${workload.service_id}`)
+                          : undefined
                       }
                     />
                   ))}

@@ -55,7 +55,9 @@ export function ProjectDetail() {
         <>
           <PageHeader
             title={state.data.name}
-            description={state.data.description || 'A Project groups a stack on one or more of your servers.'}
+            description={
+              state.data.description || 'A Project groups a stack on one or more of your servers.'
+            }
             guidanceKey="project.overview"
             actions={
               <Button variant="danger" onClick={() => setConfirmDelete(true)}>

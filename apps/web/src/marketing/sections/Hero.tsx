@@ -146,8 +146,14 @@ function FoxBackdrop() {
       className="so-fox pointer-events-none absolute left-1/2 top-1/2 z-0 w-[86%] max-w-[1040px] -translate-x-1/2 -translate-y-1/2"
     >
       <svg viewBox="9 9 82 82" className="so-fade-in h-auto w-full">
-        <polygon points="50,31 41,31 16,15 28,45 21,51 35,73 50,86" style={{ fill: 'var(--so-marsala)' }} />
-        <polygon points="50,31 59,31 84,15 72,45 79,51 65,73 50,86" style={{ fill: 'var(--so-cognac)' }} />
+        <polygon
+          points="50,31 41,31 16,15 28,45 21,51 35,73 50,86"
+          style={{ fill: 'var(--so-marsala)' }}
+        />
+        <polygon
+          points="50,31 59,31 84,15 72,45 79,51 65,73 50,86"
+          style={{ fill: 'var(--so-cognac)' }}
+        />
         <polygon points="37,53 50,59 63,53 50,84" style={{ fill: 'var(--so-peach)' }} />
         <g className="so-fox-eye">
           <polygon points="28,45 42,48 34,55" style={{ fill: 'var(--so-neutral-50)' }} />

@@ -1,11 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  ApiError,
-  mfaDisable,
-  mfaEnable,
-  mfaSetup,
-  type MfaSetup,
-} from '@slideops/api-client';
+import { ApiError, mfaDisable, mfaEnable, mfaSetup, type MfaSetup } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
 import { KeyRound, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';

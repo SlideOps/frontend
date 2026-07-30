@@ -1,4 +1,9 @@
-import { ApiError, redeployService, updateServiceConfiguration, type Service } from '@slideops/api-client';
+import {
+  ApiError,
+  redeployService,
+  updateServiceConfiguration,
+  type Service,
+} from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
 import { AlertTriangle, RefreshCw, Settings } from '@slideops/icons';
 import { useState } from 'react';
@@ -133,7 +138,9 @@ export function ServiceConfiguration({
       onChanged();
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.message : 'The redeploy could not be started. Try again.',
+        caught instanceof ApiError
+          ? caught.message
+          : 'The redeploy could not be started. Try again.',
       );
     } finally {
       setRedeploying(false);
@@ -160,7 +167,9 @@ export function ServiceConfiguration({
           id="svc-command"
           className={`${inputClass} font-mono`}
           placeholder={
-            service.runtime === 'systemd' ? '/usr/local/bin/app --serve' : 'Leave empty for the image default'
+            service.runtime === 'systemd'
+              ? '/usr/local/bin/app --serve'
+              : 'Leave empty for the image default'
           }
           value={command}
           onChange={(event) => setCommand(event.target.value)}
@@ -202,10 +211,10 @@ export function ServiceConfiguration({
               onChange={(event) => setEnvText(event.target.value)}
             />
             <Text variant="caption" tone="secondary">
-              One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value —
-              it is encrypted and never shown again. This list <strong>replaces</strong> what is
-              there, so delete a line to remove that variable. A sealed value cannot be read back, so
-              its line shows empty; retype it to keep it, or it will be dropped.
+              One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value
+              — it is encrypted and never shown again. This list <strong>replaces</strong> what is
+              there, so delete a line to remove that variable. A sealed value cannot be read back,
+              so its line shows empty; retype it to keep it, or it will be dropped.
             </Text>
           </>
         ) : (

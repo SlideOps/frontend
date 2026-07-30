@@ -98,7 +98,10 @@ function toPlugin(raw: CatalogEntry): Plugin {
  * Project's installed and enabled flags; with no Project only the Core bundle
  * reads as installed, which is what the browse-only global screen relies on.
  */
-export function listMarketplacePlugins(projectId?: string, signal?: AbortSignal): Promise<Plugin[]> {
+export function listMarketplacePlugins(
+  projectId?: string,
+  signal?: AbortSignal,
+): Promise<Plugin[]> {
   return apiRequest<unknown>('/marketplace/plugins', { query: { project_id: projectId }, signal })
     .then((r) => unwrap<CatalogEntry[]>(r, 'plugins'))
     .then((list) => list.map(toPlugin));
@@ -136,9 +139,10 @@ export function installPlugin(
   projectId: string,
   input: InstallPluginInput,
 ): Promise<InstalledPlugin> {
-  return apiRequest<unknown>(`/projects/${projectId}/plugins`, { method: 'POST', body: input }).then(
-    (r) => unwrap<InstalledPlugin>(r, 'plugin'),
-  );
+  return apiRequest<unknown>(`/projects/${projectId}/plugins`, {
+    method: 'POST',
+    body: input,
+  }).then((r) => unwrap<InstalledPlugin>(r, 'plugin'));
 }
 
 /**

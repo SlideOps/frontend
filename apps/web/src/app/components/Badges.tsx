@@ -7,8 +7,7 @@ import { Boxes, CheckCircle2, ScanSearch, ShieldCheck } from '@slideops/icons';
  * badges read correctly in both themes and never hard-code a value.
  */
 
-const badgeBase =
-  'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium';
+const badgeBase = 'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium';
 
 type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 

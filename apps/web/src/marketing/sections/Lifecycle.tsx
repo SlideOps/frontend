@@ -72,7 +72,12 @@ export function Lifecycle() {
               <Text as="span" variant="body-sm" className="mt-3 block font-semibold">
                 {step.name}
               </Text>
-              <Text as="span" variant="caption" tone="secondary" className="mt-1 block normal-case tracking-normal">
+              <Text
+                as="span"
+                variant="caption"
+                tone="secondary"
+                className="mt-1 block normal-case tracking-normal"
+              >
                 {step.note}
               </Text>
             </div>

@@ -50,7 +50,10 @@ export function notificationFromEvent(event: OperationEvent): AppNotification | 
 
   // A plan reaching approval is the one status tick that demands the Operator.
   // It waits on screen until acted on and links straight to the Operation.
-  if (event.type === 'operation.status' && readString(event.data, 'status') === 'awaiting_approval') {
+  if (
+    event.type === 'operation.status' &&
+    readString(event.data, 'status') === 'awaiting_approval'
+  ) {
     return {
       ...base,
       kind: 'action_required',

@@ -35,9 +35,9 @@ describe('buildServiceSchema', () => {
 
   it('accepts any CPU and memory the Operator chooses on their own server', () => {
     // Resources are the Operator's, not a tier cap, so a large limit is valid.
-    expect(buildServiceSchema().safeParse(values({ cpu_limit: 32, memory_mb: 131072 })).success).toBe(
-      true,
-    );
+    expect(
+      buildServiceSchema().safeParse(values({ cpu_limit: 32, memory_mb: 131072 })).success,
+    ).toBe(true);
   });
 
   it('still enforces a sane minimum on the limits', () => {

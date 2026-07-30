@@ -29,8 +29,8 @@ make dev
 
 `make dev` runs the app through Turborepo on a single port:
 
-| App | Port | What it is |
-|-----|------|------------|
+| App | Port | What it is                                                                                             |
+| --- | ---- | ------------------------------------------------------------------------------------------------------ |
 | web | 4321 | The whole frontend: marketing at `/`, the Operator area at `/app`, the Admin control plane at `/admin` |
 
 Run it directly instead:

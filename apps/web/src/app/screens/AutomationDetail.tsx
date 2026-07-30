@@ -44,14 +44,17 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 export function AutomationDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { state, reload } = useAsyncData<DetailData>(async (signal) => {
-    const automation = await getAutomation(id, signal);
-    const [node, capability] = await Promise.all([
-      getNode(automation.node_id, signal).catch(() => null),
-      getCapability(automation.capability_key, signal).catch(() => null),
-    ]);
-    return { automation, node, capability };
-  }, [id]);
+  const { state, reload } = useAsyncData<DetailData>(
+    async (signal) => {
+      const automation = await getAutomation(id, signal);
+      const [node, capability] = await Promise.all([
+        getNode(automation.node_id, signal).catch(() => null),
+        getCapability(automation.capability_key, signal).catch(() => null),
+      ]);
+      return { automation, node, capability };
+    },
+    [id],
+  );
 
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [enabled, setEnabled] = useState(true);
@@ -109,7 +112,9 @@ export function AutomationDetail() {
       navigate('/app/automations');
     } catch (cause) {
       setError(
-        cause instanceof ApiError ? cause.message : 'This Automation could not be removed. Try again.',
+        cause instanceof ApiError
+          ? cause.message
+          : 'This Automation could not be removed. Try again.',
       );
       setDeleting(false);
     }

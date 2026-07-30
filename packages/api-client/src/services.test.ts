@@ -146,7 +146,9 @@ describe('services requests', () => {
   });
 
   it('reads logs from a JSON envelope', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { logs: 'line one\nline two' }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { logs: 'line one\nline two' }),
+    );
     const logs = await getServiceLogs('sv_1', 50);
     expect(logs).toBe('line one\nline two');
   });

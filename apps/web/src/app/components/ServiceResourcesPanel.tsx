@@ -116,7 +116,8 @@ export function ServiceResourcesPanel({ service, onUpdated }: ServiceResourcesPa
     } catch (error) {
       if (error instanceof ApiError && error.code === 'invalid_resources') {
         setInvalidMessage(
-          error.message || 'Each limit must be a value greater than zero. Adjust them and apply again.',
+          error.message ||
+            'Each limit must be a value greater than zero. Adjust them and apply again.',
         );
       } else if (error instanceof ApiError) {
         setFailure(error);

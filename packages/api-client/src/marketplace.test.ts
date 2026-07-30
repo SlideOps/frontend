@@ -111,7 +111,9 @@ describe('marketplace requests', () => {
     await uninstallPlugin('pr_1', 'postgresql');
     const deleteInit = deleteMock.mock.calls[0]?.[1];
     expect(deleteInit?.method).toBe('DELETE');
-    expect(String(deleteMock.mock.calls[0]?.[0])).toContain('/api/v1/projects/pr_1/plugins/postgresql');
+    expect(String(deleteMock.mock.calls[0]?.[0])).toContain(
+      '/api/v1/projects/pr_1/plugins/postgresql',
+    );
 
     // Second read: the Plugin is gone.
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(200, { plugins: [] }));

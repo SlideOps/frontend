@@ -119,7 +119,9 @@ export function Services() {
               description="A Service is one solution running on a Node under hard resource limits. Deploy one from an image or a repository, or import an app you were already running on a server before you found SlideOps."
               action={
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button onClick={() => navigate('/app/services/new')}>Deploy your first Service</Button>
+                  <Button onClick={() => navigate('/app/services/new')}>
+                    Deploy your first Service
+                  </Button>
                   <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
                     Import what is already running
                   </Button>
@@ -132,7 +134,9 @@ export function Services() {
                 <ServiceRow
                   key={service.id}
                   service={service}
-                  projectName={state.data.projects.get(service.project_id)?.name ?? 'Unknown Project'}
+                  projectName={
+                    state.data.projects.get(service.project_id)?.name ?? 'Unknown Project'
+                  }
                   nodeName={state.data.nodes.get(service.node_id)?.name ?? 'Unknown Node'}
                   onOpen={() => navigate(`/app/services/${service.id}`)}
                 />

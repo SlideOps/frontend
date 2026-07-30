@@ -24,7 +24,9 @@ describe('a response with no error envelope', () => {
 
   // A real envelope always wins: the server's own wording is better than ours.
   it('prefers the backend message when there is one', () => {
-    const error = normalizeError(404, { error: { code: 'not_found', message: 'the node was not found' } });
+    const error = normalizeError(404, {
+      error: { code: 'not_found', message: 'the node was not found' },
+    });
     expect(error.message).toBe('the node was not found');
     expect(error.code).toBe('not_found');
   });

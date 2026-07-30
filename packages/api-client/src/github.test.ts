@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  disconnectGitHub,
-  getGitHubStatus,
-  githubAuthorizeUrl,
-  listGitHubRepos,
-} from './github';
+import { disconnectGitHub, getGitHubStatus, githubAuthorizeUrl, listGitHubRepos } from './github';
 
 /** Build a Response-like stub for the mocked fetch. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -23,7 +18,9 @@ describe('github requests', () => {
   it('reads status over the same origin with cookies, accepting a bare shape', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(200, { configured: true, connected: true, login: 'octocat' }));
+      .mockResolvedValue(
+        jsonResponse(200, { configured: true, connected: true, login: 'octocat' }),
+      );
 
     const status = await getGitHubStatus();
 

@@ -152,7 +152,9 @@ export function ProjectStack({ projectId }: { projectId: string }) {
       reload();
     } catch (error) {
       setActionError(
-        error instanceof ApiError ? error.message : 'That Plugin could not be installed. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That Plugin could not be installed. Try again.',
       );
     } finally {
       setBusyId(null);
@@ -187,7 +189,9 @@ export function ProjectStack({ projectId }: { projectId: string }) {
     } catch (error) {
       setPendingUninstall(null);
       setActionError(
-        error instanceof ApiError ? error.message : 'That Plugin could not be uninstalled. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That Plugin could not be uninstalled. Try again.',
       );
     } finally {
       setBusyId(null);
@@ -236,8 +240,8 @@ export function ProjectStack({ projectId }: { projectId: string }) {
         description={
           <>
             This removes <span className="font-medium text-ink">{pendingUninstall?.name}</span> from
-            this Project. Its Capabilities stop being available here, and Services that rely on it may
-            no longer deploy. It stays in the Marketplace and can be installed again.
+            this Project. Its Capabilities stop being available here, and Services that rely on it
+            may no longer deploy. It stays in the Marketplace and can be installed again.
           </>
         }
         confirmLabel="Uninstall"

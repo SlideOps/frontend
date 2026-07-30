@@ -151,7 +151,10 @@ export function paletteReducer(state: PaletteState, action: PaletteAction): Pale
     case 'error':
       return { ...state, status: 'error', groups: [], items: [], activeIndex: 0 };
     case 'move':
-      return { ...state, activeIndex: wrapIndex(state.activeIndex + action.delta, state.items.length) };
+      return {
+        ...state,
+        activeIndex: wrapIndex(state.activeIndex + action.delta, state.items.length),
+      };
     case 'reset':
       return initialPaletteState;
     default:

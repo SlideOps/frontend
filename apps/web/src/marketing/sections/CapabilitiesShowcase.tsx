@@ -20,9 +20,9 @@ export function CapabilitiesShowcase() {
         </Text>
         <Text variant="body" tone="secondary" className="mt-5">
           Only security is Core: four outcomes pre-installed on every server, so a server is secured
-          the moment you connect it. Everything else is a marketplace Plugin you install per Project,
-          so each Project carries only the stack it uses. Each outcome plans, executes, verifies, and
-          rolls back on its own, and adapts to the Linux family your server runs.
+          the moment you connect it. Everything else is a marketplace Plugin you install per
+          Project, so each Project carries only the stack it uses. Each outcome plans, executes,
+          verifies, and rolls back on its own, and adapts to the Linux family your server runs.
         </Text>
       </div>
 

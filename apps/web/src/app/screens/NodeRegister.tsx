@@ -144,14 +144,23 @@ export function NodeRegister() {
                 />
                 <span>
                   <span className="font-medium text-ink">Private key</span>
-                  <span className="mt-0.5 block text-ink-muted">Recommended. Stronger and never locks you out during hardening.</span>
+                  <span className="mt-0.5 block text-ink-muted">
+                    Recommended. Stronger and never locks you out during hardening.
+                  </span>
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input type="radio" value="password" className="mt-0.5 accent-brand" {...register('auth_kind')} />
+                <input
+                  type="radio"
+                  value="password"
+                  className="mt-0.5 accent-brand"
+                  {...register('auth_kind')}
+                />
                 <span>
                   <span className="font-medium text-ink">Password</span>
-                  <span className="mt-0.5 block text-ink-muted">Password sign in stays on so you are never locked out.</span>
+                  <span className="mt-0.5 block text-ink-muted">
+                    Password sign in stays on so you are never locked out.
+                  </span>
                 </span>
               </label>
             </div>

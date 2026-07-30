@@ -115,7 +115,6 @@ describe('auth requests', () => {
       message: 'Those details do not match.',
     });
   });
-
 });
 
 describe('sign in providers and the GitHub entry point', () => {

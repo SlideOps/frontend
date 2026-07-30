@@ -13,7 +13,15 @@ function directiveState(value: string | undefined): 'yes' | 'no' | 'unknown' {
   return value.toLowerCase() === 'yes' ? 'yes' : 'no';
 }
 
-function PostureRow({ label, value, good }: { label: string; value: string; good: boolean | null }) {
+function PostureRow({
+  label,
+  value,
+  good,
+}: {
+  label: string;
+  value: string;
+  good: boolean | null;
+}) {
   return (
     <div className="flex items-center justify-between gap-3 py-2">
       <span className="text-sm text-ink-muted">{label}</span>
@@ -53,14 +61,14 @@ export function ServerPosture({ node, facts }: { node: Node; facts?: DiscoveryRe
         />
         <PostureRow
           label="Root sign in over SSH"
-          value={permitRoot === 'unknown' ? 'Unknown' : permitRoot === 'no' ? 'Disabled' : 'Permitted'}
+          value={
+            permitRoot === 'unknown' ? 'Unknown' : permitRoot === 'no' ? 'Disabled' : 'Permitted'
+          }
           good={permitRoot === 'unknown' ? null : permitRoot === 'no'}
         />
         <PostureRow
           label="Password sign in"
-          value={
-            passwordAuth === 'unknown' ? 'Unknown' : passwordAuth === 'no' ? 'Off' : 'On'
-          }
+          value={passwordAuth === 'unknown' ? 'Unknown' : passwordAuth === 'no' ? 'Off' : 'On'}
           good={passwordAuth === 'unknown' ? null : passwordAuth === 'no'}
         />
       </dl>

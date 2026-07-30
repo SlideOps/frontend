@@ -59,7 +59,11 @@ function firstString(parameters: Record<string, unknown>, keys: readonly string[
 function paramPort(parameters: Record<string, unknown>): number | null {
   const raw = parameters['port'];
   const value =
-    typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim() !== ''
+        ? Number(raw)
+        : NaN;
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
@@ -105,7 +109,11 @@ export function resolveEndpoint(
  * and secret so any special character in them stays safe. Redis with no account
  * takes the empty-user form `redis://:secret@host:port`.
  */
-export function buildConnectionUrl(endpoint: ResolvedEndpoint, host: string, secret: string): string {
+export function buildConnectionUrl(
+  endpoint: ResolvedEndpoint,
+  host: string,
+  secret: string,
+): string {
   const account = endpoint.username ? encodeURIComponent(endpoint.username) : '';
   const authority = `${account}:${encodeURIComponent(secret)}@${host}:${endpoint.port}`;
   const base = `${endpoint.scheme}://${authority}`;
