@@ -16,7 +16,7 @@ import { Activity, ArrowLeft, Clock, Play, Server, Trash2 } from '@slideops/icon
 import { Guidance } from '@slideops/tooltips';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { RiskBadge } from '../components/Badges';
+import { RiskBadge, StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ScheduleBuilder } from '../components/ScheduleBuilder';
@@ -27,6 +27,46 @@ interface DetailData {
   automation: Automation;
   node: Node | null;
   capability: Capability | null;
+}
+
+/**
+ * What this Automation will actually do, in the inputs it was saved with.
+ *
+ * The page said when it runs and never what it runs with. An Operator looking at
+ * a scheduled "Manage server user" could not tell which username it creates, and
+ * a run that happens unattended is exactly the one whose inputs need to be
+ * readable. Secret values are already redacted by the API and stay that way here.
+ */
+function WhatItDoes({
+  automation,
+  capability,
+}: {
+  automation: Automation;
+  capability: Capability | null;
+}) {
+  const entries = Object.entries(automation.parameters ?? {});
+  if (entries.length === 0) {
+    return (
+      <Text variant="body-sm" tone="secondary">
+        {capability?.name ?? 'This Capability'} takes no inputs. It runs the same way every time.
+      </Text>
+    );
+  }
+  // Named the way the Capability names them, so the page reads like the form the
+  // Automation was created from rather than like the stored record.
+  const labelFor = (key: string) =>
+    capability?.parameters?.find((parameter) => parameter.key === key)?.label ?? key;
+  return (
+    <div className="flex flex-col divide-y divide-border">
+      {entries.map(([key, value]) => (
+        <InfoRow key={key} label={labelFor(key)}>
+          <Text variant="body-sm" as="span" className="font-mono">
+            {String(value)}
+          </Text>
+        </InfoRow>
+      ))}
+    </div>
+  );
 }
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -180,13 +220,35 @@ export function AutomationDetail() {
                     </Text>
                   </InfoRow>
                   <InfoRow label="Last run">
-                    <Text variant="body-sm" as="span">
-                      {state.data.automation.last_run_at
-                        ? new Date(state.data.automation.last_run_at).toLocaleString()
-                        : 'Not run yet'}
-                    </Text>
+                    {state.data.automation.last_run_at ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Text variant="body-sm" as="span">
+                          {new Date(state.data.automation.last_run_at).toLocaleString()}
+                        </Text>
+                        {/* Whether it worked, not only when it ran. A schedule
+                            nobody watches is exactly the thing that needs to say
+                            so when it stops working. */}
+                        {state.data.automation.last_run_status ? (
+                          <StatusBadge status={state.data.automation.last_run_status} />
+                        ) : null}
+                      </span>
+                    ) : (
+                      <Text variant="body-sm" as="span">
+                        Not run yet
+                      </Text>
+                    )}
                   </InfoRow>
                 </div>
+
+                {state.data.automation.last_run_status === 'failed' ? (
+                  <p
+                    role="status"
+                    className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger"
+                  >
+                    The last run of this Automation failed. It will try again at the next scheduled
+                    time. Open the run to see what went wrong.
+                  </p>
+                ) : null}
 
                 <div className="mt-2 flex flex-wrap gap-2">
                   {state.data.automation.last_operation_id ? (
@@ -205,6 +267,11 @@ export function AutomationDetail() {
                     See Operations in History
                   </Button>
                 </div>
+              </Card>
+
+              <Card className="flex flex-col gap-4">
+                <Text variant="h4">What it does</Text>
+                <WhatItDoes automation={state.data.automation} capability={state.data.capability} />
               </Card>
 
               <Card className="flex flex-col gap-4">
