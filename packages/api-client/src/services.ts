@@ -468,3 +468,23 @@ export function deployComposeStack(input: {
     body: input,
   }).then((r) => unwrap<Service>(r, 'service'));
 }
+
+/**
+ * Give a Service its own web address: assign a hostname if it has none, route it
+ * through the reverse proxy, and ask for a certificate.
+ *
+ * You will not usually need this. Every Service deployed since hostnames existed
+ * gets one automatically. It is for the two cases left over: a Service deployed
+ * before that, which has a port and no name, and one whose routing or certificate
+ * did not take the first time.
+ *
+ * It answers as soon as the hostname is settled and the routing streams after,
+ * like a deploy. It never changes an address a Service already has, so calling it
+ * again retries the route rather than handing out a different name. Nothing is
+ * rebuilt and the workload is not restarted.
+ */
+export function exposeService(id: string): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/expose`, {
+    method: 'POST',
+  }).then((r) => unwrap<Service>(r, 'service'));
+}

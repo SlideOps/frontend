@@ -189,6 +189,7 @@ export {
   planComposeStack,
   deployComposeStack,
   AUTO_HOST_PORT,
+  exposeService,
   updateServiceResources,
   updateServiceConfiguration,
   type Service,

@@ -1,7 +1,8 @@
-import { type Service } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
+import { ApiError, exposeService, type Service } from '@slideops/api-client';
+import { Button, Card, Text } from '@slideops/design-system';
 import { ArrowUpRight, Globe } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { useState } from 'react';
 import { RevealValue } from './RevealValue';
 import { serviceEndpointState } from './service-endpoint';
 
@@ -31,8 +32,36 @@ function EndpointNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function ServiceEndpoint({ service }: { service: Service }) {
+export function ServiceEndpoint({
+  service,
+  onChanged,
+}: {
+  service: Service;
+  onChanged?: () => void;
+}) {
   const state = serviceEndpointState(service);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Offered when a Service has a port but no name of its own. That is either one
+  // deployed before hostnames existed, or one whose routing did not take, and the
+  // alternative for both used to be redeploying a working application to rename it.
+  const canBeNamed = state.kind === 'addresses' && !service.domain;
+
+  const giveAddress = async () => {
+    setWorking(true);
+    setError(null);
+    try {
+      await exposeService(service.id);
+      onChanged?.();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.message : 'The address could not be set up. Try again.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  };
 
   return (
     <Card>
@@ -83,6 +112,26 @@ export function ServiceEndpoint({ service }: { service: Service }) {
               This Service is {service.status}, so the address will not answer until it is running.
               The address itself does not change.
             </EndpointNote>
+          ) : null}
+
+          {canBeNamed ? (
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-subtle p-3">
+              <Text variant="body-sm" tone="secondary">
+                This Service answers on a port but has no web address of its own. Giving it one
+                routes it by name over HTTPS. Nothing is rebuilt and it keeps running throughout.
+              </Text>
+              <div>
+                <Button variant="secondary" onClick={giveAddress} disabled={working}>
+                  <Globe width={15} height={15} aria-hidden />
+                  {working ? 'Setting up the address' : 'Give it a web address'}
+                </Button>
+              </div>
+              {error ? (
+                <p role="alert" className="text-sm text-danger">
+                  {error}
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           <div className="flex flex-col gap-1.5 border-t border-border pt-3">
