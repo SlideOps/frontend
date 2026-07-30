@@ -46,9 +46,25 @@ export interface ServiceSource {
 
 /** One published port: a Node port mapped to a port inside the workload. */
 export interface ServicePort {
+  /**
+   * The port on the server. Send {@link AUTO_HOST_PORT} to have SlideOps choose a
+   * free one, which is the normal case: it avoids both the ports it has already
+   * given out on that server and the ports the server reports as listening, so a
+   * second application cannot land on the first one's port.
+   *
+   * A number you set is honoured exactly, even if something else holds it. You may
+   * know something SlideOps does not, and the deploy reports the conflict from the
+   * server itself rather than moving your application somewhere you did not ask for.
+   */
   host: number;
   container: number;
 }
+
+/**
+ * The host port that means "choose one for me". Zero is never a real published
+ * port, so it reads unambiguously as an instruction rather than as an address.
+ */
+export const AUTO_HOST_PORT = 0;
 
 /**
  * A Service. `env` is redacted in responses, so it is never returned inline.
@@ -95,14 +111,21 @@ export interface Service {
    */
   config_changed_at?: string;
   /**
-   * The addresses this Service answers on from outside the server, one per
-   * published port as `http://<node-address>:<host-port>`. Computed from the Node
-   * address on every read rather than stored, so it stays correct if the server's
-   * address changes, and empty when nothing is published.
+   * The hostname this Service answers on, empty until one is assigned.
    *
-   * This is the base URL another program calls: a frontend, a mobile app, or a
-   * second Service. The published port is opened on the host firewall as part of
-   * the deploy, so it answers with no domain set up first.
+   * Every Service gets one as part of deploying, so it is reachable by name rather
+   * than at an address with a port number in it. It survives a redeploy that moves
+   * the port, and it is the name the certificate is issued for.
+   */
+  domain?: string;
+  /**
+   * The addresses this Service answers on from outside the server, best first:
+   * `https://<domain>` when it has one, then `http://<node-address>:<host-port>`
+   * per published port. Computed on every read rather than stored, so it stays
+   * correct if the server's address changes.
+   *
+   * The first entry is the base URL to give another program: a frontend, a mobile
+   * app, or a second Service.
    */
   public_urls?: string[];
   created_at: string;

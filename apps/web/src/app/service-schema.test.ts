@@ -83,8 +83,16 @@ describe('parsePorts', () => {
     });
   });
 
-  it('reports an error for a bad line', () => {
-    expect(parsePorts('80').error).toBeTruthy();
+  // A bare port is the container port, and SlideOps chooses the public one. That
+  // is the default the form offers, because picking public ports by hand is how
+  // two applications on one server end up fighting over the same one.
+  it('reads a bare port as the container port with the public port left to SlideOps', () => {
+    expect(parsePorts('80')).toEqual({ ports: [{ host: 0, container: 80 }] });
+  });
+
+  it('reports an error for a line that is neither form', () => {
+    expect(parsePorts('80:90:100').error).toBeTruthy();
+    expect(parsePorts('web').error).toBeTruthy();
   });
 });
 

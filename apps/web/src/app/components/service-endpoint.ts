@@ -14,7 +14,15 @@ import type { Service } from '@slideops/api-client';
 export type ServiceEndpointState =
   | {
       kind: 'addresses';
-      /** One base URL per published port. */
+      /**
+       * The address to hand to another program: the Service's own hostname when it
+       * has one. It survives a redeploy that moves the port and it can carry a
+       * certificate, which the port address cannot.
+       */
+      primary: string;
+      /** The remaining addresses, one per published port. */
+      alternates: string[];
+      /** Every address, primary first. */
       urls: string[];
       /** Whether it answers right now. The address is the same either way. */
       answering: boolean;
@@ -27,8 +35,16 @@ export function serviceEndpointState(
   service: Pick<Service, 'public_urls' | 'ports' | 'status'>,
 ): ServiceEndpointState {
   const urls = (service.public_urls ?? []).filter((url) => url.trim() !== '');
-  if (urls.length > 0) {
-    return { kind: 'addresses', urls, answering: service.status === 'running' };
+  const [primary] = urls;
+  if (primary) {
+    // The API returns them best first, the hostname leading when there is one.
+    return {
+      kind: 'addresses',
+      primary,
+      alternates: urls.slice(1),
+      urls,
+      answering: service.status === 'running',
+    };
   }
   // A published port with no address means the Node is the thing to look at, not
   // the Service: the deploy did its part and there is simply nothing to build a

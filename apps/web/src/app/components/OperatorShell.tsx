@@ -111,6 +111,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'nodes',
+      group: 'Your infrastructure',
       label: 'Servers',
       icon: Server,
       active: active === 'nodes',
@@ -118,6 +119,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'projects',
+      group: 'Your infrastructure',
       label: 'Projects',
       icon: FolderKanban,
       active: active === 'projects',
@@ -125,6 +127,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'services',
+      group: 'Your infrastructure',
       label: 'Services',
       icon: Container,
       active: active === 'services',
@@ -132,6 +135,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'capabilities',
+      group: 'Set things up',
       label: 'Capabilities',
       icon: Layers,
       active: active === 'capabilities',
@@ -139,6 +143,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'marketplace',
+      group: 'Set things up',
       label: 'Marketplace',
       icon: Package,
       active: active === 'marketplace',
@@ -146,6 +151,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'automations',
+      group: 'Set things up',
       label: 'Automations',
       icon: Clock,
       active: active === 'automations',
@@ -153,6 +159,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'operations',
+      group: 'What happened',
       label: 'History',
       icon: Activity,
       active: active === 'operations',
@@ -160,6 +167,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'credentials',
+      group: 'What happened',
       label: 'Credentials',
       icon: KeyRound,
       active: active === 'credentials',
@@ -167,6 +175,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'reports',
+      group: 'What happened',
       label: 'Reports',
       icon: FileText,
       active: active === 'reports',
@@ -174,6 +183,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'billing',
+      group: 'Account',
       label: 'Billing',
       icon: CreditCard,
       active: active === 'billing',
@@ -181,6 +191,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'extensions',
+      group: 'Account',
       label: 'Extensions',
       icon: Boxes,
       active: active === 'extensions',
@@ -188,6 +199,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     },
     {
       key: 'security',
+      group: 'Account',
       label: 'Security',
       icon: Shield,
       active: active === 'security',

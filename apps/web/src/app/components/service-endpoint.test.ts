@@ -13,6 +13,8 @@ describe('serviceEndpointState', () => {
     });
     expect(state).toEqual({
       kind: 'addresses',
+      primary: 'http://169.58.53.167:8080',
+      alternates: ['http://169.58.53.167:9090'],
       urls: ['http://169.58.53.167:8080', 'http://169.58.53.167:9090'],
       answering: true,
     });
@@ -26,6 +28,8 @@ describe('serviceEndpointState', () => {
     });
     expect(state).toEqual({
       kind: 'addresses',
+      primary: 'http://169.58.53.167:8080',
+      alternates: [],
       urls: ['http://169.58.53.167:8080'],
       answering: false,
     });
@@ -55,5 +59,24 @@ describe('serviceEndpointState', () => {
     expect(
       serviceEndpointState({ public_urls: ['', '   '], ports: [{ host: 8080, container: 80 }], status: 'running' }),
     ).toEqual({ kind: 'no-node-address' });
+  });
+});
+
+// The hostname is the address to build against, so it has to be the one shown
+// first and copied. The port address is a convenience, not the contract.
+describe('serviceEndpointState with a hostname', () => {
+  it('leads with the hostname and keeps the port address as an alternate', () => {
+    const state = serviceEndpointState({
+      public_urls: ['https://shop.10.0.0.1.nip.io', 'http://10.0.0.1:20000'],
+      ports: [{ host: 20000, container: 80 }],
+      status: 'running',
+    });
+    expect(state).toEqual({
+      kind: 'addresses',
+      primary: 'https://shop.10.0.0.1.nip.io',
+      alternates: ['http://10.0.0.1:20000'],
+      urls: ['https://shop.10.0.0.1.nip.io', 'http://10.0.0.1:20000'],
+      answering: true,
+    });
   });
 });

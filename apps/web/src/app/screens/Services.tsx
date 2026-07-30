@@ -63,6 +63,14 @@ function ServiceRow({
         <Text variant="body-sm" tone="secondary" className="truncate">
           {projectName} · {nodeName} · {service.runtime === 'systemd' ? 'systemd' : 'container'}
         </Text>
+        {/* Where it answers, on the list itself. An Operator running several
+            applications on one server should not have to open each one to find
+            out which address belongs to which. */}
+        {service.public_urls && service.public_urls[0] ? (
+          <Text variant="caption" tone="secondary" className="mt-0.5 block truncate font-mono">
+            {service.public_urls[0].replace(/^https?:\/\//, '')}
+          </Text>
+        ) : null}
       </span>
       <span className="hidden shrink-0 sm:block">
         <ServiceMetricsInline id={service.id} running={service.status === 'running'} />
