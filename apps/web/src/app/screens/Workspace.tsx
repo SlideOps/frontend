@@ -79,9 +79,7 @@ function HealthCard({ operations }: { operations: Operation[] }) {
       <div className="mt-3 flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <CheckCircle2 width={16} height={16} className="text-success" aria-hidden />
-          <Text variant="body-sm">
-            {completed} verified
-          </Text>
+          <Text variant="body-sm">{completed} verified</Text>
         </div>
         <div className="flex items-center gap-2">
           <XCircle width={16} height={16} className="text-danger" aria-hidden />
@@ -119,7 +117,11 @@ export function Workspace() {
       {state.status === 'ready' ? (
         <div className="flex flex-col gap-8">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Projects" value={state.data.projects.length} guidanceKey="dashboard.projects" />
+            <StatCard
+              label="Projects"
+              value={state.data.projects.length}
+              guidanceKey="dashboard.projects"
+            />
             <StatCard label="Nodes" value={state.data.nodes.length} guidanceKey="dashboard.nodes" />
             <StatCard
               label="Operations"
@@ -153,7 +155,11 @@ export function Workspace() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {state.data.nodes.slice(0, 4).map((node) => (
-                    <NodeRow key={node.id} node={node} onOpen={() => navigate(`/app/nodes/${node.id}`)} />
+                    <NodeRow
+                      key={node.id}
+                      node={node}
+                      onOpen={() => navigate(`/app/nodes/${node.id}`)}
+                    />
                   ))}
                 </div>
               </section>

@@ -213,7 +213,9 @@ export function listServices(signal?: AbortSignal): Promise<Service[]> {
 
 /** Read one Service by its id. */
 export function getService(id: string, signal?: AbortSignal): Promise<Service> {
-  return apiRequest<unknown>(`/services/${id}`, { signal }).then((r) => unwrap<Service>(r, 'service'));
+  return apiRequest<unknown>(`/services/${id}`, { signal }).then((r) =>
+    unwrap<Service>(r, 'service'),
+  );
 }
 
 /**
@@ -253,7 +255,11 @@ export function removeService(id: string): Promise<void> {
  * unwraps a JSON envelope when the body parses as one. That keeps a plain log
  * stream intact, which the shared JSON request helper would otherwise discard.
  */
-export async function getServiceLogs(id: string, tail = 200, signal?: AbortSignal): Promise<string> {
+export async function getServiceLogs(
+  id: string,
+  tail = 200,
+  signal?: AbortSignal,
+): Promise<string> {
   const base = apiBase();
   const origin =
     typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost';

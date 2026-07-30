@@ -151,9 +151,9 @@ export function ServiceUpdatePanel({ service, onDeployed }: ServiceUpdatePanelPr
           <Text variant="h4">Deployment</Text>
         </div>
         <Text variant="body-sm" tone="secondary" className="mt-3">
-          This was already running when SlideOps found it, so SlideOps has nothing to rebuild it from.
-          You can start, stop, restart, and watch it here; to deploy a new version, do it the way you
-          always have, or deploy it as a new Service from its repository.
+          This was already running when SlideOps found it, so SlideOps has nothing to rebuild it
+          from. You can start, stop, restart, and watch it here; to deploy a new version, do it the
+          way you always have, or deploy it as a new Service from its repository.
         </Text>
       </Card>
     );
@@ -193,11 +193,7 @@ export function ServiceUpdatePanel({ service, onDeployed }: ServiceUpdatePanelPr
             </div>
           </div>
         ) : state.data ? (
-          <UpdateResult
-            update={state.data}
-            deploying={redeploying}
-            onDeployLatest={deployLatest}
-          />
+          <UpdateResult update={state.data} deploying={redeploying} onDeployLatest={deployLatest} />
         ) : null}
       </div>
 

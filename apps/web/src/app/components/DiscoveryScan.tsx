@@ -1,9 +1,4 @@
-import type {
-  Assessment,
-  AssessmentFinding,
-  DiscoveryResult,
-  Facts,
-} from '@slideops/api-client';
+import type { Assessment, AssessmentFinding, DiscoveryResult, Facts } from '@slideops/api-client';
 import { Text } from '@slideops/design-system';
 import {
   AlertTriangle,
@@ -195,10 +190,13 @@ function SshSection({ facts }: { facts: Facts }) {
       ) : null}
       {effectiveEntries.length > 0 ? (
         <div className="py-2">
-          <Collapsible title="Effective SSH configuration" summary={`${effectiveEntries.length} directives`}>
+          <Collapsible
+            title="Effective SSH configuration"
+            summary={`${effectiveEntries.length} directives`}
+          >
             <Text variant="body-sm" tone="secondary" className="mb-3">
-              The resolved sshd settings and key paths are hidden. Reveal a value to read it, or copy
-              it without showing it.
+              The resolved sshd settings and key paths are hidden. Reveal a value to read it, or
+              copy it without showing it.
             </Text>
             <dl className="flex flex-col divide-y divide-border">
               {effectiveEntries.map(([key, value]) => (
@@ -372,7 +370,11 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
         <dl className="flex flex-col divide-y divide-border">
           {os?.pretty_name || os?.name ? (
             <LabeledRow label="Distribution">
-              <RevealValue value={os.pretty_name ?? os.name ?? ''} label="distribution" sensitive={false} />
+              <RevealValue
+                value={os.pretty_name ?? os.name ?? ''}
+                label="distribution"
+                sensitive={false}
+              />
             </LabeledRow>
           ) : null}
           {facts.kernel ? (
@@ -421,7 +423,11 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
       icon: <Shield width={16} height={16} aria-hidden />,
       defaultOpen: false,
       summary:
-        facts.firewall.active === undefined ? undefined : facts.firewall.active ? 'Active' : 'Inactive',
+        facts.firewall.active === undefined
+          ? undefined
+          : facts.firewall.active
+            ? 'Active'
+            : 'Inactive',
       content: (
         <dl className="flex flex-col divide-y divide-border">
           {facts.firewall.backend ? (
@@ -448,7 +454,11 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
       content: (
         <dl className="flex flex-col divide-y divide-border">
           <LabeledRow label="Docker">
-            <StatePill on={!!facts.containers.docker_present} onLabel="Present" offLabel="Not present" />
+            <StatePill
+              on={!!facts.containers.docker_present}
+              onLabel="Present"
+              offLabel="Not present"
+            />
           </LabeledRow>
           {facts.containers.runtime ? (
             <LabeledRow label="Runtime">
@@ -469,10 +479,18 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
       content: (
         <dl className="flex flex-col divide-y divide-border">
           <LabeledRow label="NGINX">
-            <StatePill on={!!facts.web_servers.nginx_present} onLabel="Present" offLabel="Not present" />
+            <StatePill
+              on={!!facts.web_servers.nginx_present}
+              onLabel="Present"
+              offLabel="Not present"
+            />
           </LabeledRow>
           <LabeledRow label="Caddy">
-            <StatePill on={!!facts.web_servers.caddy_present} onLabel="Present" offLabel="Not present" />
+            <StatePill
+              on={!!facts.web_servers.caddy_present}
+              onLabel="Present"
+              offLabel="Not present"
+            />
           </LabeledRow>
         </dl>
       ),
@@ -492,7 +510,11 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
             <LabeledRow key={index} label={database.engine ? humanize(database.engine) : 'Engine'}>
               <span className="flex flex-wrap items-center gap-2">
                 {database.version ? (
-                  <RevealValue value={database.version} label="database version" sensitive={false} />
+                  <RevealValue
+                    value={database.version}
+                    label="database version"
+                    sensitive={false}
+                  />
                 ) : null}
                 {database.running !== undefined ? (
                   <StatePill on={database.running} onLabel="Running" offLabel="Stopped" />
@@ -537,13 +559,22 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
       content: (
         <dl className="flex flex-col divide-y divide-border">
           <LabeledRow label="Let's Encrypt">
-            <StatePill on={!!facts.tls.lets_encrypt_present} onLabel="Present" offLabel="Not present" />
+            <StatePill
+              on={!!facts.tls.lets_encrypt_present}
+              onLabel="Present"
+              offLabel="Not present"
+            />
           </LabeledRow>
           {names.length > 0 ? (
             <LabeledRow label="Certificate names">
               <div className="flex flex-wrap gap-1.5">
                 {names.map((name, index) => (
-                  <RevealValue key={`${name}-${index}`} value={name} label="certificate name" sensitive />
+                  <RevealValue
+                    key={`${name}-${index}`}
+                    value={name}
+                    label="certificate name"
+                    sensitive
+                  />
                 ))}
               </div>
             </LabeledRow>
@@ -630,7 +661,10 @@ function buildSections(assessment: Assessment, facts: Facts): Section[] {
       content: (
         <dl className="flex flex-col divide-y divide-border">
           {extra.map(([key, value]) => (
-            <div key={key} className="grid grid-cols-1 gap-1 py-2 sm:grid-cols-[11rem_1fr] sm:gap-4">
+            <div
+              key={key}
+              className="grid grid-cols-1 gap-1 py-2 sm:grid-cols-[11rem_1fr] sm:gap-4"
+            >
               <dt className="text-xs font-medium text-ink-muted">{humanize(key)}</dt>
               <dd className="min-w-0">
                 <FactValue value={value} />

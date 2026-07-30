@@ -63,8 +63,8 @@ export function ServicePreview({ service }: { service: Service }) {
           </div>
           <Text variant="body-sm" tone="secondary" className="mt-2 break-words">
             The live running Service, reached over the secure SSH tunnel, so its port is never
-            exposed publicly. An app that uses absolute asset paths may render imperfectly here; open
-            it in a new tab for the full experience.
+            exposed publicly. An app that uses absolute asset paths may render imperfectly here;
+            open it in a new tab for the full experience.
           </Text>
         </>
       ) : (

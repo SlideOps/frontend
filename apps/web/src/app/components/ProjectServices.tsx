@@ -69,7 +69,12 @@ export function ProjectServices({ projectId }: { projectId: string }) {
                   <ServiceMetricsInline id={service.id} running={service.status === 'running'} />
                 </span>
                 <ServiceStatusBadge status={service.status} />
-                <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
+                <ChevronRight
+                  width={18}
+                  height={18}
+                  className="shrink-0 text-ink-muted"
+                  aria-hidden
+                />
               </button>
             ))}
           </div>

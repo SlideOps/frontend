@@ -84,7 +84,9 @@ export function ProjectServers({ projectId }: { projectId: string }) {
     } catch (error) {
       setPendingUnassign(null);
       setActionError(
-        error instanceof ApiError ? error.message : 'That server could not be unassigned. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That server could not be unassigned. Try again.',
       );
     }
   };
@@ -123,7 +125,11 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                       {node.ssh_username}@{node.address}:{node.port}
                     </Text>
                   </span>
-                  <Button variant="ghost" size="sm" onClick={() => navigate(`/app/nodes/${node.id}`)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/app/nodes/${node.id}`)}
+                  >
                     Open server
                     <ArrowRight width={15} height={15} aria-hidden />
                   </Button>
@@ -154,29 +160,29 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                   way.
                 </Text>
                 <div className="flex flex-wrap items-center gap-3">
-                <label htmlFor="assign-server" className="sr-only">
-                  Choose a server to assign
-                </label>
-                <select
-                  id="assign-server"
-                  className={`${selectClass} max-w-xs`}
-                  value={selected}
-                  onChange={(event) => setSelected(event.target.value)}
-                >
-                  <option value="" disabled>
-                    Choose a server
-                  </option>
-                  {state.data.assignable.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      {node.name} ({node.address})
-                      {node.project_id ? ' — currently in another Project' : ''}
+                  <label htmlFor="assign-server" className="sr-only">
+                    Choose a server to assign
+                  </label>
+                  <select
+                    id="assign-server"
+                    className={`${selectClass} max-w-xs`}
+                    value={selected}
+                    onChange={(event) => setSelected(event.target.value)}
+                  >
+                    <option value="" disabled>
+                      Choose a server
                     </option>
-                  ))}
-                </select>
-                <Button onClick={assign} disabled={!selected || assigning}>
-                  <Plus width={15} height={15} aria-hidden />
-                  {assigning ? 'Assigning' : 'Assign'}
-                </Button>
+                    {state.data.assignable.map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {node.name} ({node.address})
+                        {node.project_id ? ' — currently in another Project' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <Button onClick={assign} disabled={!selected || assigning}>
+                    <Plus width={15} height={15} aria-hidden />
+                    {assigning ? 'Assigning' : 'Assign'}
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -200,10 +206,9 @@ export function ProjectServers({ projectId }: { projectId: string }) {
         title="Unassign this server?"
         description={
           <>
-            This returns{' '}
-            <span className="font-medium text-ink">{pendingUnassign?.name}</span> to the server level.
-            The server stays connected and secured; it just leaves this Project and can be assigned
-            elsewhere. Services running on it are not touched here.
+            This returns <span className="font-medium text-ink">{pendingUnassign?.name}</span> to
+            the server level. The server stays connected and secured; it just leaves this Project
+            and can be assigned elsewhere. Services running on it are not touched here.
           </>
         }
         confirmLabel="Unassign server"

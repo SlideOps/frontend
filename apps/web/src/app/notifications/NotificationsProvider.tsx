@@ -36,11 +36,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         }
         const { push, pushEnabled, pushPermission } = useNotificationsStore.getState();
         push(notification);
-        if (
-          pushEnabled &&
-          pushPermission === 'granted' &&
-          typeof Notification !== 'undefined'
-        ) {
+        if (pushEnabled && pushPermission === 'granted' && typeof Notification !== 'undefined') {
           try {
             new Notification(notification.title, {
               body: notification.body,

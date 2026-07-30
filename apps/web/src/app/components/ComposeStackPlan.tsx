@@ -119,10 +119,14 @@ export function ComposeStackPlan({
     setPlanning(true);
     setError(null);
     try {
-      setPlan(await planComposeStack({ node_id: nodeID, repository_url: repositoryURL, branch, name }));
+      setPlan(
+        await planComposeStack({ node_id: nodeID, repository_url: repositoryURL, branch, name }),
+      );
     } catch (caught) {
       setError(
-        caught instanceof ApiError ? caught.message : 'That repository could not be planned. Try again.',
+        caught instanceof ApiError
+          ? caught.message
+          : 'That repository could not be planned. Try again.',
       );
     } finally {
       setPlanning(false);
@@ -219,7 +223,11 @@ export function ComposeStackPlan({
           {plan.steps.length > 0 ? (
             <ol className="flex flex-col">
               {plan.steps.map((step, index) => (
-                <PlanStep key={`${step.kind}-${step.compose_service}-${index}`} step={step} index={index} />
+                <PlanStep
+                  key={`${step.kind}-${step.compose_service}-${index}`}
+                  step={step}
+                  index={index}
+                />
               ))}
             </ol>
           ) : null}
@@ -267,8 +275,8 @@ export function ComposeStackPlan({
           <div className="flex flex-col gap-2 border-t border-border pt-4">
             <Text variant="body-sm" tone="secondary">
               Approving runs every step above in order. Each Capability runs as a real Operation, so
-              it is planned, verified, and recorded in History exactly as if you had run it yourself.
-              You can cancel it at any point from the Service.
+              it is planned, verified, and recorded in History exactly as if you had run it
+              yourself. You can cancel it at any point from the Service.
             </Text>
             <div>
               <Button onClick={approve} disabled={!canApprove || running}>

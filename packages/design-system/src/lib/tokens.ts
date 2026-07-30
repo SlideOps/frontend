@@ -16,7 +16,8 @@
 /** Read the resolved value of a CSS custom property from an element (defaulting to :root). */
 export function readCssVar(name: string, el?: Element | null): string {
   const target =
-    el ?? (typeof document !== 'undefined' && document.documentElement ? document.documentElement : null);
+    el ??
+    (typeof document !== 'undefined' && document.documentElement ? document.documentElement : null);
   if (!target || typeof getComputedStyle !== 'function') {
     return '';
   }

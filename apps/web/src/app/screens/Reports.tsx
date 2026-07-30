@@ -22,7 +22,11 @@ interface ReportChoice {
 
 const REPORT_TYPES: ReportChoice[] = [
   { type: 'health', label: 'Health', blurb: 'Current and recent Node metrics.' },
-  { type: 'verification', label: 'Verification', blurb: 'Recent verification results and evidence.' },
+  {
+    type: 'verification',
+    label: 'Verification',
+    blurb: 'Recent verification results and evidence.',
+  },
   { type: 'inventory', label: 'Inventory', blurb: 'Nodes with their OS, distro, and key facts.' },
   { type: 'operations', label: 'Operations', blurb: 'A history summary with counts and outcomes.' },
   { type: 'security', label: 'Security', blurb: 'The SSH and firewall posture per Node.' },
@@ -45,7 +49,9 @@ function SectionView({ section }: { section: ReportSection }) {
         <dl className="mt-3 divide-y divide-border">
           {section.rows.map((row, index) => (
             <div key={index} className="grid grid-cols-[12rem_1fr] gap-3 py-2">
-              <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{row.label}</dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                {row.label}
+              </dt>
               <dd className="min-w-0 break-words text-sm text-ink">{row.value}</dd>
             </div>
           ))}
@@ -64,7 +70,11 @@ function SectionView({ section }: { section: ReportSection }) {
             <thead className="border-b border-border bg-subtle/40">
               <tr>
                 {section.table.headers.map((header, index) => (
-                  <th key={index} scope="col" className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  <th
+                    key={index}
+                    scope="col"
+                    className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted"
+                  >
                     {header}
                   </th>
                 ))}
@@ -149,7 +159,11 @@ export function Reports() {
           description="Generate a readable report from your Operations, verifications, discoveries, and metrics. Pick a type, scope it to a Node if you like, and print it when you need a record."
           guidanceKey="reports.overview"
           actions={
-            <Button variant="secondary" onClick={() => window.print()} disabled={state.status !== 'ready'}>
+            <Button
+              variant="secondary"
+              onClick={() => window.print()}
+              disabled={state.status !== 'ready'}
+            >
               <Printer width={16} height={16} aria-hidden />
               Print
             </Button>
@@ -157,11 +171,7 @@ export function Reports() {
         />
 
         <div className="mb-6 flex flex-col gap-4">
-          <div
-            className="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Report type"
-          >
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Report type">
             {REPORT_TYPES.map((choice) => (
               <button
                 key={choice.type}

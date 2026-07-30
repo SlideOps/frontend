@@ -121,11 +121,7 @@ export function NodeHealth({ nodeId }: { nodeId: string }) {
                 value={pct(state.data.current.disk_used_percent)}
                 percent={state.data.current.disk_used_percent}
               />
-              <Metric
-                icon={HeartPulse}
-                label="Uptime"
-                value={uptime(state.data.current)}
-              />
+              <Metric icon={HeartPulse} label="Uptime" value={uptime(state.data.current)} />
             </div>
 
             {typeof state.data.current.service_count === 'number' ? (
@@ -154,8 +150,8 @@ export function NodeHealth({ nodeId }: { nodeId: string }) {
           <div className="rounded-md border border-dashed border-border bg-subtle/40 px-5 py-8 text-center">
             <Text variant="h4">Monitoring is not enabled</Text>
             <Text variant="body-sm" tone="secondary" className="mx-auto mt-2 max-w-md">
-              Enable monitoring on this Node to see live health and a recent history here. It runs as
-              a Capability you review and approve first, and it never changes anything else.
+              Enable monitoring on this Node to see live health and a recent history here. It runs
+              as a Capability you review and approve first, and it never changes anything else.
             </Text>
             <Button
               className="mt-4"

@@ -1,4 +1,9 @@
-import { AUTO_HOST_PORT, type DeployServiceInput, type ServiceEnvVar, type ServicePort } from '@slideops/api-client';
+import {
+  AUTO_HOST_PORT,
+  type DeployServiceInput,
+  type ServiceEnvVar,
+  type ServicePort,
+} from '@slideops/api-client';
 import { z } from 'zod';
 
 /*
@@ -40,7 +45,10 @@ export function buildServiceSchema() {
         .int('Enter memory as a whole number of MB.')
         .min(MIN_MEMORY_MB, `Give the Service at least ${MIN_MEMORY_MB} MB.`),
       pids_limit: z
-        .union([z.literal(''), z.coerce.number().int('Enter a whole number.').positive('Enter a positive number.')])
+        .union([
+          z.literal(''),
+          z.coerce.number().int('Enter a whole number.').positive('Enter a positive number.'),
+        ])
         .optional(),
       env: z.string().optional(),
       ports: z.string().optional(),
@@ -184,7 +192,6 @@ export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string 
   }
   return { env };
 }
-
 
 /** Turn validated form values into the deploy input the backend expects. */
 export function toDeployInput(values: ServiceFormValues): DeployServiceInput {

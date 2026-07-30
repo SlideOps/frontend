@@ -123,7 +123,9 @@ export function History() {
       reload();
     } catch (error) {
       setActionError(
-        error instanceof ApiError ? error.message : 'That Operation could not be deleted. Try again.',
+        error instanceof ApiError
+          ? error.message
+          : 'That Operation could not be deleted. Try again.',
       );
       setPendingDelete(null);
     } finally {
@@ -134,7 +136,8 @@ export function History() {
   // Clearing is scoped to whatever the Operator is currently looking at, so the
   // action always matches what is on screen rather than quietly reaching wider.
   // On the All tab that means every finished Operation.
-  const clearableStatus = activeTab.status && isFinished(activeTab.status) ? activeTab.status : null;
+  const clearableStatus =
+    activeTab.status && isFinished(activeTab.status) ? activeTab.status : null;
   const canClear = filter === 'all' || clearableStatus !== null;
 
   const runClear = async () => {
@@ -179,10 +182,12 @@ export function History() {
         actions={
           <>
             <Refreshing show={refreshing} />
-            {canClear && state.status === 'ready' && state.data.some((op) => isFinished(op.status)) ? (
-            <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>
-              <Trash2 width={16} height={16} aria-hidden />
-              {clearableStatus ? `Clear ${activeTab.label.toLowerCase()}` : 'Clear finished'}
+            {canClear &&
+            state.status === 'ready' &&
+            state.data.some((op) => isFinished(op.status)) ? (
+              <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>
+                <Trash2 width={16} height={16} aria-hidden />
+                {clearableStatus ? `Clear ${activeTab.label.toLowerCase()}` : 'Clear finished'}
               </Button>
             ) : null}
           </>
@@ -280,7 +285,11 @@ export function History() {
 
       <ConfirmDialog
         open={clearing}
-        title={clearableStatus ? `Clear every ${clearableStatus} Operation?` : 'Clear every finished Operation?'}
+        title={
+          clearableStatus
+            ? `Clear every ${clearableStatus} Operation?`
+            : 'Clear every finished Operation?'
+        }
         description={
           clearableStatus
             ? `This removes every ${clearableStatus} Operation from your History, along with its event log. Nothing still running or waiting on you is touched, and nothing on your servers changes.`

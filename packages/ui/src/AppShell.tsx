@@ -43,7 +43,11 @@ function ThemeToggle() {
       aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      {isDark ? <Sun width={18} height={18} aria-hidden /> : <Moon width={18} height={18} aria-hidden />}
+      {isDark ? (
+        <Sun width={18} height={18} aria-hidden />
+      ) : (
+        <Moon width={18} height={18} aria-hidden />
+      )}
     </button>
   );
 }
@@ -80,7 +84,9 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4 md:flex">
         <div className="flex items-center gap-2 px-2 pb-6">
           <Logo size={26} />
-          <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{surface}</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+            {surface}
+          </span>
         </div>
         <nav className="flex flex-1 flex-col gap-1" aria-label={`${surface} navigation`}>
           {nav.map((item, index) => {
@@ -106,7 +112,9 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
         <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 py-3 backdrop-blur md:px-6">
           <div className="flex items-center gap-2 md:hidden">
             <Logo size={22} markOnly />
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{surface}</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              {surface}
+            </span>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {actions}
@@ -114,7 +122,9 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
           </div>
         </header>
 
-        <main className={cn('min-w-0 flex-1', dense ? 'p-4 md:p-6' : 'p-4 md:p-8', 'pb-24 md:pb-8')}>
+        <main
+          className={cn('min-w-0 flex-1', dense ? 'p-4 md:p-6' : 'p-4 md:p-8', 'pb-24 md:pb-8')}
+        >
           {children}
         </main>
       </div>

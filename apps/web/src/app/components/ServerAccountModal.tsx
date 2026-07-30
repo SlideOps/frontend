@@ -192,7 +192,8 @@ export function ServerAccountModal({
               <div className="flex flex-col gap-3">
                 <Text variant="body-sm" tone="secondary">
                   SlideOps connects to this server as {account.username} with a private key you
-                  supplied. Download it to use this account in another SSH client, then keep it safe.
+                  supplied. Download it to use this account in another SSH client, then keep it
+                  safe.
                 </Text>
                 <div>
                   <Button onClick={downloadKey} disabled={downloading} aria-busy={downloading}>
@@ -209,8 +210,8 @@ export function ServerAccountModal({
             ) : (
               <div className="flex flex-col gap-3">
                 <Text variant="body-sm" tone="secondary">
-                  SlideOps connects to this server as {account.username} with a password you supplied.
-                  Reveal it to copy it into another tool.
+                  SlideOps connects to this server as {account.username} with a password you
+                  supplied. Reveal it to copy it into another tool.
                 </Text>
                 <RevealValue
                   label="Password"

@@ -161,8 +161,8 @@ export function AutomationNew() {
       <div className="mb-6">
         <Text variant="h1">New Automation</Text>
         <Text variant="body" tone="secondary" className="mt-2 max-w-2xl">
-          Choose a Node and a Capability, fill in any inputs, and set a schedule. Every scheduled run
-          is auto-approved yet runs the full lifecycle and is recorded in History.
+          Choose a Node and a Capability, fill in any inputs, and set a schedule. Every scheduled
+          run is auto-approved yet runs the full lifecycle and is recorded in History.
         </Text>
       </div>
 

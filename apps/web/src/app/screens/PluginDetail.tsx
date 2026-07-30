@@ -51,15 +51,18 @@ export function PluginDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
 
-  const result = useAsyncData<PluginView>(async (signal) => {
-    // No Project here: the catalog is global, so only Core reads as installed and
-    // the Capability lookup resolves the Core security Capabilities by name.
-    const [plugin, capabilities] = await Promise.all([
-      getMarketplacePlugin(id, undefined, signal),
-      listCapabilities({}, signal),
-    ]);
-    return { plugin, capabilities };
-  }, [id]);
+  const result = useAsyncData<PluginView>(
+    async (signal) => {
+      // No Project here: the catalog is global, so only Core reads as installed and
+      // the Capability lookup resolves the Core security Capabilities by name.
+      const [plugin, capabilities] = await Promise.all([
+        getMarketplacePlugin(id, undefined, signal),
+        listCapabilities({}, signal),
+      ]);
+      return { plugin, capabilities };
+    },
+    [id],
+  );
 
   return (
     <OperatorShell active="marketplace">
@@ -163,9 +166,7 @@ export function PluginDetail() {
                   <Card className="h-fit flex-col gap-4">
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes width={18} height={18} className="text-brand" aria-hidden />
-                      <Text variant="h4">
-                        {isCore ? 'Built in' : 'Install this Plugin'}
-                      </Text>
+                      <Text variant="h4">{isCore ? 'Built in' : 'Install this Plugin'}</Text>
                       <Guidance for="marketplace.install" />
                     </div>
 
@@ -185,9 +186,9 @@ export function PluginDetail() {
                     ) : (
                       <div className="flex flex-col gap-4">
                         <Text variant="body-sm" tone="secondary">
-                          Plugins are installed per Project, not globally. Open the Project that needs
-                          this Plugin to install and configure it there; its Capabilities then become
-                          available inside that Project.
+                          Plugins are installed per Project, not globally. Open the Project that
+                          needs this Plugin to install and configure it there; its Capabilities then
+                          become available inside that Project.
                         </Text>
                         <Button
                           variant="secondary"

@@ -67,11 +67,7 @@ function ControlCard({
             {control.description}
           </Text>
         </div>
-        <Button
-          variant={control.engaged ? 'primary' : 'danger'}
-          disabled={busy}
-          onClick={onToggle}
-        >
+        <Button variant={control.engaged ? 'primary' : 'danger'} disabled={busy} onClick={onToggle}>
           {control.engaged ? 'Release' : 'Hold'}
         </Button>
       </div>
@@ -123,7 +119,10 @@ export function Emergency() {
       case 'lockdown':
         return run(emergencyLockdown, 'Every control is engaged. The platform is locked down.');
       case 'release-all':
-        return run(emergencyReleaseAll, 'Every control is released. The platform is running normally.');
+        return run(
+          emergencyReleaseAll,
+          'Every control is released. The platform is running normally.',
+        );
       case 'revoke-sessions':
         return run(async () => {
           const revoked = await revokeAllSessions();
@@ -232,11 +231,15 @@ export function Emergency() {
             <Text variant="h4">Everything at once</Text>
             <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
               For when the answer is to stop the platform and work out what happened afterwards.
-              Lockdown engages every control above; it does not sign anyone out and does not stop work
-              already executing.
+              Lockdown engages every control above; it does not sign anyone out and does not stop
+              work already executing.
             </Text>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button variant="danger" disabled={busy} onClick={() => setPending({ kind: 'lockdown' })}>
+              <Button
+                variant="danger"
+                disabled={busy}
+                onClick={() => setPending({ kind: 'lockdown' })}
+              >
                 <Lock width={16} height={16} aria-hidden />
                 Lockdown
               </Button>
@@ -255,8 +258,8 @@ export function Emergency() {
             <Text variant="h4">System users</Text>
             <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
               Ending every session is the control for a credential incident — the one thing no path
-              switch can reach. It signs you out along with everyone else, which is the point. Pair it
-              with holding new sign ins only if you are certain you can release that afterwards.
+              switch can reach. It signs you out along with everyone else, which is the point. Pair
+              it with holding new sign ins only if you are certain you can release that afterwards.
             </Text>
             <div className="mt-4">
               <Button

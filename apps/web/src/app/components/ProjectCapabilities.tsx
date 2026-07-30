@@ -159,12 +159,14 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
         <Guidance for="project.capabilities" />
       </div>
       <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an
-        Operation on one of this Project's servers; a Plugin Capability runs with this Project's
+        The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start
+        an Operation on one of this Project's servers; a Plugin Capability runs with this Project's
         context.
       </Text>
 
-      {state.status === 'loading' ? <Loading label="Loading the Capabilities for this Project" /> : null}
+      {state.status === 'loading' ? (
+        <Loading label="Loading the Capabilities for this Project" />
+      ) : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {ready ? (
         nodes.length === 0 ? (
@@ -188,7 +190,9 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
                 {nodes.map((node) => (
                   <option key={node.id} value={node.id}>
                     {node.name}
-                    {ready && !ready.assignedIDs.has(node.id) ? ' — not assigned to this Project' : ''}
+                    {ready && !ready.assignedIDs.has(node.id)
+                      ? ' — not assigned to this Project'
+                      : ''}
                   </option>
                 ))}
               </select>

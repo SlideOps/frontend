@@ -2,15 +2,7 @@ import { createElement, forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../lib/cn';
 
 export type TextVariant =
-  | 'display'
-  | 'h1'
-  | 'h2'
-  | 'h3'
-  | 'h4'
-  | 'body'
-  | 'body-sm'
-  | 'caption'
-  | 'code';
+  'display' | 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'body-sm' | 'caption' | 'code';
 
 export type TextTone = 'primary' | 'secondary' | 'brand' | 'accent';
 

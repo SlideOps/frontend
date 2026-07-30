@@ -29,7 +29,8 @@ export const guidance: GuidanceRegistry = {
   },
   'dashboard.health': {
     label: 'Health at a glance',
-    summary: 'A quick read on your Workspace: how many Nodes you have and how your recent Operations went.',
+    summary:
+      'A quick read on your Workspace: how many Nodes you have and how your recent Operations went.',
   },
   'dashboard.projects': {
     label: 'Projects',
@@ -37,13 +38,15 @@ export const guidance: GuidanceRegistry = {
   },
   'project.overview': {
     label: 'Project',
-    summary: 'The second level of the model: a Project runs a stack on one or more of your servers.',
+    summary:
+      'The second level of the model: a Project runs a stack on one or more of your servers.',
     detail:
       'You connect and secure your servers at the server level, then create a Project, assign the servers it runs on, install only the Plugins it needs, connect a repository, and deploy its Services. A Project carries its own stack, so each one holds only what it uses.',
   },
   'project.create': {
     label: 'Create a Project',
-    summary: 'Name a new Project and, optionally, describe what it runs. You assign servers and install its stack next.',
+    summary:
+      'Name a new Project and, optionally, describe what it runs. You assign servers and install its stack next.',
   },
   'project.name': {
     label: 'Name',
@@ -55,39 +58,46 @@ export const guidance: GuidanceRegistry = {
   },
   'project.servers': {
     label: 'Servers',
-    summary: 'The servers assigned to this Project. A server is connected and secured at the server level first, then assigned here.',
+    summary:
+      'The servers assigned to this Project. A server is connected and secured at the server level first, then assigned here.',
     detail:
       'A Project runs its stack and Services on the servers assigned to it. Assign a server you already connected and secured; unassigning returns it to the server level without touching the server itself.',
   },
   'project.assign': {
     label: 'Assign a server',
-    summary: 'Add one of your servers to this Project. Only servers not already in a Project can be assigned.',
+    summary:
+      'Add one of your servers to this Project. Only servers not already in a Project can be assigned.',
   },
   'project.stack': {
     label: 'Stack',
-    summary: 'The Plugins installed into this Project. Install only what this Project needs; each unlocks its Capabilities here.',
+    summary:
+      'The Plugins installed into this Project. Install only what this Project needs; each unlocks its Capabilities here.',
     detail:
       'This is the per-Project Marketplace. Installing, enabling, and uninstalling act on this Project, so it carries only the stack it uses. The Core security bundle is on every server and shows as built in, so it is never installed or removed here.',
   },
   'project.capabilities': {
     label: 'Capabilities available here',
-    summary: "The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an Operation on one of its servers.",
+    summary:
+      "The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an Operation on one of its servers.",
     detail:
       'A Core Capability runs on any server. A Plugin Capability runs only inside a Project that installed its Plugin, so starting one here carries this Project as its context. Assign a server to the Project first, since a Capability always runs on a server.',
   },
   'project.github': {
     label: 'GitHub',
-    summary: 'Connect GitHub so a Service with a repository source can clone on first deploy and pull on redeploys.',
+    summary:
+      'Connect GitHub so a Service with a repository source can clone on first deploy and pull on redeploys.',
     detail:
       'Connecting GitHub needs an OAuth app the platform registered. Once it is configured, connect your account to let deploys pull from your repositories. The access token is stored encrypted and never shown.',
   },
   'project.services': {
     label: 'Services',
-    summary: 'The Services deployed in this Project, each on one of its servers under hard resource limits.',
+    summary:
+      'The Services deployed in this Project, each on one of its servers under hard resource limits.',
   },
   'project.routing': {
     label: 'Routing',
-    summary: "The domain requests reach this Project by, and the host ports its Services occupy on each server.",
+    summary:
+      'The domain requests reach this Project by, and the host ports its Services occupy on each server.',
     detail:
       "Give this Project a domain, then point that domain's DNS at this Project's server: an A record to the server address, and an AAAA record too if you use IPv6. Once DNS resolves, set up a reverse proxy to serve the domain and send its requests to one of this Project's Services. The host ports listed here show which Project reaches which service on a shared server, so two Projects never collide on the same port.",
   },
@@ -130,7 +140,8 @@ export const guidance: GuidanceRegistry = {
   },
   'node.discover': {
     label: 'Discover',
-    summary: 'Connect read-only and gather the Facts about this Node. Discovery never changes anything.',
+    summary:
+      'Connect read-only and gather the Facts about this Node. Discovery never changes anything.',
     detail:
       'Discovery opens a read-only SSH connection and reads the state of the Node: its operating system, services, listening ports, and SSH posture. It never changes a single setting. Everything that follows is planned from what Discovery finds.',
   },
@@ -148,7 +159,8 @@ export const guidance: GuidanceRegistry = {
   },
   'node.health': {
     label: 'Health',
-    summary: 'A read-only look at this Node right now: CPU load, memory, disk, uptime, and services.',
+    summary:
+      'A read-only look at this Node right now: CPU load, memory, disk, uptime, and services.',
     detail:
       'Health connects read only over SSH and reads the current metrics, and a recent history when the monitoring log is present. It never changes the Node. Enable the monitoring Capability to keep a history you can chart here.',
   },
@@ -158,51 +170,60 @@ export const guidance: GuidanceRegistry = {
   },
   'server.posture': {
     label: 'Security posture',
-    summary: 'How this server is secured right now: the account SlideOps signs in as, how it signs in, and whether root can still sign in.',
+    summary:
+      'How this server is secured right now: the account SlideOps signs in as, how it signs in, and whether root can still sign in.',
     detail:
       'A secure server never lets SlideOps operate as root. This reads the connection account and, from the last quick check, whether root sign in is still permitted and whether password sign in is on. Anything the quick check has not read yet is shown as unknown rather than guessed.',
   },
   'server.secure': {
     label: 'Secure this server',
-    summary: 'A guided path to stop operating as root: create a non-root administrator, harden SSH, then switch SlideOps to the new account.',
+    summary:
+      'A guided path to stop operating as root: create a non-root administrator, harden SSH, then switch SlideOps to the new account.',
     detail:
       'SlideOps should never operate a server as root once it is connected. This checklist walks you through it in order: run the quick check, create a non-root administrator with full sudo, harden SSH so root can no longer sign in, then switch the stored credential to the new account. Each step is a normal Operation you review and approve, and the final switch verifies the new account can sign in before it changes anything.',
   },
   'server.secure.discover': {
     label: 'Run the quick check',
-    summary: 'Read the server over SSH first, so the steps that follow are planned from what is really there. It changes nothing.',
+    summary:
+      'Read the server over SSH first, so the steps that follow are planned from what is really there. It changes nothing.',
   },
   'server.secure.admin': {
     label: 'Create a non-root administrator',
-    summary: 'Create a dedicated account with full sudo so SlideOps never has to sign in as root. This opens an Operation you approve.',
+    summary:
+      'Create a dedicated account with full sudo so SlideOps never has to sign in as root. This opens an Operation you approve.',
     detail:
       'This launches the Create Application User Capability with full sudo. Give the account a username and a public key you hold. When you start it, the Operation opens at its plan for you to review and approve before anything runs.',
   },
   'server.secure.hardenSsh': {
     label: 'Harden SSH',
-    summary: 'Turn off direct root sign in over SSH, so the only way in is the non-root account you created. This opens an Operation you approve.',
+    summary:
+      'Turn off direct root sign in over SSH, so the only way in is the non-root account you created. This opens an Operation you approve.',
     detail:
       'This launches the Secure SSH Capability, which sets PermitRootLogin to no among other hardening. Do this only after the non-root administrator exists and works, so you are never left without a way in. The Operation opens at its plan for you to review and approve.',
   },
   'server.secure.rotate': {
     label: 'Switch to the new account',
-    summary: 'Point SlideOps at the non-root account. The new credential is verified before the switch, so a wrong one changes nothing.',
+    summary:
+      'Point SlideOps at the non-root account. The new credential is verified before the switch, so a wrong one changes nothing.',
     detail:
       'Once the non-root administrator exists and SSH is hardened, switch the stored connection credential to that account. SlideOps signs in with the new credential first and only switches if that succeeds, so a mistake here can never lock you out. From then on every Operation runs as the non-root account, never as root.',
   },
   'server.settings': {
     label: 'Server settings',
-    summary: 'Manage ongoing access to this server: rotate the connection credential and manage the accounts on it.',
+    summary:
+      'Manage ongoing access to this server: rotate the connection credential and manage the accounts on it.',
   },
   'server.credential': {
     label: 'Connection credential',
-    summary: 'Change the account or secret SlideOps signs in with. The new credential is verified before the switch, so you are never locked out.',
+    summary:
+      'Change the account or secret SlideOps signs in with. The new credential is verified before the switch, so you are never locked out.',
     detail:
       'This rotates the stored credential SlideOps uses to reach the server. You can move the connection to a different account at the same time. SlideOps signs in with the new credential before it switches, so if the new credential cannot sign in nothing changes and the old one keeps working.',
   },
   'server.credential.username': {
     label: 'Connection username',
-    summary: 'Leave this to keep the current account, or set a different account for SlideOps to sign in as.',
+    summary:
+      'Leave this to keep the current account, or set a different account for SlideOps to sign in as.',
   },
   'server.credential.authKind': {
     label: 'How to sign in',
@@ -210,27 +231,32 @@ export const guidance: GuidanceRegistry = {
   },
   'server.credential.secret': {
     label: 'New credential',
-    summary: 'The new password or private key. It is stored encrypted the moment it arrives and never shown again.',
+    summary:
+      'The new password or private key. It is stored encrypted the moment it arrives and never shown again.',
   },
   'server.users': {
     label: 'Server accounts',
-    summary: 'The accounts on this server and their access level. The account SlideOps connects with is protected and cannot be removed.',
+    summary:
+      'The accounts on this server and their access level. The account SlideOps connects with is protected and cannot be removed.',
     detail:
       'This reads the accounts on the server: full administrators, limited accounts with no sudo, and the built-in system accounts. The account SlideOps signs in with is marked and cannot be removed, so managing accounts never locks you out.',
   },
   'server.users.create': {
     label: 'Create or update an account',
-    summary: 'Add an account or reset its password, choosing whether it is a full administrator or a limited account. This opens an Operation you approve.',
+    summary:
+      'Add an account or reset its password, choosing whether it is a full administrator or a limited account. This opens an Operation you approve.',
     detail:
       'Give the account a username and, when you want to set or reset it, a password. Choose a full administrator with sudo, or a limited account with no sudo. This launches the manage-server-user Operation, which opens at its plan for you to review and approve.',
   },
   'server.users.remove': {
     label: 'Remove an account',
-    summary: 'Remove an account from the server. The connection account, root, and system accounts are protected and cannot be removed.',
+    summary:
+      'Remove an account from the server. The connection account, root, and system accounts are protected and cannot be removed.',
   },
   'reports.overview': {
     label: 'Reports',
-    summary: 'Generate a readable report from your Operations, verifications, discoveries, and metrics.',
+    summary:
+      'Generate a readable report from your Operations, verifications, discoveries, and metrics.',
     detail:
       'A report is generated on read from what SlideOps already holds. Pick a type, scope it to a Node if you like, and print it when you need a record. Nothing is changed to produce a report.',
   },
@@ -244,13 +270,15 @@ export const guidance: GuidanceRegistry = {
   },
   'capability.core': {
     label: 'Core and Plugin Capabilities',
-    summary: 'These are the Core security Capabilities, on every server. A Project unlocks more once its Plugin is installed.',
+    summary:
+      'These are the Core security Capabilities, on every server. A Project unlocks more once its Plugin is installed.',
     detail:
       'The Core security bundle is available on every Node with no Project: secure SSH, configure the firewall, create an application user, and manage packages and updates. Every other Capability comes from a Plugin and becomes available inside a Project once that Project installs the Plugin from the Marketplace.',
   },
   'capability.risk': {
     label: 'Risk',
-    summary: 'How much a Capability changes on the Node. You always review a plan before anything runs.',
+    summary:
+      'How much a Capability changes on the Node. You always review a plan before anything runs.',
   },
   'capability.category': {
     label: 'Category',
@@ -258,11 +286,13 @@ export const guidance: GuidanceRegistry = {
   },
   'capability.outcome': {
     label: 'Outcome',
-    summary: 'What this Capability achieves on a Node, stated as a result rather than a set of commands.',
+    summary:
+      'What this Capability achieves on a Node, stated as a result rather than a set of commands.',
   },
   'capability.intent': {
     label: 'Intent',
-    summary: 'Why this Capability exists and the goal it serves, so you choose it for the right reason.',
+    summary:
+      'Why this Capability exists and the goal it serves, so you choose it for the right reason.',
   },
   'capability.platforms': {
     label: 'Supported platforms',
@@ -272,13 +302,15 @@ export const guidance: GuidanceRegistry = {
   },
   'capability.verification': {
     label: 'How verification proves it',
-    summary: 'The way SlideOps confirms the outcome really happened before calling the Operation done.',
+    summary:
+      'The way SlideOps confirms the outcome really happened before calling the Operation done.',
     detail:
       'Every Operation ends by proving its result: SlideOps re-reads the Node and, where it matters, opens a fresh connection so a change that would lock you out is caught. The evidence is shown with each check.',
   },
   'capability.start': {
     label: 'Start an Operation',
-    summary: 'Choose a Node, fill in any inputs, and open the plan. Nothing runs until you approve it.',
+    summary:
+      'Choose a Node, fill in any inputs, and open the plan. Nothing runs until you approve it.',
     detail:
       'Some Capabilities need a few inputs, such as a domain or a path. Those are shown as a form here, each field with its own guidance and validation. When you start, the Operation opens at its plan for you to review and approve.',
   },
@@ -378,25 +410,29 @@ export const guidance: GuidanceRegistry = {
   },
   'notifications.center': {
     label: 'Notifications',
-    summary: 'A running list of your Operation results: what completed and whether verification passed.',
+    summary:
+      'A running list of your Operation results: what completed and whether verification passed.',
     detail:
       'As your Operations finish, their results appear here in real time over the same live connection that drives the terminal. Open one to jump straight to its full record. Nothing here leaves your Workspace.',
   },
   'notifications.push': {
     label: 'Browser notifications',
-    summary: 'Let SlideOps notify you when an Operation completes, even when this tab is in the background.',
+    summary:
+      'Let SlideOps notify you when an Operation completes, even when this tab is in the background.',
     detail:
       'Turn this on to receive a notification from your browser the moment an Operation completes or its verification result is in, so you do not have to watch the screen. Your browser asks for permission first, and you can turn it off at any time.',
   },
   'automation.approval': {
     label: 'Scheduled runs are auto-approved',
-    summary: 'Setting up an Automation is your standing approval for its runs, so scheduled Operations run without a fresh approval.',
+    summary:
+      'Setting up an Automation is your standing approval for its runs, so scheduled Operations run without a fresh approval.',
     detail:
       'An Automation is a saved intent to run a Capability on a Node on a schedule. Creating it is your approval for those runs, so each scheduled Operation is auto-approved. It still runs the full lifecycle of discover, assess, plan, execute, and verify, always lands in History, and always respects emergency pause and Operator suspend.',
   },
   'automation.schedule': {
     label: 'Schedule',
-    summary: 'How often this Automation runs. Times are in UTC so a run never shifts with your clock.',
+    summary:
+      'How often this Automation runs. Times are in UTC so a run never shifts with your clock.',
     detail:
       'Choose hourly, daily, weekly, or monthly, and the time or day the run needs. SlideOps computes the next run from this and shows it back to you in plain language.',
   },
@@ -406,78 +442,93 @@ export const guidance: GuidanceRegistry = {
   },
   'marketplace.overview': {
     label: 'Marketplace',
-    summary: 'Browse first-party Plugins here, then install the ones a Project needs from inside that Project.',
+    summary:
+      'Browse first-party Plugins here, then install the ones a Project needs from inside that Project.',
     detail:
       'A Plugin is a first-party bundle of Capabilities and Providers behind one manifest. The Core security bundle is pre-installed on every server; every other Plugin is installed per Project, so a Project carries only the stack it needs. This catalog is for browsing; open a Project to install a Plugin there. Everything a Plugin adds runs inside the same discover, plan, approve, execute, and verify loop as the rest of SlideOps.',
   },
   'marketplace.perProject': {
     label: 'Installed per Project',
-    summary: 'Plugins install into a Project, not globally. Open a Project to install and configure the ones it needs.',
+    summary:
+      'Plugins install into a Project, not globally. Open a Project to install and configure the ones it needs.',
     detail:
       'Only the Core security bundle is pre-installed and always available. Every other Plugin is installed per Project, so each Project carries only the stack it uses. This catalog stays global for browsing; the install, configure, enable, and uninstall actions live inside a Project.',
   },
   'marketplace.search': {
     label: 'Search by outcome',
-    summary: 'Search for the outcome you want, such as a database or a runtime, not the technology.',
+    summary:
+      'Search for the outcome you want, such as a database or a runtime, not the technology.',
   },
   'marketplace.manifest': {
     label: 'What it does',
-    summary: 'The Plugin manifest in plain language: what it delivers and the version you would install.',
+    summary:
+      'The Plugin manifest in plain language: what it delivers and the version you would install.',
   },
   'marketplace.provides': {
     label: 'Capabilities it adds',
-    summary: 'The Capabilities this Plugin unlocks. Once it is installed and enabled, each one runs like any other.',
+    summary:
+      'The Capabilities this Plugin unlocks. Once it is installed and enabled, each one runs like any other.',
   },
   'marketplace.permissions': {
     label: 'Permissions',
-    summary: 'What this Plugin is allowed to do on your Nodes, stated plainly before you install it.',
+    summary:
+      'What this Plugin is allowed to do on your Nodes, stated plainly before you install it.',
   },
   'marketplace.install': {
     label: 'Install',
-    summary: 'Plugins install into a Project. Open the Project you want, then install and configure it there.',
+    summary:
+      'Plugins install into a Project. Open the Project you want, then install and configure it there.',
     detail:
       'Installing is per Project: a Plugin unlocks its Capabilities inside the Project it is installed in. When a Plugin needs configuration, the form is generated from its manifest, each field validated the same way a Capability input is. Secret values are stored encrypted and redacted afterward.',
   },
   'marketplace.reconfigure': {
     label: 'Reconfigure',
-    summary: 'Change this Plugin configuration. Secret values are redacted, so re-enter them to change them.',
+    summary:
+      'Change this Plugin configuration. Secret values are redacted, so re-enter them to change them.',
   },
   'marketplace.enabled': {
     label: 'Enable or disable',
-    summary: 'Disable a Plugin to hold back its Capabilities without uninstalling it. Enable it to bring them back.',
+    summary:
+      'Disable a Plugin to hold back its Capabilities without uninstalling it. Enable it to bring them back.',
   },
   'capability.source': {
     label: 'Source',
-    summary: 'Where this Capability comes from: the pre-installed Core bundle, or the Plugin that added it.',
+    summary:
+      'Where this Capability comes from: the pre-installed Core bundle, or the Plugin that added it.',
   },
   'capability.matrix': {
     label: 'Capability matrix',
-    summary: 'Which Capabilities apply to which platforms, generated from the Providers behind each one.',
+    summary:
+      'Which Capabilities apply to which platforms, generated from the Providers behind each one.',
     detail:
       'The matrix is generated from the Provider registry, not hand maintained, so it always reflects what will actually run. A check means a Capability is supported on that platform.',
   },
 
   'tier.panel': {
     label: 'Tier and usage',
-    summary: 'Your tier fixes how much you can run. Each meter shows what you are using against the limit.',
+    summary:
+      'Your tier fixes how much you can run. Each meter shows what you are using against the limit.',
     detail:
       'Every Operator sits on a tier that sets hard ceilings on Nodes, Projects, Services, and the total vCPU and memory your Services may allocate. This panel reads your current usage against those ceilings so you can see your headroom. When a meter is close to full, remove something or ask an admin to raise your tier.',
   },
   'services.overview': {
     label: 'Services',
-    summary: 'A Service is one solution running on a Node under hard resource limits your tier allows.',
+    summary:
+      'A Service is one solution running on a Node under hard resource limits your tier allows.',
     detail:
       'A Service is a deployed solution: a container or a systemd unit running on one of your Nodes inside a Project, with hard CPU, memory, and process limits. Deploying is your explicit intent, so it is not routed through the Operation approval gate, but it still streams progress and always verifies the workload is actually running.',
   },
   'services.deploy': {
     label: 'Deploy a Service',
-    summary: 'Choose a Project and Node, a source, a runtime, and limits within your remaining quota.',
+    summary:
+      'Choose a Project and Node, a source, a runtime, and limits within your remaining quota.',
     detail:
       'A deploy runs one workload on a Node under the limits you set. The CPU and memory limits are constrained to what your tier leaves. SlideOps runs the workload with those limits applied and verifies it is up before marking it running.',
   },
   'services.quota': {
     label: 'Remaining quota',
-    summary: 'How much of your tier is still free for a new Service: Services left, vCPU, and memory.',
+    summary:
+      'How much of your tier is still free for a new Service: Services left, vCPU, and memory.',
   },
   'service.name': {
     label: 'Name',
@@ -499,7 +550,8 @@ export const guidance: GuidanceRegistry = {
   },
   'service.source': {
     label: 'Source',
-    summary: 'Where the workload comes from: a prebuilt image, or a repository cloned and built first.',
+    summary:
+      'Where the workload comes from: a prebuilt image, or a repository cloned and built first.',
   },
   'service.image': {
     label: 'Image',
@@ -517,17 +569,20 @@ export const guidance: GuidanceRegistry = {
   },
   'service.githubRepo': {
     label: 'From GitHub',
-    summary: 'Pick a repository from your connected GitHub account to fill the URL and branch for you.',
+    summary:
+      'Pick a repository from your connected GitHub account to fill the URL and branch for you.',
     detail:
       'When GitHub is connected, the repositories you can reach are listed here. Choosing one fills the repository URL and defaults the branch to that repository default branch. You can still edit both afterward.',
   },
   'service.command': {
     label: 'Command',
-    summary: 'The command the workload runs. A systemd Service needs one; a container may override its entrypoint.',
+    summary:
+      'The command the workload runs. A systemd Service needs one; a container may override its entrypoint.',
   },
   'service.cpu': {
     label: 'vCPU limit',
-    summary: 'The hard CPU ceiling, in vCPU, for example 0.5. It cannot exceed your remaining quota.',
+    summary:
+      'The hard CPU ceiling, in vCPU, for example 0.5. It cannot exceed your remaining quota.',
   },
   'service.memory': {
     label: 'Memory limit',
@@ -543,15 +598,18 @@ export const guidance: GuidanceRegistry = {
   },
   'service.env': {
     label: 'Environment',
-    summary: 'Environment variables, one per line as KEY=value. Secret values are stored encrypted and redacted.',
+    summary:
+      'Environment variables, one per line as KEY=value. Secret values are stored encrypted and redacted.',
   },
   'service.metrics': {
     label: 'Live usage',
-    summary: 'The current CPU and memory this Service is using against its limit, read live from the Node.',
+    summary:
+      'The current CPU and memory this Service is using against its limit, read live from the Node.',
   },
   'service.lifecycle': {
     label: 'Actions',
-    summary: 'Start, stop, or restart the running workload, or remove the Service and free its allocation.',
+    summary:
+      'Start, stop, or restart the running workload, or remove the Service and free its allocation.',
     detail:
       'These act on the running workload on the Node. Stop halts it without removing it; start brings a stopped Service back; restart cycles it. Remove stops and removes the workload and frees the vCPU and memory it held.',
   },
@@ -568,7 +626,8 @@ export const guidance: GuidanceRegistry = {
   },
   'service.preview': {
     label: 'Preview',
-    summary: 'The live running Service, reached over the secure SSH tunnel so its port stays private.',
+    summary:
+      'The live running Service, reached over the secure SSH tunnel so its port stays private.',
     detail:
       'This embeds the running app itself, proxied over the same SSH tunnel that reaches the Node, so nothing is exposed publicly. It appears once the Service is running and publishes a port. An app that relies on absolute asset paths may render imperfectly here; open it in a new tab for the full experience.',
   },
@@ -576,7 +635,8 @@ export const guidance: GuidanceRegistry = {
   // Admin control-plane guidance. Cross-tenant read for oversight only.
   'overview.health': {
     label: 'Platform health',
-    summary: 'A calm read on the platform: services, queues, and live Operations across all tenants.',
+    summary:
+      'A calm read on the platform: services, queues, and live Operations across all tenants.',
     detail:
       'The Admin surface reads across tenants for oversight only. It shows platform health, active Operations everywhere, and headline analytics, without ever acting on an Operator Node directly.',
   },
@@ -586,7 +646,8 @@ export const guidance: GuidanceRegistry = {
   },
   'overview.operators': {
     label: 'Operators',
-    summary: 'The Operators on the platform. Cross-tenant read is limited to oversight and support.',
+    summary:
+      'The Operators on the platform. Cross-tenant read is limited to oversight and support.',
   },
   'overview.nodes': {
     label: 'Nodes',
@@ -614,7 +675,8 @@ export const guidance: GuidanceRegistry = {
   },
   'operators.tier': {
     label: 'Tier',
-    summary: 'Set the tier this Operator sits on, which fixes their Node, Project, Service, vCPU, and memory ceilings.',
+    summary:
+      'Set the tier this Operator sits on, which fixes their Node, Project, Service, vCPU, and memory ceilings.',
     detail:
       'Each Operator sits on one of four tiers: free, starter, pro, or enterprise. The tier sets hard ceilings on how many Nodes, Projects, and Services they may run and the total vCPU and memory their Services may allocate. Changing it takes effect immediately and is written to the audit trail.',
   },
@@ -664,7 +726,8 @@ export const guidance: GuidanceRegistry = {
   },
   'overview.emergency': {
     label: 'Emergency controls',
-    summary: 'Pause or resume executions platform wide. Every action is confirmed and fully audited.',
+    summary:
+      'Pause or resume executions platform wide. Every action is confirmed and fully audited.',
     detail:
       'Emergency controls are first-class, audited actions. Pausing all executions, or suspending a single Operator execution, always asks for confirmation and is written to the immutable audit trail.',
   },

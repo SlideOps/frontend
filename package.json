@@ -16,7 +16,9 @@
     "fmt": "prettier --write \"**/*.{ts,tsx,css,json,md}\""
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",

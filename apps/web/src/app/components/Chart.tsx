@@ -1,4 +1,9 @@
-import { prefersReducedMotion, resolveChartPalette, useTheme, type ChartPalette } from '@slideops/design-system';
+import {
+  prefersReducedMotion,
+  resolveChartPalette,
+  useTheme,
+  type ChartPalette,
+} from '@slideops/design-system';
 import * as echarts from 'echarts';
 import { useEffect, useRef } from 'react';
 
@@ -55,10 +60,7 @@ export function Chart({ build, ariaLabel, height = 260, className }: ChartProps)
     }
     const palette = resolveChartPalette();
     const option = build(palette);
-    chart.setOption(
-      { animation: !prefersReducedMotion(), ...option },
-      { notMerge: true },
-    );
+    chart.setOption({ animation: !prefersReducedMotion(), ...option }, { notMerge: true });
   }, [build, resolved]);
 
   return (

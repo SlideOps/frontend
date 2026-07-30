@@ -8,16 +8,22 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { LazyChart } from '../components/LazyChart';
 import { StatTile } from '../components/StatTile';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { capabilityUsageOption, operationsOverTimeOption, statusBreakdownOption } from '../charts/options';
+import {
+  capabilityUsageOption,
+  operationsOverTimeOption,
+  statusBreakdownOption,
+} from '../charts/options';
 
 /** The Admin overview: headline numbers, a status breakdown, and two charts. */
 export function Overview() {
   const overview = useAsyncData((signal) => getOverview(signal), []);
   const analytics = useAsyncData((signal) => getAnalytics(signal), []);
 
-  const overTime = analytics.state.status === 'ready' ? analytics.state.data.operations_over_time : [];
+  const overTime =
+    analytics.state.status === 'ready' ? analytics.state.data.operations_over_time : [];
   const usage = analytics.state.status === 'ready' ? analytics.state.data.capability_usage : [];
-  const byStatus = overview.state.status === 'ready' ? overview.state.data.operations_by_status : {};
+  const byStatus =
+    overview.state.status === 'ready' ? overview.state.data.operations_by_status : {};
 
   const buildOverTime = useCallback(
     (palette: ChartPalette) => operationsOverTimeOption(palette, overTime),
@@ -50,7 +56,11 @@ export function Overview() {
               value={overview.state.data.operators_total}
               guidanceKey="overview.operators"
             />
-            <StatTile label="Nodes" value={overview.state.data.nodes_total} guidanceKey="overview.nodes" />
+            <StatTile
+              label="Nodes"
+              value={overview.state.data.nodes_total}
+              guidanceKey="overview.nodes"
+            />
             <StatTile
               label="Operations"
               value={overview.state.data.operations_total}
@@ -84,7 +94,9 @@ export function Overview() {
             <div className="flex items-center gap-2">
               <Text variant="body-sm" className="font-medium">
                 Executions are{' '}
-                {overview.state.data.executions_paused ? 'paused platform wide' : 'running normally'}
+                {overview.state.data.executions_paused
+                  ? 'paused platform wide'
+                  : 'running normally'}
               </Text>
               <Guidance for="overview.emergency" />
             </div>

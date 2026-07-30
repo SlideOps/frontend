@@ -99,7 +99,10 @@ export function Audit() {
                     </TD>
                     <TD className="whitespace-nowrap font-medium">{entry.action}</TD>
                     <TD className="text-ink-muted">{entry.target}</TD>
-                    <TD className="max-w-xs truncate text-ink-muted" title={metadataSummary(entry.metadata)}>
+                    <TD
+                      className="max-w-xs truncate text-ink-muted"
+                      title={metadataSummary(entry.metadata)}
+                    >
                       {metadataSummary(entry.metadata)}
                     </TD>
                     <TD className="whitespace-nowrap text-ink-muted">{entry.ip}</TD>

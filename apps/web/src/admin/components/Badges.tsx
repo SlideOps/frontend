@@ -6,8 +6,7 @@ import type { OperationStatus, OperatorStatus } from '@slideops/api-client';
  * so the badges read correctly in both themes and never hard-code a value.
  */
 
-const badgeBase =
-  'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium';
+const badgeBase = 'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium';
 
 type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -64,7 +63,5 @@ const operatorLabel: Record<OperatorStatus, string> = {
 
 export function OperatorStatusBadge({ status }: { status: OperatorStatus }) {
   const tone = operatorTone[status] ?? 'neutral';
-  return (
-    <span className={cn(badgeBase, toneClass[tone])}>{operatorLabel[status] ?? status}</span>
-  );
+  return <span className={cn(badgeBase, toneClass[tone])}>{operatorLabel[status] ?? status}</span>;
 }

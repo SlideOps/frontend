@@ -1,8 +1,4 @@
-import {
-  listAdminOperations,
-  listOperators,
-  type OperationStatus,
-} from '@slideops/api-client';
+import { listAdminOperations, listOperators, type OperationStatus } from '@slideops/api-client';
 import { Text } from '@slideops/design-system';
 import { Activity } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
@@ -43,10 +39,7 @@ export function Operations() {
     () => ({ status: status || undefined, operator_id: operatorId || undefined }),
     [status, operatorId],
   );
-  const { state } = useAsyncData(
-    (signal) => listAdminOperations(filter, signal),
-    [filter],
-  );
+  const { state } = useAsyncData((signal) => listAdminOperations(filter, signal), [filter]);
 
   return (
     <AdminShell active="operations">

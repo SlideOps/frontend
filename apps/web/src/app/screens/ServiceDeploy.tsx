@@ -113,8 +113,8 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
   // The ports and environment boxes are free text, and the resolver only reports
   // on them at submit. The plan does not go through submit, so surface the same
   // message there rather than silently dropping what could not be read.
-  const plannedIssues = [plannedPorts.error, plannedEnv.error].filter(
-    (issue): issue is string => Boolean(issue),
+  const plannedIssues = [plannedPorts.error, plannedEnv.error].filter((issue): issue is string =>
+    Boolean(issue),
   );
 
   // Filling in a repository from the connected GitHub account sets the clone URL
@@ -202,7 +202,9 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 </option>
               ))}
             </select>
-            {errors.node_id ? <p className="text-sm text-danger">{errors.node_id.message}</p> : null}
+            {errors.node_id ? (
+              <p className="text-sm text-danger">{errors.node_id.message}</p>
+            ) : null}
           </div>
         </div>
 
@@ -213,7 +215,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-              <input type="radio" value="container" className="mt-0.5 accent-brand" {...register('runtime')} />
+              <input
+                type="radio"
+                value="container"
+                className="mt-0.5 accent-brand"
+                {...register('runtime')}
+              />
               <span>
                 <span className="font-medium text-ink">Container</span>
                 <span className="mt-0.5 block text-ink-muted">
@@ -222,7 +229,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-              <input type="radio" value="systemd" className="mt-0.5 accent-brand" {...register('runtime')} />
+              <input
+                type="radio"
+                value="systemd"
+                className="mt-0.5 accent-brand"
+                {...register('runtime')}
+              />
               <span>
                 <span className="font-medium text-ink">systemd</span>
                 <span className="mt-0.5 block text-ink-muted">
@@ -231,7 +243,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-              <input type="radio" value="compose" className="mt-0.5 accent-brand" {...register('runtime')} />
+              <input
+                type="radio"
+                value="compose"
+                className="mt-0.5 accent-brand"
+                {...register('runtime')}
+              />
               <span>
                 <span className="font-medium text-ink">Compose stack</span>
                 <span className="mt-0.5 block text-ink-muted">
@@ -251,17 +268,29 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-              <input type="radio" value="image" className="mt-0.5 accent-brand" {...register('source_type')} />
+              <input
+                type="radio"
+                value="image"
+                className="mt-0.5 accent-brand"
+                {...register('source_type')}
+              />
               <span>
                 <span className="font-medium text-ink">Image</span>
                 <span className="mt-0.5 block text-ink-muted">Run a prebuilt image.</span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-              <input type="radio" value="repository" className="mt-0.5 accent-brand" {...register('source_type')} />
+              <input
+                type="radio"
+                value="repository"
+                className="mt-0.5 accent-brand"
+                {...register('source_type')}
+              />
               <span>
                 <span className="font-medium text-ink">Repository</span>
-                <span className="mt-0.5 block text-ink-muted">Clone a repository and build it first.</span>
+                <span className="mt-0.5 block text-ink-muted">
+                  Clone a repository and build it first.
+                </span>
               </span>
             </label>
           </div>
@@ -301,8 +330,8 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 </select>
                 <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
                   <GitBranch width={14} height={14} aria-hidden />
-                  Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository fills
-                  the URL and branch below.
+                  Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository
+                  fills the URL and branch below.
                 </Text>
               </div>
             ) : null}
@@ -385,9 +414,9 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           />
           <Text variant="body-sm" tone="secondary">
             The port your application listens on inside its container, one per line.{' '}
-            <strong className="font-medium text-ink">SlideOps picks the public port</strong> and gives
-            this Service its own web address, so two applications on one server can never take each
-            other&apos;s port. To choose the public port yourself, write it as{' '}
+            <strong className="font-medium text-ink">SlideOps picks the public port</strong> and
+            gives this Service its own web address, so two applications on one server can never take
+            each other&apos;s port. To choose the public port yourself, write it as{' '}
             <code>host:container</code>.
           </Text>
           {errors.ports ? <p className="text-sm text-danger">{errors.ports.message}</p> : null}
@@ -404,15 +433,17 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
             id="env"
             rows={3}
             spellCheck={false}
-            placeholder={'DATABASE_URL=postgres://user@host:5432/db\nsecret:SECRET_ENCRYPTION_KEY=…'}
+            placeholder={
+              'DATABASE_URL=postgres://user@host:5432/db\nsecret:SECRET_ENCRYPTION_KEY=…'
+            }
             className={`resize-y py-2 font-mono ${inputClass.replace('h-10', '')} ${errors.env ? 'border-danger' : ''}`}
             {...register('env')}
           />
           <Text variant="body-sm" tone="secondary">
             One variable per line, written <code>KEY=value</code>. Prefix a line with{' '}
-            <code>secret:</code> to seal that value: it is encrypted, never shown again, and revealed
-            only to the deploy itself. Anything unprefixed is stored as you typed it and stays
-            readable, so seal what is sensitive and leave the rest plain.
+            <code>secret:</code> to seal that value: it is encrypted, never shown again, and
+            revealed only to the deploy itself. Anything unprefixed is stored as you typed it and
+            stays readable, so seal what is sensitive and leave the rest plain.
           </Text>
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
@@ -434,9 +465,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               ports={plannedPorts.ports}
               env={plannedEnv.env}
               issues={plannedIssues}
-              onDeployed={(serviceID) =>
-                navigate(`/app/services/${serviceID}`, { replace: true })
-              }
+              onDeployed={(serviceID) => navigate(`/app/services/${serviceID}`, { replace: true })}
             />
           </div>
         ) : null}
@@ -494,7 +523,8 @@ export function ServiceDeploy() {
                 <Text variant="h4">A Project and a Node come first</Text>
                 <Text variant="body-sm" tone="secondary" className="mt-1">
                   A Service runs on a Node inside a Project. Connect a Node
-                  {state.data.projects.length === 0 ? ' and create a Project' : ''} before deploying.
+                  {state.data.projects.length === 0 ? ' and create a Project' : ''} before
+                  deploying.
                 </Text>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {state.data.nodes.length === 0 ? (

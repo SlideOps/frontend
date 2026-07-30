@@ -22,14 +22,19 @@ function shortTime(at?: string): string {
     return '';
   }
   const date = new Date(at);
-  return Number.isNaN(date.getTime()) ? at : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(date.getTime())
+    ? at
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 /**
  * A Node's recent health: memory and root disk used as percentages, on one axis,
  * with CPU load on a second axis. Missing readings are simply omitted.
  */
-export function nodeHealthOption(palette: ChartPalette, history: NodeMetricSample[]): EChartsOption {
+export function nodeHealthOption(
+  palette: ChartPalette,
+  history: NodeMetricSample[],
+): EChartsOption {
   const times = history.map((sample) => shortTime(sample.at));
   return {
     grid: { top: 28, right: 44, bottom: 28, left: 40 },

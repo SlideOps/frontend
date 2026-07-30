@@ -50,7 +50,11 @@ export interface Report {
 }
 
 /** Generate a report of the given type, optionally scoped to one Node. */
-export function getReport(type: ReportType, nodeId?: string, signal?: AbortSignal): Promise<Report> {
+export function getReport(
+  type: ReportType,
+  nodeId?: string,
+  signal?: AbortSignal,
+): Promise<Report> {
   return apiRequest<{ report?: Report } & Partial<Report>>('/reports', {
     query: { type, node_id: nodeId },
     signal,

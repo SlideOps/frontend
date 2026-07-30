@@ -69,8 +69,7 @@ export interface MfaSetup {
  * is granted.
  */
 export type LoginResult =
-  | { kind: 'authenticated'; operator: Operator }
-  | { kind: 'mfa_required'; challenge: string };
+  { kind: 'authenticated'; operator: Operator } | { kind: 'mfa_required'; challenge: string };
 
 interface OperatorEnvelope {
   operator?: Operator;

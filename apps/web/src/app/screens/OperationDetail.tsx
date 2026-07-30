@@ -50,12 +50,7 @@ const OperationTerminal = lazy(() =>
 
 /** A live indicator for the event stream connection. */
 function StreamIndicator({ status }: { status: StreamStatus }) {
-  const label =
-    status === 'open'
-      ? 'Live'
-      : status === 'closed'
-        ? 'Stream closed'
-        : 'Reconnecting';
+  const label = status === 'open' ? 'Live' : status === 'closed' ? 'Stream closed' : 'Reconnecting';
   const tone = status === 'open' ? 'text-success' : 'text-ink-muted';
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs ${tone}`} role="status">
@@ -184,7 +179,12 @@ export function OperationDetail() {
   if (loadError && !operation) {
     return (
       <OperatorShell active="operations">
-        <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/app/operations')}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4"
+          onClick={() => navigate('/app/operations')}
+        >
           <ArrowLeft width={16} height={16} aria-hidden />
           History
         </Button>
@@ -204,11 +204,17 @@ export function OperationDetail() {
   const status = operation.status;
   const isPreExecution = PRE_EXECUTION.includes(status);
   const isRunning = RUNNING.includes(status);
-  const hasExecution = isRunning || status === 'completed' || status === 'failed' || status === 'cancelled';
+  const hasExecution =
+    isRunning || status === 'completed' || status === 'failed' || status === 'cancelled';
 
   return (
     <OperatorShell active="operations">
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/app/operations')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+        onClick={() => navigate('/app/operations')}
+      >
         <ArrowLeft width={16} height={16} aria-hidden />
         History
       </Button>
@@ -254,7 +260,12 @@ export function OperationDetail() {
 
       {status === 'cancelled' ? (
         <div className="mb-6 flex items-start gap-3 rounded-md border border-border bg-subtle px-4 py-3">
-          <AlertTriangle width={18} height={18} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+          <AlertTriangle
+            width={18}
+            height={18}
+            className="mt-0.5 shrink-0 text-warning"
+            aria-hidden
+          />
           <Text variant="body-sm" tone="secondary">
             This Operation was cancelled. Nothing further will run.
           </Text>
@@ -282,7 +293,11 @@ export function OperationDetail() {
               <PlanReview plan={operation.plan} />
               <Card>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button size="lg" onClick={approve} disabled={approving || status !== 'awaiting_approval'}>
+                  <Button
+                    size="lg"
+                    onClick={approve}
+                    disabled={approving || status !== 'awaiting_approval'}
+                  >
                     {approving ? 'Approving' : 'Approve and run'}
                   </Button>
                   <Guidance for="operation.approve" />

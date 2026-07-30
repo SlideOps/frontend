@@ -71,8 +71,7 @@ export function normalizeError(status: number, body: unknown): ApiError {
       outer.error && typeof outer.error === 'object' ? outer.error : outer
     ) as BackendErrorShape;
     const code = typeof shape.code === 'string' ? shape.code : 'unknown_error';
-    const message =
-      typeof shape.message === 'string' ? shape.message : unparseableMessage(status);
+    const message = typeof shape.message === 'string' ? shape.message : unparseableMessage(status);
     return new ApiError(status, code, message, shape.details);
   }
   return new ApiError(status, 'unknown_error', unparseableMessage(status));

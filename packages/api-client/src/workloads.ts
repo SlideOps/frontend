@@ -54,8 +54,8 @@ export interface AdoptWorkloadInput {
  * changes nothing on it.
  */
 export function listNodeWorkloads(nodeId: string, signal?: AbortSignal): Promise<Workload[]> {
-  return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/workloads`, { signal }).then((r) =>
-    unwrap<Workload[]>(r, 'workloads'),
+  return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/workloads`, { signal }).then(
+    (r) => unwrap<Workload[]>(r, 'workloads'),
   );
 }
 

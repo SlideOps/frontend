@@ -1,9 +1,4 @@
-import {
-  ApiError,
-  listAdminTiers,
-  updateAdminTier,
-  type AdminTier,
-} from '@slideops/api-client';
+import { ApiError, listAdminTiers, updateAdminTier, type AdminTier } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
 import { Check, Layers } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';

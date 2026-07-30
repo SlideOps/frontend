@@ -65,13 +65,7 @@ const INVALID_DOMAIN_HINT = 'That does not look like a domain. Use something lik
  * this Project holds so it is clear which Project a request reaches, and can jump
  * to the reverse-proxy Capability to route the domain to a Service.
  */
-export function ProjectRouting({
-  projectId,
-  domain,
-}: {
-  projectId: string;
-  domain: string;
-}) {
+export function ProjectRouting({ projectId, domain }: { projectId: string; domain: string }) {
   const navigate = useNavigate();
   const { state } = useAsyncData((signal) => loadRouting(projectId, signal), [projectId]);
 
@@ -114,8 +108,8 @@ export function ProjectRouting({
         <Guidance for="project.routing" />
       </div>
       <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        Give this Project a domain so requests reach it by name, and see which host ports its Services
-        occupy on each server so it stays clear which Project a request reaches.
+        Give this Project a domain so requests reach it by name, and see which host ports its
+        Services occupy on each server so it stays clear which Project a request reaches.
       </Text>
 
       <div className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-5">
@@ -127,8 +121,7 @@ export function ProjectRouting({
           </div>
           {savedDomain ? (
             <Text variant="body-sm" tone="secondary" className="mb-3">
-              This Project answers to{' '}
-              <span className="font-medium text-ink">{savedDomain}</span>.
+              This Project answers to <span className="font-medium text-ink">{savedDomain}</span>.
             </Text>
           ) : (
             <Text variant="body-sm" tone="secondary" className="mb-3">
@@ -170,9 +163,9 @@ export function ProjectRouting({
           ) : null}
 
           <Text variant="body-sm" tone="secondary" className="mt-3 max-w-2xl">
-            Point the domain's DNS at this Project's server: an A record to the server address, and an
-            AAAA record too if you use IPv6. Once it resolves, set up a reverse proxy to serve the
-            domain and route its requests to one of this Project's Services.
+            Point the domain's DNS at this Project's server: an A record to the server address, and
+            an AAAA record too if you use IPv6. Once it resolves, set up a reverse proxy to serve
+            the domain and route its requests to one of this Project's Services.
           </Text>
         </div>
 
@@ -213,8 +206,8 @@ export function ProjectRouting({
         {firstServer ? (
           <div className="border-t border-border pt-5">
             <Text variant="body-sm" tone="secondary" className="mb-3 max-w-2xl">
-              Route the domain to a Service with a reverse proxy. The Capability guides the rest, from
-              the plan to the verification.
+              Route the domain to a Service with a reverse proxy. The Capability guides the rest,
+              from the plan to the verification.
             </Text>
             <Button
               variant="secondary"

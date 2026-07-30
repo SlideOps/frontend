@@ -27,7 +27,9 @@ import { useAuthStore } from './store/auth';
  */
 
 // Operator area.
-const Workspace = lazy(() => import('./app/screens/Workspace').then((m) => ({ default: m.Workspace })));
+const Workspace = lazy(() =>
+  import('./app/screens/Workspace').then((m) => ({ default: m.Workspace })),
+);
 const Nodes = lazy(() => import('./app/screens/Nodes').then((m) => ({ default: m.Nodes })));
 const NodeRegister = lazy(() =>
   import('./app/screens/NodeRegister').then((m) => ({ default: m.NodeRegister })),
@@ -41,7 +43,9 @@ const Projects = lazy(() =>
 const ProjectDetail = lazy(() =>
   import('./app/screens/ProjectDetail').then((m) => ({ default: m.ProjectDetail })),
 );
-const Services = lazy(() => import('./app/screens/Services').then((m) => ({ default: m.Services })));
+const Services = lazy(() =>
+  import('./app/screens/Services').then((m) => ({ default: m.Services })),
+);
 const ServiceDeploy = lazy(() =>
   import('./app/screens/ServiceDeploy').then((m) => ({ default: m.ServiceDeploy })),
 );
@@ -86,11 +90,15 @@ const OperationDetail = lazy(() =>
   import('./app/screens/OperationDetail').then((m) => ({ default: m.OperationDetail })),
 );
 const Reports = lazy(() => import('./app/screens/Reports').then((m) => ({ default: m.Reports })));
-const Security = lazy(() => import('./app/screens/Security').then((m) => ({ default: m.Security })));
+const Security = lazy(() =>
+  import('./app/screens/Security').then((m) => ({ default: m.Security })),
+);
 const Billing = lazy(() => import('./app/screens/Billing').then((m) => ({ default: m.Billing })));
 
 // Admin control plane.
-const Overview = lazy(() => import('./admin/screens/Overview').then((m) => ({ default: m.Overview })));
+const Overview = lazy(() =>
+  import('./admin/screens/Overview').then((m) => ({ default: m.Overview })),
+);
 const Operators = lazy(() =>
   import('./admin/screens/Operators').then((m) => ({ default: m.Operators })),
 );

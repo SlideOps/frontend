@@ -136,7 +136,10 @@ export function NodeDetail() {
             {completedHint(key, state.last_completed_at ?? '')}
           </Text>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}>
+            <Button
+              size="sm"
+              onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}
+            >
               <History width={15} height={15} aria-hidden />
               View in History
             </Button>
@@ -207,35 +210,37 @@ export function NodeDetail() {
 
           <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
             <div className="flex min-w-0 flex-col gap-6">
-            <Card className="h-fit">
-              <div className="mb-3 flex items-center gap-2">
-                <Server width={18} height={18} className="text-brand" aria-hidden />
-                <Text variant="h4">Connection</Text>
-              </div>
-              <dl className="divide-y divide-border">
-                <SummaryRow label="Hostname" value={nodeResult.state.data.hostname} />
-                <AddressRow label="Address" value={nodeResult.state.data.address} />
-                <SummaryRow label="Port" value={String(nodeResult.state.data.port)} />
-                <SummaryRow label="Username" value={nodeResult.state.data.ssh_username} />
-                <SummaryRow
-                  label="Sign in"
-                  value={nodeResult.state.data.auth_kind === 'private_key' ? 'Private key' : 'Password'}
-                />
-                <SummaryRow
-                  label="System"
-                  value={
-                    nodeResult.state.data.distro
-                      ? `${nodeResult.state.data.distro}${nodeResult.state.data.distro_version ? ` ${nodeResult.state.data.distro_version}` : ''}`
-                      : 'Unknown until Discovery'
-                  }
-                />
-                <SummaryRow label="Status" value={nodeResult.state.data.status} />
-              </dl>
-            </Card>
+              <Card className="h-fit">
+                <div className="mb-3 flex items-center gap-2">
+                  <Server width={18} height={18} className="text-brand" aria-hidden />
+                  <Text variant="h4">Connection</Text>
+                </div>
+                <dl className="divide-y divide-border">
+                  <SummaryRow label="Hostname" value={nodeResult.state.data.hostname} />
+                  <AddressRow label="Address" value={nodeResult.state.data.address} />
+                  <SummaryRow label="Port" value={String(nodeResult.state.data.port)} />
+                  <SummaryRow label="Username" value={nodeResult.state.data.ssh_username} />
+                  <SummaryRow
+                    label="Sign in"
+                    value={
+                      nodeResult.state.data.auth_kind === 'private_key' ? 'Private key' : 'Password'
+                    }
+                  />
+                  <SummaryRow
+                    label="System"
+                    value={
+                      nodeResult.state.data.distro
+                        ? `${nodeResult.state.data.distro}${nodeResult.state.data.distro_version ? ` ${nodeResult.state.data.distro_version}` : ''}`
+                        : 'Unknown until Discovery'
+                    }
+                  />
+                  <SummaryRow label="Status" value={nodeResult.state.data.status} />
+                </dl>
+              </Card>
 
-            <NodeCapacity nodeId={id} />
+              <NodeCapacity nodeId={id} />
 
-            <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
+              <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">
@@ -265,8 +270,8 @@ export function NodeDetail() {
                 ) : null}
                 {!discovering && !discovery && !discoverError ? (
                   <Text variant="body-sm" tone="secondary">
-                    Run Discovery to read this Node over SSH. It gathers Facts and an Assessment, and
-                    never changes anything.
+                    Run Discovery to read this Node over SSH. It gathers Facts and an Assessment,
+                    and never changes anything.
                   </Text>
                 ) : null}
                 {discovery ? <DiscoveryScan result={discovery} /> : null}
@@ -279,8 +284,8 @@ export function NodeDetail() {
                 </div>
                 <Text variant="body-sm" tone="secondary">
                   Apps you were already running on this server, from before SlideOps or from another
-                  account, can be brought under management without redeploying them. They keep running
-                  exactly as they are.
+                  account, can be brought under management without redeploying them. They keep
+                  running exactly as they are.
                 </Text>
                 <div className="mt-4">
                   <Button

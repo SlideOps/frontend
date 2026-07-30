@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createAutomation,
-  listAutomations,
-  runAutomation,
-  updateAutomation,
-} from './automations';
+import { createAutomation, listAutomations, runAutomation, updateAutomation } from './automations';
 
 function jsonResponse(status: number, body: unknown): Response {
   return {

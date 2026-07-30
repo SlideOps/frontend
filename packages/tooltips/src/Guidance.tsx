@@ -28,11 +28,20 @@ export function Guidance({ for: key, placement = 'top', size = 16 }: GuidancePro
 
   if (entry.detail) {
     return (
-      <Popover label={entry.label} placement={placement === 'top' ? 'bottom' : placement} trigger={(props) => (
-        <button type="button" className={triggerClass} aria-label={`About ${entry.label}`} {...props}>
-          <CircleHelp width={size} height={size} aria-hidden />
-        </button>
-      )}>
+      <Popover
+        label={entry.label}
+        placement={placement === 'top' ? 'bottom' : placement}
+        trigger={(props) => (
+          <button
+            type="button"
+            className={triggerClass}
+            aria-label={`About ${entry.label}`}
+            {...props}
+          >
+            <CircleHelp width={size} height={size} aria-hidden />
+          </button>
+        )}
+      >
         <p className="font-medium text-ink">{entry.label}</p>
         <div className="mt-1 text-ink-muted">{entry.detail}</div>
       </Popover>
@@ -41,7 +50,11 @@ export function Guidance({ for: key, placement = 'top', size = 16 }: GuidancePro
 
   return (
     <Tooltip content={entry.summary} placement={placement}>
-      <button type="button" className={triggerClass} aria-label={`About ${entry.label}: ${entry.label}`}>
+      <button
+        type="button"
+        className={triggerClass}
+        aria-label={`About ${entry.label}: ${entry.label}`}
+      >
         <CircleHelp width={size} height={size} aria-hidden />
       </button>
     </Tooltip>

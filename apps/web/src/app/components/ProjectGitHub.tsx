@@ -109,9 +109,12 @@ export function ProjectGitHub() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Text variant="body-sm" tone="secondary">
                 Connected as{' '}
-                <span className="font-medium text-ink">{state.data.status.login ?? 'your account'}</span>.
-                Deploys can pull from the{' '}
-                {state.data.repos.length > 0 ? `${state.data.repos.length} ` : ''}repositories below.
+                <span className="font-medium text-ink">
+                  {state.data.status.login ?? 'your account'}
+                </span>
+                . Deploys can pull from the{' '}
+                {state.data.repos.length > 0 ? `${state.data.repos.length} ` : ''}repositories
+                below.
               </Text>
               <Button variant="ghost" size="sm" onClick={() => setConfirmDisconnect(true)}>
                 Disconnect
@@ -123,29 +126,31 @@ export function ProjectGitHub() {
                 <ul className="divide-y divide-border">
                   {state.data.repos.map((repo) => (
                     <li key={repo.full_name} className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-ink">{repo.full_name}</span>
-                        {repo.private ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
-                            <Lock width={11} height={11} aria-hidden />
-                            Private
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-ink">
+                            {repo.full_name}
                           </span>
-                        ) : null}
+                          {repo.private ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+                              <Lock width={11} height={11} aria-hidden />
+                              Private
+                            </span>
+                          ) : null}
+                        </div>
+                        <Text variant="caption" tone="secondary" className="block">
+                          Default branch {repo.default_branch}
+                        </Text>
                       </div>
-                      <Text variant="caption" tone="secondary" className="block">
-                        Default branch {repo.default_branch}
-                      </Text>
-                    </div>
-                    <a
-                      href={repo.html_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex shrink-0 items-center gap-1 text-sm text-brand transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                    >
-                      Open
-                      <ArrowUpRight width={14} height={14} aria-hidden />
-                    </a>
+                      <a
+                        href={repo.html_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1 text-sm text-brand transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      >
+                        Open
+                        <ArrowUpRight width={14} height={14} aria-hidden />
+                      </a>
                     </li>
                   ))}
                 </ul>

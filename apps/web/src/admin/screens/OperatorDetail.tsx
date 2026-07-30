@@ -114,7 +114,12 @@ export function OperatorDetail() {
 
   return (
     <AdminShell active="operators">
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/admin/operators')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+        onClick={() => navigate('/admin/operators')}
+      >
         <ArrowLeft width={16} height={16} aria-hidden />
         All Operators
       </Button>
@@ -184,19 +189,24 @@ export function OperatorDetail() {
                 </div>
               </div>
               <dl className="divide-y divide-border">
-                <SummaryRow label="Status" value={operator.status === 'suspended' ? 'Suspended' : 'Active'} />
-                <SummaryRow label="Role" value={isAdmin ? 'Administrator' : 'Operator'} />
                 <SummaryRow
-                  label="Tier"
-                  value={currentTier ? tierLabel[currentTier] : 'Not set'}
+                  label="Status"
+                  value={operator.status === 'suspended' ? 'Suspended' : 'Active'}
                 />
+                <SummaryRow label="Role" value={isAdmin ? 'Administrator' : 'Operator'} />
+                <SummaryRow label="Tier" value={currentTier ? tierLabel[currentTier] : 'Not set'} />
                 <SummaryRow label="Nodes" value={String(operator.node_count)} />
                 <SummaryRow label="Operations" value={String(operator.operation_count)} />
                 <SummaryRow
                   label="Last active"
-                  value={operator.last_active ? new Date(operator.last_active).toLocaleString() : 'Never'}
+                  value={
+                    operator.last_active ? new Date(operator.last_active).toLocaleString() : 'Never'
+                  }
                 />
-                <SummaryRow label="Joined" value={new Date(operator.created_at).toLocaleDateString()} />
+                <SummaryRow
+                  label="Joined"
+                  value={new Date(operator.created_at).toLocaleDateString()}
+                />
               </dl>
             </Card>
 

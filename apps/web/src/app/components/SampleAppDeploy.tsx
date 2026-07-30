@@ -78,9 +78,7 @@ function LaunchForm({ data }: { data: LaunchData }) {
 
   // A Service runs on a server assigned to its Project, so the server choices are
   // exactly the ones assigned to the picked Project.
-  const assignedNodes = projectId
-    ? data.nodes.filter((node) => node.project_id === projectId)
-    : [];
+  const assignedNodes = projectId ? data.nodes.filter((node) => node.project_id === projectId) : [];
 
   const portNumber = Number(hostPort);
   const portValid =
@@ -200,7 +198,9 @@ function LaunchForm({ data }: { data: LaunchData }) {
           The port on your server the sample answers on. Change it if {DEFAULT_HOST_PORT} is taken.
         </Text>
         {hostPort.trim() !== '' && !portValid ? (
-          <p className="text-sm text-danger">Enter a port between {MIN_PORT} and {MAX_PORT}.</p>
+          <p className="text-sm text-danger">
+            Enter a port between {MIN_PORT} and {MAX_PORT}.
+          </p>
         ) : null}
       </div>
 

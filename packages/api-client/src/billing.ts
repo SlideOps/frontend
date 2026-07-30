@@ -67,11 +67,7 @@ export interface CheckoutResult {
 
 /** The five things a promo effect can do. The kind selects which fields are read. */
 export type PromoEffectKind =
-  | 'percent_discount'
-  | 'fixed_discount'
-  | 'duration_conditional'
-  | 'value_add'
-  | 'tier_grant';
+  'percent_discount' | 'fixed_discount' | 'duration_conditional' | 'value_add' | 'tier_grant';
 
 /**
  * One thing a promo code does. A percent discount reads percent; a fixed discount

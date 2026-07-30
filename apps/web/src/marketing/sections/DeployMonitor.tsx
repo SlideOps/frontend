@@ -1,5 +1,13 @@
 import { Text } from '@slideops/design-system';
-import { Activity, Bell, Cpu, GitBranch, HardDrive, HeartPulse, MemoryStick } from '@slideops/icons';
+import {
+  Activity,
+  Bell,
+  Cpu,
+  GitBranch,
+  HardDrive,
+  HeartPulse,
+  MemoryStick,
+} from '@slideops/icons';
 import { useReveal } from '../useReveal';
 
 const deploySteps = [

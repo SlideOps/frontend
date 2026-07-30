@@ -45,11 +45,15 @@ describe('notificationFromEvent', () => {
   });
 
   it('detects when an Operation has moved past awaiting approval', () => {
-    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'awaiting_approval' } }))).toBe(
-      false,
+    expect(
+      isPastApproval(event({ type: 'operation.status', data: { status: 'awaiting_approval' } })),
+    ).toBe(false);
+    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'approved' } }))).toBe(
+      true,
     );
-    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'approved' } }))).toBe(true);
-    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'executing' } }))).toBe(true);
+    expect(isPastApproval(event({ type: 'operation.status', data: { status: 'executing' } }))).toBe(
+      true,
+    );
     expect(isPastApproval(event({ type: 'operation.completed' }))).toBe(true);
     expect(isPastApproval(event({ type: 'operation.log' }))).toBe(false);
   });
@@ -58,7 +62,11 @@ describe('notificationFromEvent', () => {
     const store = useNotificationsStore.getState();
     store.clear();
     const pending = notificationFromEvent(
-      event({ type: 'operation.status', operation_id: 'op_9', data: { status: 'awaiting_approval' } }),
+      event({
+        type: 'operation.status',
+        operation_id: 'op_9',
+        data: { status: 'awaiting_approval' },
+      }),
     );
     store.push(pending!);
     expect(useNotificationsStore.getState().items).toHaveLength(1);
@@ -74,7 +82,11 @@ describe('notificationFromEvent', () => {
 
   it('turns a passed verification into a success notification', () => {
     const result = notificationFromEvent(
-      event({ type: 'operation.verification', data: { passed: true }, message: 'All checks passed.' }),
+      event({
+        type: 'operation.verification',
+        data: { passed: true },
+        message: 'All checks passed.',
+      }),
     );
 
     expect(result).not.toBeNull();

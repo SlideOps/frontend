@@ -57,7 +57,8 @@ export function Toaster() {
     return null;
   }
 
-  const dismiss = (id: string) => setActive((current) => current.filter((toast) => toast.id !== id));
+  const dismiss = (id: string) =>
+    setActive((current) => current.filter((toast) => toast.id !== id));
 
   return (
     <div
@@ -82,7 +83,10 @@ export function Toaster() {
             <Icon
               width={20}
               height={20}
-              className={cn('mt-0.5 shrink-0', actionRequired ? 'text-warning' : toneColor[toast.tone])}
+              className={cn(
+                'mt-0.5 shrink-0',
+                actionRequired ? 'text-warning' : toneColor[toast.tone],
+              )}
               aria-hidden
             />
             <div className="min-w-0 flex-1">

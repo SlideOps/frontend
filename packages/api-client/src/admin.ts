@@ -110,9 +110,9 @@ export interface EmergencyStatus {
 
 /** Read the platform headline. */
 export function getOverview(signal?: AbortSignal): Promise<Overview> {
-  return apiRequest<{ overview?: Overview } & Partial<Overview>>('/admin/overview', { signal }).then(
-    (r) => r.overview ?? (r as Overview),
-  );
+  return apiRequest<{ overview?: Overview } & Partial<Overview>>('/admin/overview', {
+    signal,
+  }).then((r) => r.overview ?? (r as Overview));
 }
 
 /** List every Operator on the platform, for oversight. */
@@ -175,10 +175,13 @@ export interface AuditFilter {
 
 /** Read a page of the audit trail, newest first. */
 export function listAudit(filter: AuditFilter = {}, signal?: AbortSignal): Promise<AuditEntry[]> {
-  return apiRequest<{ entries?: AuditEntry[]; audit?: AuditEntry[] } | AuditEntry[]>('/admin/audit', {
-    query: { limit: filter.limit, offset: filter.offset },
-    signal,
-  }).then((r) => (Array.isArray(r) ? r : (r.entries ?? r.audit ?? [])));
+  return apiRequest<{ entries?: AuditEntry[]; audit?: AuditEntry[] } | AuditEntry[]>(
+    '/admin/audit',
+    {
+      query: { limit: filter.limit, offset: filter.offset },
+      signal,
+    },
+  ).then((r) => (Array.isArray(r) ? r : (r.entries ?? r.audit ?? [])));
 }
 
 /** Pause every execution platform wide. Queued Operations wait, nothing is lost. Audited. */
@@ -238,10 +241,7 @@ export function listAdminTiers(signal?: AbortSignal): Promise<AdminTier[]> {
  * no restart, and audited by the backend. A 400 with an `invalid_...` code marks
  * an out-of-range value (counts must be >= -1, amount >= 0).
  */
-export function updateAdminTier(
-  name: string,
-  input: Omit<AdminTier, 'name'>,
-): Promise<AdminTier> {
+export function updateAdminTier(name: string, input: Omit<AdminTier, 'name'>): Promise<AdminTier> {
   return apiRequest<unknown>(`/admin/tiers/${name}`, { method: 'PUT', body: input }).then((r) =>
     unwrap<AdminTier>(r, 'tier'),
   );

@@ -43,7 +43,12 @@ export function AdminOperationDetail() {
 
   return (
     <AdminShell active="operations">
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/admin/operations')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+        onClick={() => navigate('/admin/operations')}
+      >
         <ArrowLeft width={16} height={16} aria-hidden />
         All Operations
       </Button>

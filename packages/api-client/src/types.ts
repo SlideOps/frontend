@@ -75,13 +75,7 @@ export type RiskLevel = 'low' | 'medium' | 'high';
  * public key. Types stay open ended so a new one never breaks rendering.
  */
 export type CapabilityParameterType =
-  | 'string'
-  | 'text'
-  | 'number'
-  | 'boolean'
-  | 'domain'
-  | 'path'
-  | 'public_key';
+  'string' | 'text' | 'number' | 'boolean' | 'domain' | 'path' | 'public_key';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the

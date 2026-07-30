@@ -205,7 +205,11 @@ export function Automations() {
             icon={Clock}
             title="No Automations yet"
             description="Automate a Capability you run often. Choose a Node and a Capability, set a schedule, and SlideOps will run it for you and record every result."
-            action={<Button onClick={() => navigate('/app/automations/new')}>Create your first Automation</Button>}
+            action={
+              <Button onClick={() => navigate('/app/automations/new')}>
+                Create your first Automation
+              </Button>
+            }
           />
         ) : (
           <div className="flex flex-col gap-2">

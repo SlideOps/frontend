@@ -116,7 +116,12 @@ export function ServiceMetricsPanel({ id, running }: { id: string; running: bool
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Meter label="CPU" used={metrics.cpu_percent} limit={100} valueText={pct(metrics.cpu_percent)} />
+      <Meter
+        label="CPU"
+        used={metrics.cpu_percent}
+        limit={100}
+        valueText={pct(metrics.cpu_percent)}
+      />
       <Meter
         label="Memory"
         used={metrics.memory_used_mb}

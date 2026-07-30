@@ -7,7 +7,9 @@ import {
 } from './parameter-schema';
 
 /** A compact way to declare a parameter for a test. */
-function param(over: Partial<CapabilityParameter> & { key: string; type: CapabilityParameter['type'] }): CapabilityParameter {
+function param(
+  over: Partial<CapabilityParameter> & { key: string; type: CapabilityParameter['type'] },
+): CapabilityParameter {
   return {
     label: over.label ?? over.key,
     required: over.required ?? false,
@@ -18,7 +20,9 @@ function param(over: Partial<CapabilityParameter> & { key: string; type: Capabil
 
 describe('buildParameterSchema', () => {
   it('enforces required string parameters', () => {
-    const schema = buildParameterSchema([param({ key: 'username', type: 'string', required: true })]);
+    const schema = buildParameterSchema([
+      param({ key: 'username', type: 'string', required: true }),
+    ]);
 
     expect(schema.safeParse({ username: '' }).success).toBe(false);
     expect(schema.safeParse({ username: 'deploy' }).success).toBe(true);
@@ -46,7 +50,9 @@ describe('buildParameterSchema', () => {
   });
 
   it('recognizes an SSH public key', () => {
-    const schema = buildParameterSchema([param({ key: 'public_key', type: 'public_key', required: true })]);
+    const schema = buildParameterSchema([
+      param({ key: 'public_key', type: 'public_key', required: true }),
+    ]);
 
     const key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBodyHere operator@slideops';
     expect(schema.safeParse({ public_key: key }).success).toBe(true);
@@ -96,7 +102,12 @@ describe('defaultParameterValues', () => {
 
 describe('cleanParameterValues', () => {
   it('drops blank and undefined values but keeps a false boolean', () => {
-    const cleaned = cleanParameterValues({ username: 'deploy', note: '', missing: undefined, sudo: false });
+    const cleaned = cleanParameterValues({
+      username: 'deploy',
+      note: '',
+      missing: undefined,
+      sudo: false,
+    });
 
     expect(cleaned).toEqual({ username: 'deploy', sudo: false });
   });

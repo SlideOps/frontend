@@ -101,7 +101,10 @@ export function FactsView({ facts }: { facts: Facts }) {
   return (
     <div className="flex flex-col divide-y divide-border">
       {entries.map(([key, value]) => (
-        <div key={key} className="grid grid-cols-1 gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[12rem_1fr] sm:gap-4">
+        <div
+          key={key}
+          className="grid grid-cols-1 gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[12rem_1fr] sm:gap-4"
+        >
           <Text variant="body-sm" className="font-medium">
             {humanize(key)}
           </Text>

@@ -26,11 +26,18 @@ export function THead({ children }: { children: ReactNode }) {
   );
 }
 
-export function TH({ children, className, ...rest }: ThHTMLAttributes<HTMLTableCellElement> & { children: ReactNode }) {
+export function TH({
+  children,
+  className,
+  ...rest
+}: ThHTMLAttributes<HTMLTableCellElement> & { children: ReactNode }) {
   return (
     <th
       scope="col"
-      className={cn('whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted', className)}
+      className={cn(
+        'whitespace-nowrap px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted',
+        className,
+      )}
       {...rest}
     >
       {children}
