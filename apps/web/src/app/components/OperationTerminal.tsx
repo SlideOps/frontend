@@ -1,9 +1,10 @@
 import type { OperationEvent } from '@slideops/api-client';
 import { useTheme } from '@slideops/design-system';
 import { FitAddon } from '@xterm/addon-fit';
-import { Terminal, type ITheme } from '@xterm/xterm';
+import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
+import { terminalTheme } from './terminal-theme';
 
 /*
  * The live terminal. It embeds xterm.js and writes each Operation event as a
@@ -41,43 +42,6 @@ function formatLine(event: OperationEvent): string {
       }
       return event.message;
   }
-}
-
-/** Resolve a semantic color token to a concrete color the terminal can use. */
-function resolveColor(varName: string): string | undefined {
-  if (typeof document === 'undefined' || !document.body) {
-    return undefined;
-  }
-  const probe = document.createElement('span');
-  probe.style.color = `var(${varName})`;
-  probe.style.position = 'absolute';
-  probe.style.visibility = 'hidden';
-  document.body.appendChild(probe);
-  const value = getComputedStyle(probe).color;
-  probe.remove();
-  return value || undefined;
-}
-
-function terminalTheme(): ITheme {
-  const theme: ITheme = {};
-  const mappings: Array<[keyof ITheme, string]> = [
-    ['background', '--color-bg-app'],
-    ['foreground', '--color-text-primary'],
-    ['cursor', '--color-accent'],
-    ['green', '--color-success'],
-    ['red', '--color-danger'],
-    ['yellow', '--color-warning'],
-    ['blue', '--color-info'],
-    ['cyan', '--color-info'],
-    ['brightBlack', '--color-text-secondary'],
-  ];
-  for (const [key, varName] of mappings) {
-    const value = resolveColor(varName);
-    if (value) {
-      (theme as Record<string, string>)[key] = value;
-    }
-  }
-  return theme;
 }
 
 export interface OperationTerminalProps {

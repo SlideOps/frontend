@@ -1,4 +1,5 @@
 import {
+  serviceShellUrl,
   ApiError,
   cancelServiceDeploy,
   getNode,
@@ -33,6 +34,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
+import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { Refreshing } from '../components/Refreshing';
@@ -269,6 +271,30 @@ export function ServiceDetail() {
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
               <ServiceEndpoint service={service} onChanged={reload} />
+
+              <Card>
+                <div className="mb-2 flex items-center gap-2">
+                  <Text variant="h4">Shell</Text>
+                </div>
+                <ShellTerminal
+                  urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
+                  scopeLabel={
+                    service.runtime === 'systemd'
+                      ? 'This Service, on the server'
+                      : 'Inside this Service'
+                  }
+                  scopeDetail={
+                    service.runtime === 'systemd'
+                      ? 'A shell on the server in this Service\u2019s own directory. A systemd Service is not a container, so this one is not confined to it. Opening it is recorded in the audit trail.'
+                      : 'A shell inside this Service\u2019s own container, where only this application\u2019s files and processes are reachable. The rest of the server is not. Opening it is recorded in the audit trail.'
+                  }
+                  unavailableReason={
+                    service.status === 'running'
+                      ? undefined
+                      : `This Service is ${service.status}, so there is nothing running to open a shell in.`
+                  }
+                />
+              </Card>
               <ServicePreview service={service} />
 
               <Card>
