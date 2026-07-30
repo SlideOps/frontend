@@ -1,0 +1,9 @@
+# Generated or vendored output. Formatting it would produce a large diff nobody
+# wrote, and in the case of the lockfile a diff that is actively harmful.
+node_modules
+dist
+build
+coverage
+.turbo
+.vite
+pnpm-lock.yaml
