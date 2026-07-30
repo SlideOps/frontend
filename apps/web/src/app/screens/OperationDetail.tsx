@@ -10,8 +10,8 @@ import {
   type OperationStatus,
   type StreamStatus,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Terminal, Wifi, XCircle } from '@slideops/icons';
+import { Button, Card, Text, Section } from '@slideops/design-system';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Wifi, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
@@ -341,19 +341,18 @@ export function OperationDetail() {
           </Card>
 
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Terminal width={18} height={18} className="text-brand" aria-hidden />
-                  <Text variant="h4">Live output</Text>
-                  <Guidance for="operation.terminal" />
-                </div>
-                {isRunning ? (
+            <Section
+              title="Live output"
+              flush
+              adornment={<Guidance for="operation.terminal" />}
+              action={
+                isRunning ? (
                   <Button variant="danger" size="sm" onClick={cancel} disabled={cancelling}>
                     {cancelling ? 'Cancelling' : 'Cancel'}
                   </Button>
-                ) : null}
-              </div>
+                ) : null
+              }
+            >
               <Suspense
                 fallback={
                   <div className="flex h-80 w-full items-center justify-center rounded-md border border-border bg-app">
@@ -368,7 +367,7 @@ export function OperationDetail() {
                   {actionError}
                 </p>
               ) : null}
-            </Card>
+            </Section>
 
             {operation.verification ? (
               <VerificationView verification={operation.verification} />

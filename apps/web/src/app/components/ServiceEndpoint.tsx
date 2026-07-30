@@ -1,5 +1,5 @@
 import { ApiError, exposeService, type Service } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { ArrowUpRight, Globe } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
@@ -64,13 +64,7 @@ export function ServiceEndpoint({
   };
 
   return (
-    <Card>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Globe width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">Reach it from anywhere</Text>
-        <Guidance for="service.endpoint" />
-      </div>
-
+    <Section title="Reach it from anywhere" adornment={<Guidance for="service.endpoint" />}>
       {state.kind === 'addresses' ? (
         <div className="flex flex-col gap-3">
           <Text variant="body-sm" tone="secondary">
@@ -164,6 +158,6 @@ export function ServiceEndpoint({
           a mapping written host:container, then redeploy to apply it.
         </EndpointNote>
       )}
-    </Card>
+    </Section>
   );
 }

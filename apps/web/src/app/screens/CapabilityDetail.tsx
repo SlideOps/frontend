@@ -52,7 +52,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div className="py-5 first:pt-0 last:pb-0">
       <div className="mb-2 flex items-center gap-2">
         <Text variant="caption" tone="secondary">
           {title}
@@ -393,7 +393,9 @@ export function CapabilityDetail() {
                 </Card>
               ) : null}
 
-              <Card className="flex flex-col gap-5">
+              {/* No frame around the document. These are parts of one page, and
+                  a border around them said they were separate things. */}
+              <div className="flex flex-col divide-y divide-border">
                 <Section title="Outcome" guidanceKey="capability.outcome">
                   <Text variant="body" tone="secondary">
                     {capabilityResult.state.data.description}
@@ -440,7 +442,7 @@ export function CapabilityDetail() {
                     </div>
                   </Section>
                 ) : null}
-              </Card>
+              </div>
             </div>
 
             <Card className="h-fit">
