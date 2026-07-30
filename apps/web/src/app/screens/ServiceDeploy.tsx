@@ -21,7 +21,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ComposeStackPlan } from '../components/ComposeStackPlan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import { buildServiceSchema, toDeployInput, type ServiceFormValues } from '../service-schema';
+import {
+  buildServiceSchema,
+  parseEnv,
+  parsePorts,
+  toDeployInput,
+  type ServiceFormValues,
+} from '../service-schema';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface DeployData {
@@ -95,6 +101,21 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
   const plannedRepo = watch('repository_url');
   const plannedName = watch('name');
   const plannedBranch = watch('branch');
+  // Approving a plan deploys the application as well, so it needs the same fields
+  // the submit path sends. These are read live rather than on submit.
+  const plannedProject = watch('project_id');
+  const plannedBuild = watch('build');
+  const plannedCommand = watch('command');
+  const plannedCPU = watch('cpu_limit');
+  const plannedMemory = watch('memory_mb');
+  const plannedPorts = parsePorts(watch('ports'));
+  const plannedEnv = parseEnv(watch('env'));
+  // The ports and environment boxes are free text, and the resolver only reports
+  // on them at submit. The plan does not go through submit, so surface the same
+  // message there rather than silently dropping what could not be read.
+  const plannedIssues = [plannedPorts.error, plannedEnv.error].filter(
+    (issue): issue is string => Boolean(issue),
+  );
 
   // Filling in a repository from the connected GitHub account sets the clone URL
   // and defaults the branch to that repository's default branch.
@@ -385,24 +406,36 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           />
           <Text variant="body-sm" tone="secondary">
             One variable per line, written <code>KEY=value</code>. Prefix a line with{' '}
-            <code>secret:</code> to seal that value — it is encrypted, never shown again, and revealed
+            <code>secret:</code> to seal that value: it is encrypted, never shown again, and revealed
             only to the deploy itself. Anything unprefixed is stored as you typed it and stays
             readable, so seal what is sensitive and leave the rest plain.
           </Text>
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
 
-      {sourceType === 'repository' ? (
-        <div className="mt-6">
-          <ComposeStackPlan
-            nodeID={plannedNode ?? ''}
-            repositoryURL={plannedRepo ?? ''}
-            branch={plannedBranch}
-            name={plannedName}
-          />
-        </div>
-      ) : null}
-
+        {sourceType === 'repository' ? (
+          <div className="mt-6">
+            <ComposeStackPlan
+              nodeID={plannedNode ?? ''}
+              projectID={plannedProject ?? ''}
+              repositoryURL={plannedRepo ?? ''}
+              branch={plannedBranch}
+              name={plannedName}
+              // A number input hands back a string, and the schema only coerces on
+              // submit, which this path does not go through.
+              cpuLimit={Number(plannedCPU) || 0}
+              memoryMB={Number(plannedMemory) || 0}
+              build={plannedBuild || undefined}
+              command={plannedCommand || undefined}
+              ports={plannedPorts.ports}
+              env={plannedEnv.env}
+              issues={plannedIssues}
+              onDeployed={(serviceID) =>
+                navigate(`/app/services/${serviceID}`, { replace: true })
+              }
+            />
+          </div>
+        ) : null}
 
         {formError ? (
           <div role="alert" className="rounded-md border border-border bg-subtle px-4 py-3">

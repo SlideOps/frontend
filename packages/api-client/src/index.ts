@@ -187,6 +187,7 @@ export {
   redeployService,
   cancelServiceDeploy,
   planComposeStack,
+  deployComposeStack,
   updateServiceResources,
   updateServiceConfiguration,
   type Service,
