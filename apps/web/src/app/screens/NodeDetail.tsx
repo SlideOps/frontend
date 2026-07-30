@@ -1,4 +1,5 @@
 import {
+  nodeShellUrl,
   ApiError,
   discoverNode,
   getCapabilityStates,
@@ -20,6 +21,7 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
+import { ShellTerminal } from '../components/ShellTerminal';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -256,6 +258,22 @@ export function NodeDetail() {
               />
 
               <NodeHealth nodeId={id} />
+
+              <Card>
+                <div className="mb-2 flex items-center gap-2">
+                  <Text variant="h4">Terminal</Text>
+                </div>
+                <ShellTerminal
+                  urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
+                  scopeLabel="This whole server"
+                  scopeDetail="A shell on the server itself, as the SSH account SlideOps connects with: the same access you would have opening a terminal yourself. For a shell confined to one application, open it from that Service instead. Opening one is recorded in the audit trail."
+                  unavailableReason={
+                    nodeResult.state.data.status === 'unreachable'
+                      ? 'This server is unreachable, so there is nothing to open a shell onto.'
+                      : undefined
+                  }
+                />
+              </Card>
 
               <Card>
                 <div className="mb-4 flex items-center gap-2">

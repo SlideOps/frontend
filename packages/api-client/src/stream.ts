@@ -52,20 +52,45 @@ export function openEventStream<TEvent>(
  * cookie rides the upgrade request, which is what authenticates the stream.
  */
 export function operationStreamUrl(): string {
+  return websocketUrl('/stream');
+}
+
+/**
+ * Derive a websocket URL for a backend path, following the API base rather than
+ * the page's own location, so a backend deployed on another origin is reached at
+ * the backend. The scheme is upgraded alongside: wss for https, ws otherwise.
+ * The session cookie rides the upgrade request, which is what authenticates it.
+ */
+export function websocketUrl(path: string, query?: Record<string, string | number>): string {
   const base = apiBase();
+  const search = query
+    ? `?${new URLSearchParams(
+        Object.entries(query).map(([key, value]) => [key, String(value)]),
+      ).toString()}`
+    : '';
 
   if (apiIsCrossOrigin()) {
     const url = new URL(base);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    url.pathname = `${url.pathname.replace(/\/$/, '')}/stream`;
-    return url.toString();
+    url.pathname = `${url.pathname.replace(/\/$/, '')}${path}`;
+    return `${url.toString()}${search}`;
   }
 
   if (typeof window === 'undefined' || !window.location) {
-    return `ws://localhost${base}/stream`;
+    return `ws://localhost${base}${path}${search}`;
   }
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}${base}/stream`;
+  return `${scheme}://${window.location.host}${base}${path}${search}`;
+}
+
+/** The websocket carrying an interactive terminal on a Node: the whole server. */
+export function nodeShellUrl(nodeID: string, cols: number, rows: number): string {
+  return websocketUrl(`/nodes/${encodeURIComponent(nodeID)}/shell`, { cols, rows });
+}
+
+/** The websocket carrying a shell scoped to one Service's own container. */
+export function serviceShellUrl(serviceID: string, cols: number, rows: number): string {
+  return websocketUrl(`/services/${encodeURIComponent(serviceID)}/shell`, { cols, rows });
 }
 
 export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
