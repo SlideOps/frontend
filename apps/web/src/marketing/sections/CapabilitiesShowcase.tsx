@@ -1,8 +1,11 @@
 import { Text } from '@slideops/design-system';
 import { Boxes, Check } from '@slideops/icons';
 import {
+  capabilityCategoryCount,
+  capabilityCount,
   coreCapabilities,
   marketplaceCapabilities,
+  marketplaceCapabilityCount,
   type ShowcaseCapability,
 } from '../content/capabilities';
 import { useReveal } from '../useReveal';
@@ -19,10 +22,12 @@ export function CapabilitiesShowcase() {
           Core security on every server, the rest from the marketplace
         </Text>
         <Text variant="body" tone="secondary" className="mt-5">
-          Only security is Core: four outcomes pre-installed on every server, so a server is secured
-          the moment you connect it. Everything else is a marketplace Plugin you install per
-          Project, so each Project carries only the stack it uses. Each outcome plans, executes,
-          verifies, and rolls back on its own, and adapts to the Linux family your server runs.
+          {capabilityCount} Capabilities across {capabilityCategoryCount} categories. Seven are
+          Core, on every server the moment you connect it, and they cover securing the machine and
+          the people who use it. The other {marketplaceCapabilityCount} are marketplace Plugins you
+          install per Project, so each Project carries only the stack it uses. Every one of them
+          plans, executes, verifies, and rolls back on its own, and adapts to the Linux family your
+          server runs.
         </Text>
       </div>
 
@@ -41,7 +46,7 @@ function CoreGroup() {
           Core
         </span>
         <Text as="span" variant="body-sm" tone="secondary">
-          Pre-installed on every server, nothing to add
+          On every server, nothing to install
         </Text>
       </div>
       <div
@@ -66,7 +71,7 @@ function MarketplaceGroup() {
           Marketplace
         </span>
         <Text as="span" variant="body-sm" tone="secondary">
-          Installed per Project, so each Project carries only its stack
+          {marketplaceCapabilityCount} more, installed per Project
         </Text>
       </div>
       <div

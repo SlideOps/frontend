@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import gettingStarted from '../docs/getting-started.md?raw';
 import serversAndProjects from '../docs/servers-and-projects.md?raw';
 import howAnOperationWorks from '../docs/how-an-operation-works.md?raw';
+import dayToDay from '../docs/day-to-day.md?raw';
 
 interface Doc {
   slug: string;
@@ -31,6 +32,12 @@ const docs: Doc[] = [
     title: 'How an Operation works',
     summary: 'The lifecycle every Operation follows, step by step.',
     content: howAnOperationWorks,
+  },
+  {
+    slug: 'day-to-day',
+    title: 'Day to day',
+    summary: 'Readiness, adoption, terminals, Automations, Reports, and your account.',
+    content: dayToDay,
   },
 ];
 

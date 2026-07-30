@@ -14,7 +14,7 @@ A Project holds one stack and the Services that run it. You create a Project, as
 
 ### Core versus the marketplace
 
-Only security is Core. Four security outcomes are pre-installed on every server with nothing to add: Secure SSH, the host Firewall, Create Application User, and Manage Packages and updates.
+Seven Capabilities are Core, on every server with nothing to install: Secure SSH, Configure firewall, Create application user, Manage server user, Remove server user, Manage packages, and Enable monitoring. They cover securing the machine and the people who use it. Everything else is a marketplace Plugin.
 
 Everything else is a marketplace Plugin, installed per Project: containers, a reverse proxy, HTTPS, monitoring, backups, databases, runtimes, static sites, and extra security add-ons such as fail2ban, automatic updates, key-only SSH, and a read-only server audit. Because Plugins install into a Project rather than a whole account, each Project carries only the stack it uses. Installing a Python runtime into a Go Project would be waste, so you never have to.
 
