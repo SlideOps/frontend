@@ -237,9 +237,14 @@ export {
 } from './operations';
 export {
   getCapabilityStates,
+  getReadiness,
   type CapabilityState,
   type CapabilityStateStatus,
   type CapabilityStateSource,
+  type Readiness,
+  type ReadinessMeasure,
+  type ReadinessSeverity,
+  type ReadinessState,
 } from './capability-states';
 export {
   listNodeWorkloads,

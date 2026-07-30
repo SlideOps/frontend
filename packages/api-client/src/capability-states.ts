@@ -62,3 +62,55 @@ export function getCapabilityStates(
     { query: { project_id: projectId }, signal },
   ).then((r) => r.states ?? {});
 }
+
+/*
+ * Server readiness: what a secure, usable server has, against what this one
+ * already has.
+ */
+
+/** How much a missing measure matters. A measure in place carries "none". */
+export type ReadinessSeverity = 'critical' | 'high' | 'medium' | 'low' | 'none';
+
+/** What is known about one measure. `detected` counts as much as `done`. */
+export type ReadinessState = 'done' | 'detected' | 'missing' | 'unknown';
+
+/** One thing a ready server has, and where this server stands on it. */
+export interface ReadinessMeasure {
+  capability_key: string;
+  title: string;
+  /** What its absence exposes you to, in plain terms. */
+  why: string;
+  category: 'security' | 'ready' | 'resilience';
+  essential: boolean;
+  state: ReadinessState;
+  /**
+   * Severity belongs to the gap, not the measure: it is `none` once satisfied,
+   * because there is nothing left to act on.
+   */
+  severity: ReadinessSeverity;
+  /** How it was decided, so the claim can be checked rather than believed. */
+  evidence?: string;
+}
+
+export interface Readiness {
+  /** False until Discovery has run, in which case nothing can honestly be said. */
+  discovered: boolean;
+  summary: string;
+  essentials_missing: number;
+  satisfied: ReadinessMeasure[];
+  missing: ReadinessMeasure[];
+}
+
+/**
+ * Read whether a server is ready and what is missing.
+ *
+ * Connecting a Node creates an account, hardens SSH and moves the connection.
+ * That is the right place to start and not the whole job: this covers the rest,
+ * including the things servers are actually lost to.
+ */
+export function getReadiness(nodeId: string, signal?: AbortSignal): Promise<Readiness> {
+  return apiRequest<{ readiness?: Readiness } & Partial<Readiness>>(
+    `/nodes/${encodeURIComponent(nodeId)}/readiness`,
+    { signal },
+  ).then((r) => r.readiness ?? (r as Readiness));
+}

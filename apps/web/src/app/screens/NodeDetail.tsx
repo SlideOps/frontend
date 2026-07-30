@@ -21,6 +21,7 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
+import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -257,6 +258,10 @@ export function NodeDetail() {
                 }
               />
 
+              <Card>
+                <ServerReadiness nodeId={id} />
+              </Card>
+
               <NodeHealth nodeId={id} />
 
               <Card>
@@ -329,11 +334,12 @@ export function NodeDetail() {
                   <ErrorNote error={capabilitiesResult.state.error} />
                 ) : null}
                 {capabilitiesResult.state.status === 'ready' ? (
-                  <div className="grid gap-4">
+                  <div className="rounded-md border border-border bg-surface px-3">
                     {capabilitiesResult.state.data.map((capability) => (
                       <CapabilityCard
                         key={capability.key}
                         capability={capability}
+                        inPlace={Boolean(states[capability.key])}
                         badge={capabilityBadge(capability.key, states[capability.key])}
                         footer={capabilityFooter(capability.key, states[capability.key])}
                       />

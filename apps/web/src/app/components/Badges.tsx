@@ -85,7 +85,28 @@ const riskLabel: Record<RiskLevel, string> = {
   high: 'High risk',
 };
 
-export function RiskBadge({ risk }: { risk: RiskLevel }) {
+/**
+ * How risky it is to *run* this Capability.
+ *
+ * `inPlace` matters more than it looks. This risk describes the act of running
+ * something, not the state of the server, and showing it unchanged next to
+ * something already done was actively confusing: a hardened server still read
+ * "High risk" beside SSH, which says nothing an Operator can act on and teaches
+ * them to stop reading the badge at all.
+ *
+ * So once the outcome is in place the risk is stated quietly and in the past
+ * tense of a decision already taken. What matters then is that it is done, which
+ * the completion badge beside it says. Where a Capability has *not* been run, the
+ * risk is exactly the warning it was always meant to be.
+ */
+export function RiskBadge({ risk, inPlace = false }: { risk: RiskLevel; inPlace?: boolean }) {
+  if (inPlace) {
+    return (
+      <span className={cn(badgeBase, toneClass.neutral)} title="How risky it is to run this again.">
+        {riskLabel[risk] ?? risk} to re-run
+      </span>
+    );
+  }
   const tone = riskTone[risk] ?? 'neutral';
   return <span className={cn(badgeBase, toneClass[tone])}>{riskLabel[risk] ?? risk}</span>;
 }
