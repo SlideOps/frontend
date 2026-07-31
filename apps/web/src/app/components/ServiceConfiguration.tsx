@@ -211,10 +211,11 @@ export function ServiceConfiguration({
               onChange={(event) => setEnvText(event.target.value)}
             />
             <Text variant="caption" tone="secondary">
-              One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a value
-              : it is encrypted and never shown again. This list <strong>replaces</strong> what is
-              there, so delete a line to remove that variable. A sealed value cannot be read back,
-              so its line shows empty; retype it to keep it, or it will be dropped.
+              One per line, <code>KEY=value</code>. Prefix with <code>secret:</code> to seal a
+              value: it is encrypted and never shown again. This list <strong>replaces</strong> what
+              is there, so delete a line to remove that variable.
+              <br />A sealed value cannot be read back, so its line shows empty. Leaving it empty
+              keeps the value it already has; type a new one to replace it.
             </Text>
           </>
         ) : (
