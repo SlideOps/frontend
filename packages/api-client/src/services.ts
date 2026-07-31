@@ -494,3 +494,38 @@ export function exposeService(id: string): Promise<Service> {
     method: 'POST',
   }).then((r) => unwrap<Service>(r, 'service'));
 }
+
+/** One thing that happened to a Service. */
+export interface ServiceActivity {
+  id: string;
+  /** A stable identifier, so a client can group without parsing the message. */
+  kind: string;
+  /** Already in the Operator's language, written when it happened. */
+  message: string;
+  outcome: 'ok' | 'failed' | 'pending';
+  /**
+   * Context beside the message: the commit a deploy built, the variable names an
+   * edit moved. Never a value out of an environment.
+   */
+  detail: Record<string, unknown>;
+  created_at: string;
+}
+
+/**
+ * A Service's own trail, newest first.
+ *
+ * Not History, which records Operations against a server, and not the audit
+ * trail, which stays scoped to security relevant acts. This is what happened to
+ * one application: what deployed and from which commit, what stopped it, what
+ * changed its configuration just before it broke.
+ */
+export function getServiceActivity(
+  id: string,
+  limit = 100,
+  signal?: AbortSignal,
+): Promise<ServiceActivity[]> {
+  return apiRequest<unknown>(
+    `/services/${encodeURIComponent(id)}/activity?limit=${encodeURIComponent(String(limit))}`,
+    { signal },
+  ).then((r) => unwrap<ServiceActivity[]>(r, 'activity'));
+}

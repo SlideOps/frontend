@@ -35,6 +35,7 @@ import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { CapabilityManagement } from '../components/CapabilityManagement';
+import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
@@ -102,10 +103,11 @@ function LogView({ id }: { id: string }) {
   const logs = state.status === 'ready' ? state.data.trim() : '';
 
   return (
-    <Section
-      title="Logs"
-      adornment={<Guidance for="service.logs" />}
-      action={
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <Text variant="body-sm" tone="secondary">
+          The last of what the workload printed.
+        </Text>
         <span className="flex items-center gap-3">
           <Refreshing label="Reading" show={refreshing} />
           <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
@@ -113,14 +115,13 @@ function LogView({ id }: { id: string }) {
             Refresh
           </Button>
         </span>
-      }
-    >
+      </div>
       {state.status === 'loading' ? <Loading label="Reading recent logs" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {/* A failed refresh keeps the last logs on screen and says so, rather than
           replacing readable output with an error panel. */}
       {refreshError ? (
-        <p role="alert" className="mb-2 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {refreshError.message}
         </p>
       ) : null}
@@ -139,6 +140,53 @@ function LogView({ id }: { id: string }) {
           </Text>
         )
       ) : null}
+    </div>
+  );
+}
+
+/*
+ * Logs and activity, together and folded away by default.
+ *
+ * They answer one question between them and neither answers it alone: the output
+ * says the application is unhappy, and the trail says what changed just before it
+ * became unhappy. Splitting them across the page meant reading one, scrolling,
+ * and trying to hold the other in your head.
+ *
+ * It starts open. This is the section an Operator came to the page for when
+ * something is wrong, and a fold is the right way to put a long thing away, not
+ * the right way to greet somebody with it hidden.
+ */
+function LogsAndActivity({ id }: { id: string }) {
+  const [tab, setTab] = useState<'logs' | 'activity'>('logs');
+
+  return (
+    <Section title="Logs and activity" adornment={<Guidance for="service.logs" />} collapsible>
+      <div
+        role="tablist"
+        aria-label="What to show"
+        className="flex w-fit gap-1 rounded-md border border-border p-1"
+      >
+        {(
+          [
+            ['logs', 'Output'],
+            ['activity', 'Activity'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            onClick={() => setTab(value)}
+            className={`rounded px-3 py-1 text-sm transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+              tab === value ? 'bg-subtle font-medium text-ink' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'logs' ? <LogView id={id} /> : <ServiceActivityTrail id={id} />}
     </Section>
   );
 }
@@ -287,7 +335,9 @@ export function ServiceDetail() {
                 installed
               />
 
-              <Section title="Shell" flush={false}>
+              {/* Folded by default: a terminal is the least likely reason to
+                  open a Service page and the most expensive thing on it. */}
+              <Section title="Shell" collapsible defaultOpen={false}>
                 <ShellTerminal
                   urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
                   scopeLabel={
@@ -310,12 +360,16 @@ export function ServiceDetail() {
 
               <ServicePreview service={service} />
 
-              <Section title="Live usage" adornment={<Guidance for="service.metrics" />}>
+              <Section title="Live usage" adornment={<Guidance for="service.metrics" />} collapsible>
                 <ServiceMetricsPanel id={service.id} running={isRunning} />
               </Section>
 
+              {/* Above the configuration rather than below it. This is what an
+                  Operator opens the page for when something is wrong, and it used
+                  to sit at the very bottom, under the whole environment editor. */}
+              <LogsAndActivity id={service.id} />
+
               <ServiceConfiguration service={service} onChanged={reload} />
-              <LogView id={service.id} />
             </div>
 
             <div className="flex min-w-0 flex-col gap-6">

@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+
 import { describe, expect, it } from 'vitest';
 import { Section } from './Section';
 
@@ -58,5 +59,84 @@ describe('Section', () => {
       </Section>,
     );
     expect(container.querySelector('section')?.className).not.toContain('border-t');
+  });
+
+  describe('when collapsible', () => {
+    it('folds and unfolds from the heading, and says which it is', () => {
+      render(
+        <Section title="Shell" collapsible>
+          <p>terminal</p>
+        </Section>,
+      );
+      const toggle = screen.getByRole('button', { name: /Shell/ });
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('terminal')).toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+      fireEvent.click(toggle);
+      expect(screen.getByText('terminal')).toBeInTheDocument();
+    });
+
+    // Hiding with CSS would leave a shell connected and a metrics panel polling
+    // behind a section the Operator believes they closed.
+    it('unmounts the body rather than hiding it', () => {
+      render(
+        <Section title="Live usage" collapsible>
+          <p>polling</p>
+        </Section>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Live usage/ }));
+      expect(screen.queryByText('polling')).not.toBeInTheDocument();
+    });
+
+    it('starts folded when asked, for something long that is rarely wanted', () => {
+      render(
+        <Section title="Manage" collapsible defaultOpen={false}>
+          <p>actions</p>
+        </Section>,
+      );
+      expect(screen.getByRole('button', { name: /Manage/ })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(screen.queryByText('actions')).not.toBeInTheDocument();
+    });
+
+    // A folded section still has to say what is inside it, or folding it away
+    // means losing the one number that would have said whether to open it.
+    it('shows the summary only while folded', () => {
+      render(
+        <Section title="Logs" collapsible summary="12 lines" defaultOpen={false}>
+          <p>output</p>
+        </Section>,
+      );
+      expect(screen.getByText('12 lines')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /Logs/ }));
+      expect(screen.queryByText('12 lines')).not.toBeInTheDocument();
+    });
+
+    // Refreshing something nobody can see is a button that only causes doubt.
+    it('folds the action away with the body', () => {
+      render(
+        <Section title="Logs" collapsible action={<button>Refresh</button>}>
+          <p>output</p>
+        </Section>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Logs/ }));
+      expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+    });
+
+    it('is still a landmark named by its heading', () => {
+      render(
+        <Section title="Command and environment" collapsible>
+          <p>content</p>
+        </Section>,
+      );
+      expect(
+        screen.getByRole('region', { name: 'Command and environment' }),
+      ).toBeInTheDocument();
+    });
   });
 });

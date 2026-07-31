@@ -151,6 +151,44 @@ describe('ShellTerminal', () => {
     expect(FakeSocket.last?.readyState).toBe(3);
   });
 
+  /*
+   * Closing has to put the terminal away as well as end the session.
+   *
+   * The box was keyed on the idle status alone, so closing disposed the terminal
+   * and left twenty four rems of empty bordered nothing sitting on the page.
+   * Close looked like it had not worked, because the only thing that visibly
+   * changed was a button label.
+   */
+  it('puts the terminal away when the shell is closed', async () => {
+    const { container } = render();
+    const box = () => container.querySelector('[style*="24rem"]');
+
+    expect(box()?.className).toContain('hidden');
+
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+    await waitFor(() => expect(box()?.className).toContain('block'));
+
+    await userEvent.click(await screen.findByRole('button', { name: /close/i }));
+    await waitFor(() => expect(box()?.className).toContain('hidden'));
+  });
+
+  // Closing must not be a one way door: the same box has to come back.
+  it('shows the terminal again when it is reopened', async () => {
+    const { container } = render();
+    const box = () => container.querySelector('[style*="24rem"]');
+
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+    await userEvent.click(await screen.findByRole('button', { name: /close/i }));
+    await waitFor(() => expect(box()?.className).toContain('hidden'));
+
+    await userEvent.click(await screen.findByRole('button', { name: /open again/i }));
+    await waitFor(() => expect(box()?.className).toContain('block'));
+  });
+
   // A shell must not outlive the page: unmounting has to end the session, or one
   // stays open on the Operator's server for a tab that is already gone.
   it('closes the shell when the page goes away', async () => {
