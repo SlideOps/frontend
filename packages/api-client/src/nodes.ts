@@ -31,6 +31,12 @@ export interface ServerUser {
   access_level: 'admin' | 'limited';
   system: boolean;
   connection: boolean;
+  /**
+   * The account's password is locked, so it cannot be signed into. An account
+   * with no password at all is not disabled: it never had one, and offering to
+   * enable it would open it with none.
+   */
+  disabled: boolean;
 }
 
 /**
