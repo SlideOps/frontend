@@ -50,6 +50,13 @@ larger than the machine's spare disk is fine.
 Use it to take a backup before something risky, to move onto a managed database
 elsewhere, or to hand data to somebody.
 
+An export that cannot be produced says so, beside the button, and saves nothing.
+A database this Service does not use, or one that is not there, is refused with
+the reason rather than quietly handing over a file. An export that came back
+empty is refused too: an empty dump looks exactly like a successful one until
+somebody tries to restore from it, which is the worst possible moment to find
+out.
+
 ### Restoring
 
 Restoring happens in two steps, and the split is deliberate.
