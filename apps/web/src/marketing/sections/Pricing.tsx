@@ -1,7 +1,9 @@
 import { Button, Text } from '@slideops/design-system';
 import { ArrowRight, Check, Server } from '@slideops/icons';
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { signUpUrl } from '../content/site';
+import { fetchLivePrices } from '../live-pricing';
 import { useReveal } from '../useReveal';
 
 interface Tier {
@@ -89,6 +91,22 @@ const tiers: Tier[] = [
  *  never your server's resources. */
 export function Pricing() {
   const { ref, shown } = useReveal<HTMLDivElement>();
+  /*
+   * The written-in prices above are the fallback, not the source.
+   *
+   * They disagreed with what checkout charged for a while, and correcting both
+   * once would only have fixed it until the next Admin edit. So the page asks
+   * the platform what it will actually charge, and falls back to what it shipped
+   * with when the answer does not arrive. A marketing page that renders nothing
+   * because an API call failed is worse than one showing a price that is very
+   * nearly always right.
+   */
+  const [live, setLive] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLivePrices(controller.signal).then(setLive);
+    return () => controller.abort();
+  }, []);
   return (
     <section id="pricing" className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-6 py-20 md:py-24">
@@ -126,7 +144,7 @@ export function Pricing() {
               <Text variant="h3">{tier.name}</Text>
               <div className="mt-3 flex items-baseline gap-1.5">
                 <Text as="span" variant="display" className="text-3xl">
-                  {tier.price}
+                  {live[tier.name.toLowerCase()] ?? tier.price}
                 </Text>
                 {tier.cadence ? (
                   <Text as="span" variant="body-sm" tone="secondary">
