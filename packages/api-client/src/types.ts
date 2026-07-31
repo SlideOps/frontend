@@ -225,7 +225,15 @@ export interface OperationEvent {
 export interface Operation {
   id: string;
   node_id: string;
+  project_id?: string | null;
   capability_key: string;
+  /**
+   * The names behind the ids, resolved by the server. History listed a Capability
+   * key and a timestamp, so it said what had run and never where.
+   */
+  capability_name?: string;
+  node_name?: string;
+  project_name?: string;
   status: OperationStatus;
   plan: Plan | null;
   verification: Verification | null;
