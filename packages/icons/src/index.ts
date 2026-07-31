@@ -9,6 +9,7 @@ export {
   BellRing,
   BookOpen,
   Boxes,
+  Upload,
   Unlock,
   MessageSquare,
   Building2,

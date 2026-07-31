@@ -433,6 +433,7 @@ export function CapabilityDetail() {
                 <CapabilityManagement
                   capabilityKey={key}
                   nodeId={preselectedNode ?? ''}
+                  projectId={preselectedProject}
                   installed={Boolean(done)}
                 />
 
