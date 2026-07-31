@@ -17,6 +17,7 @@ const listCapabilityActions = vi.fn();
 const runCapabilityAction = vi.fn();
 const uploadToNode = vi.fn();
 const createOperation = vi.fn();
+const downloadCapabilityAction = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -24,6 +25,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   runCapabilityAction: (...args: unknown[]) => runCapabilityAction(...args),
   uploadToNode: (...args: unknown[]) => uploadToNode(...args),
   createOperation: (...args: unknown[]) => createOperation(...args),
+  downloadCapabilityAction: (...args: unknown[]) => downloadCapabilityAction(...args),
 }));
 
 const { CapabilityManagement } = await import('./CapabilityManagement');
@@ -68,6 +70,7 @@ describe('CapabilityManagement', () => {
     runCapabilityAction.mockReset();
     uploadToNode.mockReset();
     createOperation.mockReset().mockResolvedValue({ id: 'op-1' });
+    downloadCapabilityAction.mockReset().mockResolvedValue(undefined);
   });
 
   // The adaptive rule, from both sides.
@@ -127,21 +130,48 @@ describe('CapabilityManagement', () => {
   });
 
   // A download with a required input missing would produce a file named after
-  // nothing, so the link is held until it can succeed.
+  // nothing, so it is held until it can succeed.
   it('holds the download until its required input is given', async () => {
     const operator = userEvent.setup();
     show({ installed: true });
 
-    const link = await screen.findByText('Download');
-    expect(link.closest('a')).not.toHaveAttribute('href');
+    const button = await screen.findByRole('button', { name: /Download/ });
+    expect(button).toBeDisabled();
 
     await operator.type(screen.getByPlaceholderText('app'), 'prudent_journal');
-    await waitFor(() =>
-      expect(link.closest('a')).toHaveAttribute(
-        'href',
-        expect.stringContaining('database=prudent_journal'),
-      ),
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  /*
+   * This was a bare anchor pointed at the download URL. Without a download
+   * attribute a click is a top level navigation, so an export the server refused
+   * replaced the whole application with a page of raw JSON: no message, nothing
+   * saved, and no way to read the reason without opening devtools. Which is
+   * indistinguishable from the button doing nothing at all.
+   */
+  it('reports a refused export instead of navigating away from the app', async () => {
+    const { ApiError } = await import('@slideops/api-client');
+    downloadCapabilityAction.mockRejectedValue(
+      new ApiError(403, 'out_of_scope', 'this service does not use a database called "other"'),
     );
+    const operator = userEvent.setup();
+    show({ installed: true, serviceId: 'svc-1' });
+
+    await operator.type(await screen.findByPlaceholderText('app'), 'other');
+    await operator.click(screen.getByRole('button', { name: /Download/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('does not use a database called');
+  });
+
+  it('says so when the export actually saved', async () => {
+    downloadCapabilityAction.mockResolvedValue(undefined);
+    const operator = userEvent.setup();
+    show({ installed: true });
+
+    await operator.type(await screen.findByPlaceholderText('app'), 'prudent_journal');
+    await operator.click(screen.getByRole('button', { name: /Download/ }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved to your downloads');
   });
 
   // Scoping is what stops a Service page reaching another application's data on
@@ -162,13 +192,19 @@ describe('CapabilityManagement', () => {
   });
 
   it('scopes the download to the Service too', async () => {
+    downloadCapabilityAction.mockResolvedValue(undefined);
     const operator = userEvent.setup();
     show({ installed: true, serviceId: 'svc-1' });
 
     await operator.type(await screen.findByPlaceholderText('app'), 'prudent_journal');
-    const link = screen.getByText('Download').closest('a');
+    await operator.click(screen.getByRole('button', { name: /Download/ }));
+
     await waitFor(() =>
-      expect(link).toHaveAttribute('href', expect.stringContaining('service_id=svc-1')),
+      expect(downloadCapabilityAction).toHaveBeenCalledWith('install-postgresql', 'export-database', {
+        node_id: 'n1',
+        service_id: 'svc-1',
+        parameters: { database: 'prudent_journal' },
+      }),
     );
   });
 
