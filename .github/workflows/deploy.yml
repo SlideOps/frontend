@@ -29,10 +29,11 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      # No version pinned here on purpose: package.json declares
+      # packageManager, and giving the action a second version makes it refuse to
+      # choose between them rather than pick one.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
