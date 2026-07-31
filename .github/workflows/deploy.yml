@@ -1,0 +1,96 @@
+name: Deploy
+
+# Only main, and only after CI has passed on that same commit. CI already lints,
+# typechecks, tests and builds, so this rebuilds rather than reusing an artifact
+# only because the build is cheap and a fresh one cannot be stale.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the web app
+    runs-on: ubuntu-latest
+    # workflow_run fires on failure too, so the conclusion has to be checked or a
+    # red build ships.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout the commit CI tested
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        # No API base is set: the app defaults to /api/v1, and the API is served
+        # from the same origin. Setting an absolute URL here would make every
+        # request cross-origin and break the session cookie.
+        run: pnpm run build
+
+      - name: Authorise the deploy key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload the build beside the live one
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          # Uploaded to web.incoming, never over the live directory. Copying onto
+          # the running app would serve a new index.html naming asset bundles
+          # that had not arrived yet, which is a blank page rather than an old one.
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${USER}@${HOST}" 'rm -rf /opt/slideops/web.incoming && mkdir -p /opt/slideops/web.incoming'
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=~/.ssh/known_hosts" \
+            ./apps/web/dist/ "${USER}@${HOST}:/opt/slideops/web.incoming/"
+
+      - name: Swap it in, and roll back if the site stops answering
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${USER}@${HOST}" /opt/slideops/deploy-web.sh
+
+      - name: Confirm the site from outside
+        env:
+          BASE_URL: ${{ secrets.DEPLOY_BASE_URL }}
+        run: |
+          curl -fsS --max-time 20 -o /dev/null "${BASE_URL}/"
+          # A client route has to fall through to the app rather than 404, which
+          # is the thing that breaks if the Caddy config is ever wrong.
+          curl -fsS --max-time 20 -o /dev/null "${BASE_URL}/login"
+          echo "the site and its client routes are answering"
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
