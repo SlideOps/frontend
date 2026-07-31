@@ -193,10 +193,16 @@ export function ShellTerminal({
         </p>
       ) : null}
 
+      {/* Shown only while there is a session in it.
+          Closing disposes the terminal but this box was keyed on idle alone, so a
+          closed shell left twenty four rems of empty bordered nothing on the page
+          and Close appeared not to have worked. A disposed terminal has taken its
+          own elements out of the DOM, so what remained was a frame around
+          genuinely nothing. */}
       <div
         ref={containerRef}
         className={`min-w-0 overflow-hidden rounded-md border border-border bg-app ${
-          status === 'idle' ? 'hidden' : 'block'
+          live ? 'block' : 'hidden'
         }`}
         style={{ height: '24rem' }}
       />

@@ -57,14 +57,7 @@ export function runCapabilityAction(
   ).then((r) => unwrap<ActionTable>(r, 'table'));
 }
 
-/**
- * The URL a file producing Action downloads from.
- *
- * A URL rather than a fetch, so the browser downloads it the way it downloads
- * anything: streamed to disk, with a progress indicator, and without the whole
- * file passing through JavaScript memory first. A database dump can be larger
- * than the tab can hold.
- */
+/** The URL a file producing Action downloads from. */
 export function capabilityActionDownloadUrl(
   capabilityKey: string,
   actionKey: string,
@@ -78,6 +71,80 @@ export function capabilityActionDownloadUrl(
     ...(input.parameters ?? {}),
   });
   return `/api/v1/capabilities/${encodeURIComponent(capabilityKey)}/actions/${encodeURIComponent(actionKey)}/download?${query}`;
+}
+
+/** The filename the server chose, when it said. */
+function filenameFrom(disposition: string | null, fallback: string): string {
+  if (!disposition) {
+    return fallback;
+  }
+  const quoted = /filename="([^"]+)"/.exec(disposition)?.[1];
+  if (quoted) {
+    return quoted;
+  }
+  const bare = /filename=([^;]+)/.exec(disposition)?.[1];
+  return bare ? bare.trim() : fallback;
+}
+
+/**
+ * Download what a file producing Action returns, and say so when it fails.
+ *
+ * This was a bare anchor pointed at the URL above, which is why a failed export
+ * looked like nothing happening. Without a `download` attribute a click is a
+ * top level navigation, so an export the server refused, for a database outside
+ * the Service's scope or one that does not exist, replaced the whole application
+ * with a page of raw JSON. There was no way to read the reason without opening
+ * devtools, and nothing at all was written to disk.
+ *
+ * Fetching first means the status is known before anything is saved: a refusal
+ * becomes a message beside the button, and only a real response reaches the
+ * disk. The body is still streamed by the browser rather than assembled here,
+ * and a Blob is backed by the browser's own storage rather than the JS heap, so
+ * a dump larger than memory is still fine.
+ */
+export async function downloadCapabilityAction(
+  capabilityKey: string,
+  actionKey: string,
+  input: { node_id: string; service_id?: string; parameters?: Record<string, string> },
+): Promise<void> {
+  const response = await fetch(capabilityActionDownloadUrl(capabilityKey, actionKey, input), {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = (payload as { error?: { code?: string; message?: string } }).error;
+    throw new ApiError(
+      response.status,
+      error?.code ?? 'download_failed',
+      error?.message ?? 'That export could not be produced.',
+    );
+  }
+
+  const blob = await response.blob();
+  // An export that arrives empty is a failure wearing a success. Saying so beats
+  // handing over a file that only reveals itself as useless during a restore.
+  if (blob.size === 0) {
+    throw new ApiError(502, 'empty_download', 'That export came back empty, so nothing was saved.');
+  }
+
+  const name = filenameFrom(
+    response.headers.get('Content-Disposition'),
+    `${input.parameters?.database ?? capabilityKey}.sql`,
+  );
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    // Revoking immediately can cut the save short in some browsers, so this
+    // waits for the click to have been handled.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
 }
 
 /** A file staged on a Node, waiting for the Operation that will use it. */
