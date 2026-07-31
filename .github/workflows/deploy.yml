@@ -63,15 +63,17 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          # Uploaded to web.incoming, never over the live directory. Copying onto
-          # the running app would serve a new index.html naming asset bundles
-          # that had not arrived yet, which is a blank page rather than an old one.
+          # Uploaded inside the mounted directory, never over the live release.
+          # Copying onto the running app would serve a new index.html naming asset
+          # bundles that had not arrived yet, which is a blank page rather than an
+          # old one. The publish step then moves a symlink, which the container
+          # sees because it happens inside the mount rather than to it.
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
             -o UserKnownHostsFile=~/.ssh/known_hosts \
-            "${USER}@${HOST}" 'rm -rf /opt/slideops/web.incoming && mkdir -p /opt/slideops/web.incoming'
+            "${USER}@${HOST}" 'rm -rf /opt/slideops/web/incoming && mkdir -p /opt/slideops/web/incoming'
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=~/.ssh/known_hosts" \
-            ./apps/web/dist/ "${USER}@${HOST}:/opt/slideops/web.incoming/"
+            ./apps/web/dist/ "${USER}@${HOST}:/opt/slideops/web/incoming/"
 
       - name: Swap it in, and roll back if the site stops answering
         env:
