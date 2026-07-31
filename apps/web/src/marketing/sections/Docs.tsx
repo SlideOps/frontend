@@ -6,6 +6,7 @@ import gettingStarted from '../docs/getting-started.md?raw';
 import serversAndProjects from '../docs/servers-and-projects.md?raw';
 import howAnOperationWorks from '../docs/how-an-operation-works.md?raw';
 import dayToDay from '../docs/day-to-day.md?raw';
+import managingWhatYouInstalled from '../docs/managing-what-you-installed.md?raw';
 import deploymentMethods from '../docs/deployment-methods.md?raw';
 
 interface Doc {
@@ -39,6 +40,12 @@ const docs: Doc[] = [
     title: 'Ways to get something running',
     summary: 'Repository, image or adopted, as a container, a Compose stack or a systemd service.',
     content: deploymentMethods,
+  },
+  {
+    slug: 'managing-what-you-installed',
+    title: 'Managing what you installed',
+    summary: 'Reading a database, exporting it, and restoring one, with approval.',
+    content: managingWhatYouInstalled,
   },
   {
     slug: 'day-to-day',
