@@ -32,6 +32,15 @@ export {
   type LoginResult,
 } from './auth';
 export {
+  listCapabilityActions,
+  runCapabilityAction,
+  capabilityActionDownloadUrl,
+  type CapabilityAction,
+  type ActionTable,
+  type ActionEffect,
+  type ActionProduces,
+} from './capability-actions';
+export {
   listProjects,
   createProject,
   getProject,
