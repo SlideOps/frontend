@@ -38,6 +38,7 @@ import { databaseManageStep } from '../database-credentials';
 import { CompletionBadge, DetectedBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { CapabilityManagement } from '../components/CapabilityManagement';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -341,7 +342,7 @@ export function CapabilityDetail() {
                 <CreateDatabaseCredentials
                   capabilityKey={key}
                   states={states}
-                  nodeId={preselectedNode}
+                  nodeId={preselectedNode ?? ''}
                   projectId={preselectedProject}
                 />
               ) : null}
@@ -426,6 +427,14 @@ export function CapabilityDetail() {
                     </div>
                   </Section>
                 ) : null}
+
+                {/* Only once it is installed here. Before that there is nothing
+                    to manage, and the page stays the description it always was. */}
+                <CapabilityManagement
+                  capabilityKey={key}
+                  nodeId={preselectedNode ?? ''}
+                  installed={Boolean(done)}
+                />
 
                 {capabilityResult.state.data.verification_strategy ? (
                   <Section title="How verification proves it" guidanceKey="capability.verification">
