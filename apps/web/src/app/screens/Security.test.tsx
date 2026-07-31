@@ -48,6 +48,24 @@ function renderScreen() {
   );
 }
 
+describe('Security: this deployment', () => {
+  beforeEach(() => signedInAs(account));
+
+  // An Operator running SlideOps on their own server had no way to find the URL
+  // their own app was talking to without asking somebody.
+  it('shows the API base this build actually calls, resolved to an address', async () => {
+    renderScreen();
+    const base = await screen.findByText(/\/api\/v1$/);
+    expect(base.textContent).toMatch(/^https?:\/\//);
+  });
+
+  it('links to the API reference', async () => {
+    renderScreen();
+    const link = await screen.findByRole('link', { name: /\/docs$/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/docs'));
+  });
+});
+
 describe('Security: password', () => {
   beforeEach(() => {
     changePassword.mockReset();

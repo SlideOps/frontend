@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ApiError,
+  apiBase,
   changePassword,
   mfaDisable,
   mfaEnable,
@@ -177,6 +178,58 @@ function DisableMfa() {
 }
 
 /**
+ * Where this deployment's API lives.
+ *
+ * An Operator running SlideOps on their own server had no way to find the URL
+ * their own app was talking to, or the API reference, without asking somebody.
+ * It is not a secret and it is not guessable from the outside, so it belongs on
+ * a page rather than in a conversation.
+ *
+ * The base is read from the client itself, so it is always the address this
+ * build actually calls rather than one written down and left to drift.
+ */
+function ApiDetails() {
+  const base = apiBase();
+  // The client uses a relative base when the API shares this origin, which is
+  // the usual arrangement. Showing "/api/v1" would be true and useless, so it
+  // is resolved against the page.
+  const absolute = /^https?:\/\//i.test(base) ? base : new URL(base, window.location.origin).href;
+  const docs = new URL('/docs', absolute).href;
+
+  return (
+    <div className="flex max-w-xl flex-col gap-3">
+      <Text variant="body-sm" tone="secondary">
+        This is the API your app is talking to, and the reference for it. Useful when you are wiring
+        another client, or checking what a request actually returns.
+      </Text>
+      <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+          <Text variant="body-sm" tone="secondary">
+            API base
+          </Text>
+          <Text variant="code" className="select-all break-all">
+            {absolute}
+          </Text>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+          <Text variant="body-sm" tone="secondary">
+            API reference
+          </Text>
+          <a
+            href={docs}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all font-mono text-sm text-brand underline underline-offset-2"
+          >
+            {docs}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Change the account password.
  *
  * The current password is asked for because a signed-in session is not proof of
@@ -298,7 +351,11 @@ export function Security() {
       />
 
       <div className="flex flex-col gap-8">
-        <Section title="Password" flush>
+        <Section title="This deployment" flush>
+          <ApiDetails />
+        </Section>
+
+        <Section title="Password">
           <ChangePassword />
         </Section>
 
