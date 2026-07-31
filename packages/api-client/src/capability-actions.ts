@@ -1,3 +1,4 @@
+import { ApiError } from './errors';
 import { apiRequest, unwrap } from './http';
 import type { CapabilityParameter } from './types';
 
@@ -77,4 +78,42 @@ export function capabilityActionDownloadUrl(
     ...(input.parameters ?? {}),
   });
   return `/api/v1/capabilities/${encodeURIComponent(capabilityKey)}/actions/${encodeURIComponent(actionKey)}/download?${query}`;
+}
+
+/** A file staged on a Node, waiting for the Operation that will use it. */
+export interface StagedUpload {
+  id: string;
+  path: string;
+  /** The size the Node measured after the upload finished, not what was sent. */
+  bytes: number;
+}
+
+/**
+ * Send a file to a Node and leave it there.
+ *
+ * This changes nothing. Uploading a database dump does not restore it: at the
+ * moment the file lands the database is untouched, and restoring it is a separate
+ * Operation with a plan to approve. That split exists because a file cannot
+ * travel as an Operation parameter, and a destructive change must not happen
+ * without a plan somebody read.
+ */
+export async function uploadToNode(nodeId: string, file: File): Promise<StagedUpload> {
+  const response = await fetch(`/api/v1/uploads?node_id=${encodeURIComponent(nodeId)}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    // The File is passed straight through, so the browser streams it rather than
+    // reading a whole database dump into memory first.
+    body: file,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = (payload as { error?: { code?: string; message?: string } }).error;
+    throw new ApiError(
+      response.status,
+      error?.code ?? 'upload_failed',
+      error?.message ?? 'That upload did not complete.',
+    );
+  }
+  return (payload as { upload: StagedUpload }).upload;
 }

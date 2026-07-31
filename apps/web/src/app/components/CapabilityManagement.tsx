@@ -1,14 +1,18 @@
 import {
   ApiError,
   capabilityActionDownloadUrl,
+  createOperation,
   listCapabilityActions,
   runCapabilityAction,
+  uploadToNode,
   type ActionTable,
   type CapabilityAction,
+  type StagedUpload,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { Download, RefreshCw } from '@slideops/icons';
+import { Download, RefreshCw, Upload } from '@slideops/icons';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 
@@ -192,6 +196,139 @@ function ActionRow({
 }
 
 /**
+ * Restoring a database from a dump you upload.
+ *
+ * Two steps on purpose. The upload puts the file on the server and changes
+ * nothing; the restore is an Operation with a plan to read and approve. A file
+ * cannot travel as an Operation parameter, and a destructive change should not
+ * happen without somebody seeing what it will destroy, so the split is what makes
+ * both possible.
+ *
+ * The size the server measured is shown before anything else happens, because a
+ * truncated upload restored as though it were whole is the failure that only
+ * shows up much later.
+ */
+function RestoreFromUpload({
+  nodeId,
+  projectId,
+  database,
+}: {
+  nodeId: string;
+  projectId?: string;
+  database?: string;
+}) {
+  const navigate = useNavigate();
+  const [file, setFile] = useState<File | null>(null);
+  const [target, setTarget] = useState(database ?? '');
+  const [staged, setStaged] = useState<StagedUpload | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async () => {
+    if (!file) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      setStaged(await uploadToNode(nodeId, file));
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'That upload did not complete.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const planRestore = async () => {
+    if (!staged || !target.trim()) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const operation = await createOperation({
+        node_id: nodeId,
+        project_id: projectId,
+        capability_key: 'restore-postgresql',
+        parameters: { database: target.trim(), upload_id: staged.id },
+      });
+      // Straight to the Operation, because nothing has happened yet: it is waiting
+      // for its plan to be read and approved.
+      navigate(`/app/operations/${operation.id}`);
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'That could not be prepared.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border-b border-border py-4 last:border-b-0">
+      <Text variant="body-sm" className="font-medium">
+        Restore from a dump
+      </Text>
+      <Text variant="body-sm" tone="secondary" className="mt-1 block max-w-2xl">
+        Upload a SQL dump, then approve the restore. Uploading changes nothing: the database is
+        untouched until you have read the plan and agreed to it. A copy of what is there now is
+        taken first, so it can be put back.
+      </Text>
+
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">Dump file</span>
+          <input
+            type="file"
+            accept=".sql,.dump,text/plain,application/octet-stream"
+            aria-label="Dump file"
+            className="text-sm text-ink file:mr-2 file:h-9 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:text-sm file:text-ink"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setStaged(null);
+            }}
+          />
+        </label>
+        <Button size="sm" variant="secondary" disabled={!file || busy} onClick={send}>
+          <Upload width={15} height={15} aria-hidden />
+          {busy && !staged ? 'Uploading' : 'Upload'}
+        </Button>
+      </div>
+
+      {staged ? (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <Text variant="body-sm" tone="secondary" className="w-full">
+            {staged.bytes.toLocaleString()} bytes arrived on the server. Check that against the file
+            you meant to send before restoring it.
+          </Text>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">Restore into</span>
+            <input
+              className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-ink"
+              aria-label="Restore into"
+              placeholder="app"
+              value={target}
+              onChange={(event) => setTarget(event.target.value)}
+            />
+          </label>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={busy || !target.trim()}
+            onClick={planRestore}
+          >
+            Plan the restore
+          </Button>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Management for an installed Capability, or nothing at all.
  *
  * Renders nothing when the Capability offers no Actions, or when it is not
@@ -202,10 +339,16 @@ export function CapabilityManagement({
   capabilityKey,
   nodeId,
   serviceId,
+  projectId,
+  scopedDatabase,
   installed,
 }: {
   capabilityKey: string;
   nodeId: string;
+  /** The Project a restore Operation belongs to, since it is a Plugin Capability. */
+  projectId?: string;
+  /** Prefills the restore target on a Service page, where it is already known. */
+  scopedDatabase?: string;
   /**
    * Narrows everything to one Service. A database server usually carries a
    * database per application, so a Service page that showed all of them is how
@@ -259,6 +402,9 @@ export function CapabilityManagement({
               onResult={(key, table) => setResults((current) => ({ ...current, [key]: table }))}
             />
           ))}
+          {capabilityKey === 'install-postgresql' ? (
+            <RestoreFromUpload nodeId={nodeId} projectId={projectId} database={scopedDatabase} />
+          ) : null}
         </div>
       ) : null}
     </Section>

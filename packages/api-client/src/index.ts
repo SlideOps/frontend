@@ -35,6 +35,8 @@ export {
   listCapabilityActions,
   runCapabilityAction,
   capabilityActionDownloadUrl,
+  uploadToNode,
+  type StagedUpload,
   type CapabilityAction,
   type ActionTable,
   type ActionEffect,
