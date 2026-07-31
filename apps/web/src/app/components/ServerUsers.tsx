@@ -143,6 +143,13 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
                     </span>
                   ) : null}
                   {user.system ? <span className="text-xs text-ink-muted">System</span> : null}
+                  {/* A disabled account still exists and still appears; saying so
+                      here is what stops it reading as a live way in. */}
+                  {user.disabled ? (
+                    <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">
+                      Disabled
+                    </span>
+                  ) : null}
                   <ChevronRight
                     width={14}
                     height={14}
