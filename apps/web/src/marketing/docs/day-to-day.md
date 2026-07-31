@@ -28,6 +28,17 @@ An Automation is a saved intent to run a Capability on a server on a schedule. S
 
 The list tells you how the last run went, not only when the next one is due. An Automation that has started failing says so.
 
+### Work with what you installed
+
+A Capability's page becomes its management page once the thing is installed.
+Databases list what they hold and what is connected to them, export a complete
+copy streamed straight to you, and restore from a dump you upload.
+
+Reading is immediate and changes nothing. Restoring is an Operation you approve,
+with a copy of the current database taken first so it can be put back. On a
+Service page all of it is scoped to that Service, so a database server shared by
+several applications never shows one application another's data.
+
 ### Read what happened
 
 History records every Operation, with its plan, its output, and the evidence from its verification. Reports pull that into five answers: what has been verified and on what evidence, what has been run and how often, the security posture of each server, an inventory of the fleet, and the health of one machine over time.
