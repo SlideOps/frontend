@@ -1,9 +1,10 @@
-import type { DiscoveryResult, Node } from '@slideops/api-client';
+import { getReadiness, type DiscoveryResult, type Node } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, CheckCircle2, RefreshCw, ShieldCheck } from '@slideops/icons';
+import { ArrowRight, Check, CheckCircle2, RefreshCw, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 /** A yes/no/unknown reading of an sshd directive from the last quick check. */
 function directiveState(value: string | undefined): 'yes' | 'no' | 'unknown' {
@@ -88,28 +89,48 @@ function Step({
   title,
   children,
   action,
+  done = false,
+  evidence,
 }: {
   index: number;
   guidanceKey: string;
   title: string;
   children: ReactNode;
   action: ReactNode;
+  /** Already true on this server, whether SlideOps did it or found it that way. */
+  done?: boolean;
+  /** How it was decided, so a claim of done can be checked rather than believed. */
+  evidence?: string;
 }) {
   return (
     <li className="flex gap-4">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-sm font-semibold text-brand">
-        {index}
+      <span
+        className={
+          done
+            ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success'
+            : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-sm font-semibold text-brand'
+        }
+      >
+        {done ? <Check width={15} height={15} aria-hidden /> : index}
       </span>
       <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <Text variant="body" className="font-medium">
+        <div className="flex flex-wrap items-center gap-2">
+          <Text variant="body" className={done ? 'font-medium text-ink-muted' : 'font-medium'}>
             {title}
           </Text>
+          {done ? (
+            <span className="rounded-pill bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+              Done
+            </span>
+          ) : null}
           <Guidance for={guidanceKey} />
         </div>
         <Text variant="body-sm" tone="secondary" className="mt-1">
-          {children}
+          {done && evidence ? evidence : children}
         </Text>
+        {/* A step already satisfied keeps its control, because running it again is
+            sometimes exactly what an Operator wants, but it stops being presented
+            as the next thing to do. */}
         <div className="mt-3">{action}</div>
       </div>
     </li>
@@ -117,10 +138,18 @@ function Step({
 }
 
 /**
- * The guided path to stop operating a server as root: run the quick check,
- * create a non-root administrator, harden SSH, then switch SlideOps to the new
- * account. Each step launches a normal Operation the Operator approves; the
- * final switch verifies the new account can sign in before it changes anything.
+ * The guided path to stop operating a server as root.
+ *
+ * This used to be a fixed list of four steps that never changed. On a server
+ * secured weeks ago it still read "Create a non-root administrator", as though
+ * nothing had happened, while the readiness panel directly beneath it said the
+ * opposite. Two components on one page disagreeing about the same server teaches
+ * an Operator to trust neither.
+ *
+ * It reads the same readiness the rest of the page trusts, so a step SlideOps
+ * carried out and a step the Operator did by hand before SlideOps ever saw the
+ * machine both count. Detected counts as much as done: a server hardened by hand
+ * is a hardened server.
  */
 export function SecureServer({
   nodeId,
@@ -134,6 +163,27 @@ export function SecureServer({
   onRotate: () => void;
 }) {
   const navigate = useNavigate();
+  const readiness = useAsyncData((signal) => getReadiness(nodeId, signal), [nodeId]);
+
+  // Every measure the report knows about, satisfied or not, keyed by Capability.
+  const measures =
+    readiness.state.status === 'ready'
+      ? [...readiness.state.data.satisfied, ...readiness.state.data.missing]
+      : [];
+  const satisfied = (key: string) => {
+    const measure = measures.find((entry) => entry.capability_key === key);
+    return {
+      done: measure?.state === 'done' || measure?.state === 'detected',
+      evidence: measure?.evidence,
+    };
+  };
+
+  const discovered = readiness.state.status === 'ready' && readiness.state.data.discovered;
+  const appUser = satisfied('create-app-user');
+  const ssh = satisfied('secure-ssh');
+  // The connection is on the non-root account exactly when SlideOps is not
+  // connecting as root, which the Node itself records.
+  const everythingDone = discovered && appUser.done && ssh.done;
 
   return (
     <Card>
@@ -143,8 +193,9 @@ export function SecureServer({
         <Guidance for="server.secure" />
       </div>
       <Text variant="body-sm" tone="secondary" className="mb-5">
-        SlideOps should never operate a server as root once it is connected. Follow these steps in
-        order to create a non-root administrator, harden SSH, then switch to the new account.
+        {everythingDone
+          ? 'This server is already secured. Everything below is done, kept here so you can see what was applied and run any of it again if you need to.'
+          : 'SlideOps should never operate a server as root once it is connected. Follow these steps in order to create a non-root administrator, harden SSH, then switch to the new account.'}
       </Text>
 
       <ol className="flex flex-col gap-6">
@@ -152,6 +203,12 @@ export function SecureServer({
           index={1}
           guidanceKey="server.secure.discover"
           title="Run the quick check"
+          done={discovered}
+          evidence={
+            discovered
+              ? 'This server has been read, so the steps below are planned from what is really there.'
+              : undefined
+          }
           action={
             <Button size="sm" variant="secondary" onClick={onDiscover} disabled={discovering}>
               <RefreshCw
@@ -171,6 +228,8 @@ export function SecureServer({
           index={2}
           guidanceKey="server.secure.admin"
           title="Create a non-root administrator"
+          done={appUser.done}
+          evidence={appUser.evidence}
           action={
             <Button
               size="sm"
@@ -189,6 +248,8 @@ export function SecureServer({
           index={3}
           guidanceKey="server.secure.hardenSsh"
           title="Harden SSH"
+          done={ssh.done}
+          evidence={ssh.evidence}
           action={
             <Button
               size="sm"
@@ -207,6 +268,10 @@ export function SecureServer({
           index={4}
           guidanceKey="server.secure.rotate"
           title="Switch to the new account"
+          done={everythingDone}
+          evidence={
+            everythingDone ? 'SlideOps is connected on a non-root account with sudo.' : undefined
+          }
           action={
             <Button size="sm" onClick={onRotate}>
               <CheckCircle2 width={15} height={15} aria-hidden />
