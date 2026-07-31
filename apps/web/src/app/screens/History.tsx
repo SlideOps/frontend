@@ -49,11 +49,19 @@ function OperationRow({
         </span>
         <span className="min-w-0 flex-1">
           <Text variant="body-sm" className="truncate font-medium">
-            {operation.capability_key}
+            {operation.capability_name || operation.capability_key}
           </Text>
+          {/* Where it ran, not only when. A list of Operations that says what
+              happened and never to which machine is the one question the record
+              exists to answer. */}
           <Text variant="body-sm" tone="secondary" className="truncate">
-            {when}
+            {[operation.node_name, operation.project_name].filter(Boolean).join(' · ') || when}
           </Text>
+          {operation.node_name ? (
+            <Text variant="caption" tone="secondary" className="truncate">
+              {when}
+            </Text>
+          ) : null}
         </span>
         <StatusBadge status={operation.status} />
         <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
