@@ -34,6 +34,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
+import { CapabilityManagement } from '../components/CapabilityManagement';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
@@ -275,6 +276,15 @@ export function ServiceDetail() {
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
               <ServiceEndpoint service={service} onChanged={reload} />
+
+              {/* Scoped to this Service, so a database server shared by several
+                  applications shows only the part this one uses. */}
+              <CapabilityManagement
+                capabilityKey="install-postgresql"
+                nodeId={service.node_id}
+                serviceId={service.id}
+                installed
+              />
 
               <Section title="Shell" flush={false}>
                 <ShellTerminal

@@ -48,7 +48,7 @@ export function listCapabilityActions(
 export function runCapabilityAction(
   capabilityKey: string,
   actionKey: string,
-  input: { node_id: string; parameters?: Record<string, string> },
+  input: { node_id: string; service_id?: string; parameters?: Record<string, string> },
 ): Promise<ActionTable> {
   return apiRequest(
     `/capabilities/${encodeURIComponent(capabilityKey)}/actions/${encodeURIComponent(actionKey)}`,
@@ -67,8 +67,14 @@ export function runCapabilityAction(
 export function capabilityActionDownloadUrl(
   capabilityKey: string,
   actionKey: string,
-  input: { node_id: string; parameters?: Record<string, string> },
+  input: { node_id: string; service_id?: string; parameters?: Record<string, string> },
 ): string {
-  const query = new URLSearchParams({ node_id: input.node_id, ...(input.parameters ?? {}) });
+  const query = new URLSearchParams({
+    node_id: input.node_id,
+    // Scoping the download too, or a Service page would hand somebody a copy of
+    // another application's database simply by typing its name.
+    ...(input.service_id ? { service_id: input.service_id } : {}),
+    ...(input.parameters ?? {}),
+  });
   return `/api/v1/capabilities/${encodeURIComponent(capabilityKey)}/actions/${encodeURIComponent(actionKey)}/download?${query}`;
 }

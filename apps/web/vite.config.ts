@@ -30,8 +30,16 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'slideops-mark.svg', 'icon-180.png'],
         workbox: {
-          // The API is never a navigation fallback; app shell routes are.
-          navigateFallbackDenylist: [/^\/api\//],
+          // Anything the backend serves is never a navigation fallback; app
+          // shell routes are.
+          //
+          // /docs was missing from this list, and the consequence was invisible
+          // to every check that did not use a browser. The server returned
+          // Swagger correctly and curl saw it, while a real visitor got the app
+          // shell from the service worker cache, because a service worker
+          // intercepts navigation before the request is ever made. The API
+          // reference looked permanently broken while being served perfectly.
+          navigateFallbackDenylist: [/^\/api\//, /^\/docs/, /^\/healthz$/, /^\/swagger/],
           runtimeCaching: [
             {
               // Cache the read-only resource lists so History and cached views in

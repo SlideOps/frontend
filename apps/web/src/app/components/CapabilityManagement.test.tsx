@@ -44,11 +44,12 @@ const actions = [
   },
 ];
 
-function show(props: { installed: boolean; nodeId?: string }) {
+function show(props: { installed: boolean; nodeId?: string; serviceId?: string }) {
   return renderInApp(
     <CapabilityManagement
       capabilityKey="install-postgresql"
       nodeId={props.nodeId ?? 'n1'}
+      serviceId={props.serviceId}
       installed={props.installed}
     />,
   );
@@ -132,6 +133,39 @@ describe('CapabilityManagement', () => {
         expect.stringContaining('database=prudent_journal'),
       ),
     );
+  });
+
+  // Scoping is what stops a Service page reaching another application's data on
+  // a shared database server.
+  it('passes the Service through so the server can scope the read', async () => {
+    runCapabilityAction.mockResolvedValue({ columns: ['Database'], rows: [] });
+    const operator = userEvent.setup();
+    show({ installed: true, serviceId: 'svc-1' });
+
+    await operator.click(await screen.findByRole('button', { name: /Show/ }));
+    await waitFor(() =>
+      expect(runCapabilityAction).toHaveBeenCalledWith('install-postgresql', 'list-databases', {
+        node_id: 'n1',
+        service_id: 'svc-1',
+        parameters: {},
+      }),
+    );
+  });
+
+  it('scopes the download to the Service too', async () => {
+    const operator = userEvent.setup();
+    show({ installed: true, serviceId: 'svc-1' });
+
+    await operator.type(await screen.findByPlaceholderText('app'), 'prudent_journal');
+    const link = screen.getByText('Download').closest('a');
+    await waitFor(() =>
+      expect(link).toHaveAttribute('href', expect.stringContaining('service_id=svc-1')),
+    );
+  });
+
+  it('says it is scoped when it is', async () => {
+    show({ installed: true, serviceId: 'svc-1' });
+    expect(await screen.findByText(/only what it actually uses is shown/)).toBeInTheDocument();
   });
 
   it('reports a refusal from the server', async () => {

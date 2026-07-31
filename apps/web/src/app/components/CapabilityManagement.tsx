@@ -77,12 +77,14 @@ function ActionRow({
   capabilityKey,
   action,
   nodeId,
+  serviceId,
   result,
   onResult,
 }: {
   capabilityKey: string;
   action: CapabilityAction;
   nodeId: string;
+  serviceId?: string;
   result?: ActionTable;
   onResult: (key: string, table: ActionTable | undefined) => void;
 }) {
@@ -102,6 +104,7 @@ function ActionRow({
         action.key,
         await runCapabilityAction(capabilityKey, action.key, {
           node_id: nodeId,
+          service_id: serviceId,
           parameters: values,
         }),
       );
@@ -114,6 +117,7 @@ function ActionRow({
 
   const downloadHref = capabilityActionDownloadUrl(capabilityKey, action.key, {
     node_id: nodeId,
+    service_id: serviceId,
     parameters: values,
   });
 
@@ -197,10 +201,17 @@ function ActionRow({
 export function CapabilityManagement({
   capabilityKey,
   nodeId,
+  serviceId,
   installed,
 }: {
   capabilityKey: string;
   nodeId: string;
+  /**
+   * Narrows everything to one Service. A database server usually carries a
+   * database per application, so a Service page that showed all of them is how
+   * somebody acts on another application's data by picking the wrong row.
+   */
+  serviceId?: string;
   /** Whether this Capability's outcome is already in place on this Node. */
   installed: boolean;
 }) {
@@ -227,7 +238,11 @@ export function CapabilityManagement({
   return (
     <Section
       title="Manage"
-      description="This is installed on the selected server, so you can read what it holds and take a copy of it. Nothing here changes anything: every change is still a Capability you approve."
+      description={
+        serviceId
+          ? 'Scoped to this Service: only what it actually uses is shown, so nothing here can reach another application on the same server. Nothing here changes anything either.'
+          : 'This is installed on the selected server, so you can read what it holds and take a copy of it. Nothing here changes anything: every change is still a Capability you approve.'
+      }
     >
       {actions.state.status === 'loading' ? <Loading label="Reading what this offers" /> : null}
       {actions.state.status === 'error' ? <ErrorNote error={actions.state.error} /> : null}
@@ -239,6 +254,7 @@ export function CapabilityManagement({
               capabilityKey={capabilityKey}
               action={action}
               nodeId={nodeId}
+              serviceId={serviceId}
               result={results[action.key]}
               onResult={(key, table) => setResults((current) => ({ ...current, [key]: table }))}
             />
