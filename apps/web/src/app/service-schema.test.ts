@@ -104,8 +104,8 @@ describe('parseEnv', () => {
   it('parses KEY=value lines into entries the API accepts', () => {
     expect(parseEnv('NODE_ENV=production\nPORT=80')).toEqual({
       env: [
-        { key: 'NODE_ENV', value: 'production', secret: false },
-        { key: 'PORT', value: '80', secret: false },
+        { key: 'NODE_ENV', value: 'production', secret: false, keep: false },
+        { key: 'PORT', value: '80', secret: false, keep: false },
       ],
     });
   });
@@ -113,8 +113,8 @@ describe('parseEnv', () => {
   it('seals a line prefixed with the secret marker', () => {
     expect(parseEnv('DATABASE_URL=postgres://x\nsecret:SECRET_ENCRYPTION_KEY=abc')).toEqual({
       env: [
-        { key: 'DATABASE_URL', value: 'postgres://x', secret: false },
-        { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: true },
+        { key: 'DATABASE_URL', value: 'postgres://x', secret: false, keep: false },
+        { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: true, keep: false },
       ],
     });
   });
@@ -123,13 +123,46 @@ describe('parseEnv', () => {
   // silently make a value the Operator needs unreadable forever.
   it('does not guess that a value is secret from its name', () => {
     expect(parseEnv('SECRET_ENCRYPTION_KEY=abc').env).toEqual([
-      { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: false },
+      { key: 'SECRET_ENCRYPTION_KEY', value: 'abc', secret: false, keep: false },
+    ]);
+  });
+
+  /*
+   * The one that cost a running application.
+   *
+   * A sealed value cannot be read back, so the editor renders `secret:KEY=` with
+   * nothing after it. Saving that used to send an empty string, and because the
+   * list replaces what is there, it deleted the value. An Operator added one
+   * variable and lost every secret the Service had, discovering it when the
+   * application came back up with an empty DATABASE_URL and would not start.
+   */
+  it('reads an empty sealed line as keep, not as an empty value', () => {
+    const { env } = parseEnv('secret:DATABASE_URL=\nAPP_ENV=production');
+    expect(env).toEqual([
+      { key: 'DATABASE_URL', value: '', secret: true, keep: true },
+      { key: 'APP_ENV', value: 'production', secret: false, keep: false },
+    ]);
+  });
+
+  // Typing a new value replaces it, which is the whole point of being able to
+  // edit one.
+  it('does not keep a sealed value that was given a new one', () => {
+    expect(parseEnv('secret:DATABASE_URL=postgres://new').env).toEqual([
+      { key: 'DATABASE_URL', value: 'postgres://new', secret: true, keep: false },
+    ]);
+  });
+
+  // An empty plain value is a real value, and blanking one is something an
+  // Operator may genuinely mean.
+  it('does not treat an empty plain value as keep', () => {
+    expect(parseEnv('OPTIONAL_FLAG=').env).toEqual([
+      { key: 'OPTIONAL_FLAG', value: '', secret: false, keep: false },
     ]);
   });
 
   it('keeps a value containing an equals sign intact', () => {
     expect(parseEnv('DSN=host=db user=api').env).toEqual([
-      { key: 'DSN', value: 'host=db user=api', secret: false },
+      { key: 'DSN', value: 'host=db user=api', secret: false, keep: false },
     ]);
   });
 
@@ -173,7 +206,9 @@ describe('toDeployInput', () => {
     // The array shape the API takes. This assertion previously encoded the map
     // shape, which is how the mismatch went unnoticed: the test agreed with the
     // client and neither agreed with the server.
-    expect(input.env).toEqual([{ key: 'NODE_ENV', value: 'production', secret: false }]);
+    expect(input.env).toEqual([
+      { key: 'NODE_ENV', value: 'production', secret: false, keep: false },
+    ]);
     expect(input.pids_limit).toBe(128);
   });
 });

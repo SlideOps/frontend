@@ -201,6 +201,12 @@ export interface DeployServiceInput {
  * sensitive and leave the rest plain.
  */
 export interface ServiceEnvVar {
+  /**
+   * Leave this variable's stored value untouched. It is how an editor says "I did
+   * not change this sealed value", which an empty string cannot say, because that
+   * already means "make this empty".
+   */
+  keep?: boolean;
   key: string;
   value: string;
   secret: boolean;
