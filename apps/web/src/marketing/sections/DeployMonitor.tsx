@@ -22,6 +22,51 @@ const metrics = [
   { icon: HardDrive, label: 'Disk', value: 'w-1/3' },
 ];
 
+/*
+ * The ways a workload gets onto a server.
+ *
+ * The site used to describe exactly one: deploying from GitHub. That is the
+ * fullest option and not the only one, and the two it left out are the ones that
+ * matter most to somebody who already has servers running. Adoption in
+ * particular is the answer to "I have years of things on this box", and saying
+ * nothing about it invites the conclusion that SlideOps only works on a clean
+ * machine.
+ */
+const methods = [
+  {
+    name: 'From a repository',
+    detail:
+      'Clone a branch, build it, run it. Every redeploy pulls that branch, and SlideOps tells you when new commits are waiting. The only source it can rebuild from, so the only one where redeploy means "take the newest code".',
+  },
+  {
+    name: 'From an image',
+    detail:
+      'Run an image that already exists. Nothing is built here, which suits anything published to a registry or built somewhere else.',
+  },
+  {
+    name: 'Adopted',
+    detail:
+      'It was already running when SlideOps found it. Adopting changes nothing: not restarted, not rebuilt, not moved. SlideOps starts keeping a record, so a server with years of history joins without a migration.',
+  },
+];
+
+function MethodGrid() {
+  return (
+    <div className="mt-10 grid gap-4 sm:grid-cols-3">
+      {methods.map((method) => (
+        <article key={method.name} className="rounded-lg border border-border bg-app p-5">
+          <Text variant="body-sm" className="font-semibold">
+            {method.name}
+          </Text>
+          <Text variant="body-sm" tone="secondary" className="mt-2 block">
+            {method.detail}
+          </Text>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 /** Deploy from GitHub and watch everything: pull deploys, monitoring, and history. */
 export function DeployMonitor() {
   const { ref, shown } = useReveal<HTMLDivElement>();
@@ -33,14 +78,17 @@ export function DeployMonitor() {
             Deploy and monitor
           </Text>
           <Text as="h2" variant="h1" className="mt-3">
-            Ship from GitHub, then watch it run
+            Three ways in, however your work already runs
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
-            Deploy Services straight from your repositories, and keep an eye on every one. SlideOps
-            records CPU, memory, disk, and Service health on a schedule, and writes every Operation
-            to a History you can read.
+            A Service comes from a repository, from an image, or from something already running on
+            the server that SlideOps adopts as it stands. It runs as a container, a Compose stack,
+            or a systemd service with no container at all. Whichever you pick, you get an address, a
+            terminal, monitoring, and every Operation written to a History you can read.
           </Text>
         </div>
+
+        <MethodGrid />
 
         <div
           ref={ref}
