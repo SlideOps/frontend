@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { renderInApp } from '../../test/render';
 
 /*
@@ -14,11 +15,15 @@ import { renderInApp } from '../../test/render';
 
 const listCapabilityActions = vi.fn();
 const runCapabilityAction = vi.fn();
+const uploadToNode = vi.fn();
+const createOperation = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   listCapabilityActions: (key: string) => listCapabilityActions(key),
   runCapabilityAction: (...args: unknown[]) => runCapabilityAction(...args),
+  uploadToNode: (...args: unknown[]) => uploadToNode(...args),
+  createOperation: (...args: unknown[]) => createOperation(...args),
 }));
 
 const { CapabilityManagement } = await import('./CapabilityManagement');
@@ -46,12 +51,14 @@ const actions = [
 
 function show(props: { installed: boolean; nodeId?: string; serviceId?: string }) {
   return renderInApp(
-    <CapabilityManagement
-      capabilityKey="install-postgresql"
-      nodeId={props.nodeId ?? 'n1'}
-      serviceId={props.serviceId}
-      installed={props.installed}
-    />,
+    <MemoryRouter>
+      <CapabilityManagement
+        capabilityKey="install-postgresql"
+        nodeId={props.nodeId ?? 'n1'}
+        serviceId={props.serviceId}
+        installed={props.installed}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -59,6 +66,8 @@ describe('CapabilityManagement', () => {
   beforeEach(() => {
     listCapabilityActions.mockReset().mockResolvedValue(actions);
     runCapabilityAction.mockReset();
+    uploadToNode.mockReset();
+    createOperation.mockReset().mockResolvedValue({ id: 'op-1' });
   });
 
   // The adaptive rule, from both sides.
@@ -176,5 +185,64 @@ describe('CapabilityManagement', () => {
 
     await operator.click(await screen.findByRole('button', { name: /Show/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('no such database');
+  });
+
+  /*
+   * Restoring is two steps on purpose: the upload changes nothing, and the
+   * restore is an Operation with a plan to approve. What is pinned is that the
+   * upload really does not restore, and that the size the server measured is put
+   * in front of somebody before they agree to anything.
+   */
+  it('uploads without restoring anything', async () => {
+    uploadToNode.mockResolvedValue({ id: 'up-1', path: '/x', bytes: 29296 });
+    const operator = userEvent.setup();
+    show({ installed: true });
+
+    const input = await screen.findByLabelText('Dump file');
+    await operator.upload(input, new File(['-- dump'], 'app.sql', { type: 'text/plain' }));
+    await operator.click(screen.getByRole('button', { name: /Upload/ }));
+
+    await waitFor(() => expect(uploadToNode).toHaveBeenCalled());
+    // The upload must not have restored anything.
+    expect(createOperation).not.toHaveBeenCalled();
+    expect(await screen.findByText(/29,296 bytes arrived/)).toBeInTheDocument();
+  });
+
+  it('creates an Operation to approve rather than restoring on the spot', async () => {
+    uploadToNode.mockResolvedValue({ id: 'up-1', path: '/x', bytes: 100 });
+    const operator = userEvent.setup();
+    show({ installed: true });
+
+    await operator.upload(
+      await screen.findByLabelText('Dump file'),
+      new File(['-- dump'], 'app.sql', { type: 'text/plain' }),
+    );
+    await operator.click(screen.getByRole('button', { name: /Upload/ }));
+    await screen.findByLabelText('Restore into');
+    await operator.type(screen.getByLabelText('Restore into'), 'app');
+    await operator.click(screen.getByRole('button', { name: 'Plan the restore' }));
+
+    await waitFor(() =>
+      expect(createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          capability_key: 'restore-postgresql',
+          parameters: { database: 'app', upload_id: 'up-1' },
+        }),
+      ),
+    );
+  });
+
+  it('reports an upload that did not complete', async () => {
+    const { ApiError } = await import('@slideops/api-client');
+    uploadToNode.mockRejectedValue(new ApiError(413, 'too_large', 'that file is too large'));
+    const operator = userEvent.setup();
+    show({ installed: true });
+
+    await operator.upload(
+      await screen.findByLabelText('Dump file'),
+      new File(['x'], 'app.sql', { type: 'text/plain' }),
+    );
+    await operator.click(screen.getByRole('button', { name: /Upload/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('too large');
   });
 });

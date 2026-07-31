@@ -283,6 +283,7 @@ export function ServiceDetail() {
                 capabilityKey="install-postgresql"
                 nodeId={service.node_id}
                 serviceId={service.id}
+                projectId={service.project_id}
                 installed
               />
 
