@@ -8,6 +8,7 @@ import {
 import { Button, Section, Text } from '@slideops/design-system';
 import { Boxes, Check } from '@slideops/icons';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 import { ServiceStatusBadge } from './Badges';
@@ -66,6 +67,7 @@ function WorkloadRow({
 }
 
 export function RunningHere({ nodeId }: { nodeId: string }) {
+  const navigate = useNavigate();
   const workloads = useAsyncData((signal) => listNodeWorkloads(nodeId, signal), [nodeId]);
   const projects = useAsyncData((signal) => listProjects(signal), []);
   const [projectID, setProjectID] = useState('');
@@ -75,9 +77,28 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
 
   const chosenProject =
     projectID || (projects.state.status === 'ready' ? (projects.state.data[0]?.id ?? '') : '');
+  // Read once, so the narrowing holds: referring to projects.state.data after a
+  // separate boolean does not tell the compiler which variant it is.
+  const projectList = projects.state.status === 'ready' ? projects.state.data : null;
+  const noProjects = projectList !== null && projectList.length === 0;
+  // Adopting files a workload into a Project, so there has to be one to file it
+  // into. Until there is, the controls say so rather than looking ready.
+  const canAdopt = projectList !== null && chosenProject !== '';
 
   const adopt = async (list: Workload[]) => {
-    if (!chosenProject || list.length === 0) {
+    if (list.length === 0) {
+      return;
+    }
+    // This used to return here with no message at all, so pressing Manage did
+    // nothing whatsoever: no request, no error, no change on screen. A button
+    // that silently declines is worse than one that fails, because there is
+    // nothing to react to.
+    if (!chosenProject) {
+      setError(
+        noProjects
+          ? 'A workload has to be managed inside a Project, and there are none yet. Create a Project first.'
+          : 'Still loading your Projects. Try again in a moment.',
+      );
       return;
     }
     setBusy(true);
@@ -129,6 +150,39 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
               SlideOps never rebuilds it.
             </Text>
 
+            {/* The Project is chosen once, above the list, because it applies to
+                every row. It used to sit at the bottom beside "Manage all", so a
+                row's own button gave no hint that a Project was involved at all. */}
+            {noProjects ? (
+              <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-sm">
+                A workload is managed inside a Project, and you have none yet.{' '}
+                <button
+                  type="button"
+                  onClick={() => navigate('/app/projects')}
+                  className="font-medium text-brand underline underline-offset-2"
+                >
+                  Create a Project
+                </button>{' '}
+                first, then come back.
+              </p>
+            ) : projectList ? (
+              <label className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-ink-muted">Manage these under</span>
+                <select
+                  aria-label="Project to manage these under"
+                  className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-ink"
+                  value={chosenProject}
+                  onChange={(event) => setProjectID(event.target.value)}
+                >
+                  {projectList.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             {note ? (
               <p role="status" className="text-sm text-success">
                 {note}
@@ -145,7 +199,7 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
                 <WorkloadRow
                   key={workload.ref}
                   workload={workload}
-                  busy={busy}
+                  busy={busy || !canAdopt}
                   onAdopt={(one) => adopt([one])}
                 />
               ))}
@@ -162,27 +216,7 @@ export function RunningHere({ nodeId }: { nodeId: string }) {
               }
               return (
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* The Project has to be chosen, because a Service lives in one
-                      and guessing would file somebody's work in the wrong place. */}
-                  {projects.state.status === 'ready' && projects.state.data.length > 0 ? (
-                    <select
-                      aria-label="Project to manage these under"
-                      className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-ink"
-                      value={chosenProject}
-                      onChange={(event) => setProjectID(event.target.value)}
-                    >
-                      {projects.state.data.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    disabled={busy || !chosenProject}
-                    onClick={() => adopt(unmanaged)}
-                  >
+                  <Button size="sm" disabled={busy || !canAdopt} onClick={() => adopt(unmanaged)}>
                     {busy ? 'Bringing them in' : `Manage all ${unmanaged.length}`}
                   </Button>
                 </div>
