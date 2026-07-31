@@ -4,7 +4,7 @@ import {
   updateServiceConfiguration,
   type Service,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { AlertTriangle, RefreshCw, Settings } from '@slideops/icons';
 import { useState } from 'react';
 import { RevealValue } from './RevealValue';
@@ -148,17 +148,16 @@ export function ServiceConfiguration({
   };
 
   return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Settings width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">Command and environment</Text>
-      </div>
-
-      <Text variant="body-sm" tone="secondary">
-        Change what this Service runs and the variables it runs with. Saving records the change;
-        because a container bakes these in when it is created, a redeploy is what applies it.
-      </Text>
-
+    <Section
+      title="Command and environment"
+      adornment={<Settings width={16} height={16} className="text-brand" aria-hidden />}
+      description="Change what this Service runs and the variables it runs with. Saving records the change; because a container bakes these in when it is created, a redeploy is what applies it."
+      collapsible
+      // Folded by default. It is the longest thing on the page, and the one edit
+      // it exists for is rare next to the reasons somebody opens a Service.
+      defaultOpen={false}
+      summary={`${Object.keys(service.env ?? {}).length} variables`}
+    >
       <div className="flex flex-col gap-2">
         <label htmlFor="svc-command" className="text-sm font-medium text-ink">
           Command
@@ -255,6 +254,6 @@ export function ServiceConfiguration({
           {saving ? 'Saving' : 'Save changes'}
         </Button>
       </div>
-    </Card>
+    </Section>
   );
 }

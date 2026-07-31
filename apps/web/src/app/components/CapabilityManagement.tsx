@@ -1,7 +1,7 @@
 import {
   ApiError,
-  capabilityActionDownloadUrl,
   createOperation,
+  downloadCapabilityAction,
   listCapabilityActions,
   runCapabilityAction,
   uploadToNode,
@@ -119,11 +119,29 @@ function ActionRow({
     }
   };
 
-  const downloadHref = capabilityActionDownloadUrl(capabilityKey, action.key, {
-    node_id: nodeId,
-    service_id: serviceId,
-    parameters: values,
-  });
+  // Downloading reports like everything else here. It used to be a bare anchor,
+  // so a refused export navigated the tab to a page of JSON instead of saying
+  // what was wrong, which is indistinguishable from the button doing nothing.
+  const [downloaded, setDownloaded] = useState<string | null>(null);
+  const download = async () => {
+    setBusy(true);
+    setError(null);
+    setDownloaded(null);
+    try {
+      await downloadCapabilityAction(capabilityKey, action.key, {
+        node_id: nodeId,
+        service_id: serviceId,
+        parameters: values,
+      });
+      setDownloaded('Saved to your downloads.');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.message : 'That export could not be produced. Try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="border-b border-border py-4 last:border-b-0">
@@ -154,19 +172,10 @@ function ActionRow({
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {action.produces === 'file' ? (
-          // A plain anchor, not a fetch: the browser streams it to disk with its
-          // own progress and never holds a whole database dump in the tab's
-          // memory, which a dump larger than a gigabyte would not survive.
-          <a
-            href={missing ? undefined : downloadHref}
-            aria-disabled={missing}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus${
-              missing ? ' pointer-events-none opacity-50' : ''
-            }`}
-          >
+          <Button size="sm" variant="secondary" disabled={busy || missing} onClick={download}>
             <Download width={15} height={15} aria-hidden />
-            Download
-          </a>
+            {busy ? 'Preparing' : 'Download'}
+          </Button>
         ) : (
           <Button size="sm" variant="secondary" disabled={busy} onClick={run}>
             <RefreshCw
@@ -188,6 +197,11 @@ function ActionRow({
       {error ? (
         <p role="alert" className="mt-2 text-sm text-danger">
           {error}
+        </p>
+      ) : null}
+      {downloaded ? (
+        <p role="status" className="mt-2 text-sm text-ink-muted">
+          {downloaded}
         </p>
       ) : null}
       {result ? <div className="mt-3">{<ResultTable table={result} />}</div> : null}
@@ -386,6 +400,7 @@ export function CapabilityManagement({
           ? 'Scoped to this Service: only what it actually uses is shown, so nothing here can reach another application on the same server. Nothing here changes anything either.'
           : 'This is installed on the selected server, so you can read what it holds and take a copy of it. Nothing here changes anything: every change is still a Capability you approve.'
       }
+      collapsible
     >
       {actions.state.status === 'loading' ? <Loading label="Reading what this offers" /> : null}
       {actions.state.status === 'error' ? <ErrorNote error={actions.state.error} /> : null}
