@@ -60,6 +60,25 @@ credential by name or by value is sealed on the way in.
 Saving the configuration does not disturb what is running. The redeploy is what
 applies it, and it pulls the latest commit on the branch at the same time.
 
+### See what happened to a Service
+
+Every Service keeps its own record: what deployed and from which commit, what
+started and stopped it, what changed its configuration, when a shell was opened
+in it, and every deploy that failed along with the reason.
+
+It sits beside that Service's output, because the two answer one question
+together. The output tells you the application is unhappy. The record tells you
+that somebody changed three environment variables nine minutes before it became
+unhappy, which is the part you cannot get from the logs at any length.
+
+A configuration change lists the variables that moved by name. Never their
+values, which is what lets this be shown on the Service page rather than hidden
+behind another permission.
+
+This is not History. History records Operations, which act on a server through
+the full lifecycle. Most of what happens to an application is not an Operation
+at all, and it used to leave no trace anywhere.
+
 ### Read what happened
 
 History records every Operation, with its plan, its output, and the evidence from its verification. Reports pull that into five answers: what has been verified and on what evidence, what has been run and how often, the security posture of each server, an inventory of the fleet, and the health of one machine over time.
