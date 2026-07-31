@@ -151,6 +151,20 @@ export function parsePorts(text?: string): { ports: ServicePort[]; error?: strin
 export const SECRET_PREFIX = 'secret:';
 
 /**
+ * A sealed line with no value means "leave this one alone".
+ *
+ * A sealed value cannot be read back, so the editor has nothing to put in its
+ * box and renders `secret:KEY=`. Saving that used to send an empty string, and
+ * because the list replaces what is there, it deleted the value: an Operator
+ * adding one variable lost every secret the Service had and found out when the
+ * application would not start.
+ *
+ * Reading it as "keep" is safe because the alternative is not useful. Setting a
+ * secret to the empty string is not something anybody means to do, and somebody
+ * who genuinely wants a variable gone deletes its line, which already removes it.
+ */
+
+/**
  * Parse the environment textarea into the entries the API takes: one object per
  * variable, each carrying whether it should be sealed.
  *
@@ -181,6 +195,7 @@ export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string 
     }
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
+    const keep = secret && value === '';
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
       return { env: [], error: `"${key}" is not a valid variable name.` };
     }
@@ -188,7 +203,7 @@ export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string 
       return { env: [], error: `"${key}" is set more than once.` };
     }
     seen.add(key);
-    env.push({ key, value, secret });
+    env.push({ key, value, secret, keep });
   }
   return { env };
 }
