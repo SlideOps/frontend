@@ -13,7 +13,7 @@ interface AuthLayoutProps {
 /** The centered card frame shared by every Operator authentication screen. */
 export function AuthLayout({ title, description, children, footer }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app px-4 py-12 text-ink">
+    <div className="flex min-h-dvh items-center justify-center bg-app px-4 py-12 text-ink">
       <div className="w-full max-w-md">
         <Card raised>
           <div className="mb-6 flex flex-col items-center text-center">

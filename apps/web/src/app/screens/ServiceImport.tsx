@@ -224,7 +224,7 @@ export function ServiceImport() {
         ) : (
           <div className="flex flex-col gap-6">
             <Card className="flex flex-wrap items-end gap-4">
-              <div className="min-w-[14rem] flex-1">
+              <div className="w-full min-w-0 sm:w-auto sm:min-w-[14rem] sm:flex-1">
                 <label htmlFor="import-node" className="mb-1 block text-sm font-medium text-ink">
                   Read this server
                 </label>
@@ -241,7 +241,7 @@ export function ServiceImport() {
                   ))}
                 </select>
               </div>
-              <div className="min-w-[14rem] flex-1">
+              <div className="w-full min-w-0 sm:w-auto sm:min-w-[14rem] sm:flex-1">
                 <label htmlFor="import-project" className="mb-1 block text-sm font-medium text-ink">
                   Add what you import to
                 </label>
