@@ -61,6 +61,16 @@ export interface Credentials {
 export interface MfaSetup {
   secret: string;
   otpauth_url: string;
+  /**
+   * The provisioning URI already drawn as a QR code, as a PNG data URI ready for
+   * an img tag.
+   *
+   * Rendered by the server because the alternative is a public QR image service,
+   * which would send a live TOTP secret to a third party. Empty when it could
+   * not be drawn, in which case the secret is still shown and enrolment
+   * continues by hand.
+   */
+  qr_code?: string;
 }
 
 /**
