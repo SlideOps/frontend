@@ -26,12 +26,15 @@ questions.
 
 ### What each engine offers
 
-|                           | PostgreSQL | MySQL and MariaDB | Redis                    |
-| ------------------------- | ---------- | ----------------- | ------------------------ |
-| Databases and their sizes | Yes        | Yes               | Keyspaces and key counts |
-| What is connected now     | Yes        | Yes               | Yes                      |
-| Export a copy             | Yes        | Yes               | No                       |
-| Restore from a dump       | Yes        | Yes               | No                       |
+|                           | PostgreSQL | MySQL and MariaDB | MongoDB | Redis                    |
+| ------------------------- | ---------- | ----------------- | ------- | ------------------------ |
+| Databases and their sizes | Yes        | Yes               | Yes     | Keyspaces and key counts |
+| What is connected now     | Yes        | Yes               | Yes     | Yes                      |
+| Export a copy             | Yes        | Yes               | Yes     | No                       |
+| Restore from a dump       | Yes        | Yes               | Yes     | No                       |
+
+MongoDB exports a compressed archive rather than SQL, which is the form its own
+tools read, and that is what its restore expects back.
 
 Redis has no export, deliberately. A dump of a running Redis is either the whole
 server's file, which does not belong to any one keyspace, or a key by key walk
@@ -74,6 +77,18 @@ When it runs, a copy of the current database is taken first. That copy is what
 makes the rollback real: if the restore fails, or if the result comes back empty,
 what was there before goes back. The uploaded dump is removed afterwards, so a
 complete copy of your data is not left sitting on the server.
+
+Those copies are kept for two weeks and then cleared, along with any upload you
+started and never used. Kept forever they would be several complete copies of
+your data sitting on a disk; cleared immediately they would be no use the one
+time you wanted to undo something. The copy from the restore you just ran is
+never swept, because it is that restore's way back.
+
+A restore also hands the database back to the application that owns it. That
+sounds like an implementation detail and is not: the restore runs as an
+administrator, and on recent PostgreSQL that would otherwise leave your
+application locked out of its own data, with every table present and not one row
+readable.
 
 ### Scoped to the Service, not the server
 
