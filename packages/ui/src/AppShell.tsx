@@ -80,8 +80,8 @@ function NavButton({ item, dense }: { item: NavItem; dense: boolean }) {
  */
 export function AppShell({ nav, surface, children, actions, dense = false }: AppShellProps) {
   return (
-    <div className="flex min-h-screen bg-app text-ink">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4 md:flex">
+    <div className="flex min-h-dvh bg-app text-ink">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4 md:flex">
         <div className="flex items-center gap-2 px-2 pb-6">
           <Logo size={26} />
           <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
@@ -109,7 +109,7 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 py-3 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur md:px-6 md:pt-3">
           <div className="flex items-center gap-2 md:hidden">
             <Logo size={22} markOnly />
             <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
@@ -134,7 +134,7 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
         // Scrolls rather than dividing the screen by however many destinations
         // exist. Squeezing a dozen into a phone's width left every label truncated
         // to a few characters, which is not a navigation bar, it is a puzzle.
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 overflow-x-auto border-t border-border bg-surface px-1 pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 overflow-x-auto border-t border-border bg-surface px-1 pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] md:hidden"
       >
         {nav.map((item) => {
           const Icon = item.icon;

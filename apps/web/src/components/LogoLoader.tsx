@@ -93,7 +93,7 @@ export function LogoLoader({ size, label, fullScreen = false }: LogoLoaderProps)
       <div
         role="status"
         aria-label={announced}
-        className="flex min-h-screen w-full flex-col items-center justify-center gap-4 bg-app text-ink"
+        className="flex min-h-dvh w-full flex-col items-center justify-center gap-4 bg-app text-ink"
       >
         {stack}
       </div>
