@@ -24,7 +24,7 @@ import {
   type PasswordConfirmValues,
 } from '../../auth-schemas';
 import { OperatorShell } from '../components/OperatorShell';
-import { useAuthStore } from '../../store/auth';
+import { isAdmin, useAuthStore } from '../../store/auth';
 
 /** Enable MFA: start setup, show the secret, then confirm a code. */
 function EnableMfa() {
@@ -349,6 +349,25 @@ export function Security() {
         description="How you prove this account is yours: the password you sign in with, and a second step on top of it."
         guidanceKey="security.mfa"
       />
+
+      {/* An admin who came here because the control plane turned them away needs
+          to land on the reason, not scroll for it. */}
+      {isAdmin(operator) && !enabled ? (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-md border border-brand bg-subtle px-4 py-3"
+        >
+          <ShieldCheck width={18} height={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
+          <div>
+            <Text variant="body-sm" className="font-medium">
+              The admin area needs this turned on
+            </Text>
+            <Text variant="body-sm" tone="secondary" className="mt-1 block">
+              Two step verification is below. Turn it on and the control plane opens.
+            </Text>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-8">
         <Section title="This deployment" flush>
