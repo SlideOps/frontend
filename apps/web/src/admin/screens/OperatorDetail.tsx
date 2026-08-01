@@ -34,7 +34,7 @@ const selectClass =
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr] gap-3 py-2">
+    <div className="grid gap-1 py-2 sm:grid-cols-[9rem_1fr] sm:gap-3">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="min-w-0 break-words text-sm text-ink">{value}</dd>
     </div>

@@ -7,7 +7,20 @@
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#743930" />
+    <!-- The address bar follows the theme rather than staying one colour in both,
+         which is most of what makes an installed app stop looking like a tab. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf6f4" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1210" />
+
+    <!-- iOS ignores the manifest for these. Without them an installed app opens
+         with Safari's chrome on top, which is the difference between something
+         that feels installed and a bookmark. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="SlideOps" />
+    <!-- default translucent lets the page run under the status bar, which is what
+         viewport-fit=cover and the safe area insets are already set up for. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta
       name="description"
       content="SlideOps helps Operators discover, configure, deploy, secure, verify, and monitor their own infrastructure. Knowledge becomes Capabilities. Capabilities create Confidence."

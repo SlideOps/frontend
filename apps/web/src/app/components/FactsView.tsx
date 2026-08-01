@@ -74,7 +74,7 @@ export function FactValue({ value }: { value: unknown }) {
     return (
       <dl className="flex flex-col gap-2">
         {Object.entries(value as Record<string, unknown>).map(([key, nested]) => (
-          <div key={key} className="grid grid-cols-[10rem_1fr] gap-3">
+          <div key={key} className="grid gap-1 sm:grid-cols-[10rem_1fr] sm:gap-3">
             <dt className="text-xs font-medium text-ink-muted">{humanize(key)}</dt>
             <dd className="min-w-0">
               <FactValue value={nested} />

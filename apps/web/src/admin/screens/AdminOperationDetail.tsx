@@ -11,7 +11,7 @@ import { useAsyncData } from '../hooks/useAsyncData';
 
 function RecordRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[10rem_1fr] gap-3 py-2.5">
+    <div className="grid gap-1 py-2.5 sm:grid-cols-[10rem_1fr] sm:gap-3">
       <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</dt>
       <dd className="min-w-0 break-words text-sm text-ink">{value}</dd>
     </div>

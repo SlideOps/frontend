@@ -56,7 +56,7 @@ function SectionView({ section }: { section: ReportSection }) {
       {section.rows && section.rows.length > 0 ? (
         <dl className="mt-3 divide-y divide-border">
           {section.rows.map((row, index) => (
-            <div key={index} className="grid grid-cols-[12rem_1fr] gap-3 py-2">
+            <div key={index} className="grid gap-1 py-2 sm:grid-cols-[12rem_1fr] sm:gap-3">
               <dt className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                 {row.label}
               </dt>

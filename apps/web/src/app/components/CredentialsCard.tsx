@@ -67,7 +67,7 @@ interface PlainRow {
 /** One labelled row in the credentials list. */
 function CredentialRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[8rem_1fr] items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <div className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
