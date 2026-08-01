@@ -119,6 +119,13 @@ const PromoCodes = lazy(() =>
   import('./admin/screens/PromoCodes').then((m) => ({ default: m.PromoCodes })),
 );
 const Tiers = lazy(() => import('./admin/screens/Tiers').then((m) => ({ default: m.Tiers })));
+// A shell on a page of its own, for working on a second screen.
+const NodeShellPage = lazy(() =>
+  import('./app/screens/ShellPage').then((m) => ({ default: m.NodeShellPage })),
+);
+const ServiceShellPage = lazy(() =>
+  import('./app/screens/ShellPage').then((m) => ({ default: m.ServiceShellPage })),
+);
 const Subscribers = lazy(() =>
   import('./admin/screens/Subscribers').then((m) => ({ default: m.Subscribers })),
 );
@@ -183,6 +190,11 @@ export function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="billing" element={<Billing />} />
           <Route path="security" element={<Security />} />
+          {/* The standalone shells sit inside the authenticated area so they are
+              guarded like everything else, but they render no application
+              navigation: the page is one terminal and nothing more. */}
+          <Route path="nodes/:id/shell" element={<NodeShellPage />} />
+          <Route path="services/:id/shell" element={<ServiceShellPage />} />
         </Route>
 
         {/* Admin control plane: admin role only. */}

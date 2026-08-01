@@ -264,6 +264,7 @@ export function NodeDetail() {
 
               <Section title="Terminal">
                 <ShellTerminal
+                  standalonePath={`/app/nodes/${id}/shell`}
                   urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
                   scopeLabel="This whole server"
                   scopeDetail="A shell on the server itself, as the SSH account SlideOps connects with: the same access you would have opening a terminal yourself. For a shell confined to one application, open it from that Service instead. Opening one is recorded in the audit trail."

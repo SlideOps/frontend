@@ -5,6 +5,8 @@ export {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  Maximize2,
+  Minimize2,
   Bell,
   BellRing,
   BookOpen,
