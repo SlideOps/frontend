@@ -25,6 +25,7 @@ import {
 } from '../../auth-schemas';
 import { OperatorShell } from '../components/OperatorShell';
 import { isAdmin, useAuthStore } from '../../store/auth';
+import { CopyButton } from '../components/CopyButton';
 
 /** Enable MFA: start setup, show the secret, then confirm a code. */
 function EnableMfa() {
@@ -83,13 +84,42 @@ function EnableMfa() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      {/* Scanning first, because it is what almost everybody will do and the one
+          step that cannot be got wrong by mistyping. */}
+      {setup.qr_code ? (
+        <div className="flex flex-col items-center gap-3 rounded-md border border-border bg-subtle p-4 sm:flex-row sm:items-start sm:gap-5">
+          <img
+            src={setup.qr_code}
+            alt="QR code for your authenticator app"
+            width={180}
+            height={180}
+            // White behind it whatever the theme: a dark background under a QR
+            // inverts it and many scanners will not read it.
+            className="shrink-0 rounded-md bg-white p-2"
+          />
+          <div className="min-w-0 text-center sm:text-left">
+            <Text variant="body-sm" className="font-medium">
+              Scan this with your authenticator
+            </Text>
+            <Text variant="body-sm" tone="secondary" className="mt-1 block">
+              Google Authenticator, 1Password, Authy, or whichever you use. It will show a six digit
+              code that changes every thirty seconds.
+            </Text>
+            <Text variant="caption" tone="secondary" className="mt-2 block">
+              On a phone and cannot scan your own screen? Use the setup key below instead.
+            </Text>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Text variant="caption" tone="secondary">
-            Setup secret
+            {setup.qr_code ? 'Or enter this setup key by hand' : 'Setup key'}
           </Text>
           <Guidance for="security.secret" />
+          <CopyButton value={setup.secret} label="the setup key" className="ml-auto" />
         </div>
         <Text
           variant="code"
@@ -97,12 +127,18 @@ function EnableMfa() {
         >
           {setup.secret}
         </Text>
-        <Text variant="caption" tone="secondary" className="mt-2">
-          Or add this URL to your authenticator
-        </Text>
-        <Text variant="code" className="select-all break-all text-ink-muted">
-          {setup.otpauth_url}
-        </Text>
+
+        <details className="mt-1">
+          <summary className="cursor-pointer text-xs text-ink-muted hover:text-ink">
+            The full provisioning URL, if your app takes one
+          </summary>
+          <div className="mt-2 flex items-start gap-2">
+            <Text variant="code" className="min-w-0 select-all break-all text-ink-muted">
+              {setup.otpauth_url}
+            </Text>
+            <CopyButton value={setup.otpauth_url} label="the provisioning URL" />
+          </div>
+        </details>
       </div>
       <form className="flex flex-col gap-4" onSubmit={onConfirm} noValidate>
         <Field
