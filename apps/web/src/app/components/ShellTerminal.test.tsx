@@ -189,6 +189,72 @@ describe('ShellTerminal', () => {
     await waitFor(() => expect(box()?.className).toContain('block'));
   });
 
+  /*
+   * Filling the window, for reading a long log or running something full screen.
+   *
+   * It is not the browser's own fullscreen: that hides the tab strip and the
+   * address bar, which is disorienting for something you are working in rather
+   * than watching. Filling the window keeps the browser where it is and still
+   * gives the terminal every pixel of the page.
+   */
+  it('offers to fill the window only once there is a session to fill it with', async () => {
+    render();
+    expect(screen.queryByRole('button', { name: /fill the window/i })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+  });
+
+  it('expands and comes back, and says which state it is in', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+
+    const expand = await screen.findByRole('button', { name: /fill the window/i });
+    expect(expand).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(expand);
+    const shrink = await screen.findByRole('button', { name: /leave full screen/i });
+    expect(shrink).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(shrink);
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+  });
+
+  // A control you can enter and cannot leave by reflex is a trap.
+  it('leaves the expanded view on Escape', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+
+    await userEvent.click(await screen.findByRole('button', { name: /fill the window/i }));
+    await screen.findByRole('button', { name: /leave full screen/i });
+
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+  });
+
+  /*
+   * A terminal on one monitor while the thing you are following is on the other
+   * needs a real second window, which an expanded panel in one tab cannot be.
+   */
+  it('offers a new tab only when there is a page to open', async () => {
+    render();
+    expect(screen.queryByRole('link', { name: /new tab/i })).not.toBeInTheDocument();
+
+    render({ standalonePath: '/app/nodes/n1/shell' });
+    const link = await screen.findByRole('link', { name: /new tab/i });
+    expect(link).toHaveAttribute('href', '/app/nodes/n1/shell');
+    expect(link).toHaveAttribute('target', '_blank');
+    // Without this a new tab can reach back into the opener through window.opener.
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
   // A shell must not outlive the page: unmounting has to end the session, or one
   // stays open on the Operator's server for a tab that is already gone.
   it('closes the shell when the page goes away', async () => {

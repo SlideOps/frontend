@@ -22,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { NotificationsBell } from '../notifications/NotificationsBell';
 import { CommandPalette } from './CommandPalette';
+import { InstallApp } from './InstallApp';
 import { LogoutButton } from './LogoutButton';
 
 export type ActiveKey =
@@ -226,6 +227,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
         surface="Operator"
         actions={
           <>
+            <InstallApp />
             <SearchTrigger onOpen={() => setPaletteOpen(true)} />
             <NotificationsBell />
             <LogoutButton />

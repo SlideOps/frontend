@@ -13,6 +13,7 @@ import {
 import { AppShell, type NavItem } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { InstallApp } from '../../app/components/InstallApp';
 import { LogoutButton } from './LogoutButton';
 
 export type ActiveKey =
@@ -108,7 +109,12 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
   ];
 
   return (
-    <AppShell surface="Admin" nav={nav} dense actions={<LogoutButton />}>
+    <AppShell surface="Admin" nav={nav} dense actions={
+          <>
+            <InstallApp />
+            <LogoutButton />
+          </>
+        }>
       {children}
     </AppShell>
   );

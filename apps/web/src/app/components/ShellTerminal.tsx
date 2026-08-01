@@ -2,7 +2,7 @@ import { Button, Text, useTheme } from '@slideops/design-system';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { Terminal as TerminalIcon } from '@slideops/icons';
+import { ArrowUpRight, Maximize2, Minimize2, Terminal as TerminalIcon } from '@slideops/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { terminalTheme } from './terminal-theme';
 
@@ -34,6 +34,14 @@ export interface ShellTerminalProps {
   scopeDetail: string;
   /** Disables opening, with the reason, when there is nothing to attach to. */
   unavailableReason?: string;
+  /**
+   * Where this same shell can be opened on a page of its own.
+   *
+   * Given, an "open in a new tab" control appears beside the expand control. A
+   * terminal is the one thing people want on a second monitor while they read
+   * something else on the first, and expanding it in place cannot do that.
+   */
+  standalonePath?: string;
 }
 
 type Status = 'idle' | 'connecting' | 'open' | 'closed';
@@ -43,19 +51,35 @@ export function ShellTerminal({
   scopeLabel,
   scopeDetail,
   unavailableReason,
+  standalonePath,
 }: ShellTerminalProps) {
   const { resolved } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  // Kept so the terminal can be refitted when the box changes size. Without a
+  // handle on it, expanding grows the container and leaves the terminal at its
+  // old geometry, which looks exactly like the expand having done nothing.
+  const fitRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  /*
+   * Expanded fills the window rather than entering the browser's own fullscreen.
+   *
+   * Native fullscreen takes over the whole screen and hides the tab strip and the
+   * address bar, which is disorienting for something you are working in rather
+   * than watching. Filling the window keeps the browser where it is and still
+   * gives the terminal every pixel of the page, which is what somebody reading a
+   * long log actually wanted.
+   */
+  const [expanded, setExpanded] = useState(false);
 
   const close = useCallback(() => {
     socketRef.current?.close();
     socketRef.current = null;
     terminalRef.current?.dispose();
     terminalRef.current = null;
+    fitRef.current = null;
     setStatus('closed');
   }, []);
 
@@ -79,6 +103,7 @@ export function ShellTerminal({
       theme: terminalTheme(),
     });
     const fit = new FitAddon();
+    fitRef.current = fit;
     terminal.loadAddon(fit);
     terminal.open(container);
     // Fitting measures the element, so it throws when the container has no
@@ -159,13 +184,102 @@ export function ShellTerminal({
 
   const live = status === 'connecting' || status === 'open';
 
+  // Escape leaves the expanded view, because that is what Escape does everywhere
+  // else and a control you can enter and not leave by reflex is a trap.
+  useEffect(() => {
+    if (!expanded) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
+
+  /*
+   * The terminal has to be told the size changed.
+   *
+   * xterm measures its container once and keeps that geometry. Growing the box
+   * without refitting leaves an eighty column terminal in the middle of a wide
+   * window, which looks like the expand did nothing. The remote is told too, or
+   * anything drawing a full screen interface, top or vim, keeps painting at the
+   * old size.
+   */
+  useEffect(() => {
+    const fit = fitRef.current;
+    const terminal = terminalRef.current;
+    const socket = socketRef.current;
+    if (!fit || !terminal) {
+      return;
+    }
+    // After the browser has applied the new layout, not before it.
+    const id = window.setTimeout(() => {
+      try {
+        fit.fit();
+      } catch {
+        return;
+      }
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'resize', ...geometry(terminal) }));
+      }
+      terminal.focus();
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [expanded]);
+
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      className={
+        expanded
+          ? // Fixed rather than a modal: there is nothing to dismiss by clicking
+            // away, and a shell that closed because somebody clicked beside it
+            // would be a very unwelcome surprise mid command.
+            'fixed inset-0 z-50 flex flex-col gap-3 bg-app p-4'
+          : 'flex flex-col gap-3'
+      }
+    >
       <div className="flex flex-wrap items-center gap-2">
         <TerminalIcon width={16} height={16} className="text-brand" aria-hidden />
         <Text variant="body-sm" className="font-medium">
           {scopeLabel}
         </Text>
+
+        {/* The size and window controls sit to the right, where a window's
+            controls are, and only once there is something to resize. */}
+        <span className="ml-auto flex items-center gap-1">
+          {live ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setExpanded((was) => !was)}
+              title={expanded ? 'Leave full screen (Esc)' : 'Fill the window'}
+              aria-label={expanded ? 'Leave full screen' : 'Fill the window'}
+              aria-pressed={expanded}
+            >
+              {expanded ? (
+                <Minimize2 width={15} height={15} aria-hidden />
+              ) : (
+                <Maximize2 width={15} height={15} aria-hidden />
+              )}
+            </Button>
+          ) : null}
+          {standalonePath ? (
+            <a
+              href={standalonePath}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open this shell in a new tab"
+              aria-label="Open this shell in a new tab"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <ArrowUpRight width={15} height={15} aria-hidden />
+            </a>
+          ) : null}
+        </span>
+
         {live ? (
           <Button size="sm" variant="ghost" onClick={close}>
             Close
@@ -183,9 +297,11 @@ export function ShellTerminal({
         )}
       </div>
 
-      <Text variant="caption" tone="secondary">
-        {unavailableReason ?? scopeDetail}
-      </Text>
+      {expanded ? null : (
+        <Text variant="caption" tone="secondary">
+          {unavailableReason ?? scopeDetail}
+        </Text>
+      )}
 
       {error ? (
         <p role="alert" className="text-sm text-danger">
@@ -199,12 +315,15 @@ export function ShellTerminal({
           and Close appeared not to have worked. A disposed terminal has taken its
           own elements out of the DOM, so what remained was a frame around
           genuinely nothing. */}
+      {/* Expanded, the box takes the rest of the window instead of a fixed
+          height, which is the entire point: a long log or a full screen program
+          gets every row the screen has. */}
       <div
         ref={containerRef}
         className={`min-w-0 overflow-hidden rounded-md border border-border bg-app ${
           live ? 'block' : 'hidden'
-        }`}
-        style={{ height: '24rem' }}
+        } ${expanded ? 'min-h-0 flex-1' : ''}`}
+        style={expanded ? undefined : { height: '24rem' }}
       />
     </div>
   );

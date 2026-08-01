@@ -339,6 +339,7 @@ export function ServiceDetail() {
                   open a Service page and the most expensive thing on it. */}
               <Section title="Shell" collapsible defaultOpen={false}>
                 <ShellTerminal
+                  standalonePath={`/app/services/${service.id}/shell`}
                   urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
                   scopeLabel={
                     service.runtime === 'systemd'
