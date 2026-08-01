@@ -62,6 +62,11 @@ export default defineConfig(({ mode }) => {
           ],
         },
         manifest: {
+          // A stable identity for the installed app. Without it the browser
+          // derives one from start_url, so changing where the app opens would
+          // register as a different application and install a second copy
+          // beside the first.
+          id: '/',
           name: 'SlideOps',
           short_name: 'SlideOps',
           description:
@@ -69,7 +74,35 @@ export default defineConfig(({ mode }) => {
           theme_color: BRAND,
           background_color: APP_BACKGROUND,
           display: 'standalone',
-          start_url: '/',
+          // Falls back through the list on a browser that does not support the
+          // one before it, rather than dropping straight to a plain tab.
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+          orientation: 'any',
+          categories: ['productivity', 'developer', 'utilities'],
+          start_url: '/app',
+          scope: '/',
+          // Installed, the app opens where the work is rather than on the
+          // marketing page. Somebody who installed it has already read that.
+          shortcuts: [
+            {
+              name: 'Servers',
+              short_name: 'Servers',
+              description: 'The servers you have connected',
+              url: '/app/nodes',
+            },
+            {
+              name: 'Services',
+              short_name: 'Services',
+              description: 'What is deployed and running',
+              url: '/app/services',
+            },
+            {
+              name: 'History',
+              short_name: 'History',
+              description: 'Every Operation and how it went',
+              url: '/app/history',
+            },
+          ],
           icons: [
             { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
