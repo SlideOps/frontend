@@ -255,6 +255,68 @@ describe('ShellTerminal', () => {
     expect(link.getAttribute('rel')).toContain('noopener');
   });
 
+  /*
+   * Why the shell would not open, in the server's own words.
+   *
+   * This is the failure that hid two real faults. A websocket handshake that does
+   * not complete gives JavaScript no status, no body and no reason, and this
+   * component filled the gap with a guess: that the server was unreachable. A
+   * stopped Service, an expired session and a compose stack whose shell had never
+   * worked all read as a network problem, so nobody looked anywhere else.
+   *
+   * The server now upgrades first and says why down the socket, and what it says
+   * has to reach the Operator rather than the guess.
+   */
+  it('shows why the server refused, rather than guessing', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+
+    FakeSocket.last?.emit('close', {
+      reason: 'this service has no shell to enter: it is stopped',
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/it is stopped/i);
+    expect(screen.queryByText(/may have expired/i)).not.toBeInTheDocument();
+  });
+
+  // The terminal holds what the server said on the way out. Hidden the instant the
+  // socket closed, the explanation and its hiding place arrived together.
+  it('keeps the terminal on the page after the shell ends', async () => {
+    const { container } = render();
+    const box = () => container.querySelector('[style*="24rem"]');
+
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+    await waitFor(() => expect(box()?.className).toContain('block'));
+
+    FakeSocket.last?.emit('close', { reason: 'the shell has ended' });
+    await waitFor(() => expect(box()?.className).toContain('block'));
+  });
+
+  /*
+   * A shell that ends by itself must be reopenable.
+   *
+   * Opening returned early whenever a terminal already existed, and only the Close
+   * control ever disposed one. So a session that ended on its own left the terminal
+   * in place and every later press of "Open again" hit that guard and did nothing:
+   * an enabled control that had been dead since the last exit.
+   */
+  it('opens again after the shell ends on its own', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.opened).toHaveLength(1));
+    FakeSocket.last?.openIt();
+
+    // The remote ended the session; nothing disposed the terminal.
+    FakeSocket.last?.emit('close', {});
+
+    await userEvent.click(await screen.findByRole('button', { name: /open again/i }));
+    await waitFor(() => expect(FakeSocket.opened).toHaveLength(2));
+  });
+
   // A shell must not outlive the page: unmounting has to end the session, or one
   // stays open on the Operator's server for a tab that is already gone.
   it('closes the shell when the page goes away', async () => {

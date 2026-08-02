@@ -64,6 +64,17 @@ export function ShellTerminal({
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   /*
+   * Whether a terminal exists on the page, which is not the same as a live
+   * session.
+   *
+   * The box used to be shown only while the socket was connecting or open, and a
+   * shell that ends says its last words on the way out: the server writes why it
+   * refused, then closes. Keyed on the socket, the terminal was hidden in the same
+   * instant that the explanation arrived in it, so the one message worth reading
+   * was the one nobody could. It stays until the Operator opens another.
+   */
+  const [attached, setAttached] = useState(false);
+  /*
    * Expanded fills the window rather than entering the browser's own fullscreen.
    *
    * Native fullscreen takes over the whole screen and hides the tab strip and the
@@ -74,26 +85,43 @@ export function ShellTerminal({
    */
   const [expanded, setExpanded] = useState(false);
 
-  const close = useCallback(() => {
+  const dispose = useCallback(() => {
     socketRef.current?.close();
     socketRef.current = null;
     terminalRef.current?.dispose();
     terminalRef.current = null;
     fitRef.current = null;
-    setStatus('closed');
   }, []);
+
+  const close = useCallback(() => {
+    dispose();
+    setAttached(false);
+    setStatus('closed');
+  }, [dispose]);
 
   // A shell must not outlive the page. Leaving one open would hold a session on
   // the Operator's server for a tab that is already gone.
-  useEffect(() => close, [close]);
+  useEffect(() => dispose, [dispose]);
 
   const open = useCallback(() => {
     const container = containerRef.current;
-    if (!container || terminalRef.current) {
+    if (!container) {
       return;
     }
+    /*
+     * Whatever was here is replaced rather than reused.
+     *
+     * This used to return early when a terminal already existed, and a shell that
+     * ended on its own -- the Operator typed exit, or the server closed it --
+     * disposed nothing, so the terminal stayed and every later press of "Open
+     * again" hit that guard and did nothing at all. The control was there, it was
+     * enabled, and it was dead until the page was reloaded, which is exactly what
+     * a broken feature looks like from the outside.
+     */
+    dispose();
     setError(null);
     setStatus('connecting');
+    setAttached(true);
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -121,7 +149,12 @@ export function ShellTerminal({
     socket.binaryType = 'arraybuffer';
     socketRef.current = socket;
 
+    // Whether the handshake ever completed. It decides which of two very different
+    // failures happened, and they must not be reported as the same thing.
+    let upgraded = false;
+
     socket.addEventListener('open', () => {
+      upgraded = true;
       setStatus('open');
       terminal.focus();
     });
@@ -138,12 +171,36 @@ export function ShellTerminal({
     });
 
     socket.addEventListener('error', () => {
-      setError('The shell could not be opened. The server may be unreachable.');
+      /*
+       * Only the handshake failing is reported here, and only as what it is.
+       *
+       * This message used to be shown for every failure, and it was a guess: a
+       * browser gets no status, no body and no reason from a websocket handshake
+       * that did not complete, so a stopped Service, a server that had changed its
+       * host key and a real outage all arrived as one sentence about the network.
+       * The server now upgrades first and says why down the socket, so the only
+       * failures left here are the ones that never reached the API at all.
+       */
+      if (!upgraded) {
+        setError(
+          'The shell could not be opened. Your session may have expired, or SlideOps is not reachable.',
+        );
+      }
     });
 
-    socket.addEventListener('close', () => {
+    socket.addEventListener('close', (event) => {
       setStatus('closed');
-      terminal.write('\r\n\x1b[2mDisconnected.\x1b[0m\r\n');
+      // The reason the server refused, in its own words. It wrote the same
+      // sentence into the terminal above; this puts it where an Operator who has
+      // already scrolled away will still see it.
+      if (event.reason) {
+        setError(event.reason);
+      }
+      // Writing into a terminal that has been disposed throws, and closing the
+      // panel disposes it before this event arrives.
+      if (terminalRef.current === terminal) {
+        terminal.write('\r\n\x1b[2mDisconnected.\x1b[0m\r\n');
+      }
     });
 
     // Every keystroke, unmodified. The terminal does not echo locally: the remote
@@ -170,7 +227,7 @@ export function ShellTerminal({
     terminal.onResize(() => sendResize());
     window.addEventListener('resize', sendResize);
     socket.addEventListener('close', () => window.removeEventListener('resize', sendResize));
-  }, [urlFor]);
+  }, [urlFor, dispose]);
 
   // The theme is captured when the terminal opens. Recreating a live terminal to
   // restyle it would throw away the session and whatever was on screen, which is
@@ -250,7 +307,7 @@ export function ShellTerminal({
         {/* The size and window controls sit to the right, where a window's
             controls are, and only once there is something to resize. */}
         <span className="ml-auto flex items-center gap-1">
-          {live ? (
+          {attached ? (
             <Button
               size="sm"
               variant="ghost"
@@ -285,15 +342,25 @@ export function ShellTerminal({
             Close
           </Button>
         ) : (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={open}
-            disabled={Boolean(unavailableReason)}
-            title={unavailableReason}
-          >
-            {status === 'closed' ? 'Open again' : 'Open a shell'}
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={open}
+              disabled={Boolean(unavailableReason)}
+              title={unavailableReason}
+            >
+              {status === 'closed' ? 'Open again' : 'Open a shell'}
+            </Button>
+            {/* A terminal whose session has ended is still on the page, holding
+                what it said as it went. Dismissing it has to be possible without
+                starting another session on the Operator's server. */}
+            {attached ? (
+              <Button size="sm" variant="ghost" onClick={close}>
+                Close
+              </Button>
+            ) : null}
+          </>
         )}
       </div>
 
@@ -309,19 +376,20 @@ export function ShellTerminal({
         </p>
       ) : null}
 
-      {/* Shown only while there is a session in it.
-          Closing disposes the terminal but this box was keyed on idle alone, so a
-          closed shell left twenty four rems of empty bordered nothing on the page
-          and Close appeared not to have worked. A disposed terminal has taken its
-          own elements out of the DOM, so what remained was a frame around
-          genuinely nothing. */}
+      {/* Shown while a terminal exists, which outlasts the session in it.
+          Keyed on the socket instead, the box vanished the instant a shell ended,
+          taking the server's parting words with it: a refusal is written into the
+          terminal and the socket closes immediately after, so the explanation and
+          its hiding place arrived together. Closing disposes the terminal, and a
+          disposed terminal has taken its own elements out of the DOM, so this must
+          not outlast that or it is a frame around genuinely nothing. */}
       {/* Expanded, the box takes the rest of the window instead of a fixed
           height, which is the entire point: a long log or a full screen program
           gets every row the screen has. */}
       <div
         ref={containerRef}
         className={`min-w-0 overflow-hidden rounded-md border border-border bg-app ${
-          live ? 'block' : 'hidden'
+          attached ? 'block' : 'hidden'
         } ${expanded ? 'min-h-0 flex-1' : ''}`}
         style={expanded ? undefined : { height: '24rem' }}
       />
