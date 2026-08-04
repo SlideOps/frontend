@@ -8,10 +8,15 @@ export {
   websocketUrl,
   nodeShellUrl,
   serviceShellUrl,
+  serviceLogStreamUrl,
+  openServiceLogStream,
   type StreamHandlers,
   type StreamHandle,
   type StreamStatus,
   type OperationStreamOptions,
+  type ServiceLogFrame,
+  type ServiceLogConnectionState,
+  type ServiceLogStreamOptions,
 } from './stream';
 export {
   register,
