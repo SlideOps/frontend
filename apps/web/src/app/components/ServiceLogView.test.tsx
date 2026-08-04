@@ -105,7 +105,7 @@ describe('ServiceLogView', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('opens a new connection when the Operator asks to reconnect', async () => {
+  it('opens a new connection when the Operator asks to reconnect, keeping the scrollback', async () => {
     renderInApp(<ServiceLogView id="svc-1" />);
     FakeSocket.last!.openIt();
     FakeSocket.last!.message({ type: 'history', data: 'old output' });
@@ -115,9 +115,59 @@ describe('ServiceLogView', () => {
     await userEvent.click(screen.getByRole('button', { name: /reconnect/i }));
 
     await waitFor(() => expect(FakeSocket.instances).toHaveLength(2));
-    // Reconnecting starts the view over, rather than appending a second history
-    // block underneath the first.
-    expect(screen.queryByText('old output')).not.toBeInTheDocument();
+    // A reconnect is a fresh socket, not a fresh view: the moment an Operator
+    // most needs the scrollback is exactly the moment something crashed and
+    // the connection had to recover, so it must never be the moment it is lost.
+    expect(screen.getByText('old output')).toBeInTheDocument();
+  });
+
+  // The backend sends history again on every fresh connection, including a
+  // reconnect, because each one is a new follow from its side. Applying it a
+  // second time would duplicate the same recent lines underneath themselves.
+  it('does not duplicate history delivered again after a reconnect', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'history', data: 'starting up' });
+    await screen.findByText('starting up');
+
+    await userEvent.click(screen.getByRole('button', { name: /reconnect/i }));
+    await waitFor(() => expect(FakeSocket.instances).toHaveLength(2));
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'history', data: 'starting up' });
+    FakeSocket.last!.message({ type: 'log', data: 'still going' });
+
+    await waitFor(() => expect(screen.getByText('still going')).toBeInTheDocument());
+    expect(screen.getAllByText('starting up')).toHaveLength(1);
+  });
+
+  // A marker about the stream itself must be visible in context -- an
+  // Operator reading a crash needs to see when the stream reconnected too --
+  // but never mistakeable for something the workload printed.
+  it('shows a stream diagnostic inline without treating it as workload output', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'diagnostic', message: '--- Service restarted ---' });
+    FakeSocket.last!.message({ type: 'log', data: 'listening on :8000' });
+
+    expect(await screen.findByText('--- Service restarted ---')).toBeInTheDocument();
+    expect(screen.getByText('listening on :8000')).toBeInTheDocument();
+  });
+
+  // The whole point of this feature: a crash's traceback must reach the
+  // screen live, and must never be cleared by anything -- not a reconnect, not
+  // a status change, not the Service being reported as stopped afterwards.
+  it('never clears a traceback once it has arrived', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'log', data: 'Traceback (most recent call last):' });
+    FakeSocket.last!.message({ type: 'log', data: 'ValueError: boom' });
+    await screen.findByText('ValueError: boom');
+
+    FakeSocket.last!.message({ type: 'status', status: 'stopped', message: 'Service stopped.' });
+    await screen.findByText(/Service stopped\./);
+
+    expect(screen.getByText('Traceback (most recent call last):')).toBeInTheDocument();
+    expect(screen.getByText('ValueError: boom')).toBeInTheDocument();
   });
 
   it('closes the socket when it unmounts, rather than leaving a session open', () => {

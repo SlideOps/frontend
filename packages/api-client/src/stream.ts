@@ -102,11 +102,13 @@ export function serviceLogStreamUrl(serviceID: string): string {
 /**
  * One frame of a Service log stream. `type` says what the rest means:
  * `history` and `log` carry `data`, the workload's own text; `status` carries
- * a connection state and an optional human sentence for it; `error` means the
- * stream cannot continue and `message` says why.
+ * a connection state and an optional human sentence for it; `diagnostic`
+ * carries a message about the stream itself (attached, reconnected, a
+ * replacement container) rather than the workload's own output; `error` means
+ * the stream cannot continue and `message` says why.
  */
 export interface ServiceLogFrame {
-  type: 'history' | 'log' | 'status' | 'error';
+  type: 'history' | 'log' | 'status' | 'diagnostic' | 'error';
   data?: string;
   status?: string;
   message?: string;
@@ -130,6 +132,10 @@ export interface ServiceLogStreamOptions {
   /** Called on every connection state change, with a human sentence when the
    * backend sent one (otherwise a default for the state). */
   onStateChange: (state: ServiceLogConnectionState, detail?: string) => void;
+  /** Called for internal stream diagnostics -- attached, reconnected, a
+   * replacement container after a restart -- kept apart from onLine so a
+   * marker about the stream is never mistaken for the workload's own output. */
+  onDiagnostic?: (message: string) => void;
   /** Override the derived URL, mainly for tests. */
   url?: string;
   /** The largest reconnect delay, in milliseconds. */
@@ -200,6 +206,9 @@ export function openServiceLogStream(options: ServiceLogStreamOptions): StreamHa
           break;
         case 'status':
           setState(LOG_STATUS_STATE[frame.status ?? ''] ?? 'connecting', frame.message);
+          break;
+        case 'diagnostic':
+          options.onDiagnostic?.(frame.message ?? '');
           break;
         case 'error':
           permanentError = frame.message ?? 'The service logs could not be streamed.';
