@@ -75,7 +75,7 @@ function detailText(entry: ServiceActivity): string | null {
 function entryText(entry: ServiceActivity): string {
   const when = new Date(entry.created_at).toLocaleString();
   const detail = detailText(entry);
-  return detail ? `${when}: ${entry.message} (${detail})` : `${when}: ${entry.message}`;
+  return detail ? `${when} — ${entry.message} (${detail})` : `${when} — ${entry.message}`;
 }
 
 /** The trail, newest first. */
