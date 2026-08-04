@@ -2,6 +2,7 @@ import { getServiceActivity, type ServiceActivity } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
 import { RefreshCw } from '@slideops/icons';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { CopyButton } from './CopyButton';
 import { ErrorNote, Loading } from './Feedback';
 import { Refreshing } from './Refreshing';
 
@@ -69,12 +70,21 @@ function detailText(entry: ServiceActivity): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/** One entry, as a line of plain text: when, what, and the detail beside it,
+ * in the same words the trail already shows. */
+function entryText(entry: ServiceActivity): string {
+  const when = new Date(entry.created_at).toLocaleString();
+  const detail = detailText(entry);
+  return detail ? `${when} — ${entry.message} (${detail})` : `${when} — ${entry.message}`;
+}
+
 /** The trail, newest first. */
 export function ServiceActivityTrail({ id }: { id: string }) {
   const { state, reload, refreshing, refreshError } = useAsyncData(
     (signal) => getServiceActivity(id, 100, signal),
     [id],
   );
+  const entries = state.status === 'ready' ? state.data : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -82,8 +92,9 @@ export function ServiceActivityTrail({ id }: { id: string }) {
         <Text variant="body-sm" tone="secondary">
           Deploys, restarts, configuration changes and shells, newest first.
         </Text>
-        <span className="flex items-center gap-3">
+        <span className="flex items-center gap-2">
           <Refreshing label="Reading" show={refreshing} />
+          <CopyButton value={entries.map(entryText).join('\n')} label="the activity trail" />
           <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
             <RefreshCw width={14} height={14} aria-hidden />
             Refresh
