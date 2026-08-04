@@ -99,4 +99,24 @@ describe('ServiceActivityTrail', () => {
     await userEvent.click(screen.getByRole('button', { name: /Refresh/ }));
     await waitFor(() => expect(getServiceActivity).toHaveBeenCalledTimes(2));
   });
+
+  // An Operator pasting this into a support ticket wants the trail as text,
+  // newest first, the same order it reads on screen.
+  it('copies the trail as plain text', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    renderInApp(<ServiceActivityTrail id="svc-1" />);
+    await screen.findByText('The deploy failed.');
+
+    await userEvent.click(screen.getByRole('button', { name: /copy the activity trail/i }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    const copied = writeText.mock.calls[0]![0] as string;
+    expect(copied.split('\n')).toHaveLength(3);
+    expect(copied).toContain('The deploy failed.');
+    expect(copied).toContain('Deployed, and the Service is running.');
+
+    vi.unstubAllGlobals();
+  });
 });
