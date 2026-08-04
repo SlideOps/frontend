@@ -64,14 +64,16 @@ function record() {
   const states: ServiceLogConnectionState[] = [];
   const history: string[] = [];
   const lines: string[] = [];
+  const diagnostics: string[] = [];
   const handle = openServiceLogStream({
     serviceId: 'svc-1',
     url: 'ws://test/logs/stream',
     onHistory: (h) => history.push(h),
     onLine: (l) => lines.push(l),
     onStateChange: (s) => states.push(s),
+    onDiagnostic: (m) => diagnostics.push(m),
   });
-  return { states, history, lines, handle };
+  return { states, history, lines, diagnostics, handle };
 }
 
 describe('openServiceLogStream', () => {
@@ -85,6 +87,19 @@ describe('openServiceLogStream', () => {
 
     expect(history).toEqual(['line1\nline2']);
     expect(lines).toEqual(['line3', 'line4']);
+  });
+
+  it('keeps stream diagnostics apart from log lines', () => {
+    const { lines, diagnostics } = record();
+    const socket = FakeSocket.last!;
+    socket.openIt();
+    socket.message({ type: 'diagnostic', message: 'Docker stream attached.' });
+    socket.message({ type: 'log', data: 'listening on :8000' });
+    socket.message({ type: 'diagnostic', message: '--- Service restarted ---' });
+    socket.message({ type: 'log', data: 'listening on :8000' });
+
+    expect(diagnostics).toEqual(['Docker stream attached.', '--- Service restarted ---']);
+    expect(lines).toEqual(['listening on :8000', 'listening on :8000']);
   });
 
   it('reports connection state changes from status frames', () => {

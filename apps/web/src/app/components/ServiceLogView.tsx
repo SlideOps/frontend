@@ -13,18 +13,26 @@ import { ansiSegmentStyle, parseAnsiLine } from './ansi';
  * the last of what the workload already printed -- and then every new line
  * arrives as its own message, in order, for as long as this stays mounted.
  * There is nothing to poll and nothing to refetch: the backend pushes, this
- * appends.
+ * appends, immediately, as each message arrives.
  *
- * Reconnecting is mostly not this component's problem. The backend already
- * follows through a Service being restarted and through the ordinary bounds on
- * how long one SSH command may run, on its side of the same socket, so an
- * Operator watching rarely sees either. What this reconnects is the socket
- * itself going away -- a real network drop -- with the same backoff every other
- * live connection in this app already uses.
+ * The backend keeps following through a Service being restarted and through
+ * the ordinary bounds on how long one SSH command may run, on its side of the
+ * same socket, so an Operator watching rarely sees either. What this
+ * reconnects is the socket itself going away -- a real network drop -- with
+ * the same backoff every other live connection in this app already uses. A
+ * reconnect, from either side, never clears what is already on screen: the
+ * backend never resends history once it has already followed once, and this
+ * view never throws away a line it has already shown. A crash is exactly the
+ * moment this matters most, so nothing here is allowed to clear the buffer on
+ * its own.
  */
 
-interface LogLine {
+interface LogEntry {
   id: number;
+  // "line" is the workload's own output; "diagnostic" is a marker about the
+  // stream itself (attached, reconnected, a replacement container), shown
+  // inline but never confused for something the workload printed.
+  kind: 'line' | 'diagnostic';
   text: string;
 }
 
@@ -77,10 +85,17 @@ function ConnectionIndicator({ state }: { state: ServiceLogConnectionState }) {
   );
 }
 
-/** One line, ANSI colour preserved where the workload sent it, every other
- * escape sequence stripped. */
-function LogLineRow({ text }: { text: string }) {
-  const segments = parseAnsiLine(text);
+/** One entry: the workload's own line, ANSI colour preserved and every other
+ * escape sequence stripped, or a dimmed marker about the stream itself. */
+function LogEntryRow({ entry }: { entry: LogEntry }) {
+  if (entry.kind === 'diagnostic') {
+    return (
+      <div role="status" className="my-1 text-center text-[11px] italic text-ink-muted">
+        {entry.text}
+      </div>
+    );
+  }
+  const segments = parseAnsiLine(entry.text);
   return (
     <div className="whitespace-pre-wrap break-all">
       {segments.map((segment, index) => (
@@ -88,79 +103,77 @@ function LogLineRow({ text }: { text: string }) {
           {segment.text}
         </span>
       ))}
-      {segments.length === 0 ? ' ' : null}
+      {segments.length === 0 ? ' ' : null}
     </div>
   );
 }
 
 export function ServiceLogView({ id }: { id: string }) {
-  const [lines, setLines] = useState<LogLine[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
   const [state, setState] = useState<ServiceLogConnectionState>('connecting');
   const [detail, setDetail] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  // Bumped on every manual reconnect, so the connect effect below reruns
-  // without id itself needing to change.
+  // Bumped when the Operator asks to reconnect, so the connect effect below
+  // reruns without id itself needing to change -- and, deliberately, without
+  // the entries effect above it rerunning, so a manual reconnect never clears
+  // what is already on screen.
   const [generation, setGeneration] = useState(0);
 
   const seqRef = useRef(0);
-  const pendingRef = useRef<LogLine[]>([]);
-  const flushHandleRef = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Whether history has already been shown once for this Service. The backend
+  // sends it again on every fresh connection -- including a reconnect after
+  // the socket itself dropped -- since each is a new follow from its side.
+  // Applying it a second time would duplicate the same recent lines under
+  // themselves; skipping it here is what "only append" means for the one
+  // frame that is not itself a new line.
+  const receivedHistoryRef = useRef(false);
 
-  const nextLine = (text: string): LogLine => ({ id: seqRef.current++, text });
-
-  // Incoming lines are buffered and flushed on the next animation frame rather
-  // than on every message. A chatty workload can print dozens of lines in a
-  // single tick, and a state update -- and a re-render -- per line is what
-  // "flickering" and "a complete rerender every message" both mean in practice.
-  const scheduleFlush = () => {
-    if (flushHandleRef.current !== null) {
-      return;
-    }
-    flushHandleRef.current = window.requestAnimationFrame(() => {
-      flushHandleRef.current = null;
-      if (pendingRef.current.length === 0) {
-        return;
-      }
-      const incoming = pendingRef.current;
-      pendingRef.current = [];
-      setLines((current) => {
-        const next = current.concat(incoming);
-        return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
-      });
+  const append = (kind: LogEntry['kind'], text: string) => {
+    setEntries((current) => {
+      const next = current.concat({ id: seqRef.current++, kind, text });
+      return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next;
     });
   };
 
+  // Resets only when the Operator switches to a different Service. Nothing
+  // else -- not a reconnect, not a restart, not the websocket dropping and
+  // coming back -- may clear the buffer, or the one moment an Operator needs
+  // the scrollback most is exactly the moment something would erase it.
   useEffect(() => {
-    setLines([]);
+    setEntries([]);
+    seqRef.current = 0;
+    receivedHistoryRef.current = false;
     setState('connecting');
     setDetail(null);
-    seqRef.current = 0;
-    pendingRef.current = [];
+  }, [id]);
 
+  useEffect(() => {
     const handle = openServiceLogStream({
       serviceId: id,
       onHistory: (history) => {
-        const historyLines = history.split('\n').map(nextLine);
-        setLines(historyLines);
+        if (receivedHistoryRef.current) {
+          return;
+        }
+        receivedHistoryRef.current = true;
+        const historyLines = history.split('\n');
+        setEntries((current) =>
+          current.concat(historyLines.map((text) => ({ id: seqRef.current++, kind: 'line', text }))),
+        );
       },
-      onLine: (line) => {
-        pendingRef.current.push(nextLine(line));
-        scheduleFlush();
-      },
+      // Appended the instant it arrives: no buffering, no batching, so an
+      // Operator watching a crash happen sees the traceback the moment the
+      // backend forwards it, not on the next animation frame or the next
+      // refresh.
+      onLine: (line) => append('line', line),
+      onDiagnostic: (message) => append('diagnostic', message),
       onStateChange: (nextState, nextDetail) => {
         setState(nextState);
         setDetail(nextDetail ?? null);
       },
     });
 
-    return () => {
-      if (flushHandleRef.current !== null) {
-        window.cancelAnimationFrame(flushHandleRef.current);
-        flushHandleRef.current = null;
-      }
-      handle.close();
-    };
+    return () => handle.close();
   }, [id, generation]);
 
   // Follows the bottom while auto-scroll is on, and only then: an Operator who
@@ -175,7 +188,7 @@ export function ServiceLogView({ id }: { id: string }) {
       return;
     }
     el.scrollTop = el.scrollHeight;
-  }, [lines, autoScroll]);
+  }, [entries, autoScroll]);
 
   const handleScroll = () => {
     const el = containerRef.current;
@@ -186,6 +199,7 @@ export function ServiceLogView({ id }: { id: string }) {
     setAutoScroll(distanceFromBottom <= NEAR_BOTTOM_PX);
   };
 
+  // A fresh socket, not a fresh view: the scrollback stays exactly as it was.
   const reconnect = () => {
     setAutoScroll(true);
     setGeneration((value) => value + 1);
@@ -229,8 +243,8 @@ export function ServiceLogView({ id }: { id: string }) {
         aria-label="Live Service output"
         className="max-h-80 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
       >
-        {lines.length > 0 ? (
-          lines.map((line) => <LogLineRow key={line.id} text={line.text} />)
+        {entries.length > 0 ? (
+          entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} />)
         ) : (
           <Text variant="body-sm" tone="secondary">
             {state === 'connecting' ? 'Reading recent output…' : 'No logs yet.'}
