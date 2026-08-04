@@ -1,8 +1,9 @@
 import { openServiceLogStream, type ServiceLogConnectionState } from '@slideops/api-client';
 import { Button, Text, cn } from '@slideops/design-system';
 import { RefreshCw } from '@slideops/icons';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ansiSegmentStyle, parseAnsiLine } from './ansi';
+import { CopyButton } from './CopyButton';
 
 /*
  * The Service's live output: `docker logs --follow`, `docker compose logs
@@ -211,6 +212,13 @@ export function ServiceLogView({ id }: { id: string }) {
     setGeneration((value) => value + 1);
   };
 
+  // Exactly what is on screen, in the same order: the workload's own lines
+  // and the stream diagnostics between them, joined the way they are already
+  // read top to bottom. An Operator pasting this into a support ticket wants
+  // the whole picture, restarts included, not a guess at which lines were the
+  // real output.
+  const fullText = useMemo(() => entries.map((entry) => entry.text).join('\n'), [entries]);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
@@ -220,10 +228,13 @@ export function ServiceLogView({ id }: { id: string }) {
           </Text>
           <ConnectionIndicator state={state} />
         </span>
-        <Button variant="ghost" size="sm" onClick={reconnect}>
-          <RefreshCw width={14} height={14} aria-hidden />
-          Reconnect
-        </Button>
+        <span className="flex items-center gap-2">
+          <CopyButton value={fullText} label="the log output" />
+          <Button variant="ghost" size="sm" onClick={reconnect}>
+            <RefreshCw width={14} height={14} aria-hidden />
+            Reconnect
+          </Button>
+        </span>
       </div>
 
       {/* A permanent refusal -- the Service does not exist, or never created a

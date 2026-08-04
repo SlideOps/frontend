@@ -192,6 +192,30 @@ describe('ServiceLogView', () => {
     expect(screen.getByText('ValueError: boom')).toBeInTheDocument();
   });
 
+  // An Operator pasting this into a support ticket wants the whole picture --
+  // the workload's own lines and the stream diagnostics between them -- in
+  // the same order they are already reading it on screen.
+  it('copies everything on screen, lines and diagnostics, in order', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'history', data: 'starting up' });
+    await screen.findByText('starting up');
+    FakeSocket.last!.message({ type: 'diagnostic', message: '--- Service restarted ---' });
+    FakeSocket.last!.message({ type: 'log', data: 'listening on :8000' });
+    await waitFor(() => expect(screen.getByText('listening on :8000')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: /copy the log output/i }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        'starting up\n--- Service restarted ---\nlistening on :8000',
+      ),
+    );
+  });
+
   it('closes the socket when it unmounts, rather than leaving a session open', () => {
     const { unmount } = renderInApp(<ServiceLogView id="svc-1" />);
     const socket = FakeSocket.last!;
