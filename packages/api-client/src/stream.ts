@@ -93,6 +93,166 @@ export function serviceShellUrl(serviceID: string, cols: number, rows: number): 
   return websocketUrl(`/services/${encodeURIComponent(serviceID)}/shell`, { cols, rows });
 }
 
+/** The websocket carrying a Service's live output: recent history, then every
+ * new line as the workload prints it. */
+export function serviceLogStreamUrl(serviceID: string): string {
+  return websocketUrl(`/services/${encodeURIComponent(serviceID)}/logs/stream`);
+}
+
+/**
+ * One frame of a Service log stream. `type` says what the rest means:
+ * `history` and `log` carry `data`, the workload's own text; `status` carries
+ * a connection state and an optional human sentence for it; `error` means the
+ * stream cannot continue and `message` says why.
+ */
+export interface ServiceLogFrame {
+  type: 'history' | 'log' | 'status' | 'error';
+  data?: string;
+  status?: string;
+  message?: string;
+}
+
+export type ServiceLogConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'stopped'
+  | 'disconnected'
+  | 'stream_ended';
+
+export interface ServiceLogStreamOptions {
+  /** The Service whose live output to follow. */
+  serviceId: string;
+  /** Called once with the recent output, before anything else. */
+  onHistory: (history: string) => void;
+  /** Called for each new line, in the order it was printed. */
+  onLine: (line: string) => void;
+  /** Called on every connection state change, with a human sentence when the
+   * backend sent one (otherwise a default for the state). */
+  onStateChange: (state: ServiceLogConnectionState, detail?: string) => void;
+  /** Override the derived URL, mainly for tests. */
+  url?: string;
+  /** The largest reconnect delay, in milliseconds. */
+  maxBackoffMs?: number;
+}
+
+const LOG_STREAM_INITIAL_BACKOFF_MS = 500;
+const LOG_STREAM_DEFAULT_MAX_BACKOFF_MS = 15000;
+
+const LOG_STATUS_STATE: Record<string, ServiceLogConnectionState> = {
+  connecting: 'connecting',
+  connected: 'connected',
+  reconnecting: 'reconnecting',
+  stopped: 'stopped',
+};
+
+/**
+ * Open a Service's live output. It connects to the cookie authenticated
+ * websocket, delivers the recent history once and every new line after it as
+ * the backend follows the workload, and reconnects the socket itself with
+ * backoff if the connection drops -- the backend already reconnects the
+ * follow command on its own side of that same socket, so this only has to
+ * cover the socket going away entirely, not the ordinary hiccups inside it.
+ *
+ * An error frame from the backend (the Service does not exist, or never had a
+ * workload to read) is permanent: the socket closing right after one does not
+ * trigger a reconnect, since nothing about retrying would change the answer.
+ * Close the returned handle to stop for good; that, too, does not reconnect.
+ */
+export function openServiceLogStream(options: ServiceLogStreamOptions): StreamHandle {
+  const url = options.url ?? serviceLogStreamUrl(options.serviceId);
+  const maxBackoff = options.maxBackoffMs ?? LOG_STREAM_DEFAULT_MAX_BACKOFF_MS;
+
+  let socket: WebSocket | null = null;
+  let backoff = LOG_STREAM_INITIAL_BACKOFF_MS;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+  let permanentError: string | null = null;
+
+  const setState = (state: ServiceLogConnectionState, detail?: string) =>
+    options.onStateChange(state, detail);
+
+  const connect = () => {
+    if (closed) {
+      return;
+    }
+    setState(backoff === LOG_STREAM_INITIAL_BACKOFF_MS ? 'connecting' : 'reconnecting');
+    socket = new WebSocket(url);
+
+    socket.addEventListener('open', () => {
+      backoff = LOG_STREAM_INITIAL_BACKOFF_MS;
+    });
+
+    socket.addEventListener('message', (message) => {
+      let frame: ServiceLogFrame;
+      try {
+        frame = JSON.parse(message.data as string) as ServiceLogFrame;
+      } catch {
+        // A malformed frame should never take down the stream; skip it.
+        return;
+      }
+      switch (frame.type) {
+        case 'history':
+          options.onHistory(frame.data ?? '');
+          break;
+        case 'log':
+          options.onLine(frame.data ?? '');
+          break;
+        case 'status':
+          setState(LOG_STATUS_STATE[frame.status ?? ''] ?? 'connecting', frame.message);
+          break;
+        case 'error':
+          permanentError = frame.message ?? 'The service logs could not be streamed.';
+          setState('disconnected', permanentError);
+          break;
+      }
+    });
+
+    socket.addEventListener('close', (event) => {
+      if (closed) {
+        setState('disconnected');
+        return;
+      }
+      if (permanentError) {
+        // The backend already said why, and said it for good: retrying would
+        // only reconnect to the same answer.
+        closed = true;
+        return;
+      }
+      if (event.wasClean && event.code === 1000 && !event.reason) {
+        setState('stream_ended');
+      }
+      scheduleReconnect();
+    });
+
+    socket.addEventListener('error', () => {
+      // The close handler follows an error and drives the reconnect; nothing
+      // to do here beyond letting the socket settle.
+    });
+  };
+
+  const scheduleReconnect = () => {
+    setState('reconnecting');
+    reconnectTimer = setTimeout(() => {
+      backoff = Math.min(backoff * 2, maxBackoff);
+      connect();
+    }, backoff);
+  };
+
+  connect();
+
+  return {
+    close: () => {
+      closed = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      socket?.close();
+    },
+  };
+}
+
 export type StreamStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 export interface OperationStreamOptions {

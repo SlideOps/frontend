@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderInApp } from '../../test/render';
 
 /*
@@ -16,7 +16,6 @@ import { renderInApp } from '../../test/render';
 const getService = vi.fn();
 const getProject = vi.fn();
 const getNode = vi.fn();
-const getServiceLogs = vi.fn();
 const getServiceActivity = vi.fn();
 const getServiceMetrics = vi.fn();
 const listCapabilityActions = vi.fn();
@@ -27,7 +26,6 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   getService: (...a: unknown[]) => getService(...a),
   getProject: (...a: unknown[]) => getProject(...a),
   getNode: (...a: unknown[]) => getNode(...a),
-  getServiceLogs: (...a: unknown[]) => getServiceLogs(...a),
   getServiceActivity: (...a: unknown[]) => getServiceActivity(...a),
   getServiceMetrics: (...a: unknown[]) => getServiceMetrics(...a),
   listCapabilityActions: (...a: unknown[]) => listCapabilityActions(...a),
@@ -35,6 +33,44 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
+
+// The Logs tab opens a live websocket the moment it is on screen, which it is
+// by default. A websocket the test drives, standing in for the browser's, so
+// what streams down it is deterministic instead of a real network call.
+class FakeSocket {
+  static last: FakeSocket | null = null;
+  static readonly OPEN = 1;
+
+  readyState = 0;
+  private listeners: Record<string, Array<(event: unknown) => void>> = {};
+
+  constructor(public url: string) {
+    FakeSocket.last = this;
+  }
+
+  addEventListener(type: string, handler: (event: unknown) => void) {
+    (this.listeners[type] ??= []).push(handler);
+  }
+
+  close() {
+    this.readyState = 3;
+  }
+
+  emit(type: string, event: unknown) {
+    for (const handler of this.listeners[type] ?? []) {
+      handler(event);
+    }
+  }
+
+  openIt() {
+    this.readyState = FakeSocket.OPEN;
+    this.emit('open', {});
+  }
+
+  message(data: unknown) {
+    this.emit('message', { data: JSON.stringify(data) });
+  }
+}
 
 const service = {
   id: 'svc-1',
@@ -66,10 +102,11 @@ function show() {
 
 describe('ServiceDetail', () => {
   beforeEach(() => {
+    FakeSocket.last = null;
+    vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket);
     getService.mockReset().mockResolvedValue(service);
     getProject.mockReset().mockResolvedValue({ id: 'p-1', name: 'Kenpoly' });
     getNode.mockReset().mockResolvedValue({ id: 'n-1', name: 'contabo vps' });
-    getServiceLogs.mockReset().mockResolvedValue('listening on :8000\nready');
     getServiceActivity.mockReset().mockResolvedValue([
       {
         id: 'a1',
@@ -100,15 +137,25 @@ describe('ServiceDetail', () => {
     checkServiceUpdate.mockReset().mockResolvedValue({ behind: false });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   // The claim that keeps coming back: there is no log console on the Service.
-  it('shows the logs section, open, with the workload output in it', async () => {
+  it('shows the logs section, open, live, with the workload output in it', async () => {
     show();
 
     expect(await screen.findByRole('button', { name: /^Logs and activity/ })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
+    await screen.findByRole('log');
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'history', data: 'listening on :8000\nready' });
+
     expect(await screen.findByRole('log')).toHaveTextContent('listening on :8000');
+    FakeSocket.last!.message({ type: 'log', data: 'a request came in' });
+    await waitFor(() => expect(screen.getByRole('log')).toHaveTextContent('a request came in'));
   });
 
   it('shows the activity trail beside the output', async () => {
