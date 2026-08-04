@@ -153,6 +153,28 @@ describe('ServiceLogView', () => {
     expect(screen.getByText('listening on :8000')).toBeInTheDocument();
   });
 
+  // A replacement container's diagnostic carries its id and start time on
+  // their own lines; they must survive as line breaks, not run together into
+  // one unreadable sentence.
+  it('preserves line breaks in a multi-line diagnostic', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({
+      type: 'diagnostic',
+      message: 'Connected to replacement container.\nContainer ID: abc123abc123\nStarted: 2026-08-04T14:00:00Z',
+    });
+
+    let marker: HTMLElement | undefined;
+    await waitFor(() => {
+      marker = screen.getAllByRole('status').find((el) => el.textContent?.includes('Container ID'));
+      expect(marker).toBeDefined();
+    });
+    expect(marker?.textContent).toContain('Connected to replacement container.');
+    expect(marker?.textContent).toContain('Container ID: abc123abc123');
+    expect(marker?.textContent).toContain('Started: 2026-08-04T14:00:00Z');
+    expect(marker!).toHaveClass('whitespace-pre-line');
+  });
+
   // The whole point of this feature: a crash's traceback must reach the
   // screen live, and must never be cleared by anything -- not a reconnect, not
   // a status change, not the Service being reported as stopped afterwards.
