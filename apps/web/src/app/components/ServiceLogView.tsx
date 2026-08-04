@@ -275,7 +275,7 @@ export function ServiceLogView({ id }: { id: string }) {
           onClick={() => setAutoScroll(true)}
           className="self-end text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          Scrolled up — new output is arriving below. Jump to latest.
+          New output is arriving below. Jump to latest.
         </button>
       ) : null}
     </div>
