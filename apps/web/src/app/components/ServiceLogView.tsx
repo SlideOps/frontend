@@ -89,8 +89,14 @@ function ConnectionIndicator({ state }: { state: ServiceLogConnectionState }) {
  * escape sequence stripped, or a dimmed marker about the stream itself. */
 function LogEntryRow({ entry }: { entry: LogEntry }) {
   if (entry.kind === 'diagnostic') {
+    // A diagnostic can carry more than one line -- a replacement container's
+    // id and start time alongside the marker itself -- so line breaks are
+    // preserved rather than collapsed into one run-on sentence.
     return (
-      <div role="status" className="my-1 text-center text-[11px] italic text-ink-muted">
+      <div
+        role="status"
+        className="my-1.5 whitespace-pre-line border-y border-border/60 py-1 text-center text-[11px] italic text-ink-muted"
+      >
         {entry.text}
       </div>
     );
