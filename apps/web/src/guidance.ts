@@ -574,6 +574,13 @@ export const guidance: GuidanceRegistry = {
     detail:
       'When GitHub is connected, the repositories you can reach are listed here. Choosing one fills the repository URL and defaults the branch to that repository default branch. You can still edit both afterward.',
   },
+  'service.build': {
+    label: 'Subdirectory',
+    summary:
+      'Only needed for a monorepo: the path, inside the repository, of the one module to build and deploy. Leave it empty to build the repository root.',
+    detail:
+      'The repository is cloned in full either way. This narrows the Docker build context down to one subdirectory, so a monorepo with several applications in one repository deploys just the one you name here, such as apps/api or services/worker, instead of the whole thing. It is a path, not a command.',
+  },
   'service.command': {
     label: 'Command',
     summary:

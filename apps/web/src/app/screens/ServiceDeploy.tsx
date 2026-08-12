@@ -350,9 +350,10 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               {...register('branch')}
             />
             <Field
-              label="Build command (optional)"
-              placeholder="docker build -t app ."
+              label="Subdirectory (optional)"
+              placeholder="apps/api"
               error={errors.build?.message}
+              labelAdornment={<Guidance for="service.build" />}
               {...register('build')}
             />
           </div>
