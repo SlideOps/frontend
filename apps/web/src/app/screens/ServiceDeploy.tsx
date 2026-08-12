@@ -350,9 +350,10 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               {...register('branch')}
             />
             <Field
-              label="Build command (optional)"
-              placeholder="docker build -t app ."
+              label="Subdirectory (optional)"
+              placeholder="apps/api"
               error={errors.build?.message}
+              labelAdornment={<Guidance for="service.build" />}
               {...register('build')}
             />
           </div>
@@ -448,7 +449,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
 
-        {sourceType === 'repository' ? (
+        {sourceType === 'repository' && runtime === 'compose' ? (
           <div className="mt-6">
             <ComposeStackPlan
               nodeID={plannedNode ?? ''}
