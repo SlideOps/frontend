@@ -5,7 +5,6 @@ import {
   getNode,
   getProject,
   getService,
-  getServiceLogs,
   redeployService,
   removeService,
   restartService,
@@ -36,10 +35,10 @@ import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { CapabilityManagement } from '../components/CapabilityManagement';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
+import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
-import { Refreshing } from '../components/Refreshing';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -94,55 +93,6 @@ function sourceText(service: Service): string {
   return service.source.repository_url ?? 'Repository';
 }
 
-/** A simple, read-only log view. Preserves formatting and belongs to both themes. */
-function LogView({ id }: { id: string }) {
-  const { state, reload, refreshing, refreshError } = useAsyncData(
-    (signal) => getServiceLogs(id, 200, signal),
-    [id],
-  );
-  const logs = state.status === 'ready' ? state.data.trim() : '';
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
-        <Text variant="body-sm" tone="secondary">
-          The last of what the workload printed.
-        </Text>
-        <span className="flex items-center gap-3">
-          <Refreshing label="Reading" show={refreshing} />
-          <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
-            <RefreshCw width={14} height={14} aria-hidden />
-            Refresh
-          </Button>
-        </span>
-      </div>
-      {state.status === 'loading' ? <Loading label="Reading recent logs" /> : null}
-      {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
-      {/* A failed refresh keeps the last logs on screen and says so, rather than
-          replacing readable output with an error panel. */}
-      {refreshError ? (
-        <p role="alert" className="text-sm text-danger">
-          {refreshError.message}
-        </p>
-      ) : null}
-      {state.status === 'ready' ? (
-        logs ? (
-          <pre
-            role="log"
-            aria-label="Recent Service logs"
-            className="max-h-80 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
-          >
-            {logs}
-          </pre>
-        ) : (
-          <Text variant="body-sm" tone="secondary">
-            No logs yet.
-          </Text>
-        )
-      ) : null}
-    </div>
-  );
-}
 
 /*
  * Logs and activity, together and folded away by default.
@@ -186,7 +136,7 @@ function LogsAndActivity({ id }: { id: string }) {
           </button>
         ))}
       </div>
-      {tab === 'logs' ? <LogView id={id} /> : <ServiceActivityTrail id={id} />}
+      {tab === 'logs' ? <ServiceLogView id={id} /> : <ServiceActivityTrail id={id} />}
     </Section>
   );
 }
