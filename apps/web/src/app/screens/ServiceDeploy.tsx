@@ -449,7 +449,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
 
-        {sourceType === 'repository' ? (
+        {sourceType === 'repository' && runtime === 'compose' ? (
           <div className="mt-6">
             <ComposeStackPlan
               nodeID={plannedNode ?? ''}
