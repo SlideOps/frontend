@@ -8,7 +8,7 @@ import {
   type Plugin,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Check, ShieldCheck } from '@slideops/icons';
+import { ArrowRight, Boxes, capabilityIcon, Check, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -53,11 +53,14 @@ function StackCard({
   onUninstall: () => void;
   onOpen: () => void;
 }) {
+  const Icon = plugin.provides?.[0]
+    ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+    : Boxes;
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <Boxes width={18} height={18} aria-hidden />
+          <Icon width={18} height={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <Text variant="h4">{plugin.name}</Text>

@@ -7,7 +7,7 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ChevronRight, Container, Plus, ScanSearch } from '@slideops/icons';
+import { ChevronRight, Container, Plus, ScanSearch, serviceIcon } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
 import { AdoptedBadge, ServiceStatusBadge } from '../components/Badges';
@@ -47,6 +47,7 @@ function ServiceRow({
   nodeName: string;
   onOpen: () => void;
 }) {
+  const Icon = serviceIcon(service.source.image);
   return (
     <button
       type="button"
@@ -54,7 +55,7 @@ function ServiceRow({
       className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-        <Container width={18} height={18} aria-hidden />
+        <Icon width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
         <Text variant="body-sm" className="font-medium">

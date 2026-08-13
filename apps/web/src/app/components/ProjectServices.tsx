@@ -1,6 +1,6 @@
 import { listServices, type Service } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ChevronRight, Container, Plus } from '@slideops/icons';
+import { ChevronRight, Container, Plus, serviceIcon } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useNavigate } from 'react-router-dom';
 import { ServiceStatusBadge } from './Badges';
@@ -47,7 +47,9 @@ export function ProjectServices({ projectId }: { projectId: string }) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {state.data.map((service) => (
+            {state.data.map((service) => {
+              const Icon = serviceIcon(service.source.image);
+              return (
               <button
                 key={service.id}
                 type="button"
@@ -55,7 +57,7 @@ export function ProjectServices({ projectId }: { projectId: string }) {
                 className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                  <Container width={18} height={18} aria-hidden />
+                  <Icon width={18} height={18} aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
                   <Text variant="body-sm" className="font-medium">
@@ -76,7 +78,8 @@ export function ProjectServices({ projectId }: { projectId: string }) {
                   aria-hidden
                 />
               </button>
-            ))}
+              );
+            })}
           </div>
         )
       ) : null}

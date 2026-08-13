@@ -8,7 +8,7 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { Container, Plus, Search, Server } from '@slideops/icons';
+import { Plus, Search, Server, serviceIcon } from '@slideops/icons';
 import { useEffect, useRef, useState } from 'react';
 
 /*
@@ -168,6 +168,8 @@ export function TargetPicker({ onPick }: { onPick: (target: PickedTarget) => voi
                             : target.service.runtime === 'systemd'
                               ? 'systemd'
                               : 'container';
+                        const Icon =
+                          target.kind === 'node' ? Server : serviceIcon(target.service.source.image);
                         return (
                           <button
                             key={key}
@@ -179,11 +181,7 @@ export function TargetPicker({ onPick }: { onPick: (target: PickedTarget) => voi
                             }}
                             className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                           >
-                            {target.kind === 'node' ? (
-                              <Server width={15} height={15} className="shrink-0 text-brand" aria-hidden />
-                            ) : (
-                              <Container width={15} height={15} className="shrink-0 text-brand" aria-hidden />
-                            )}
+                            <Icon width={15} height={15} className="shrink-0 text-brand" aria-hidden />
                             <span className="min-w-0 flex-1">
                               <Text variant="body-sm" className="block truncate font-medium">
                                 {label}

@@ -10,7 +10,7 @@ import {
   type Workload,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Container, Plus, RefreshCw, ScanSearch, Server } from '@slideops/icons';
+import { ArrowRight, Container, Plus, RefreshCw, ScanSearch, Server, serviceIcon } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -83,10 +83,11 @@ function WorkloadRow({
   onOpen: () => void;
 }) {
   const ports = workload.ports.map((port) => port.host).join(', ');
+  const Icon = workload.runtime === 'container' ? serviceIcon(workload.image) : Server;
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-surface px-4 py-3">
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-        <Container width={18} height={18} aria-hidden />
+        <Icon width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
         <Text variant="body-sm" className="font-medium">

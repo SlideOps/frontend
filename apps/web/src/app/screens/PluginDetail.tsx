@@ -5,7 +5,7 @@ import {
   type Plugin,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ArrowRight, Boxes, Lock, ShieldCheck } from '@slideops/icons';
+import { ArrowLeft, ArrowRight, Boxes, capabilityIcon, Lock, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -82,13 +82,16 @@ export function PluginDetail() {
             const { plugin, capabilities } = result.state.data;
             const isCore = Boolean(plugin.is_core);
             const byKey = new Map(capabilities.map((c) => [c.key, c]));
+            const PluginIcon = plugin.provides[0]
+              ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+              : Boxes;
 
             return (
               <>
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Boxes width={22} height={22} aria-hidden />
+                      <PluginIcon width={22} height={22} aria-hidden />
                     </span>
                     <div className="min-w-0">
                       <Text variant="h1">{plugin.name}</Text>

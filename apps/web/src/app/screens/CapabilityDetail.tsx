@@ -13,10 +13,10 @@ import { Button, Card, Text } from '@slideops/design-system';
 import {
   ArrowLeft,
   ArrowRight,
+  capabilityIcon,
   Database,
   History,
   KeyRound,
-  Layers,
   ListChecks,
   Play,
   ScanSearch,
@@ -295,7 +295,10 @@ export function CapabilityDetail() {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                <Layers width={22} height={22} aria-hidden />
+                {(() => {
+                  const Icon = capabilityIcon(capabilityResult.state.data);
+                  return <Icon width={22} height={22} aria-hidden />;
+                })()}
               </span>
               <div className="min-w-0">
                 <Text variant="h1">{capabilityResult.state.data.name}</Text>

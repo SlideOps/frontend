@@ -17,10 +17,10 @@ import {
 import { Button, Card, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
-  Container,
   Play,
   RefreshCw,
   Server,
+  serviceIcon,
   Square,
   Trash2,
   XCircle,
@@ -209,6 +209,7 @@ export function ServiceDetail() {
   // An adopted workload was already running when SlideOps found it, so there is
   // nothing to rebuild it from and redeploying it is refused by the API.
   const isAdopted = service?.adopted === true;
+  const ServiceHeroIcon = serviceIcon(service?.source?.image);
 
   return (
     <OperatorShell active="services">
@@ -228,7 +229,7 @@ export function ServiceDetail() {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                <Container width={22} height={22} aria-hidden />
+                <ServiceHeroIcon width={22} height={22} aria-hidden />
               </span>
               <div className="min-w-0">
                 <Text variant="h1">{service.name}</Text>

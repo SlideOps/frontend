@@ -1,6 +1,6 @@
 import { listMarketplacePlugins, type Plugin } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Check, Package, Search } from '@slideops/icons';
+import { ArrowRight, Boxes, capabilityIcon, Check, Package, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
@@ -35,11 +35,14 @@ function matches(plugin: Plugin, query: string): boolean {
 
 /** One Plugin presented as a card, with its outcome, what it provides, and its install state. */
 function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) {
+  const Icon = plugin.provides?.[0]
+    ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+    : Boxes;
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <Boxes width={18} height={18} aria-hidden />
+          <Icon width={18} height={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <Text variant="h4">{plugin.name}</Text>

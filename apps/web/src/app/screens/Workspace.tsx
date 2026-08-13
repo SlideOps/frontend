@@ -9,7 +9,7 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, CheckCircle2, Layers, Plus, Server, XCircle } from '@slideops/icons';
+import { ArrowRight, capabilityIcon, CheckCircle2, Plus, Server, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
@@ -219,10 +219,12 @@ export function Workspace() {
               {/* Rows, like every other list of Capabilities, so the same thing
                   looks the same wherever it appears. */}
               <div className="flex flex-col divide-y divide-border border-y border-border">
-                {state.data.capabilities.slice(0, 2).map((capability) => (
+                {state.data.capabilities.slice(0, 2).map((capability) => {
+                  const Icon = capabilityIcon(capability);
+                  return (
                   <div key={capability.key} className="flex items-start gap-3 py-3.5">
                     <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Layers width={15} height={15} aria-hidden />
+                      <Icon width={15} height={15} aria-hidden />
                     </span>
                     <div className="min-w-0 flex-1">
                       <Text variant="body-sm" className="font-medium">
@@ -246,7 +248,8 @@ export function Workspace() {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ) : null}

@@ -87,6 +87,7 @@ const runningService = {
   project_id: 'p1',
   runtime: 'container',
   status: 'running',
+  source: { type: 'image', image: 'node:20-alpine' },
 } as Service;
 
 const stoppedService = {
@@ -95,6 +96,7 @@ const stoppedService = {
   project_id: 'p1',
   runtime: 'container',
   status: 'stopped',
+  source: { type: 'image', image: 'redis:7-alpine' },
 } as Service;
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
