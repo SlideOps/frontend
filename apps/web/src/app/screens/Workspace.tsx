@@ -168,6 +168,7 @@ export function Workspace() {
                     <NodeRow
                       key={node.id}
                       node={node}
+                      boxed
                       onOpen={() => navigate(`/app/nodes/${node.id}`)}
                     />
                   ))}

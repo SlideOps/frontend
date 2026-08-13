@@ -85,7 +85,7 @@ function WorkloadRow({
   const ports = workload.ports.map((port) => port.host).join(', ');
   const Icon = workload.runtime === 'container' ? serviceIcon(workload.image) : Server;
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-surface px-4 py-3">
+    <div className="flex flex-wrap items-center gap-4 border-b border-border py-3 last:border-b-0">
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
         <Icon width={18} height={18} aria-hidden />
       </span>
@@ -308,7 +308,7 @@ export function ServiceImport() {
                   These are already running. Importing one records it as a Service so you can watch,
                   start, stop, and read it here. It does not touch the workload.
                 </Text>
-                <div className="flex flex-col gap-2">
+                <div className="rounded-md border border-border bg-surface px-4">
                   {importable.map((workload) => (
                     <WorkloadRow
                       key={`${workload.runtime}:${workload.ref}`}
@@ -328,7 +328,7 @@ export function ServiceImport() {
                   <Container width={20} height={20} className="text-brand" aria-hidden />
                   <Text variant="h3">Already managed here</Text>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="rounded-md border border-border bg-surface px-4">
                   {managed.map((workload) => (
                     <WorkloadRow
                       key={`${workload.runtime}:${workload.ref}`}

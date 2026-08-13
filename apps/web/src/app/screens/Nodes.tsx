@@ -8,7 +8,16 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
 
-function NodeRow({ node, onOpen }: { node: Node; onOpen: () => void }) {
+function NodeRow({
+  node,
+  onOpen,
+  boxed = false,
+}: {
+  node: Node;
+  onOpen: () => void;
+  /** A standalone bordered tile, for a short preview list sitting beside another. The full list uses one shared border and a hairline between rows instead. */
+  boxed?: boolean;
+}) {
   const discovered = node.last_discovered_at
     ? `Discovered ${new Date(node.last_discovered_at).toLocaleDateString()}`
     : 'Not discovered yet';
@@ -16,7 +25,11 @@ function NodeRow({ node, onOpen }: { node: Node; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className={
+        boxed
+          ? 'flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          : 'flex w-full items-center gap-4 border-b border-border py-3 text-left transition-colors duration-fast ease-standard last:border-b-0 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      }
     >
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
         <Server width={18} height={18} aria-hidden />
@@ -164,18 +177,20 @@ export function Nodes() {
                     <Text variant="body-sm" tone="secondary" className="font-medium uppercase">
                       {tag}
                     </Text>
-                    {nodes.map((node) => (
-                      <NodeRow
-                        key={node.id}
-                        node={node}
-                        onOpen={() => navigate(`/app/nodes/${node.id}`)}
-                      />
-                    ))}
+                    <div className="rounded-md border border-border bg-surface px-4">
+                      {nodes.map((node) => (
+                        <NodeRow
+                          key={node.id}
+                          node={node}
+                          onOpen={() => navigate(`/app/nodes/${node.id}`)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="rounded-md border border-border bg-surface px-4">
                 {filtered.map((node) => (
                   <NodeRow
                     key={node.id}
