@@ -37,6 +37,7 @@ export {
   EyeOff,
   FileText,
   FolderKanban,
+  Fingerprint,
   Gauge,
   GitBranch,
   Globe,
@@ -58,6 +59,7 @@ export {
   Moon,
   Network,
   Package,
+  Pencil,
   Play,
   Plus,
   Printer,
@@ -66,6 +68,7 @@ export {
   ScanSearch,
   Search,
   Server,
+  Tags,
   Settings,
   Shield,
   ShieldCheck,
@@ -90,3 +93,8 @@ export {
 // SlideOps custom marks.
 export { Mark, type MarkProps } from './Mark';
 export { Logo, type LogoProps } from './Logo';
+
+// Real technology brand marks (simple-icons, CC0-1.0), plus the
+// key/category lookup that picks one for a Capability.
+export * from './brands';
+export { capabilityIcon, type CapabilityIconInput } from './capability-icons';

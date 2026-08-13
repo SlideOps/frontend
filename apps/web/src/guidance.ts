@@ -126,6 +126,38 @@ export const guidance: GuidanceRegistry = {
     label: 'Project',
     summary: 'Optionally place this Node in a Project to keep related Nodes together.',
   },
+  'node.tags': {
+    label: 'Tags',
+    summary: 'Free-form labels for search and grouping, such as production or eu-west.',
+    detail:
+      'Tags are yours to define. The Nodes list can search by them and group by the first one on each Node, so a naming scheme like environment first (production, staging) makes the list easiest to scan.',
+  },
+  'node.credentialSource': {
+    label: 'Credential',
+    summary: 'Paste a new credential, or pick a key already saved in your library.',
+    detail:
+      'A saved key is imported once and reused across Nodes without pasting it again. Pasting a private key here also offers to save it to the library at the same time, so the next Node can pick it instead of pasting it too.',
+  },
+  'sshKeys.overview': {
+    label: 'SSH Keys',
+    summary: 'A library of keys saved once and reused across Nodes, instead of pasting one each time.',
+    detail:
+      'Removing a key from this library only removes its name here. The sealed key material a Node already uses is untouched and the Node keeps connecting exactly as before.',
+  },
+  'sshKeys.import': {
+    label: 'Save a key',
+    summary: 'The key is sealed the moment it arrives and is never shown again.',
+  },
+  'snippets.overview': {
+    label: 'Snippets',
+    summary: 'Commands saved once and picked from any open terminal, instead of retyped.',
+    detail:
+      'A snippet has no relationship to any particular Node or Service, so the same saved command works from any terminal you open. Picking one types it into the active tab; it is never run for you.',
+  },
+  'snippets.save': {
+    label: 'Save a command',
+    summary: 'Typed into the terminal exactly as written. It is never run for you.',
+  },
   'node.authKind': {
     label: 'How to sign in',
     summary: 'Choose a private key or a password for the SSH connection. A key is stronger.',
@@ -573,6 +605,13 @@ export const guidance: GuidanceRegistry = {
       'Pick a repository from your connected GitHub account to fill the URL and branch for you.',
     detail:
       'When GitHub is connected, the repositories you can reach are listed here. Choosing one fills the repository URL and defaults the branch to that repository default branch. You can still edit both afterward.',
+  },
+  'service.build': {
+    label: 'Subdirectory',
+    summary:
+      'Only needed for a monorepo: the path, inside the repository, of the one module to build and deploy. Leave it empty to build the repository root.',
+    detail:
+      'The repository is cloned in full either way. This narrows the Docker build context down to one subdirectory, so a monorepo with several applications in one repository deploys just the one you name here, such as apps/api or services/worker, instead of the whole thing. It is a path, not a command.',
   },
   'service.command': {
     label: 'Command',

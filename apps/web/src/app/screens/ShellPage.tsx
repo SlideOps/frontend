@@ -8,7 +8,7 @@ import {
 import { Text } from '@slideops/design-system';
 import { ArrowLeft } from '@slideops/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShellTerminal } from '../components/ShellTerminal';
+import { ShellTabs } from '../components/shell/ShellTabs';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -40,7 +40,7 @@ export function NodeShellPage() {
       onBack={() => navigate(`/app/nodes/${id}`)}
       backLabel="Back to this server"
     >
-      <ShellTerminal
+      <ShellTabs
         urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
         scopeLabel="This server"
         scopeDetail="A shell on the server itself. Opening it is recorded in the audit trail."
@@ -64,7 +64,7 @@ export function ServiceShellPage() {
       onBack={() => navigate(`/app/services/${id}`)}
       backLabel="Back to this Service"
     >
-      <ShellTerminal
+      <ShellTabs
         urlFor={(cols, rows) => serviceShellUrl(id, cols, rows)}
         scopeLabel={service?.runtime === 'systemd' ? 'This Service, on the server' : 'Inside this Service'}
         scopeDetail={
