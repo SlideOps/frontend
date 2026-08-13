@@ -24,7 +24,7 @@ import {
   ShieldCheck,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { EmptyState } from '@slideops/ui';
+import { DetailLayout, EmptyState } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -324,8 +324,9 @@ export function CapabilityDetail() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-            <div className="flex min-w-0 flex-col gap-6">
+          <DetailLayout
+            main={
+              <>
               {done && isDetected(done) ? (
                 <CapabilityAlreadyPresent
                   capabilityName={capabilityResult.state.data.name}
@@ -456,34 +457,36 @@ export function CapabilityDetail() {
                   </Section>
                 ) : null}
               </div>
-            </div>
-
-            <Card className="h-fit">
-              <div className="mb-4 flex items-center gap-2">
-                <Play width={18} height={18} className="text-brand" aria-hidden />
-                <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
-                <Guidance for="capability.start" />
-              </div>
-              {nodesResult.state.status === 'loading' ? (
-                <Loading label="Loading your Nodes" />
-              ) : nodesResult.state.status === 'error' ? (
-                <ErrorNote error={nodesResult.state.error} />
-              ) : nodes.length === 0 ? (
-                <EmptyState
-                  icon={Server}
-                  title="Connect a Node first"
-                  description="A Capability runs on a Node. Connect one, then come back to start this Operation."
-                />
-              ) : (
-                <StartOperation
-                  capability={capabilityResult.state.data}
-                  nodes={nodes}
-                  initialNodeId={preselectedNode}
-                  initialProjectId={preselectedProject}
-                />
-              )}
-            </Card>
-          </div>
+              </>
+            }
+            rail={
+              <Card className="h-fit">
+                <div className="mb-4 flex items-center gap-2">
+                  <Play width={18} height={18} className="text-brand" aria-hidden />
+                  <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
+                  <Guidance for="capability.start" />
+                </div>
+                {nodesResult.state.status === 'loading' ? (
+                  <Loading label="Loading your Nodes" />
+                ) : nodesResult.state.status === 'error' ? (
+                  <ErrorNote error={nodesResult.state.error} />
+                ) : nodes.length === 0 ? (
+                  <EmptyState
+                    icon={Server}
+                    title="Connect a Node first"
+                    description="A Capability runs on a Node. Connect one, then come back to start this Operation."
+                  />
+                ) : (
+                  <StartOperation
+                    capability={capabilityResult.state.data}
+                    nodes={nodes}
+                    initialNodeId={preselectedNode}
+                    initialProjectId={preselectedProject}
+                  />
+                )}
+              </Card>
+            }
+          />
         </>
       ) : null}
     </OperatorShell>

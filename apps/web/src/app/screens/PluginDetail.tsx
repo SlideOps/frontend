@@ -7,6 +7,7 @@ import {
 import { Button, Card, Text } from '@slideops/design-system';
 import { ArrowLeft, ArrowRight, Boxes, capabilityIcon, Lock, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { DetailLayout } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -110,8 +111,8 @@ export function PluginDetail() {
                   ) : null}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-                  <div className="flex flex-col gap-6">
+                <DetailLayout
+                  main={
                     <Card className="flex flex-col gap-5">
                       <Section title="What it does" guidanceKey="marketplace.manifest">
                         <Text variant="body" tone="secondary">
@@ -164,9 +165,9 @@ export function PluginDetail() {
                         </Section>
                       ) : null}
                     </Card>
-                  </div>
-
-                  <Card className="h-fit flex-col gap-4">
+                  }
+                  rail={
+                    <Card className="h-fit flex-col gap-4">
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes width={18} height={18} className="text-brand" aria-hidden />
                       <Text variant="h4">{isCore ? 'Built in' : 'Install this Plugin'}</Text>
@@ -207,7 +208,8 @@ export function PluginDetail() {
                       </div>
                     )}
                   </Card>
-                </div>
+                  }
+                />
               </>
             );
           })()

@@ -26,6 +26,7 @@ import {
   XCircle,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { DetailLayout } from '@slideops/ui';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ServiceStatusBadge } from '../components/Badges';
@@ -266,11 +267,9 @@ export function ServiceDetail() {
             </div>
           ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            {/* One column of sections, separated by space and a hairline. These
-                are parts of one page about one Service, and a frame around each
-                said they were five separate things. */}
-            <div className="flex min-w-0 flex-col gap-8">
+          <DetailLayout
+            main={
+              <>
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
@@ -322,9 +321,10 @@ export function ServiceDetail() {
               <LogsAndActivity id={service.id} />
 
               <ServiceConfiguration service={service} onChanged={reload} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-6">
+              </>
+            }
+            rail={
+              <>
               <Card className="h-fit">
                 <Text variant="h4">Summary</Text>
                 <dl className="mt-2 divide-y divide-border">
@@ -485,8 +485,9 @@ export function ServiceDetail() {
                   </p>
                 ) : null}
               </Card>
-            </div>
-          </div>
+              </>
+            }
+          />
         </>
       ) : null}
     </OperatorShell>

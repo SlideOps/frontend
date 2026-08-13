@@ -125,7 +125,10 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
         <main
           className={cn('min-w-0 flex-1', dense ? 'p-4 md:p-6' : 'p-4 md:p-8', 'pb-24 md:pb-8')}
         >
-          {children}
+          {/* Content is capped and centered so a page reads at the width it was
+              designed for, rather than a list or a two-column detail layout
+              stretching to whatever a wide monitor happens to be. */}
+          <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
         </main>
       </div>
 
