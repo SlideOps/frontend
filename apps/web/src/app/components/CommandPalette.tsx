@@ -141,8 +141,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]"
-      style={{ backgroundColor: 'rgba(43, 28, 23, 0.55)' }}
+      className="fixed inset-0 z-50 flex items-start justify-center bg-overlay p-4 pt-[12vh]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           close();

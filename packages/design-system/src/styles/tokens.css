@@ -1,39 +1,49 @@
 /*
  * SlideOps design tokens.
  *
- * The Everlasting Beauty palette is the only source of color. Brand colors, a
- * derived warm neutral ramp, and functional status colors are declared once as
- * primitives, then mapped to semantic tokens for the light and the dark theme.
- * Components only ever reference the semantic tokens, never the raw values.
+ * A cool, neutral, dark-first palette is the only source of color. Brand
+ * colors, a derived neutral ramp, and functional status colors are declared
+ * once as primitives, then mapped to semantic tokens for the light and the
+ * dark theme. Components only ever reference the semantic tokens, never the
+ * raw values.
+ *
+ * Token *names* are stable across the previous warm palette on purpose: a few
+ * places (LogoLoader.tsx, marketing Hero.tsx) read primitives like
+ * --so-marsala directly for brand artwork, so repainting values here repaints
+ * them too, with nothing else to touch.
  */
 
 :root {
-  /* Brand palette (Everlasting Beauty) */
-  --so-rose-quartz: #fadcdc;
-  --so-peach: #e5bea0;
-  --so-cognac: #996350;
-  --so-marsala: #743930;
-  --so-ink: #2b1c17;
+  /* Brand palette */
+  --so-rose-quartz: #eef1ff;
+  --so-peach: #a5b4fc;
+  --so-cognac: #5c7cfa;
+  --so-marsala: #3b5bdb;
+  --so-ink: #10131a;
 
-  /* Warm neutral ramp, derived from the same hue family */
+  /* Cool neutral ramp */
   --so-neutral-0: #ffffff;
-  --so-neutral-50: #faf6f4;
-  --so-neutral-100: #f3ebe7;
-  --so-neutral-200: #e7dad4;
-  --so-neutral-300: #d4c2ba;
-  --so-neutral-400: #b09a90;
-  --so-neutral-500: #8a7369;
-  --so-neutral-600: #6b544b;
-  --so-neutral-700: #4d3a33;
-  --so-neutral-800: #33241f;
-  --so-neutral-900: #241713;
-  --so-neutral-950: #1a0f0c;
+  --so-neutral-50: #f7f8fa;
+  --so-neutral-100: #eef1f5;
+  --so-neutral-200: #dde2e8;
+  --so-neutral-300: #c2c9d3;
+  --so-neutral-400: #98a2b3;
+  --so-neutral-500: #70798c;
+  --so-neutral-600: #525b6e;
+  --so-neutral-700: #394152;
+  --so-neutral-800: #23293a;
+  --so-neutral-900: #161b28;
+  --so-neutral-950: #0c0f17;
 
-  /* Functional status colors, harmonized with the warm palette */
-  --so-success: #5b8c6e;
-  --so-warning: #c98a3c;
-  --so-danger: #c8402f;
-  --so-info: #3d7a8c;
+  /* Functional status colors */
+  --so-success: #2f9e5b;
+  --so-warning: #c98a2e;
+  --so-danger: #e5484d;
+  --so-info: #3b82c4;
+
+  /* A fixed dark scrim behind a modal, independent of theme: a backdrop
+     should not invert in light mode, so this is not a light/dark pair. */
+  --color-overlay: rgba(12, 15, 23, 0.6);
 
   /* Spacing on a 4px base scale */
   --so-space-1: 0.25rem;
@@ -52,10 +62,10 @@
   --so-radius-xl: 1.5rem;
   --so-radius-pill: 9999px;
 
-  /* Warm-tinted shadows, never pure black */
-  --so-shadow-sm: 0 1px 2px rgba(43, 28, 23, 0.08);
-  --so-shadow-md: 0 4px 16px rgba(43, 28, 23, 0.1);
-  --so-shadow-lg: 0 12px 40px rgba(43, 28, 23, 0.16);
+  /* Cool-tinted shadows, never pure black */
+  --so-shadow-sm: 0 1px 2px rgba(12, 15, 23, 0.08);
+  --so-shadow-md: 0 4px 16px rgba(12, 15, 23, 0.12);
+  --so-shadow-lg: 0 12px 40px rgba(12, 15, 23, 0.2);
 
   /* Motion tokens */
   --so-duration-fast: 120ms;
@@ -73,11 +83,11 @@
   --color-bg-surface: var(--so-neutral-0);
   --color-bg-raised: var(--so-neutral-0);
   --color-bg-subtle: var(--so-rose-quartz);
-  --color-text-primary: #2b1c17;
+  --color-text-primary: #10131a;
   --color-text-secondary: var(--so-neutral-600);
   --color-text-on-brand: #ffffff;
   --color-brand: var(--so-marsala);
-  --color-brand-hover: #632f27;
+  --color-brand-hover: #2f4bc0;
   --color-accent: var(--so-cognac);
   --color-highlight: var(--so-peach);
   --color-border: var(--so-neutral-200);
@@ -89,25 +99,25 @@
   color-scheme: light;
 }
 
-/* Dark theme, a first class theme designed alongside light */
+/* Dark theme, primary: designed first, light is the derived second theme */
 :root[data-theme='dark'] {
   --color-bg-app: var(--so-neutral-900);
   --color-bg-surface: var(--so-neutral-800);
   --color-bg-raised: var(--so-neutral-700);
-  --color-bg-subtle: #3a2620;
-  --color-text-primary: #f7ece8;
+  --color-bg-subtle: #1c2333;
+  --color-text-primary: #edeff5;
   --color-text-secondary: var(--so-neutral-300);
   --color-text-on-brand: #ffffff;
-  --color-brand: #a65648;
-  --color-brand-hover: #b7695b;
-  --color-accent: #c08a76;
-  --color-highlight: rgba(229, 190, 160, 0.5);
+  --color-brand: #7c93f5;
+  --color-brand-hover: #8fa3ff;
+  --color-accent: #a3b3e0;
+  --color-highlight: rgba(124, 147, 245, 0.18);
   --color-border: var(--so-neutral-700);
-  --color-focus-ring: var(--so-peach);
-  --color-success: #6fa384;
-  --color-warning: #d79f5c;
-  --color-danger: #e05a49;
-  --color-info: #5b98a9;
+  --color-focus-ring: #9db2ff;
+  --color-success: #4cb877;
+  --color-warning: #e0a857;
+  --color-danger: #f2555a;
+  --color-info: #5fa8de;
   color-scheme: dark;
 }
 
@@ -117,20 +127,20 @@
     --color-bg-app: var(--so-neutral-900);
     --color-bg-surface: var(--so-neutral-800);
     --color-bg-raised: var(--so-neutral-700);
-    --color-bg-subtle: #3a2620;
-    --color-text-primary: #f7ece8;
+    --color-bg-subtle: #1c2333;
+    --color-text-primary: #edeff5;
     --color-text-secondary: var(--so-neutral-300);
     --color-text-on-brand: #ffffff;
-    --color-brand: #a65648;
-    --color-brand-hover: #b7695b;
-    --color-accent: #c08a76;
-    --color-highlight: rgba(229, 190, 160, 0.5);
+    --color-brand: #7c93f5;
+    --color-brand-hover: #8fa3ff;
+    --color-accent: #a3b3e0;
+    --color-highlight: rgba(124, 147, 245, 0.18);
     --color-border: var(--so-neutral-700);
-    --color-focus-ring: var(--so-peach);
-    --color-success: #6fa384;
-    --color-warning: #d79f5c;
-    --color-danger: #e05a49;
-    --color-info: #5b98a9;
+    --color-focus-ring: #9db2ff;
+    --color-success: #4cb877;
+    --color-warning: #e0a857;
+    --color-danger: #f2555a;
+    --color-info: #5fa8de;
     color-scheme: dark;
   }
 }
