@@ -1,11 +1,12 @@
-import { Button, Text } from '@slideops/design-system';
-import { Plus, Terminal as TerminalIcon, X } from '@slideops/icons';
-import { useEffect, useRef, useState } from 'react';
+import { Button } from '@slideops/design-system';
+import { Plus } from '@slideops/icons';
+import { useRef, useState } from 'react';
+import { ShellTabPanel } from './ShellTabPanel';
 import { SnippetPicker } from './SnippetPicker';
-import { useShellSession } from './useShellSession';
+import { TabStrip } from './TabStrip';
 
 /*
- * Several independent shells on one page.
+ * Several independent shells on one page, all attached to the same target.
  *
  * The websocket protocol dials a fresh SSH session per connection with no
  * server-side session registry, so N tabs is simply N independent
@@ -66,39 +67,22 @@ export function ShellTabs({ urlFor, scopeLabel, scopeDetail, unavailableReason }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-1 border-b border-border pb-2">
-        {tabs.map((tab) => (
-          <span key={tab.id} className="inline-flex items-center">
-            <button
-              type="button"
-              onClick={() => setActiveId(tab.id)}
-              aria-pressed={tab.id === activeId}
-              className={`inline-flex items-center gap-1.5 rounded-t-md px-3 py-1.5 text-sm transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                tab.id === activeId
-                  ? 'bg-surface text-ink'
-                  : 'text-ink-muted hover:bg-subtle hover:text-ink'
-              }`}
-            >
-              <TerminalIcon width={14} height={14} aria-hidden />
-              {tab.label}
-            </button>
-            <button
-              type="button"
-              onClick={() => closeTab(tab.id)}
-              aria-label={`Close ${tab.label}`}
-              className="rounded-md p-1 text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <X width={13} height={13} aria-hidden />
-            </button>
-          </span>
-        ))}
-        <Button size="sm" variant="ghost" onClick={addTab} aria-label="Open another shell tab">
-          <Plus width={15} height={15} aria-hidden />
-        </Button>
-        <span className="ml-auto">
-          <SnippetPicker onPick={sendToActive} disabled={tabs.length === 0} />
-        </span>
-      </div>
+      <TabStrip
+        tabs={tabs}
+        activeId={activeId}
+        onSelect={setActiveId}
+        onClose={closeTab}
+        trailing={
+          <>
+            <Button size="sm" variant="ghost" onClick={addTab} aria-label="Open another shell tab">
+              <Plus width={15} height={15} aria-hidden />
+            </Button>
+            <span className="ml-auto">
+              <SnippetPicker onPick={sendToActive} disabled={tabs.length === 0} />
+            </span>
+          </>
+        }
+      />
 
       {tabs.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -121,68 +105,6 @@ export function ShellTabs({ urlFor, scopeLabel, scopeDetail, unavailableReason }
           />
         ))
       )}
-    </div>
-  );
-}
-
-/** One tab's session and its chrome. Kept mounted while inactive so its socket stays alive; only hidden. */
-function ShellTabPanel({
-  active,
-  urlFor,
-  scopeLabel,
-  scopeDetail,
-  unavailableReason,
-  onSessionReady,
-}: {
-  active: boolean;
-  onSessionReady: (send: (data: string) => void) => void;
-} & Omit<ShellTabsProps, 'unavailableReason'> & { unavailableReason?: string }) {
-  const { containerRef, status, error, attached, live, open, close, send } = useShellSession(urlFor);
-
-  useEffect(() => {
-    onSessionReady(send);
-    // onSessionReady is a fresh closure each render; send is the stable
-    // identity that actually decides when this needs to re-run.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [send]);
-
-  return (
-    <div className={`min-h-0 flex-1 flex-col gap-2 ${active ? 'flex' : 'hidden'}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <Text variant="caption" tone="secondary">
-          {unavailableReason ?? scopeDetail}
-        </Text>
-        <span className="ml-auto">
-          {live ? (
-            <Button size="sm" variant="ghost" onClick={close}>
-              Close
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={open}
-              disabled={Boolean(unavailableReason)}
-              title={unavailableReason}
-            >
-              {status === 'closed' ? 'Open again' : `Open a shell (${scopeLabel})`}
-            </Button>
-          )}
-        </span>
-      </div>
-
-      {error ? (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-
-      <div
-        ref={containerRef}
-        className={`min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-app ${
-          attached ? 'block' : 'hidden'
-        }`}
-      />
     </div>
   );
 }

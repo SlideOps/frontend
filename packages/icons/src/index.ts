@@ -97,4 +97,4 @@ export { Logo, type LogoProps } from './Logo';
 // Real technology brand marks (simple-icons, CC0-1.0), plus the
 // key/category lookup that picks one for a Capability.
 export * from './brands';
-export { capabilityIcon, type CapabilityIconInput } from './capability-icons';
+export { capabilityIcon, serviceIcon, type CapabilityIconInput } from './capability-icons';

@@ -1,12 +1,11 @@
 import { getAnalytics } from '@slideops/api-client';
-import { Card, Text, type ChartPalette } from '@slideops/design-system';
+import { Card, StatTile, Text, type ChartPalette } from '@slideops/design-system';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useCallback } from 'react';
 import { AdminShell } from '../components/AdminShell';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { LazyChart } from '../components/LazyChart';
-import { StatTile } from '../components/StatTile';
 import { useAsyncData } from '../hooks/useAsyncData';
 import {
   capabilityUsageOption,
@@ -49,20 +48,23 @@ export function Analytics() {
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <StatTile
+              bordered
               label="Success rate"
               value={`${Math.round((state.data.success_rate ?? 0) * 100)}%`}
-              guidanceKey="analytics.success"
+              adornment={<Guidance for="analytics.success" />}
               tone="success"
             />
             <StatTile
+              bordered
               label="Capabilities in use"
               value={state.data.capability_usage.length}
-              guidanceKey="analytics.capabilities"
+              adornment={<Guidance for="analytics.capabilities" />}
             />
             <StatTile
+              bordered
               label="Days charted"
               value={state.data.operations_over_time.length}
-              guidanceKey="analytics.over_time"
+              adornment={<Guidance for="analytics.over_time" />}
             />
           </div>
 

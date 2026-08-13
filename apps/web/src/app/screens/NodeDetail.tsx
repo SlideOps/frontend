@@ -19,7 +19,7 @@ import {
   Server,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { PageHeader } from '@slideops/ui';
+import { DetailLayout, PageHeader } from '@slideops/ui';
 import { RunningHere } from '../components/RunningHere';
 import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -212,42 +212,44 @@ export function NodeDetail() {
             }
           />
 
-          <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-            <div className="flex min-w-0 flex-col gap-8">
-              <Card className="h-fit">
-                <div className="mb-3 flex items-center gap-2">
-                  <Server width={18} height={18} className="text-brand" aria-hidden />
-                  <Text variant="h4">Connection</Text>
-                </div>
-                <dl className="divide-y divide-border">
-                  <SummaryRow label="Hostname" value={nodeResult.state.data.hostname} />
-                  <AddressRow label="Address" value={nodeResult.state.data.address} />
-                  <SummaryRow label="Port" value={String(nodeResult.state.data.port)} />
-                  <SummaryRow label="Username" value={nodeResult.state.data.ssh_username} />
-                  <SummaryRow
-                    label="Sign in"
-                    value={
-                      nodeResult.state.data.auth_kind === 'private_key' ? 'Private key' : 'Password'
-                    }
-                  />
-                  <SummaryRow
-                    label="System"
-                    value={
-                      nodeResult.state.data.distro
-                        ? `${nodeResult.state.data.distro}${nodeResult.state.data.distro_version ? ` ${nodeResult.state.data.distro_version}` : ''}`
-                        : 'Unknown until Discovery'
-                    }
-                  />
-                  <SummaryRow label="Status" value={nodeResult.state.data.status} />
-                </dl>
-              </Card>
+          <DetailLayout
+            rail={
+              <>
+                <Card className="h-fit">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Server width={18} height={18} className="text-brand" aria-hidden />
+                    <Text variant="h4">Connection</Text>
+                  </div>
+                  <dl className="divide-y divide-border">
+                    <SummaryRow label="Hostname" value={nodeResult.state.data.hostname} />
+                    <AddressRow label="Address" value={nodeResult.state.data.address} />
+                    <SummaryRow label="Port" value={String(nodeResult.state.data.port)} />
+                    <SummaryRow label="Username" value={nodeResult.state.data.ssh_username} />
+                    <SummaryRow
+                      label="Sign in"
+                      value={
+                        nodeResult.state.data.auth_kind === 'private_key' ? 'Private key' : 'Password'
+                      }
+                    />
+                    <SummaryRow
+                      label="System"
+                      value={
+                        nodeResult.state.data.distro
+                          ? `${nodeResult.state.data.distro}${nodeResult.state.data.distro_version ? ` ${nodeResult.state.data.distro_version}` : ''}`
+                          : 'Unknown until Discovery'
+                      }
+                    />
+                    <SummaryRow label="Status" value={nodeResult.state.data.status} />
+                  </dl>
+                </Card>
 
-              <NodeCapacity nodeId={id} />
+                <NodeCapacity nodeId={id} />
 
-              <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-8">
+                <ServerPosture node={nodeResult.state.data} facts={discovery?.facts} />
+              </>
+            }
+            main={
+              <>
               <SecureServer
                 nodeId={id}
                 onDiscover={runDiscovery}
@@ -320,8 +322,9 @@ export function NodeDetail() {
                   </div>
                 ) : null}
               </div>
-            </div>
-          </div>
+              </>
+            }
+          />
 
           <section id="server-settings" className="mt-10 scroll-mt-6">
             <div className="mb-4 flex items-center gap-2">

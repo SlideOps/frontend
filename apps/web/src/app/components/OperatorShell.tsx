@@ -16,6 +16,7 @@ import {
   Server,
   Shield,
   ShieldCheck,
+  Terminal as TerminalIcon,
   X,
 } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
@@ -32,6 +33,7 @@ export type ActiveKey =
   | 'nodes'
   | 'projects'
   | 'services'
+  | 'terminal'
   | 'capabilities'
   | 'marketplace'
   | 'automations'
@@ -137,6 +139,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Container,
       active: active === 'services',
       onSelect: () => navigate('/app/services'),
+    },
+    {
+      key: 'terminal',
+      group: 'Your infrastructure',
+      label: 'Terminal',
+      icon: TerminalIcon,
+      active: active === 'terminal',
+      onSelect: () => navigate('/app/terminal'),
     },
     {
       key: 'capabilities',

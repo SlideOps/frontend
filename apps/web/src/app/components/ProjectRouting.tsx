@@ -6,8 +6,8 @@ import {
   type Node,
   type Service,
 } from '@slideops/api-client';
-import { Button, Field, Text } from '@slideops/design-system';
-import { Check, Globe, Network, Trash2 } from '@slideops/icons';
+import { Button, Field, Section, Text } from '@slideops/design-system';
+import { Check, Network, Trash2 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -101,18 +101,11 @@ export function ProjectRouting({ projectId, domain }: { projectId: string; domai
   const allocations = ready ? portAllocations(ready.nodes, ready.services) : [];
 
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Globe width={20} height={20} className="text-brand" aria-hidden />
-        <Text variant="h3">Routing</Text>
-        <Guidance for="project.routing" />
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        Give this Project a domain so requests reach it by name, and see which host ports its
-        Services occupy on each server so it stays clear which Project a request reaches.
-      </Text>
-
-      <div className="flex flex-col gap-6 rounded-lg border border-border bg-surface p-5">
+    <Section
+      title="Routing"
+      description="Give this Project a domain so requests reach it by name, and see which host ports its Services occupy on each server so it stays clear which Project a request reaches."
+      adornment={<Guidance for="project.routing" />}
+    >
         <div>
           <div className="mb-3 flex items-center gap-2">
             <Text variant="body-sm" className="font-medium">
@@ -222,7 +215,6 @@ export function ProjectRouting({ projectId, domain }: { projectId: string; domai
             </Button>
           </div>
         ) : null}
-      </div>
-    </section>
+    </Section>
   );
 }

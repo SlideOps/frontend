@@ -17,15 +17,16 @@ import {
 import { Button, Card, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
-  Container,
   Play,
   RefreshCw,
   Server,
+  serviceIcon,
   Square,
   Trash2,
   XCircle,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { DetailLayout } from '@slideops/ui';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ServiceStatusBadge } from '../components/Badges';
@@ -209,6 +210,7 @@ export function ServiceDetail() {
   // An adopted workload was already running when SlideOps found it, so there is
   // nothing to rebuild it from and redeploying it is refused by the API.
   const isAdopted = service?.adopted === true;
+  const ServiceHeroIcon = serviceIcon(service?.source?.image);
 
   return (
     <OperatorShell active="services">
@@ -228,7 +230,7 @@ export function ServiceDetail() {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                <Container width={22} height={22} aria-hidden />
+                <ServiceHeroIcon width={22} height={22} aria-hidden />
               </span>
               <div className="min-w-0">
                 <Text variant="h1">{service.name}</Text>
@@ -265,11 +267,9 @@ export function ServiceDetail() {
             </div>
           ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            {/* One column of sections, separated by space and a hairline. These
-                are parts of one page about one Service, and a frame around each
-                said they were five separate things. */}
-            <div className="flex min-w-0 flex-col gap-8">
+          <DetailLayout
+            main={
+              <>
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
@@ -321,9 +321,10 @@ export function ServiceDetail() {
               <LogsAndActivity id={service.id} />
 
               <ServiceConfiguration service={service} onChanged={reload} />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-6">
+              </>
+            }
+            rail={
+              <>
               <Card className="h-fit">
                 <Text variant="h4">Summary</Text>
                 <dl className="mt-2 divide-y divide-border">
@@ -484,8 +485,9 @@ export function ServiceDetail() {
                   </p>
                 ) : null}
               </Card>
-            </div>
-          </div>
+              </>
+            }
+          />
         </>
       ) : null}
     </OperatorShell>

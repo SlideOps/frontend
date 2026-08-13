@@ -7,7 +7,7 @@ import {
   type GitHubRepo,
   type GitHubStatus,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { ArrowUpRight, GitBranch, Lock } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
@@ -64,17 +64,11 @@ export function ProjectGitHub() {
   };
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center gap-2">
-        <GitBranch width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">GitHub</Text>
-        <Guidance for="project.github" />
-      </div>
-
+    <Section title="GitHub" adornment={<Guidance for="project.github" />}>
       {state.status === 'loading' ? <Loading label="Reading the GitHub connection" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {actionError ? (
-        <p role="alert" className="mb-3 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {actionError}
         </p>
       ) : null}
@@ -185,6 +179,6 @@ export function ProjectGitHub() {
         onConfirm={runDisconnect}
         onCancel={() => setConfirmDisconnect(false)}
       />
-    </Card>
+    </Section>
   );
 }

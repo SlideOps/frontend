@@ -7,8 +7,8 @@ import {
   updatePlugin,
   type Plugin,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Check, ShieldCheck } from '@slideops/icons';
+import { Button, Card, Section, Text } from '@slideops/design-system';
+import { ArrowRight, Boxes, capabilityIcon, Check, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -53,11 +53,14 @@ function StackCard({
   onUninstall: () => void;
   onOpen: () => void;
 }) {
+  const Icon = plugin.provides?.[0]
+    ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+    : Boxes;
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <Boxes width={18} height={18} aria-hidden />
+          <Icon width={18} height={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <Text variant="h4">{plugin.name}</Text>
@@ -199,22 +202,15 @@ export function ProjectStack({ projectId }: { projectId: string }) {
   };
 
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Boxes width={20} height={20} className="text-brand" aria-hidden />
-        <Text variant="h3">Stack</Text>
-        <Guidance for="project.stack" />
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        The Plugins installed into this Project. Install only what this Project needs; each one
-        unlocks its Capabilities here and its Services can use them. The Core security bundle is on
-        every server and shows as built in.
-      </Text>
-
+    <Section
+      title="Stack"
+      description="The Plugins installed into this Project. Install only what this Project needs; each one unlocks its Capabilities here and its Services can use them. The Core security bundle is on every server and shows as built in."
+      adornment={<Guidance for="project.stack" />}
+    >
       {state.status === 'loading' ? <Loading label="Loading the Project stack" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {actionError ? (
-        <p role="alert" className="mb-4 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {actionError}
         </p>
       ) : null}
@@ -249,6 +245,6 @@ export function ProjectStack({ projectId }: { projectId: string }) {
         onConfirm={runUninstall}
         onCancel={() => setPendingUninstall(null)}
       />
-    </section>
+    </Section>
   );
 }

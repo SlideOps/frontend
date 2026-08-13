@@ -1,5 +1,5 @@
 import { getSavedDiscovery, listServices, type Facts, type Service } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
+import { Card, StatTile, Text } from '@slideops/design-system';
 import { Cpu, Gauge, HardDrive, MemoryStick } from '@slideops/icons';
 import { ErrorNote, Loading } from './Feedback';
 import { Meter } from './Meter';
@@ -51,20 +51,6 @@ function primaryDisk(facts: Facts): NonNullable<Facts['disks']>[number] | undefi
   );
 }
 
-function Stat({ icon: Icon, label, value }: { icon: typeof Cpu; label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center gap-2 text-ink-muted">
-        <Icon width={16} height={16} aria-hidden />
-        <Text variant="caption" tone="secondary">
-          {label}
-        </Text>
-      </div>
-      <p className="mt-1.5 truncate text-xl font-semibold text-ink">{value}</p>
-    </div>
-  );
-}
-
 function CapacityBody({ facts, services }: { facts: Facts; services: Service[] }) {
   const cores = facts.cpu?.cores;
   const totalMemKb = facts.memory?.total_kb;
@@ -78,12 +64,14 @@ function CapacityBody({ facts, services }: { facts: Facts; services: Service[] }
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Stat
+        <StatTile
+          bordered
           icon={Cpu}
           label="Cores"
           value={typeof cores === 'number' ? String(cores) : 'Not reported'}
         />
-        <Stat
+        <StatTile
+          bordered
           icon={MemoryStick}
           label="Memory"
           value={typeof totalMemKb === 'number' ? gbFromKb(totalMemKb) : 'Not reported'}

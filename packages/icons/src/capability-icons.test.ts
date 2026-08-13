@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Activity, Boxes, Layers, Shield } from './index';
+import { Activity, Boxes, Container, Layers, Shield } from './index';
 import {
   ApacheIcon,
   DockerIcon,
@@ -24,7 +24,7 @@ import {
   RustIcon,
   WireGuardIcon,
 } from './brands';
-import { capabilityIcon } from './capability-icons';
+import { capabilityIcon, serviceIcon } from './capability-icons';
 
 /*
  * Capability keys are "<verb>-<technology>" strings. capabilityIcon matches
@@ -83,5 +83,43 @@ describe('capabilityIcon', () => {
 
   it('falls back to Layers when neither a brand nor a known category matches', () => {
     expect(capabilityIcon({ key: 'do-something', category: 'unknown-category' })).toBe(Layers);
+  });
+});
+
+/*
+ * A Service is identified by its Docker image, not a Capability key, and the
+ * two vocabularies genuinely disagree: the official images are `postgres`,
+ * `mongo`, `node`, `httpd`, and `golang` -- not `postgresql`, `mongodb`,
+ * `nodejs`, `apache`, or `go`. Each case below pins one of those divergences
+ * specifically, since a reused capabilityIcon token table would silently
+ * miss every one of them.
+ */
+describe('serviceIcon', () => {
+  const imageCases: Array<[string, unknown]> = [
+    ['postgres:16-alpine', PostgreSQLIcon],
+    ['mongo:7', MongoDBIcon],
+    ['node:20-alpine', NodeJSIcon],
+    ['httpd:2.4', ApacheIcon],
+    ['golang:1.22', GoIcon],
+    ['bitnami/redis:7-alpine', RedisIcon],
+    ['mysql:8', MySQLIcon],
+    ['nginx:latest', NGINXIcon],
+    ['rabbitmq:3-management', RabbitMQIcon],
+  ];
+
+  it.each(imageCases)('resolves image %s to its brand mark', (image, expected) => {
+    expect(serviceIcon(image)).toBe(expected);
+  });
+
+  it('does not false-positive "go" inside "mongo" or "django"', () => {
+    expect(serviceIcon('mongo:7')).not.toBe(GoIcon);
+    expect(serviceIcon('django:5')).not.toBe(GoIcon);
+  });
+
+  it('falls back to the generic Container mark for an unrecognized or missing image', () => {
+    expect(serviceIcon('my-company/internal-app:latest')).toBe(Container);
+    expect(serviceIcon(undefined)).toBe(Container);
+    expect(serviceIcon(null)).toBe(Container);
+    expect(serviceIcon('')).toBe(Container);
   });
 });

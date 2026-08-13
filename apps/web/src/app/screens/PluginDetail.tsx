@@ -5,8 +5,9 @@ import {
   type Plugin,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ArrowRight, Boxes, Lock, ShieldCheck } from '@slideops/icons';
+import { ArrowLeft, ArrowRight, Boxes, capabilityIcon, Lock, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { DetailLayout } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -82,13 +83,16 @@ export function PluginDetail() {
             const { plugin, capabilities } = result.state.data;
             const isCore = Boolean(plugin.is_core);
             const byKey = new Map(capabilities.map((c) => [c.key, c]));
+            const PluginIcon = plugin.provides[0]
+              ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+              : Boxes;
 
             return (
               <>
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Boxes width={22} height={22} aria-hidden />
+                      <PluginIcon width={22} height={22} aria-hidden />
                     </span>
                     <div className="min-w-0">
                       <Text variant="h1">{plugin.name}</Text>
@@ -107,8 +111,8 @@ export function PluginDetail() {
                   ) : null}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-                  <div className="flex flex-col gap-6">
+                <DetailLayout
+                  main={
                     <Card className="flex flex-col gap-5">
                       <Section title="What it does" guidanceKey="marketplace.manifest">
                         <Text variant="body" tone="secondary">
@@ -161,9 +165,9 @@ export function PluginDetail() {
                         </Section>
                       ) : null}
                     </Card>
-                  </div>
-
-                  <Card className="h-fit flex-col gap-4">
+                  }
+                  rail={
+                    <Card className="h-fit flex-col gap-4">
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes width={18} height={18} className="text-brand" aria-hidden />
                       <Text variant="h4">{isCore ? 'Built in' : 'Install this Plugin'}</Text>
@@ -204,7 +208,8 @@ export function PluginDetail() {
                       </div>
                     )}
                   </Card>
-                </div>
+                  }
+                />
               </>
             );
           })()

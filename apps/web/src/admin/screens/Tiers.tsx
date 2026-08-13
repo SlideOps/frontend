@@ -247,7 +247,9 @@ function TierCard({ tier }: { tier: AdminTier }) {
       setError('Give every limit a whole number, or mark it Unlimited.');
       return;
     }
-    if (counts.some((value) => value < 0)) {
+    // -1 is the Unlimited sentinel countToWire produces when the checkbox is
+    // ticked, not a negative limit: only below it is actually out of range.
+    if (counts.some((value) => value < -1)) {
       setError('Limits cannot be negative. Mark a field Unlimited instead.');
       return;
     }

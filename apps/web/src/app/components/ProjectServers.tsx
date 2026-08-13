@@ -6,7 +6,7 @@ import {
   unassignNodeFromProject,
   type Node,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
+import { Button, Section, Text } from '@slideops/design-system';
 import { ArrowRight, Plus, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
@@ -92,27 +92,21 @@ export function ProjectServers({ projectId }: { projectId: string }) {
   };
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center gap-2">
-        <Server width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">Servers</Text>
-        <Guidance for="project.servers" />
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4">
-        A server is connected and secured at the server level first, then assigned to a Project. The
-        Project runs its stack and Services on the servers assigned here.
-      </Text>
-
+    <Section
+      title="Servers"
+      description="A server is connected and secured at the server level first, then assigned to a Project. The Project runs its stack and Services on the servers assigned here."
+      adornment={<Guidance for="project.servers" />}
+    >
       {state.status === 'loading' ? <Loading label="Loading the servers on this Project" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
         <>
           {state.data.assigned.length > 0 ? (
-            <ul className="mb-5 flex flex-col gap-2">
+            <ul className="rounded-md border border-border bg-surface px-3">
               {state.data.assigned.map((node) => (
                 <li
                   key={node.id}
-                  className="flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2.5"
+                  className="flex items-center gap-3 border-b border-border py-3 last:border-b-0"
                 >
                   <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
                     <Server width={16} height={16} aria-hidden />
@@ -140,7 +134,7 @@ export function ProjectServers({ projectId }: { projectId: string }) {
               ))}
             </ul>
           ) : (
-            <Text variant="body-sm" tone="secondary" className="mb-5">
+            <Text variant="body-sm" tone="secondary">
               No servers assigned yet. Assign one below so this Project has somewhere to run.
             </Text>
           )}
@@ -194,7 +188,7 @@ export function ProjectServers({ projectId }: { projectId: string }) {
           </div>
 
           {actionError ? (
-            <p role="alert" className="mt-3 text-sm text-danger">
+            <p role="alert" className="text-sm text-danger">
               {actionError}
             </p>
           ) : null}
@@ -216,6 +210,6 @@ export function ProjectServers({ projectId }: { projectId: string }) {
         onConfirm={runUnassign}
         onCancel={() => setPendingUnassign(null)}
       />
-    </Card>
+    </Section>
   );
 }

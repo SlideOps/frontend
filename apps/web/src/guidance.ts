@@ -158,6 +158,12 @@ export const guidance: GuidanceRegistry = {
     label: 'Save a command',
     summary: 'Typed into the terminal exactly as written. It is never run for you.',
   },
+  'terminal.overview': {
+    label: 'Terminal',
+    summary: 'Open a shell on any server or Service without visiting its own page first.',
+    detail:
+      'Each tab is its own independent SSH session, exactly like opening a shell from a Node or Service page directly -- this is a faster way to reach the same connection, not a different one. Closing a tab ends that session; the others keep running.',
+  },
   'node.authKind': {
     label: 'How to sign in',
     summary: 'Choose a private key or a password for the SSH connection. A key is stronger.',

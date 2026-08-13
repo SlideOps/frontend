@@ -73,7 +73,7 @@ export function ProjectDetail() {
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-8">
             <div className="grid gap-6 lg:grid-cols-2">
               <ProjectServers projectId={id} />
               <ProjectGitHub />

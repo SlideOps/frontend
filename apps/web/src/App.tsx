@@ -52,6 +52,9 @@ const ProjectDetail = lazy(() =>
 const Services = lazy(() =>
   import('./app/screens/Services').then((m) => ({ default: m.Services })),
 );
+const Terminal = lazy(() =>
+  import('./app/screens/Terminal').then((m) => ({ default: m.Terminal })),
+);
 const ServiceDeploy = lazy(() =>
   import('./app/screens/ServiceDeploy').then((m) => ({ default: m.ServiceDeploy })),
 );
@@ -183,6 +186,7 @@ export function App() {
           <Route path="services/new" element={<ServiceDeploy />} />
           <Route path="services/import" element={<ServiceImport />} />
           <Route path="services/:id" element={<ServiceDetail />} />
+          <Route path="terminal" element={<Terminal />} />
           <Route path="capabilities" element={<Capabilities />} />
           <Route path="capabilities/matrix" element={<CapabilityMatrix />} />
           <Route path="capabilities/:key" element={<CapabilityDetail />} />
