@@ -87,6 +87,14 @@ export {
   type ImportSSHKeyInput,
 } from './sshkeys';
 export {
+  listSnippets,
+  createSnippet,
+  updateSnippet,
+  deleteSnippet,
+  type Snippet,
+  type SaveSnippetInput,
+} from './snippets';
+export {
   listCapabilities,
   getCapability,
   getMatrix,

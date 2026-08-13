@@ -148,6 +148,16 @@ export const guidance: GuidanceRegistry = {
     label: 'Save a key',
     summary: 'The key is sealed the moment it arrives and is never shown again.',
   },
+  'snippets.overview': {
+    label: 'Snippets',
+    summary: 'Commands saved once and picked from any open terminal, instead of retyped.',
+    detail:
+      'A snippet has no relationship to any particular Node or Service, so the same saved command works from any terminal you open. Picking one types it into the active tab; it is never run for you.',
+  },
+  'snippets.save': {
+    label: 'Save a command',
+    summary: 'Typed into the terminal exactly as written. It is never run for you.',
+  },
   'node.authKind': {
     label: 'How to sign in',
     summary: 'Choose a private key or a password for the SSH connection. A key is stronger.',

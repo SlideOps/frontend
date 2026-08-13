@@ -40,6 +40,9 @@ const NodeDetail = lazy(() =>
 const SSHKeys = lazy(() =>
   import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
 );
+const Snippets = lazy(() =>
+  import('./app/screens/Snippets').then((m) => ({ default: m.Snippets })),
+);
 const Projects = lazy(() =>
   import('./app/screens/Projects').then((m) => ({ default: m.Projects })),
 );
@@ -172,6 +175,7 @@ export function App() {
           <Route path="nodes" element={<Nodes />} />
           <Route path="nodes/new" element={<NodeRegister />} />
           <Route path="ssh-keys" element={<SSHKeys />} />
+          <Route path="snippets" element={<Snippets />} />
           <Route path="nodes/:id" element={<NodeDetail />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDetail />} />

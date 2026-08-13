@@ -10,6 +10,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Layers,
+  ListChecks,
   Package,
   Search,
   Server,
@@ -35,6 +36,7 @@ export type ActiveKey =
   | 'marketplace'
   | 'automations'
   | 'sshKeys'
+  | 'snippets'
   | 'operations'
   | 'credentials'
   | 'reports'
@@ -167,6 +169,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Fingerprint,
       active: active === 'sshKeys',
       onSelect: () => navigate('/app/ssh-keys'),
+    },
+    {
+      key: 'snippets',
+      group: 'Set things up',
+      label: 'Snippets',
+      icon: ListChecks,
+      active: active === 'snippets',
+      onSelect: () => navigate('/app/snippets'),
     },
     {
       key: 'operations',
