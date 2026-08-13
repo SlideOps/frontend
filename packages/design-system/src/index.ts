@@ -18,3 +18,4 @@ export { Card, type CardProps } from './primitives/Card';
 export { Section, type SectionProps } from './primitives/Section';
 export { Field, type FieldProps } from './primitives/Field';
 export { Text, type TextProps, type TextVariant, type TextTone } from './primitives/Text';
+export { StatTile, type StatTileProps, type StatTileTone } from './primitives/StatTile';

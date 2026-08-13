@@ -8,7 +8,7 @@ import {
   type Operation,
   type Project,
 } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
+import { Button, StatTile, Text } from '@slideops/design-system';
 import { ArrowRight, capabilityIcon, CheckCircle2, Plus, Server, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
@@ -35,38 +35,6 @@ async function loadWorkspace(signal: AbortSignal): Promise<WorkspaceData> {
     listCapabilities({}, signal),
   ]);
   return { projects, nodes, operations, capabilities };
-}
-
-/*
- * One figure in the headline strip.
- *
- * These were four bordered, shadowed cards in a grid, which gave four numbers the
- * visual weight of four documents and pushed everything else below the fold. They
- * are one strip now, divided by hairlines: the numbers are still the first thing
- * read, and they take a quarter of the height.
- */
-function Stat({
-  label,
-  value,
-  guidanceKey,
-}: {
-  label: string;
-  value: number;
-  guidanceKey: string;
-}) {
-  return (
-    <div className="flex-1 px-5 py-4 first:pl-0">
-      <div className="flex items-center gap-1.5">
-        <Text variant="caption" tone="secondary">
-          {label}
-        </Text>
-        <Guidance for={guidanceKey} size={14} />
-      </div>
-      <Text variant="h2" className="mt-1 block tabular-nums">
-        {String(value)}
-      </Text>
-    </div>
-  );
 }
 
 function HealthCard({ operations }: { operations: Operation[] }) {
@@ -127,16 +95,21 @@ export function Workspace() {
           {/* One strip, divided by hairlines, rather than four framed boxes for
               four numbers. */}
           <div className="flex flex-col divide-y divide-border border-b border-border sm:flex-row sm:divide-x sm:divide-y-0">
-            <Stat
+            <StatTile
+              className="first:pl-0"
               label="Projects"
               value={state.data.projects.length}
-              guidanceKey="dashboard.projects"
+              adornment={<Guidance for="dashboard.projects" size={14} />}
             />
-            <Stat label="Nodes" value={state.data.nodes.length} guidanceKey="dashboard.nodes" />
-            <Stat
+            <StatTile
+              label="Nodes"
+              value={state.data.nodes.length}
+              adornment={<Guidance for="dashboard.nodes" size={14} />}
+            />
+            <StatTile
               label="Operations"
               value={state.data.operations.length}
-              guidanceKey="dashboard.operations"
+              adornment={<Guidance for="dashboard.operations" size={14} />}
             />
             <HealthCard operations={state.data.operations} />
           </div>

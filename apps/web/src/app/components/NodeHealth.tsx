@@ -1,5 +1,5 @@
 import { getNodeMetrics, type NodeMetricSample } from '@slideops/api-client';
-import { Button, Card, Text, type ChartPalette } from '@slideops/design-system';
+import { Button, Card, StatTile, Text, type ChartPalette } from '@slideops/design-system';
 import { Cpu, HardDrive, HeartPulse, MemoryStick } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useCallback } from 'react';
@@ -31,41 +31,21 @@ function uptime(sample: NodeMetricSample): string {
   return '-';
 }
 
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  percent,
-}: {
-  icon: typeof Cpu;
-  label: string;
-  value: string;
-  percent?: number;
-}) {
+/** The mini progress bar under a Metric tile, when it has a percent to show. */
+function PercentBar({ percent, label }: { percent: number; label: string }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center gap-2 text-ink-muted">
-        <Icon width={16} height={16} aria-hidden />
-        <Text variant="caption" tone="secondary">
-          {label}
-        </Text>
-      </div>
-      <p className="mt-1.5 text-xl font-semibold text-ink">{value}</p>
-      {typeof percent === 'number' ? (
-        <div
-          className="mt-2 h-1.5 w-full overflow-hidden rounded-pill bg-subtle"
-          role="progressbar"
-          aria-valuenow={Math.round(percent)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={label}
-        >
-          <div
-            className={`h-full rounded-pill ${percent >= 90 ? 'bg-danger' : percent >= 75 ? 'bg-warning' : 'bg-success'}`}
-            style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-          />
-        </div>
-      ) : null}
+    <div
+      className="h-1.5 w-full overflow-hidden rounded-pill bg-subtle"
+      role="progressbar"
+      aria-valuenow={Math.round(percent)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+    >
+      <div
+        className={`h-full rounded-pill ${percent >= 90 ? 'bg-danger' : percent >= 75 ? 'bg-warning' : 'bg-success'}`}
+        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+      />
     </div>
   );
 }
@@ -100,7 +80,8 @@ export function NodeHealth({ nodeId }: { nodeId: string }) {
         state.data.monitoring_enabled ? (
           <div className="flex flex-col gap-5">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Metric
+              <StatTile
+                bordered
                 icon={Cpu}
                 label="CPU load"
                 value={
@@ -109,19 +90,29 @@ export function NodeHealth({ nodeId }: { nodeId: string }) {
                     : '-'
                 }
               />
-              <Metric
+              <StatTile
+                bordered
                 icon={MemoryStick}
                 label="Memory"
                 value={pct(state.data.current.memory_used_percent)}
-                percent={state.data.current.memory_used_percent}
+                footer={
+                  typeof state.data.current.memory_used_percent === 'number' ? (
+                    <PercentBar percent={state.data.current.memory_used_percent} label="Memory" />
+                  ) : null
+                }
               />
-              <Metric
+              <StatTile
+                bordered
                 icon={HardDrive}
                 label="Root disk"
                 value={pct(state.data.current.disk_used_percent)}
-                percent={state.data.current.disk_used_percent}
+                footer={
+                  typeof state.data.current.disk_used_percent === 'number' ? (
+                    <PercentBar percent={state.data.current.disk_used_percent} label="Root disk" />
+                  ) : null
+                }
               />
-              <Metric icon={HeartPulse} label="Uptime" value={uptime(state.data.current)} />
+              <StatTile bordered icon={HeartPulse} label="Uptime" value={uptime(state.data.current)} />
             </div>
 
             {typeof state.data.current.service_count === 'number' ? (
