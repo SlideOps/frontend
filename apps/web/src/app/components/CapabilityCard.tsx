@@ -1,6 +1,6 @@
 import type { Capability } from '@slideops/api-client';
 import { Text } from '@slideops/design-system';
-import { Layers } from '@slideops/icons';
+import { capabilityIcon } from '@slideops/icons';
 import type { ReactNode } from 'react';
 import { PluginSourceBadge, RiskBadge } from './Badges';
 
@@ -34,10 +34,11 @@ export function CapabilityCard({
   /** True when this Capability's outcome is already in place where it is shown. */
   inPlace?: boolean;
 }) {
+  const Icon = capabilityIcon(capability);
   return (
     <div className="flex items-start gap-3 border-b border-border px-1 py-3.5 last:border-b-0">
       <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-        <Layers width={15} height={15} aria-hidden />
+        <Icon width={15} height={15} aria-hidden />
       </span>
 
       <div className="min-w-0 flex-1">
