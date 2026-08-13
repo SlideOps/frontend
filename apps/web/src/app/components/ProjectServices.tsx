@@ -1,6 +1,6 @@
 import { listServices, type Service } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
-import { ChevronRight, Container, Plus, serviceIcon } from '@slideops/icons';
+import { Button, Section, Text } from '@slideops/design-system';
+import { ChevronRight, Plus, serviceIcon } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useNavigate } from 'react-router-dom';
 import { ServiceStatusBadge } from './Badges';
@@ -20,22 +20,17 @@ export function ProjectServices({ projectId }: { projectId: string }) {
   );
 
   return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Container width={20} height={20} className="text-brand" aria-hidden />
-          <Text variant="h3">Services</Text>
-          <Guidance for="project.services" />
-        </div>
+    <Section
+      title="Services"
+      description="The Services running in this Project, each on one of its servers under hard resource limits."
+      adornment={<Guidance for="project.services" />}
+      action={
         <Button size="sm" onClick={() => navigate(`/app/services/new?project=${projectId}`)}>
           <Plus width={15} height={15} aria-hidden />
           Deploy a Service
         </Button>
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        The Services running in this Project, each on one of its servers under hard resource limits.
-      </Text>
-
+      }
+    >
       {state.status === 'loading' ? <Loading label="Loading this Project's Services" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
@@ -46,7 +41,7 @@ export function ProjectServices({ projectId }: { projectId: string }) {
             </Text>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="rounded-md border border-border bg-surface px-4">
             {state.data.map((service) => {
               const Icon = serviceIcon(service.source.image);
               return (
@@ -54,7 +49,7 @@ export function ProjectServices({ projectId }: { projectId: string }) {
                 key={service.id}
                 type="button"
                 onClick={() => navigate(`/app/services/${service.id}`)}
-                className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="flex w-full items-center gap-4 border-b border-border py-3 text-left transition-colors duration-fast ease-standard last:border-b-0 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
                   <Icon width={18} height={18} aria-hidden />
@@ -83,6 +78,6 @@ export function ProjectServices({ projectId }: { projectId: string }) {
           </div>
         )
       ) : null}
-    </section>
+    </Section>
   );
 }

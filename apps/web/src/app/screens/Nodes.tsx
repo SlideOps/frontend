@@ -125,7 +125,7 @@ export function Nodes() {
             }
           />
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-8">
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 sm:max-w-xs">
                 <Search

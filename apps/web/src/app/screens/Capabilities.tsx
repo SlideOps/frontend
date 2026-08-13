@@ -84,7 +84,7 @@ export function Capabilities() {
             description="Try a different outcome, or clear the search to see everything available."
           />
         ) : (
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-8">
             {groupByCategory(catalog.state.data).map(([category, capabilities]) => (
               <section key={category}>
                 <div className="mb-4 flex items-center gap-2">
