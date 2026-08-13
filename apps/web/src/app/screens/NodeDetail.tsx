@@ -45,6 +45,7 @@ import { OperatorShell } from '../components/OperatorShell';
 import { RevealValue } from '../components/RevealValue';
 import { SecureServer, ServerPosture } from '../components/SecureServer';
 import { ServerUsers } from '../components/ServerUsers';
+import { TagsEditor } from '../components/TagsEditor';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -333,6 +334,7 @@ export function NodeDetail() {
                 onRotated={() => nodeResult.reload()}
               />
               <ServerUsers nodeId={id} node={nodeResult.state.data} />
+              <TagsEditor node={nodeResult.state.data} onSaved={() => nodeResult.reload()} />
             </div>
           </section>
         </>

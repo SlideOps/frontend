@@ -126,6 +126,28 @@ export const guidance: GuidanceRegistry = {
     label: 'Project',
     summary: 'Optionally place this Node in a Project to keep related Nodes together.',
   },
+  'node.tags': {
+    label: 'Tags',
+    summary: 'Free-form labels for search and grouping, such as production or eu-west.',
+    detail:
+      'Tags are yours to define. The Nodes list can search by them and group by the first one on each Node, so a naming scheme like environment first (production, staging) makes the list easiest to scan.',
+  },
+  'node.credentialSource': {
+    label: 'Credential',
+    summary: 'Paste a new credential, or pick a key already saved in your library.',
+    detail:
+      'A saved key is imported once and reused across Nodes without pasting it again. Pasting a private key here also offers to save it to the library at the same time, so the next Node can pick it instead of pasting it too.',
+  },
+  'sshKeys.overview': {
+    label: 'SSH Keys',
+    summary: 'A library of keys saved once and reused across Nodes, instead of pasting one each time.',
+    detail:
+      'Removing a key from this library only removes its name here. The sealed key material a Node already uses is untouched and the Node keeps connecting exactly as before.',
+  },
+  'sshKeys.import': {
+    label: 'Save a key',
+    summary: 'The key is sealed the moment it arrives and is never shown again.',
+  },
   'node.authKind': {
     label: 'How to sign in',
     summary: 'Choose a private key or a password for the SSH connection. A key is stronger.',

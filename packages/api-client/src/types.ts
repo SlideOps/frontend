@@ -61,6 +61,10 @@ export interface Node {
   port: number;
   ssh_username: string;
   auth_kind: NodeAuthKind;
+  /** Which saved SSH key this Node's credential came from, for display only.
+   *  Null when the credential was pasted directly rather than drawn from the
+   *  library. */
+  ssh_key_id: string | null;
   project_id: string | null;
   os: string | null;
   distro: string | null;

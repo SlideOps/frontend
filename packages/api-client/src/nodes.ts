@@ -17,7 +17,11 @@ export interface CreateNodeInput {
   port: number;
   ssh_username: string;
   project_id?: string;
-  auth: NodeAuth;
+  /** Either an inline credential, or the id of a key already in the SSH key
+   *  library. Exactly one path is used; a saved key skips `auth` entirely. */
+  auth?: NodeAuth;
+  ssh_key_id?: string;
+  tags?: string[];
 }
 
 /**
@@ -47,8 +51,11 @@ export interface ServerUser {
  */
 export interface RotateCredentialInput {
   username?: string;
-  auth_kind: NodeAuthKind;
-  secret: string;
+  /** Either an inline credential, or the id of a key already in the SSH key
+   *  library. Exactly one path is used. */
+  auth_kind?: NodeAuthKind;
+  secret?: string;
+  ssh_key_id?: string;
 }
 
 /** List the Operator's Nodes. */
@@ -111,6 +118,18 @@ export function rotateNodeCredential(id: string, input: RotateCredentialInput): 
   return apiRequest<{ node: Node }>(`/nodes/${id}/credential`, {
     method: 'POST',
     body: input,
+  }).then((r) => r.node);
+}
+
+/**
+ * Replace a Node's tags outright. Sends the whole set: this is a replace, not
+ * a merge, so a caller that only wants to add one tag must include the ones
+ * already there.
+ */
+export function setNodeTags(id: string, tags: string[]): Promise<Node> {
+  return apiRequest<{ node: Node }>(`/nodes/${id}/tags`, {
+    method: 'PATCH',
+    body: { tags },
   }).then((r) => r.node);
 }
 

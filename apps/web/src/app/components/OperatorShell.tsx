@@ -5,6 +5,7 @@ import {
   Container,
   CreditCard,
   FileText,
+  Fingerprint,
   FolderKanban,
   KeyRound,
   LayoutDashboard,
@@ -33,6 +34,7 @@ export type ActiveKey =
   | 'capabilities'
   | 'marketplace'
   | 'automations'
+  | 'sshKeys'
   | 'operations'
   | 'credentials'
   | 'reports'
@@ -157,6 +159,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Clock,
       active: active === 'automations',
       onSelect: () => navigate('/app/automations'),
+    },
+    {
+      key: 'sshKeys',
+      group: 'Set things up',
+      label: 'SSH Keys',
+      icon: Fingerprint,
+      active: active === 'sshKeys',
+      onSelect: () => navigate('/app/ssh-keys'),
     },
     {
       key: 'operations',

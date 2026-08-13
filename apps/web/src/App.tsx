@@ -37,6 +37,9 @@ const NodeRegister = lazy(() =>
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
 );
+const SSHKeys = lazy(() =>
+  import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
+);
 const Projects = lazy(() =>
   import('./app/screens/Projects').then((m) => ({ default: m.Projects })),
 );
@@ -168,6 +171,7 @@ export function App() {
           <Route index element={<Workspace />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="nodes/new" element={<NodeRegister />} />
+          <Route path="ssh-keys" element={<SSHKeys />} />
           <Route path="nodes/:id" element={<NodeDetail />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDetail />} />

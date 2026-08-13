@@ -67,6 +67,7 @@ export {
   discoverNode,
   getSavedDiscovery,
   rotateNodeCredential,
+  setNodeTags,
   listNodeUsers,
   revealNodeCredential,
   type NodeAuth,
@@ -76,6 +77,15 @@ export {
   type RotateCredentialInput,
   type NodeCredential,
 } from './nodes';
+export {
+  listSSHKeys,
+  importSSHKey,
+  renameSSHKey,
+  deleteSSHKey,
+  sshKeyUsage,
+  type SSHKey,
+  type ImportSSHKeyInput,
+} from './sshkeys';
 export {
   listCapabilities,
   getCapability,
