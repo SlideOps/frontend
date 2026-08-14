@@ -119,9 +119,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function render() {
+function render(initialEntries: string[] = ['/app/terminal']) {
   return renderInApp(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <Terminal />
     </MemoryRouter>,
   );
@@ -175,5 +175,43 @@ describe('Terminal', () => {
     await waitFor(() => expect(FakeSocket.all).toHaveLength(2));
 
     expect(FakeSocket.all[1]!.url).toMatch(/^ws:\/\/test\/services\/s1\?/);
+  });
+
+  it('expands and comes back, and says which state it is in', async () => {
+    render();
+    const expand = screen.getByRole('button', { name: /fill the window/i });
+    expect(expand).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(expand);
+    const shrink = await screen.findByRole('button', { name: /leave full screen/i });
+    expect(shrink).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(shrink);
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+  });
+
+  it('leaves the expanded view on Escape', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /fill the window/i }));
+    await screen.findByRole('button', { name: /leave full screen/i });
+
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+  });
+
+  it('offers a new tab that opens already expanded, and hides that link once expanded', async () => {
+    render();
+    const link = screen.getByRole('link', { name: /new tab, full screen/i });
+    expect(link).toHaveAttribute('href', '/app/terminal?expanded=1');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+
+    await userEvent.click(screen.getByRole('button', { name: /fill the window/i }));
+    expect(screen.queryByRole('link', { name: /new tab, full screen/i })).not.toBeInTheDocument();
+  });
+
+  it('starts expanded when opened with ?expanded=1, as the new-tab link does', async () => {
+    render(['/app/terminal?expanded=1']);
+    expect(await screen.findByRole('button', { name: /leave full screen/i })).toBeInTheDocument();
   });
 });

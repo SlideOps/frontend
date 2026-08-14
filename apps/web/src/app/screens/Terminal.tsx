@@ -1,7 +1,9 @@
 import { nodeShellUrl, serviceShellUrl } from '@slideops/api-client';
-import { Terminal as TerminalIcon } from '@slideops/icons';
+import { Button, Text } from '@slideops/design-system';
+import { ArrowUpRight, Maximize2, Minimize2, Terminal as TerminalIcon } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ShellTabPanel } from '../components/shell/ShellTabPanel';
 import { SnippetPicker } from '../components/shell/SnippetPicker';
 import { TabStrip } from '../components/shell/TabStrip';
@@ -15,6 +17,11 @@ import { OperatorShell } from '../components/OperatorShell';
  * dials the same shell websocket a Node's or Service's own page already
  * offers -- this is a different front door onto the same connections, not a
  * new protocol.
+ *
+ * Expanding fills the browser window the same way a single embedded
+ * ShellTerminal does. "Open in a new tab" is the same page again with
+ * ?expanded=1, since there is no one Node or Service to hand a standalone
+ * route to here -- the point of this page is picking between many.
  */
 
 interface OpenTab {
@@ -58,6 +65,24 @@ export function Terminal() {
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   const sendersRef = useRef<Record<string, (data: string) => void>>({});
+  const [searchParams] = useSearchParams();
+  // A new tab opened via "Open in a new tab" starts expanded, so it reads as
+  // the fullscreen view it was asked for rather than the ordinary page.
+  const [expanded, setExpanded] = useState(() => searchParams.get('expanded') === '1');
+
+  // Escape leaves the expanded view, matching the single embedded terminal.
+  useEffect(() => {
+    if (!expanded) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
 
   const openTarget = (target: PickedTarget) => {
     const tab = tabFor(target);
@@ -82,6 +107,90 @@ export function Terminal() {
     sendersRef.current[activeId]?.(command);
   };
 
+  const body = (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <TabStrip
+        tabs={tabs}
+        activeId={activeId}
+        onSelect={setActiveId}
+        onClose={closeTab}
+        trailing={
+          <>
+            <TargetPicker onPick={openTarget} />
+            <span className="ml-auto flex items-center gap-1">
+              {tabs.length > 0 ? <SnippetPicker onPick={sendToActive} disabled={tabs.length === 0} /> : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setExpanded((was) => !was)}
+                title={expanded ? 'Leave full screen (Esc)' : 'Fill the window'}
+                aria-label={expanded ? 'Leave full screen' : 'Fill the window'}
+                aria-pressed={expanded}
+              >
+                {expanded ? (
+                  <Minimize2 width={15} height={15} aria-hidden />
+                ) : (
+                  <Maximize2 width={15} height={15} aria-hidden />
+                )}
+              </Button>
+              {expanded ? null : (
+                <a
+                  href="/app/terminal?expanded=1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open in a new tab, full screen"
+                  aria-label="Open in a new tab, full screen"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <ArrowUpRight width={15} height={15} aria-hidden />
+                </a>
+              )}
+            </span>
+          </>
+        }
+      />
+
+      {tabs.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+          <TerminalIcon width={28} height={28} className="text-ink-muted" aria-hidden />
+          <p className="text-sm text-ink-muted">Pick a server or Service above to open a shell on it.</p>
+        </div>
+      ) : (
+        tabs.map((tab) => (
+          <ShellTabPanel
+            key={tab.id}
+            active={tab.id === activeId}
+            urlFor={tab.urlFor}
+            scopeLabel={tab.scopeLabel}
+            scopeDetail={tab.scopeDetail}
+            unavailableReason={tab.unavailableReason}
+            onSessionReady={(send) => {
+              sendersRef.current[tab.id] = send;
+            }}
+          />
+        ))
+      )}
+    </div>
+  );
+
+  if (expanded) {
+    return (
+      <OperatorShell active="terminal">
+        {/* Fixed rather than a modal: filling the window is the entire point,
+            and there is nothing to dismiss by clicking away. */}
+        <div className="fixed inset-0 z-50 flex flex-col gap-3 bg-app p-4">
+          <div className="flex items-center gap-2">
+            <TerminalIcon width={16} height={16} className="text-brand" aria-hidden />
+            <Text variant="body-sm" className="font-medium">
+              Terminal
+            </Text>
+          </div>
+          {body}
+        </div>
+      </OperatorShell>
+    );
+  }
+
   return (
     <OperatorShell active="terminal">
       <PageHeader
@@ -89,48 +198,7 @@ export function Terminal() {
         description="Open a shell on any server or Service, from anywhere in your Workspace."
         guidanceKey="terminal.overview"
       />
-
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
-        <TabStrip
-          tabs={tabs}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onClose={closeTab}
-          trailing={
-            <>
-              <TargetPicker onPick={openTarget} />
-              {tabs.length > 0 ? (
-                <span className="ml-auto">
-                  <SnippetPicker onPick={sendToActive} disabled={tabs.length === 0} />
-                </span>
-              ) : null}
-            </>
-          }
-        />
-
-        {tabs.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
-            <TerminalIcon width={28} height={28} className="text-ink-muted" aria-hidden />
-            <p className="text-sm text-ink-muted">
-              Pick a server or Service above to open a shell on it.
-            </p>
-          </div>
-        ) : (
-          tabs.map((tab) => (
-            <ShellTabPanel
-              key={tab.id}
-              active={tab.id === activeId}
-              urlFor={tab.urlFor}
-              scopeLabel={tab.scopeLabel}
-              scopeDetail={tab.scopeDetail}
-              unavailableReason={tab.unavailableReason}
-              onSessionReady={(send) => {
-                sendersRef.current[tab.id] = send;
-              }}
-            />
-          ))
-        )}
-      </div>
+      {body}
     </OperatorShell>
   );
 }
