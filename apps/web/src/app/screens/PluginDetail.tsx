@@ -83,7 +83,7 @@ export function PluginDetail() {
             const { plugin, capabilities } = result.state.data;
             const isCore = Boolean(plugin.is_core);
             const byKey = new Map(capabilities.map((c) => [c.key, c]));
-            const PluginIcon = plugin.provides[0]
+            const PluginIcon = plugin.provides?.[0]
               ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
               : Boxes;
 
