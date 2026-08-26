@@ -4,6 +4,7 @@ import { ArrowLeft, Trash2 } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -24,6 +25,7 @@ import { useAsyncData } from '../hooks/useAsyncData';
 export function ProjectDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => getProject(id, signal), [id]);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -60,10 +62,12 @@ export function ProjectDetail() {
             }
             guidanceKey="project.overview"
             actions={
-              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                <Trash2 width={16} height={16} aria-hidden />
-                Delete Project
-              </Button>
+              canWrite ? (
+                <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 width={16} height={16} aria-hidden />
+                  Delete Project
+                </Button>
+              ) : undefined
             }
           />
 

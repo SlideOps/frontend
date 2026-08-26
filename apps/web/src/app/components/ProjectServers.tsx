@@ -11,6 +11,7 @@ import { ArrowRight, Plus, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNote, Loading } from './Feedback';
@@ -46,6 +47,7 @@ const selectClass =
  */
 export function ProjectServers({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state, reload } = useAsyncData((signal) => loadServers(projectId, signal), [projectId]);
 
   const [selected, setSelected] = useState('');
@@ -127,9 +129,11 @@ export function ProjectServers({ projectId }: { projectId: string }) {
                     Open server
                     <ArrowRight width={15} height={15} aria-hidden />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setPendingUnassign(node)}>
-                    Unassign
-                  </Button>
+                  {canWrite ? (
+                    <Button variant="ghost" size="sm" onClick={() => setPendingUnassign(node)}>
+                      Unassign
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -146,7 +150,11 @@ export function ProjectServers({ projectId }: { projectId: string }) {
               </Text>
               <Guidance for="project.assign" />
             </div>
-            {state.data.assignable.length > 0 ? (
+            {!canWrite ? (
+              <Text variant="body-sm" tone="secondary">
+                Assigning a server needs a role above Viewer in this workspace.
+              </Text>
+            ) : state.data.assignable.length > 0 ? (
               <div className="flex flex-col gap-2">
                 <Text variant="caption" tone="secondary">
                   A server belongs to one Project at a time, so assigning one that is already in

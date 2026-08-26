@@ -61,6 +61,7 @@ export function CredentialRotation({
   node: Node;
   onRotated: (updated: Node) => void;
 }) {
+  const canWrite = useCanWrite();
   const [pending, setPending] = useState<RotateCredentialInput | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -124,6 +125,20 @@ export function CredentialRotation({
       }
     }
   };
+
+  if (!canWrite) {
+    return (
+      <Card>
+        <div className="mb-3 flex items-center gap-2">
+          <KeyRound width={18} height={18} className="text-brand" aria-hidden />
+          <Text variant="h4">Change connection credential</Text>
+        </div>
+        <Text variant="body-sm" tone="secondary">
+          Changing the connection credential needs a role above Viewer in this workspace.
+        </Text>
+      </Card>
+    );
+  }
 
   return (
     <Card>

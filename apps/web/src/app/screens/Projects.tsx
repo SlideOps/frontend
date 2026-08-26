@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -166,6 +167,7 @@ function CreateProjectForm({
 /** The Projects list: the second level of the model, each Project a stack on one or more servers. */
 export function Projects() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [creating, setCreating] = useState(false);
   const { state, reload } = useAsyncData((signal) => listProjects(signal), []);
 
@@ -181,10 +183,12 @@ export function Projects() {
         description="A Project groups a stack on one or more of your servers. Assign the servers it runs on, install the Plugins it needs, connect a repository, and deploy its Services."
         guidanceKey="dashboard.projects"
         actions={
-          <Button onClick={() => setCreating((open) => !open)}>
-            <Plus width={16} height={16} aria-hidden />
-            Create a Project
-          </Button>
+          canWrite ? (
+            <Button onClick={() => setCreating((open) => !open)}>
+              <Plus width={16} height={16} aria-hidden />
+              Create a Project
+            </Button>
+          ) : undefined
         }
       />
 
@@ -200,7 +204,7 @@ export function Projects() {
             icon={FolderKanban}
             title="No Projects yet"
             description="A Project groups a stack on one or more of your servers. Create one, assign the servers it runs on, and install only the Plugins it needs."
-            action={<Button onClick={() => setCreating(true)}>Create your first Project</Button>}
+            action={canWrite ? <Button onClick={() => setCreating(true)}>Create your first Project</Button> : undefined}
           />
         ) : (
           <div className="flex flex-col gap-2">

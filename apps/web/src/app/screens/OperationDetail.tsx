@@ -25,6 +25,7 @@ import { StepTimeline } from '../components/StepTimeline';
 import { VerificationView } from '../components/VerificationView';
 import { OperatorShell } from '../components/OperatorShell';
 import { useOperationsStore } from '../store/operations';
+import { useCanWrite } from '../../store/workspace';
 
 const PRE_EXECUTION: OperationStatus[] = [
   'created',
@@ -70,6 +71,7 @@ function StreamIndicator({ status }: { status: StreamStatus }) {
 export function OperationDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
 
   const events = useOperationsStore((state) => state.events[id] ?? EMPTY_EVENTS);
   const ingest = useOperationsStore((state) => state.ingest);
@@ -292,24 +294,30 @@ export function OperationDetail() {
               </div>
               <PlanReview plan={operation.plan} />
               <Card>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    size="lg"
-                    onClick={approve}
-                    disabled={approving || status !== 'awaiting_approval'}
-                  >
-                    {approving ? 'Approving' : 'Approve and run'}
-                  </Button>
-                  <Guidance for="operation.approve" />
-                  <Button variant="ghost" size="lg" onClick={cancel} disabled={cancelling}>
-                    {cancelling ? 'Cancelling' : 'Cancel'}
-                  </Button>
-                  {status !== 'awaiting_approval' ? (
-                    <Text variant="body-sm" tone="secondary">
-                      Preparing the plan. Approval opens when it is ready.
-                    </Text>
-                  ) : null}
-                </div>
+                {canWrite ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      size="lg"
+                      onClick={approve}
+                      disabled={approving || status !== 'awaiting_approval'}
+                    >
+                      {approving ? 'Approving' : 'Approve and run'}
+                    </Button>
+                    <Guidance for="operation.approve" />
+                    <Button variant="ghost" size="lg" onClick={cancel} disabled={cancelling}>
+                      {cancelling ? 'Cancelling' : 'Cancel'}
+                    </Button>
+                    {status !== 'awaiting_approval' ? (
+                      <Text variant="body-sm" tone="secondary">
+                        Preparing the plan. Approval opens when it is ready.
+                      </Text>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Text variant="body-sm" tone="secondary">
+                    Approving or cancelling needs a role above Viewer in this workspace.
+                  </Text>
+                )}
                 {actionError ? (
                   <p role="alert" className="mt-3 text-sm text-danger">
                     {actionError}
@@ -346,7 +354,7 @@ export function OperationDetail() {
               flush
               adornment={<Guidance for="operation.terminal" />}
               action={
-                isRunning ? (
+                isRunning && canWrite ? (
                   <Button variant="danger" size="sm" onClick={cancel} disabled={cancelling}>
                     {cancelling ? 'Cancelling' : 'Cancel'}
                   </Button>

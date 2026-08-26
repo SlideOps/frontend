@@ -776,4 +776,14 @@ export const guidance: GuidanceRegistry = {
     detail:
       'Emergency controls are first-class, audited actions. Pausing all executions, or suspending a single Operator execution, always asks for confirmation and is written to the immutable audit trail.',
   },
+  'team.roles': {
+    label: 'Team roles',
+    summary: 'Admin and Member act fully; Viewer is read only. Only Owner and Admin manage the team.',
+    detail:
+      'Admin has full operational access and can also invite, re-role, and remove teammates. Member has the same full operational access but cannot manage who is on the team. Viewer can see everything in this workspace but cannot change anything: every write control is hidden for them, and the backend refuses one anyway if it is ever reached. Owner is the workspace itself and is never invited.',
+  },
+  'team.role': {
+    label: 'Role',
+    summary: 'What the person you invite can do once they accept.',
+  },
 };

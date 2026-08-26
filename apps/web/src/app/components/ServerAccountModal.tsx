@@ -9,6 +9,7 @@ import { Button, Text } from '@slideops/design-system';
 import { Download, KeyRound, Lock, Trash2, Unlock, X } from '@slideops/icons';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { RevealValue } from './RevealValue';
 
 /*
@@ -55,6 +56,7 @@ function AccountActions({
   onDone: () => void;
 }) {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [busy, setBusy] = useState<null | 'disable' | 'enable' | 'remove'>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -97,6 +99,15 @@ function AccountActions({
         <Text variant="body-sm" tone="secondary">
           This is a system account. It belongs to the operating system rather than to a person, and
           changing it is left to the server.
+        </Text>
+      </div>
+    );
+  }
+  if (!canWrite) {
+    return (
+      <div className="mt-6 border-t border-border pt-4">
+        <Text variant="body-sm" tone="secondary">
+          Disabling or removing an account needs a role above Viewer in this workspace.
         </Text>
       </div>
     );
@@ -187,6 +198,7 @@ export function ServerAccountModal({
   onClose: () => void;
 }) {
   const titleId = useId();
+  const canWrite = useCanWrite();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -335,7 +347,11 @@ export function ServerAccountModal({
               Credential
             </Text>
           </div>
-          {isConnectionAccount ? (
+          {isConnectionAccount && !canWrite ? (
+            <Text variant="body-sm" tone="secondary">
+              Revealing this credential needs a role above Viewer in this workspace.
+            </Text>
+          ) : isConnectionAccount ? (
             usesPrivateKey ? (
               <div className="flex flex-col gap-3">
                 <Text variant="body-sm" tone="secondary">

@@ -5,6 +5,7 @@ import { CheckCircle2, Gauge } from '@slideops/icons';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote } from './Feedback';
 
 /*
@@ -48,6 +49,7 @@ export interface ServiceResourcesPanelProps {
  * other failure shows through the shared ErrorNote.
  */
 export function ServiceResourcesPanel({ service, onUpdated }: ServiceResourcesPanelProps) {
+  const canWrite = useCanWrite();
   // The process limit is required to resize, so fall back to the current CPU-side
   // default of one when a Service has never carried one.
   const currentPids = service.pids_limit ?? 1;
@@ -141,33 +143,41 @@ export function ServiceResourcesPanel({ service, onUpdated }: ServiceResourcesPa
       </Text>
 
       <form className="mt-4 flex flex-col gap-4" onSubmit={onSubmit} noValidate>
-        <Field
-          label="vCPU limit"
-          type="number"
-          min="0"
-          step="0.1"
-          inputMode="decimal"
-          error={errors.cpu_limit?.message}
-          {...register('cpu_limit')}
-        />
-        <Field
-          label="Memory (MB)"
-          type="number"
-          min="1"
-          step="1"
-          inputMode="numeric"
-          error={errors.memory_mb?.message}
-          {...register('memory_mb')}
-        />
-        <Field
-          label="Process limit"
-          type="number"
-          min="1"
-          step="1"
-          inputMode="numeric"
-          error={errors.pids_limit?.message}
-          {...register('pids_limit')}
-        />
+        <fieldset disabled={!canWrite} className="contents">
+          <Field
+            label="vCPU limit"
+            type="number"
+            min="0"
+            step="0.1"
+            inputMode="decimal"
+            error={errors.cpu_limit?.message}
+            {...register('cpu_limit')}
+          />
+          <Field
+            label="Memory (MB)"
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            error={errors.memory_mb?.message}
+            {...register('memory_mb')}
+          />
+          <Field
+            label="Process limit"
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            error={errors.pids_limit?.message}
+            {...register('pids_limit')}
+          />
+        </fieldset>
+
+        {!canWrite ? (
+          <Text variant="body-sm" tone="secondary">
+            Resizing needs a role above Viewer in this workspace.
+          </Text>
+        ) : null}
 
         {invalidMessage ? (
           <p role="alert" className="text-sm text-danger">
@@ -186,11 +196,13 @@ export function ServiceResourcesPanel({ service, onUpdated }: ServiceResourcesPa
           </div>
         ) : null}
 
-        <div>
-          <Button type="submit" disabled={isSubmitting || !changed}>
-            {isSubmitting ? 'Applying' : 'Apply'}
-          </Button>
-        </div>
+        {canWrite ? (
+          <div>
+            <Button type="submit" disabled={isSubmitting || !changed}>
+              {isSubmitting ? 'Applying' : 'Apply'}
+            </Button>
+          </div>
+        ) : null}
       </form>
     </Card>
   );

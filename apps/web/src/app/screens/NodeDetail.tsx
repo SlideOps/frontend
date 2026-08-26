@@ -25,6 +25,7 @@ import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import {
   completedHint,
   completionLabel,
@@ -72,6 +73,7 @@ function AddressRow({ label, value }: { label: string; value: string }) {
 export function NodeDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
 
   const nodeResult = useAsyncData((signal) => getNode(id, signal), [id]);
   const capabilitiesResult = useAsyncData((signal) => listCapabilities({}, signal), []);
@@ -200,15 +202,17 @@ export function NodeDetail() {
             title={nodeResult.state.data.name}
             description={`${nodeResult.state.data.ssh_username}@${nodeResult.state.data.address}:${nodeResult.state.data.port}`}
             actions={
-              <Button onClick={runDiscovery} disabled={discovering}>
-                <RefreshCw
-                  width={16}
-                  height={16}
-                  className={discovering ? 'animate-spin' : undefined}
-                  aria-hidden
-                />
-                {discovering ? 'Discovering' : discovery ? 'Discover again' : 'Discover'}
-              </Button>
+              canWrite ? (
+                <Button onClick={runDiscovery} disabled={discovering}>
+                  <RefreshCw
+                    width={16}
+                    height={16}
+                    className={discovering ? 'animate-spin' : undefined}
+                    aria-hidden
+                  />
+                  {discovering ? 'Discovering' : discovery ? 'Discover again' : 'Discover'}
+                </Button>
+              ) : undefined
             }
           />
 

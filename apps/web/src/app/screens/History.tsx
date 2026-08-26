@@ -11,6 +11,7 @@ import { Activity, ChevronRight, Trash2 } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Refreshing } from '../components/Refreshing';
 import { StatusBadge } from '../components/Badges';
@@ -36,6 +37,7 @@ function OperationRow({
   onOpen: () => void;
   onDelete: () => void;
 }) {
+  const canWrite = useCanWrite();
   const when = operation.created_at ? new Date(operation.created_at).toLocaleString() : '';
   return (
     <div className="flex w-full items-center gap-2 rounded-md border border-border bg-surface pr-2 transition-colors duration-fast ease-standard hover:bg-subtle">
@@ -66,7 +68,7 @@ function OperationRow({
         <StatusBadge status={operation.status} />
         <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
       </button>
-      {isFinished(operation.status) ? (
+      {isFinished(operation.status) && canWrite ? (
         <button
           type="button"
           aria-label={`Delete this ${operation.status} Operation from your History`}
@@ -101,6 +103,7 @@ const FILTER_TABS: { key: HistoryFilter; label: string; status?: OperationStatus
  */
 export function History() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const activeTab = FILTER_TABS.find((tab) => tab.key === filter) ?? { key: 'all', label: 'All' };
   // The load is keyed on the filter so switching it refetches the right slice.
@@ -190,7 +193,8 @@ export function History() {
         actions={
           <>
             <Refreshing show={refreshing} />
-            {canClear &&
+            {canWrite &&
+            canClear &&
             state.status === 'ready' &&
             state.data.some((op) => isFinished(op.status)) ? (
               <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>

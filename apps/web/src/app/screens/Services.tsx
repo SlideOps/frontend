@@ -10,6 +10,7 @@ import { Button, Text } from '@slideops/design-system';
 import { ChevronRight, Container, Plus, ScanSearch, serviceIcon } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { AdoptedBadge, ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -86,6 +87,7 @@ function ServiceRow({
 /** The Services list: every deployed Service, with status and live usage. */
 export function Services() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => loadServices(signal), []);
 
   return (
@@ -95,16 +97,18 @@ export function Services() {
         description="Everything you have deployed, and the address each one answers on. Several can share one server: SlideOps gives each its own port and its own web address, so they cannot take each other's."
         guidanceKey="services.overview"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
-              <ScanSearch width={16} height={16} aria-hidden />
-              Import what is running
-            </Button>
-            <Button onClick={() => navigate('/app/services/new')}>
-              <Plus width={16} height={16} aria-hidden />
-              Deploy a Service
-            </Button>
-          </>
+          canWrite ? (
+            <>
+              <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
+                <ScanSearch width={16} height={16} aria-hidden />
+                Import what is running
+              </Button>
+              <Button onClick={() => navigate('/app/services/new')}>
+                <Plus width={16} height={16} aria-hidden />
+                Deploy a Service
+              </Button>
+            </>
+          ) : undefined
         }
       />
 
@@ -112,21 +116,23 @@ export function Services() {
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
         <div className="flex flex-col gap-8">
-          <SampleAppDeploy />
+          {canWrite ? <SampleAppDeploy /> : null}
           {state.data.services.length === 0 ? (
             <EmptyState
               icon={Container}
               title="No Services here yet"
               description="A Service is one solution running on a Node under hard resource limits. Deploy one from an image or a repository, or import an app you were already running on a server before you found SlideOps."
               action={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button onClick={() => navigate('/app/services/new')}>
-                    Deploy your first Service
-                  </Button>
-                  <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
-                    Import what is already running
-                  </Button>
-                </div>
+                canWrite ? (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button onClick={() => navigate('/app/services/new')}>
+                      Deploy your first Service
+                    </Button>
+                    <Button variant="secondary" onClick={() => navigate('/app/services/import')}>
+                      Import what is already running
+                    </Button>
+                  </div>
+                ) : undefined
               }
             />
           ) : (

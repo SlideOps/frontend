@@ -3,6 +3,7 @@ import { Button, Section, Text } from '@slideops/design-system';
 import { ArrowUpRight, Globe } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
+import { useCanWrite } from '../../store/workspace';
 import { RevealValue } from './RevealValue';
 import { serviceEndpointState } from './service-endpoint';
 
@@ -40,6 +41,7 @@ export function ServiceEndpoint({
   onChanged?: () => void;
 }) {
   const state = serviceEndpointState(service);
+  const canWrite = useCanWrite();
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +110,7 @@ export function ServiceEndpoint({
             </EndpointNote>
           ) : null}
 
-          {canBeNamed ? (
+          {canBeNamed && canWrite ? (
             <div className="flex flex-col gap-2 rounded-md border border-border bg-subtle p-3">
               <Text variant="body-sm" tone="secondary">
                 This Service answers on a port but has no web address of its own. Giving it one

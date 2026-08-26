@@ -14,7 +14,9 @@ export function MfaVerify() {
   const navigate = useNavigate();
   const location = useLocation();
   const signIn = useAuthStore((state) => state.signIn);
-  const challenge = (location.state as { challenge?: string } | null)?.challenge;
+  const locationState = location.state as { challenge?: string; next?: string } | null;
+  const challenge = locationState?.challenge;
+  const next = locationState?.next ?? '/app';
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -34,7 +36,7 @@ export function MfaVerify() {
     try {
       const operator = await mfaVerify({ challenge, code: values.code });
       signIn(operator);
-      navigate('/app', { replace: true });
+      navigate(next, { replace: true });
     } catch (error) {
       setFormError(
         error instanceof ApiError ? error.message : 'That code did not verify. Try again.',

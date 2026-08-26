@@ -29,12 +29,17 @@ import { Guidance } from '@slideops/tooltips';
 import { DetailLayout } from '@slideops/ui';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { CapabilityManagement } from '../components/CapabilityManagement';
+import {
+  DatabaseExplorer,
+  DATABASE_EXPLORER_ACTION_KEYS,
+} from '../components/DatabaseExplorer';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -146,6 +151,7 @@ function LogsAndActivity({ id }: { id: string }) {
 export function ServiceDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state, reload } = useAsyncData((signal) => loadDetail(id, signal), [id]);
 
   const [actionError, setActionError] = useState<string | null>(null);
@@ -277,12 +283,24 @@ export function ServiceDetail() {
 
               {/* Scoped to this Service, so a database server shared by several
                   applications shows only the part this one uses. */}
+              <Section
+                title="Browse"
+                description="What is actually inside, a page at a time, searchable. Nothing here changes anything."
+                collapsible
+              >
+                <DatabaseExplorer
+                  capabilityKey="install-postgresql"
+                  nodeId={service.node_id}
+                  serviceId={service.id}
+                />
+              </Section>
               <CapabilityManagement
                 capabilityKey="install-postgresql"
                 nodeId={service.node_id}
                 serviceId={service.id}
                 projectId={service.project_id}
                 installed
+                hideActionKeys={DATABASE_EXPLORER_ACTION_KEYS}
               />
 
               {/* Folded by default: a terminal is the least likely reason to
@@ -381,6 +399,12 @@ export function ServiceDetail() {
                   <Text variant="h4">Actions</Text>
                   <Guidance for="service.lifecycle" />
                 </div>
+                {!canWrite ? (
+                  <Text variant="body-sm" tone="secondary" className="mt-4">
+                    Starting, stopping, redeploying, or removing this Service needs a role above
+                    Viewer in this workspace.
+                  </Text>
+                ) : (
                 <div className="mt-4 flex flex-col gap-3">
                   {/* While a deploy is running, stopping it is the only thing worth
                       offering: the lifecycle actions have nothing settled to act on,
@@ -478,6 +502,7 @@ export function ServiceDetail() {
                     )}
                   </div>
                 </div>
+                )}
 
                 {actionError ? (
                   <p role="alert" className="mt-3 text-sm text-danger">

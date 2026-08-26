@@ -292,6 +292,20 @@ export {
   type Workload,
   type AdoptWorkloadInput,
 } from './workloads';
+export {
+  listWorkspaces,
+  switchWorkspace,
+  listTeam,
+  inviteTeamMember,
+  updateTeamMemberRole,
+  removeTeamMember,
+  getInvitation,
+  acceptInvitation,
+  type Workspace,
+  type WorkspaceRole,
+  type Member,
+  type Invitation,
+} from './workspaces';
 export type {
   Operator,
   OperatorRole,

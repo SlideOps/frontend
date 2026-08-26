@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ApiError, createNode, importSSHKey, listProjects, listSSHKeys } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
+import { Lock } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { PageHeader } from '@slideops/ui';
+import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { nodeSchema, type NodeFormValues } from '../node-schema';
 import { OperatorShell } from '../components/OperatorShell';
@@ -17,6 +19,7 @@ const inputClass =
 /** Register a Node: connection details plus the credential, stored encrypted. */
 export function NodeRegister() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [formError, setFormError] = useState<string | null>(null);
   const [saveKey, setSaveKey] = useState(false);
   const projects = useAsyncData((signal) => listProjects(signal), []);

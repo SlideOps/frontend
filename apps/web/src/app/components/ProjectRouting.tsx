@@ -11,6 +11,7 @@ import { Check, Network, Trash2 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 
@@ -67,6 +68,7 @@ const INVALID_DOMAIN_HINT = 'That does not look like a domain. Use something lik
  */
 export function ProjectRouting({ projectId, domain }: { projectId: string; domain: string }) {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => loadRouting(projectId, signal), [projectId]);
 
   const [savedDomain, setSavedDomain] = useState(domain);
@@ -122,32 +124,38 @@ export function ProjectRouting({ projectId, domain }: { projectId: string; domai
             </Text>
           )}
 
-          <div className="flex flex-col gap-3 sm:max-w-md">
-            <Field
-              label="Domain"
-              placeholder="app.example.com"
-              value={value}
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              hint="A lowercase hostname, with no scheme, port, or path."
-              error={fieldError ?? undefined}
-              disabled={saving}
-              onChange={(event) => setValue(event.target.value)}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => save(value.trim())} disabled={saving}>
-                <Check width={15} height={15} aria-hidden />
-                {saving ? 'Saving' : 'Save domain'}
-              </Button>
-              {savedDomain ? (
-                <Button variant="ghost" onClick={() => save('')} disabled={saving}>
-                  <Trash2 width={15} height={15} aria-hidden />
-                  Clear
+          {canWrite ? (
+            <div className="flex flex-col gap-3 sm:max-w-md">
+              <Field
+                label="Domain"
+                placeholder="app.example.com"
+                value={value}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                hint="A lowercase hostname, with no scheme, port, or path."
+                error={fieldError ?? undefined}
+                disabled={saving}
+                onChange={(event) => setValue(event.target.value)}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => save(value.trim())} disabled={saving}>
+                  <Check width={15} height={15} aria-hidden />
+                  {saving ? 'Saving' : 'Save domain'}
                 </Button>
-              ) : null}
+                {savedDomain ? (
+                  <Button variant="ghost" onClick={() => save('')} disabled={saving}>
+                    <Trash2 width={15} height={15} aria-hidden />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : (
+            <Text variant="body-sm" tone="secondary">
+              Setting or clearing the domain needs a role above Viewer in this workspace.
+            </Text>
+          )}
 
           {actionError ? (
             <div className="mt-3">

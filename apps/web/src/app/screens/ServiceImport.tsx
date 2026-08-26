@@ -14,6 +14,7 @@ import { ArrowRight, Container, Plus, RefreshCw, ScanSearch, Server, serviceIcon
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -116,6 +117,7 @@ function WorkloadRow({
 /** The screen: pick a server, pick a Project, and import what is already there. */
 export function ServiceImport() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   const { state } = useAsyncData((signal) => loadImportData(signal), []);
   const ready = state.status === 'ready' ? state.data : null;
@@ -193,6 +195,20 @@ export function ServiceImport() {
 
   const importable = workloads?.filter((workload) => !workload.adopted) ?? [];
   const managed = workloads?.filter((workload) => workload.adopted) ?? [];
+
+  if (!canWrite) {
+    return (
+      <OperatorShell active="services">
+        <PageHeader title="Import what is already running" />
+        <EmptyState
+          icon={Lock}
+          title="This needs a role above Viewer"
+          description="A Viewer can see this workspace's Services but cannot import one that is already running. Ask an Owner or an Admin to invite you at a role that can, or switch to a workspace where you are."
+          action={<Button onClick={() => navigate('/app/services')}>Back to Services</Button>}
+        />
+      </OperatorShell>
+    );
+  }
 
   return (
     <OperatorShell active="services">

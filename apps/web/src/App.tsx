@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { InvitationAccept } from './auth/InvitationAccept';
 import { Login } from './auth/Login';
 import { MfaVerify } from './auth/MfaVerify';
 import { Register } from './auth/Register';
@@ -103,6 +104,7 @@ const Security = lazy(() =>
   import('./app/screens/Security').then((m) => ({ default: m.Security })),
 );
 const Billing = lazy(() => import('./app/screens/Billing').then((m) => ({ default: m.Billing })));
+const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -171,6 +173,7 @@ export function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/mfa" element={<MfaVerify />} />
+        <Route path="/invitations/:token" element={<InvitationAccept />} />
 
         {/* Operator area: any signed-in account. */}
         <Route path="/app" element={<RequireAuth />}>
@@ -202,6 +205,7 @@ export function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="billing" element={<Billing />} />
           <Route path="security" element={<Security />} />
+          <Route path="team" element={<Team />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}

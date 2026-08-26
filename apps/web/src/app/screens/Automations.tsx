@@ -15,6 +15,7 @@ import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -78,11 +79,13 @@ function AutomationRow({
   automation,
   nodeName,
   capabilityName,
+  canWrite,
   onChanged,
 }: {
   automation: Automation;
   nodeName: string;
   capabilityName: string;
+  canWrite: boolean;
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
@@ -154,37 +157,45 @@ function AutomationRow({
           {nextRunText(automation)}
         </span>
 
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            checked={automation.enabled}
-            disabled={busy !== null}
-            onChange={toggle}
-          />
-          <span className="text-xs font-medium text-ink">
+        {canWrite ? (
+          <label className="inline-flex shrink-0 cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              checked={automation.enabled}
+              disabled={busy !== null}
+              onChange={toggle}
+            />
+            <span className="text-xs font-medium text-ink">
+              {automation.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        ) : (
+          <span className="text-xs font-medium text-ink-muted">
             {automation.enabled ? 'Enabled' : 'Disabled'}
           </span>
-        </label>
+        )}
 
-        <div className="flex shrink-0 items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={runNow} disabled={busy !== null}>
-            <Play width={15} height={15} aria-hidden />
-            {busy === 'run' ? 'Starting' : 'Run now'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setConfirmDelete((value) => !value)}
-            disabled={busy !== null}
-            aria-label={`Delete the Automation for ${capabilityName}`}
-          >
-            <Trash2 width={15} height={15} aria-hidden />
-          </Button>
-        </div>
+        {canWrite ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={runNow} disabled={busy !== null}>
+              <Play width={15} height={15} aria-hidden />
+              {busy === 'run' ? 'Starting' : 'Run now'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmDelete((value) => !value)}
+              disabled={busy !== null}
+              aria-label={`Delete the Automation for ${capabilityName}`}
+            >
+              <Trash2 width={15} height={15} aria-hidden />
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      {confirmDelete ? (
+      {canWrite && confirmDelete ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-subtle px-4 py-3">
           <Text variant="body-sm" tone="secondary">
             Remove this Automation? Its past Operations stay in History.
@@ -217,6 +228,7 @@ function AutomationRow({
 /** Automations: every saved recurring intent, with run now, edit, and delete. */
 export function Automations() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state, reload } = useAsyncData<AutomationsData>(async (signal) => {
     const [automations, nodes, capabilities] = await Promise.all([
       listAutomations(signal),
@@ -232,10 +244,12 @@ export function Automations() {
         title="Automations"
         description="A saved intent to run a Capability on a Node on a schedule. Setting one up is your standing approval for those runs, so each scheduled Operation still runs the full lifecycle and lands in History."
         actions={
-          <Button onClick={() => navigate('/app/automations/new')}>
-            <Plus width={16} height={16} aria-hidden />
-            New Automation
-          </Button>
+          canWrite ? (
+            <Button onClick={() => navigate('/app/automations/new')}>
+              <Plus width={16} height={16} aria-hidden />
+              New Automation
+            </Button>
+          ) : undefined
         }
       />
 
@@ -248,9 +262,11 @@ export function Automations() {
             title="No Automations yet"
             description="Automate a Capability you run often. Choose a Node and a Capability, set a schedule, and SlideOps will run it for you and record every result."
             action={
-              <Button onClick={() => navigate('/app/automations/new')}>
-                Create your first Automation
-              </Button>
+              canWrite ? (
+                <Button onClick={() => navigate('/app/automations/new')}>
+                  Create your first Automation
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -272,6 +288,7 @@ export function Automations() {
                   automation={automation}
                   nodeName={node?.name ?? 'Unknown Node'}
                   capabilityName={capability?.name ?? automation.capability_key}
+                  canWrite={canWrite}
                   onChanged={reload}
                 />
               );

@@ -34,11 +34,18 @@ import {
   detectedLabel,
   isDetected,
 } from '../capability-completion';
+import { useCanWrite } from '../../store/workspace';
 import { databaseManageStep } from '../database-credentials';
 import { CompletionBadge, DetectedBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { CapabilityManagement } from '../components/CapabilityManagement';
+import {
+  DatabaseExplorer,
+  DATABASE_EXPLORER_ACTION_KEYS,
+  isExplorableDatabase,
+} from '../components/DatabaseExplorer';
+import { ContainerManager } from '../components/ContainerManager';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -247,6 +254,7 @@ function CreateDatabaseCredentials({
 export function CapabilityDetail() {
   const { key = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   const preselectedNode = searchParams.get('node') ?? undefined;
   // A Plugin Capability started from a Project carries ?project=; a Core
@@ -432,6 +440,28 @@ export function CapabilityDetail() {
                   </Section>
                 ) : null}
 
+                {/* Only once it is installed here, and only for a database
+                    engine DatabaseExplorer knows how to draw. Before that
+                    there is nothing to browse yet. */}
+                {done && preselectedNode && isExplorableDatabase(key) ? (
+                  <Section title="Browse">
+                    <Text variant="body-sm" tone="secondary" className="mb-3 block">
+                      What is actually inside, a page at a time, searchable. Nothing here changes
+                      anything.
+                    </Text>
+                    <DatabaseExplorer capabilityKey={key} nodeId={preselectedNode} />
+                  </Section>
+                ) : null}
+
+                {/* The container runtime's own page is where "what is
+                    actually running here" should be visible, not only on a
+                    separate cross-server import screen. */}
+                {done && preselectedNode && key === 'enable-containers' ? (
+                  <Section title="Containers">
+                    <ContainerManager nodeId={preselectedNode} projectId={preselectedProject} />
+                  </Section>
+                ) : null}
+
                 {/* Only once it is installed here. Before that there is nothing
                     to manage, and the page stays the description it always was. */}
                 <CapabilityManagement
@@ -439,6 +469,7 @@ export function CapabilityDetail() {
                   nodeId={preselectedNode ?? ''}
                   projectId={preselectedProject}
                   installed={Boolean(done)}
+                  hideActionKeys={isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined}
                 />
 
                 {capabilityResult.state.data.verification_strategy ? (

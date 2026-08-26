@@ -234,9 +234,9 @@ describe('CapabilityManagement', () => {
     const operator = userEvent.setup();
     show({ installed: true });
 
-    const input = await screen.findByLabelText('Dump file');
+    await screen.findByText('Drop a dump here, or click to browse');
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
     await operator.upload(input, new File(['-- dump'], 'app.sql', { type: 'text/plain' }));
-    await operator.click(screen.getByRole('button', { name: /Upload/ }));
 
     await waitFor(() => expect(uploadToNode).toHaveBeenCalled());
     // The upload must not have restored anything.
@@ -249,11 +249,10 @@ describe('CapabilityManagement', () => {
     const operator = userEvent.setup();
     show({ installed: true });
 
-    await operator.upload(
-      await screen.findByLabelText('Dump file'),
-      new File(['-- dump'], 'app.sql', { type: 'text/plain' }),
-    );
-    await operator.click(screen.getByRole('button', { name: /Upload/ }));
+    await screen.findByText('Drop a dump here, or click to browse');
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await operator.upload(input, new File(['-- dump'], 'app.sql', { type: 'text/plain' }));
+
     await screen.findByLabelText('Restore into');
     await operator.type(screen.getByLabelText('Restore into'), 'app');
     await operator.click(screen.getByRole('button', { name: 'Plan the restore' }));
@@ -274,11 +273,36 @@ describe('CapabilityManagement', () => {
     const operator = userEvent.setup();
     show({ installed: true });
 
-    await operator.upload(
-      await screen.findByLabelText('Dump file'),
-      new File(['x'], 'app.sql', { type: 'text/plain' }),
-    );
-    await operator.click(screen.getByRole('button', { name: /Upload/ }));
+    await screen.findByText('Drop a dump here, or click to browse');
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await operator.upload(input, new File(['x'], 'app.sql', { type: 'text/plain' }));
+
     expect(await screen.findByRole('alert')).toHaveTextContent('too large');
+  });
+
+  // A restore has to know which engine it is talking to: the same panel is
+  // now shared by every SQL and MongoDB Capability rather than assuming
+  // PostgreSQL, so a MySQL page must reach restore-mysql, not the Postgres one.
+  it('reaches the right restore Capability for a non-PostgreSQL engine', async () => {
+    uploadToNode.mockResolvedValue({ id: 'up-2', path: '/x', bytes: 50 });
+    const operator = userEvent.setup();
+    renderInApp(
+      <MemoryRouter>
+        <CapabilityManagement capabilityKey="install-mongodb" nodeId="n1" installed />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Drop a dump here, or click to browse');
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await operator.upload(input, new File(['x'], 'app.archive', { type: 'application/gzip' }));
+    await screen.findByLabelText('Restore into');
+    await operator.type(screen.getByLabelText('Restore into'), 'app');
+    await operator.click(screen.getByRole('button', { name: 'Plan the restore' }));
+
+    await waitFor(() =>
+      expect(createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ capability_key: 'restore-mongodb' }),
+      ),
+    );
   });
 });

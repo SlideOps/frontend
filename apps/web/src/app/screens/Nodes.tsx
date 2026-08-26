@@ -4,6 +4,7 @@ import { ChevronRight, Plus, Search, Server } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -101,6 +102,7 @@ function groupByFirstTag(nodes: Node[]): Array<[string, Node[]]> {
 /** The Nodes list: every Node the Operator has connected. */
 export function Nodes() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => listNodes(signal), []);
   const [search, setSearch] = useState('');
   const [grouped, setGrouped] = useState(false);
@@ -118,10 +120,12 @@ export function Nodes() {
         description="Every Linux server you have connected over SSH."
         guidanceKey="dashboard.nodes"
         actions={
-          <Button onClick={() => navigate('/app/nodes/new')}>
-            <Plus width={16} height={16} aria-hidden />
-            Connect a server
-          </Button>
+          canWrite ? (
+            <Button onClick={() => navigate('/app/nodes/new')}>
+              <Plus width={16} height={16} aria-hidden />
+              Connect a server
+            </Button>
+          ) : undefined
         }
       />
 
@@ -134,7 +138,9 @@ export function Nodes() {
             title="No servers connected yet"
             description="A server is a Linux machine you reach over SSH. Connect one and SlideOps will discover its state without changing anything."
             action={
-              <Button onClick={() => navigate('/app/nodes/new')}>Connect your first server</Button>
+              canWrite ? (
+                <Button onClick={() => navigate('/app/nodes/new')}>Connect your first server</Button>
+              ) : undefined
             }
           />
         ) : (

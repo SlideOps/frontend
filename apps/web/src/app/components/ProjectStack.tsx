@@ -12,6 +12,7 @@ import { ArrowRight, Boxes, capabilityIcon, Check, ShieldCheck } from '@slideops
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNote, Loading } from './Feedback';
@@ -107,7 +108,7 @@ function StackCard({
           <Text variant="caption" tone="secondary">
             The Core security bundle is on every server and cannot be removed.
           </Text>
-        ) : plugin.installed ? (
+        ) : !canWrite ? null : plugin.installed ? (
           <>
             <Button variant="secondary" size="sm" onClick={onToggle} disabled={busy}>
               {plugin.enabled ? 'Disable' : 'Enable'}

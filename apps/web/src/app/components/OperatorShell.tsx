@@ -23,10 +23,12 @@ import { AppShell, type NavItem } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
+import { useWorkspaceStore } from '../../store/workspace';
 import { NotificationsBell } from '../notifications/NotificationsBell';
 import { CommandPalette } from './CommandPalette';
 import { InstallApp } from './InstallApp';
 import { LogoutButton } from './LogoutButton';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export type ActiveKey =
   | 'home'
@@ -44,7 +46,8 @@ export type ActiveKey =
   | 'reports'
   | 'billing'
   | 'security'
-  | 'extensions';
+  | 'extensions'
+  | 'team';
 
 /** A visible affordance that opens the command palette, with its shortcut shown. */
 function SearchTrigger({ onOpen }: { onOpen: () => void }) {
@@ -106,7 +109,15 @@ function ShellNotice() {
 export function OperatorShell({ active, children }: { active: ActiveKey; children: ReactNode }) {
   const navigate = useNavigate();
   const operator = useAuthStore((state) => state.operator);
+  const refreshWorkspaces = useWorkspaceStore((state) => state.refresh);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Read once per app visit which workspaces this Operator can act in, so the
+  // switcher and every Viewer-role gate throughout the app have an answer
+  // before anything else on the page needs it.
+  useEffect(() => {
+    void refreshWorkspaces();
+  }, [refreshWorkspaces]);
 
   const nav: NavItem[] = [
     {
@@ -221,6 +232,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       onSelect: () => navigate('/app/billing'),
     },
     {
+      key: 'team',
+      group: 'Account',
+      label: 'Team',
+      icon: Users,
+      active: active === 'team',
+      onSelect: () => navigate('/app/team'),
+    },
+    {
       key: 'extensions',
       group: 'Account',
       label: 'Extensions',
@@ -257,6 +276,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
         surface="Operator"
         actions={
           <>
+            <WorkspaceSwitcher />
             <InstallApp />
             <SearchTrigger onOpen={() => setPaletteOpen(true)} />
             <NotificationsBell />

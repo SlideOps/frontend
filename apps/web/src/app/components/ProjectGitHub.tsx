@@ -11,6 +11,7 @@ import { Button, Section, Text } from '@slideops/design-system';
 import { ArrowUpRight, GitBranch, Lock } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNote, Loading } from './Feedback';
@@ -36,6 +37,7 @@ async function loadGitHub(signal: AbortSignal): Promise<GitHubData> {
  * deploy can pull from.
  */
 export function ProjectGitHub() {
+  const canWrite = useCanWrite();
   const { state, reload } = useAsyncData((signal) => loadGitHub(signal), []);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -93,10 +95,16 @@ export function ProjectGitHub() {
               Connect your GitHub account so a Service with a repository source can clone on first
               deploy and pull on redeploys. The access token is stored encrypted and never shown.
             </Text>
-            <Button className="self-start" onClick={connect}>
-              <GitBranch width={15} height={15} aria-hidden />
-              Connect GitHub
-            </Button>
+            {canWrite ? (
+              <Button className="self-start" onClick={connect}>
+                <GitBranch width={15} height={15} aria-hidden />
+                Connect GitHub
+              </Button>
+            ) : (
+              <Text variant="body-sm" tone="secondary">
+                Connecting GitHub needs a role above Viewer in this workspace.
+              </Text>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">

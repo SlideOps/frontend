@@ -12,12 +12,13 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Container, GitBranch } from '@slideops/icons';
+import { Container, GitBranch, Lock } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { PageHeader } from '@slideops/ui';
+import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ComposeStackPlan } from '../components/ComposeStackPlan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -498,10 +499,25 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */
 export function ServiceDeploy() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   // Deploying from inside a Project preselects it here via ?project=.
   const initialProjectId = searchParams.get('project') ?? undefined;
   const { state } = useAsyncData((signal) => loadDeployData(signal), []);
+
+  if (!canWrite) {
+    return (
+      <OperatorShell active="services">
+        <PageHeader title="Deploy a Service" />
+        <EmptyState
+          icon={Lock}
+          title="This needs a role above Viewer"
+          description="A Viewer can see this workspace's Services but cannot deploy one. Ask an Owner or an Admin to invite you at a role that can, or switch to a workspace where you are."
+          action={<Button onClick={() => navigate('/app/services')}>Back to Services</Button>}
+        />
+      </OperatorShell>
+    );
+  }
 
   return (
     <OperatorShell active="services">
