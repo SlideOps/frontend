@@ -54,6 +54,7 @@ function StackCard({
   onUninstall: () => void;
   onOpen: () => void;
 }) {
+  const canWrite = useCanWrite();
   const Icon = plugin.provides?.[0]
     ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
     : Boxes;

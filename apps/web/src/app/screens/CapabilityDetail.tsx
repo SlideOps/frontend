@@ -497,7 +497,11 @@ export function CapabilityDetail() {
                   <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
                   <Guidance for="capability.start" />
                 </div>
-                {nodesResult.state.status === 'loading' ? (
+                {!canWrite ? (
+                  <Text variant="body-sm" tone="secondary">
+                    Starting an Operation needs a role above Viewer in this workspace.
+                  </Text>
+                ) : nodesResult.state.status === 'loading' ? (
                   <Loading label="Loading your Nodes" />
                 ) : nodesResult.state.status === 'error' ? (
                   <ErrorNote error={nodesResult.state.error} />

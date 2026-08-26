@@ -12,6 +12,7 @@ import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ConfirmDialog } from './ConfirmDialog';
 

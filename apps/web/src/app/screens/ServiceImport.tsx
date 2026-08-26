@@ -10,7 +10,7 @@ import {
   type Workload,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Container, Plus, RefreshCw, ScanSearch, Server, serviceIcon } from '@slideops/icons';
+import { ArrowRight, Container, Lock, Plus, RefreshCw, ScanSearch, Server, serviceIcon } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';

@@ -118,22 +118,26 @@ export function ProjectGitHub() {
                 {state.data.repos.length > 0 ? `${state.data.repos.length} ` : ''}repositories
                 below.
               </Text>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button variant="secondary" size="sm" onClick={connect}>
-                  <GitBranch width={14} height={14} aria-hidden />
-                  Reconnect
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirmDisconnect(true)}>
-                  Disconnect
-                </Button>
-              </div>
+              {canWrite ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variant="secondary" size="sm" onClick={connect}>
+                    <GitBranch width={14} height={14} aria-hidden />
+                    Reconnect
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmDisconnect(true)}>
+                    Disconnect
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
-            <Text variant="caption" tone="secondary">
-              Don&apos;t see a repository, or a whole organization? Reconnect and grant access to it
-              on GitHub&apos;s authorization screen &mdash; this re-runs the same consent flow
-              without disconnecting first, so nothing already deployed is affected.
-            </Text>
+            {canWrite ? (
+              <Text variant="caption" tone="secondary">
+                Don&apos;t see a repository, or a whole organization? Reconnect and grant access to
+                it on GitHub&apos;s authorization screen &mdash; this re-runs the same consent flow
+                without disconnecting first, so nothing already deployed is affected.
+              </Text>
+            ) : null}
 
             {state.data.repos.length > 0 ? (
               <div className="max-h-80 overflow-y-auto rounded-md border border-border">

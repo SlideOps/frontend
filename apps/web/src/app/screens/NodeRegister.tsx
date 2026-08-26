@@ -78,6 +78,20 @@ export function NodeRegister() {
 
   const savedKeys = sshKeys.state.status === 'ready' ? sshKeys.state.data : [];
 
+  if (!canWrite) {
+    return (
+      <OperatorShell active="nodes">
+        <PageHeader title="Connect a server" />
+        <EmptyState
+          icon={Lock}
+          title="This needs a role above Viewer"
+          description="A Viewer can see this workspace's servers but cannot connect a new one. Ask an Owner or an Admin to invite you at a role that can, or switch to a workspace where you are."
+          action={<Button onClick={() => navigate('/app/nodes')}>Back to servers</Button>}
+        />
+      </OperatorShell>
+    );
+  }
+
   return (
     <OperatorShell active="nodes">
       <PageHeader

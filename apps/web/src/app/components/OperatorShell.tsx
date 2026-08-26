@@ -17,6 +17,7 @@ import {
   Shield,
   ShieldCheck,
   Terminal as TerminalIcon,
+  Users,
   X,
 } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
