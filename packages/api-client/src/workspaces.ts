@@ -1,21 +1,24 @@
 import { apiRequest, unwrap } from './http';
 
 /*
- * Team collaboration. An Operator's own account is always a Workspace of one;
- * accepting an invitation adds another Workspace to switch into, acting there
- * with the role the invitation named. Field names mirror the backend contract
- * exactly so the wire shape and the type never drift.
+ * Workspaces. An Operator's own account can hold many independently named
+ * Workspaces, each a self contained scope with its own Nodes, Projects,
+ * Services, and team: a Personal one every Operator always has, plus as many
+ * more as they create, each with a team invited into it individually. Field
+ * names mirror the backend contract exactly so the wire shape and the type
+ * never drift.
  */
 
-/** A role a member holds inside a Workspace. Owner is never invited, it is
- * the Workspace's own account and is reported for completeness only. */
+/** A role a member holds inside a Workspace. Owner is never invited: it is
+ * whoever created the Workspace, reported for completeness. */
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer';
 
-/** One Workspace an Operator can act in: their own, or one they are an
- * active member of. */
+/** One Workspace an Operator can act in: one they created, or one they are
+ * an active member of. */
 export interface Workspace {
-  owner_operator_id: string;
-  owner_email: string;
+  id: string;
+  name: string;
+  is_personal: boolean;
   role: WorkspaceRole;
   active: boolean;
 }
@@ -32,23 +35,45 @@ export interface Member {
 
 /** What an invitation link offers, read before anyone has signed in. */
 export interface Invitation {
-  workspace_email: string;
+  workspace_name: string;
   role: WorkspaceRole;
 }
 
-/** Every Workspace the signed in Operator can act in. */
+/** Every Workspace the signed in Operator can act in: every one they created,
+ * plus every one they hold an active membership in. */
 export function listWorkspaces(signal?: AbortSignal): Promise<Workspace[]> {
   return apiRequest<unknown>('/workspaces', { signal }).then((r) =>
     unwrap<Workspace[]>(r, 'workspaces'),
   );
 }
 
-/** Switch the active Workspace. Pass the Operator's own id, or an empty
- * string, to switch back to their own Workspace. */
-export function switchWorkspace(ownerOperatorId: string): Promise<void> {
+/** Create a new, empty Workspace: no Node or Project until one is added. The
+ * creator becomes its Owner. It does not become active until switched into. */
+export function createWorkspace(name: string): Promise<Workspace> {
+  return apiRequest<unknown>('/workspaces', { method: 'POST', body: { name } }).then((r) =>
+    unwrap<Workspace>(r, 'workspace'),
+  );
+}
+
+/** Rename a Workspace. Admin or Owner only. */
+export function renameWorkspace(id: string, name: string): Promise<Workspace> {
+  return apiRequest<unknown>(`/workspaces/${id}`, { method: 'PATCH', body: { name } }).then((r) =>
+    unwrap<Workspace>(r, 'workspace'),
+  );
+}
+
+/** Delete a Workspace. Refused for the Personal workspace every Operator
+ * always has, and refused while it still owns a Node or a Project. Owner only. */
+export function deleteWorkspace(id: string): Promise<void> {
+  return apiRequest<void>(`/workspaces/${id}`, { method: 'DELETE' });
+}
+
+/** Switch the active Workspace to one the Operator created or is an active
+ * member of. */
+export function switchWorkspace(workspaceId: string): Promise<void> {
   return apiRequest<void>('/workspaces/switch', {
     method: 'POST',
-    body: { owner_operator_id: ownerOperatorId },
+    body: { workspace_id: workspaceId },
   });
 }
 

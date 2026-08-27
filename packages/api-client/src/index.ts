@@ -294,6 +294,9 @@ export {
 } from './workloads';
 export {
   listWorkspaces,
+  createWorkspace,
+  renameWorkspace,
+  deleteWorkspace,
   switchWorkspace,
   listTeam,
   inviteTeamMember,

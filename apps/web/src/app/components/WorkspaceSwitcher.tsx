@@ -1,9 +1,10 @@
-import { cn } from '@slideops/design-system';
-import { Building2, Check, ChevronsUpDown } from '@slideops/icons';
+import { ApiError, createWorkspace } from '@slideops/api-client';
+import { Button, cn, Field } from '@slideops/design-system';
+import { Building2, Check, ChevronsUpDown, Plus, Settings } from '@slideops/icons';
 import { Popover } from '@slideops/tooltips';
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { activeWorkspace, useWorkspaceStore } from '../../store/workspace';
-import { useAuthStore } from '../../store/auth';
 
 const roleLabel: Record<string, string> = {
   owner: 'Owner',
@@ -12,34 +13,60 @@ const roleLabel: Record<string, string> = {
   viewer: 'Viewer',
 };
 
+/** The name and role line for one workspace entry, in the switcher and the hub alike. */
+function workspaceSubtitle(isPersonal: boolean, role: string): string {
+  return isPersonal ? 'Personal' : (roleLabel[role] ?? role);
+}
+
 /**
- * Which workspace the Operator is acting in, and a way to switch. Renders
- * nothing until there is more than one workspace to choose between: an
- * Operator who has never invited anyone and never accepted an invitation has
- * exactly one, their own, and a control that only ever offers one choice is
- * not a control, it is clutter.
+ * Which workspace the Operator is acting in, and a way to move between every
+ * one they can act in, create another, or open the fuller picker. Always
+ * rendered, even with only one workspace: creating a second one must always
+ * be one click away, the same as Vercel's own team switcher.
  */
 export function WorkspaceSwitcher() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const switchTo = useWorkspaceStore((state) => state.switchTo);
-  const ownOperatorId = useAuthStore((state) => state.operator?.id);
+  const navigate = useNavigate();
   const [switching, setSwitching] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  if (workspaces.length <= 1) {
+  if (workspaces.length === 0) {
     return null;
   }
 
   const active = activeWorkspace(workspaces) ?? workspaces[0];
 
-  const onSelect = async (ownerOperatorId: string) => {
-    if (ownerOperatorId === active?.owner_operator_id) {
+  const onSelect = async (workspaceId: string) => {
+    if (workspaceId === active?.id) {
       return;
     }
-    setSwitching(ownerOperatorId);
+    setSwitching(workspaceId);
     try {
-      await switchTo(ownerOperatorId);
+      await switchTo(workspaceId);
     } finally {
       setSwitching('');
+    }
+  };
+
+  const submitCreate = async (event: FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setCreateError(null);
+    try {
+      const created = await createWorkspace(name.trim());
+      setName('');
+      setCreating(false);
+      await switchTo(created.id);
+    } catch (caught) {
+      setCreateError(
+        caught instanceof ApiError ? caught.message : 'That workspace could not be created.',
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -54,44 +81,81 @@ export function WorkspaceSwitcher() {
           {...props}
         >
           <Building2 width={16} height={16} className="shrink-0 text-ink-muted" aria-hidden />
-          <span className="min-w-0 truncate">
-            {active?.owner_operator_id === ownOperatorId ? 'Your workspace' : active?.owner_email}
-          </span>
+          <span className="min-w-0 truncate">{active?.name}</span>
           <ChevronsUpDown width={14} height={14} className="ml-auto shrink-0 text-ink-muted" aria-hidden />
         </button>
       )}
     >
-      <div className="flex w-64 flex-col gap-1">
-        <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          Workspaces
-        </p>
-        {workspaces.map((workspace) => (
-          <button
-            key={workspace.owner_operator_id}
-            type="button"
-            disabled={switching !== ''}
-            onClick={() => void onSelect(workspace.owner_operator_id)}
-            className={cn(
-              'flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-              workspace.active ? 'bg-subtle' : undefined,
-            )}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-ink">
-                {workspace.owner_operator_id === ownOperatorId ? 'Your workspace' : workspace.owner_email}
-              </p>
-              <p className="text-xs text-ink-muted">
-                {switching === workspace.owner_operator_id
-                  ? 'Switching...'
-                  : roleLabel[workspace.role] ?? workspace.role}
-              </p>
-            </div>
-            {workspace.active ? (
-              <Check width={16} height={16} className="shrink-0 text-brand" aria-hidden />
-            ) : null}
-          </button>
-        ))}
-      </div>
+      {creating ? (
+        <form className="flex w-64 flex-col gap-3 p-1" onSubmit={(event) => void submitCreate(event)}>
+          <Field
+            label="Workspace name"
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Client X"
+            error={createError ?? undefined}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" className="flex-1" disabled={submitting || name.trim() === ''}>
+              {submitting ? 'Creating' : 'Create'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex w-64 flex-col gap-1">
+          <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Workspaces
+          </p>
+          <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+            {workspaces.map((workspace) => (
+              <button
+                key={workspace.id}
+                type="button"
+                disabled={switching !== ''}
+                onClick={() => void onSelect(workspace.id)}
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+                  workspace.active ? 'bg-subtle' : undefined,
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-ink">{workspace.name}</p>
+                  <p className="text-xs text-ink-muted">
+                    {switching === workspace.id
+                      ? 'Switching...'
+                      : workspaceSubtitle(workspace.is_personal, workspace.role)}
+                  </p>
+                </div>
+                {workspace.active ? (
+                  <Check width={16} height={16} className="shrink-0 text-brand" aria-hidden />
+                ) : null}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 flex flex-col gap-0.5 border-t border-border pt-1">
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Plus width={15} height={15} className="text-ink-muted" aria-hidden />
+              Create workspace
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/app/workspaces')}
+              className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Settings width={15} height={15} className="text-ink-muted" aria-hidden />
+              Manage workspaces
+            </button>
+          </div>
+        </div>
+      )}
     </Popover>
   );
 }

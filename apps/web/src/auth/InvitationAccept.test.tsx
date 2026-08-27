@@ -7,7 +7,7 @@ import { renderInApp } from '../test/render';
 import { useAuthStore } from '../store/auth';
 import { useWorkspaceStore } from '../store/workspace';
 
-const invitation: Invitation = { workspace_email: 'boss@example.com', role: 'member' };
+const invitation: Invitation = { workspace_name: 'Client X', role: 'member' };
 
 const getInvitationMock = vi.fn(async (_token: string) => invitation);
 const acceptInvitationMock = vi.fn(async (_token: string) => ({
@@ -60,7 +60,7 @@ beforeEach(() => {
 describe('InvitationAccept', () => {
   it('offers sign in and sign up when nobody is signed in', async () => {
     renderInvitation();
-    expect(await screen.findByText(/boss@example.com invited you/)).toBeInTheDocument();
+    expect(await screen.findByText(/You were invited to Client X/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign in to accept/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Create an account/i })).toBeInTheDocument();
   });
@@ -84,7 +84,7 @@ describe('InvitationAccept', () => {
 
   it('reads the invitation with no session required', async () => {
     renderInvitation();
-    await screen.findByText(/boss@example.com invited you/);
+    await screen.findByText(/You were invited to Client X/);
     expect(getInvitationMock).toHaveBeenCalledWith('tok_abc');
   });
 

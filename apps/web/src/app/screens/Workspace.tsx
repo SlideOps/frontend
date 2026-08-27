@@ -13,6 +13,7 @@ import { ArrowRight, capabilityIcon, CheckCircle2, Plus, Server, XCircle } from 
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
+import { activeWorkspace, useWorkspaceStore } from '../../store/workspace';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -73,11 +74,13 @@ function HealthCard({ operations }: { operations: Operation[] }) {
 export function Workspace() {
   const navigate = useNavigate();
   const { state } = useAsyncData((signal) => loadWorkspace(signal), []);
+  const workspaces = useWorkspaceStore((store) => store.workspaces);
+  const active = activeWorkspace(workspaces);
 
   return (
     <OperatorShell active="home">
       <PageHeader
-        title="Workspace"
+        title={active?.name ?? 'Workspace'}
         description="Your Projects, Nodes, and recent Operations at a glance."
         guidanceKey="dashboard.workspace"
         actions={

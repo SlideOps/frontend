@@ -10,7 +10,7 @@ interface WorkspaceState {
    * an Operator with only their own workspace is a perfectly normal result. */
   refresh: () => Promise<void>;
   /** Switch the active workspace, then re-read the list so `active` moves. */
-  switchTo: (ownerOperatorId: string) => Promise<void>;
+  switchTo: (workspaceId: string) => Promise<void>;
   /** Drop the loaded state, for sign out. */
   reset: () => void;
 }
@@ -35,8 +35,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ workspaces: [], loaded: true });
     }
   },
-  async switchTo(ownerOperatorId) {
-    await switchWorkspace(ownerOperatorId);
+  async switchTo(workspaceId) {
+    await switchWorkspace(workspaceId);
     await get().refresh();
   },
   reset() {

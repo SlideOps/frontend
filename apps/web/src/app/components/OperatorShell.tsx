@@ -1,6 +1,7 @@
 import {
   Activity,
   Boxes,
+  Building2,
   Clock,
   Container,
   CreditCard,
@@ -33,6 +34,7 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export type ActiveKey =
   | 'home'
+  | 'workspaces'
   | 'nodes'
   | 'projects'
   | 'services'
@@ -127,6 +129,22 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: LayoutDashboard,
       active: active === 'home',
       onSelect: () => navigate('/app'),
+    },
+    {
+      key: 'workspaces',
+      group: 'Workspace',
+      label: 'All Workspaces',
+      icon: Building2,
+      active: active === 'workspaces',
+      onSelect: () => navigate('/app/workspaces'),
+    },
+    {
+      key: 'team',
+      group: 'Workspace',
+      label: 'Team',
+      icon: Users,
+      active: active === 'team',
+      onSelect: () => navigate('/app/team'),
     },
     {
       key: 'nodes',
@@ -231,14 +249,6 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: CreditCard,
       active: active === 'billing',
       onSelect: () => navigate('/app/billing'),
-    },
-    {
-      key: 'team',
-      group: 'Account',
-      label: 'Team',
-      icon: Users,
-      active: active === 'team',
-      onSelect: () => navigate('/app/team'),
     },
     {
       key: 'extensions',

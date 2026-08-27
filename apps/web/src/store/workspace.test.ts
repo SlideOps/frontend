@@ -9,10 +9,11 @@ function jsonResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-const own = { owner_operator_id: 'op_1', owner_email: 'me@example.com', role: 'owner' as const, active: true };
+const own = { id: 'ws_1', name: 'Personal', is_personal: true, role: 'owner' as const, active: true };
 const shared = {
-  owner_operator_id: 'op_2',
-  owner_email: 'them@example.com',
+  id: 'ws_2',
+  name: 'Client X',
+  is_personal: false,
   role: 'viewer' as const,
   active: false,
 };
@@ -42,7 +43,7 @@ describe('workspace store', () => {
     const state = useWorkspaceStore.getState();
     expect(state.loaded).toBe(true);
     expect(state.workspaces).toHaveLength(2);
-    expect(activeWorkspace(state.workspaces)?.owner_operator_id).toBe('op_1');
+    expect(activeWorkspace(state.workspaces)?.id).toBe('ws_1');
   });
 
   it('reports a Viewer as unable to write in the active workspace', async () => {
@@ -76,11 +77,11 @@ describe('workspace store', () => {
         jsonResponse(200, { workspaces: [{ ...own, active: false }, { ...shared, active: true }] }),
       );
 
-    await useWorkspaceStore.getState().switchTo('op_2');
+    await useWorkspaceStore.getState().switchTo('ws_2');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const state = useWorkspaceStore.getState();
-    expect(activeWorkspace(state.workspaces)?.owner_operator_id).toBe('op_2');
+    expect(activeWorkspace(state.workspaces)?.id).toBe('ws_2');
   });
 
   it('resets to unloaded', () => {

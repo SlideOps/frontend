@@ -19,15 +19,17 @@ const repos: GitHubRepo[] = [
 const disconnectGitHubMock = vi.fn(async () => undefined);
 
 const ownerWorkspace: Workspace = {
-  owner_operator_id: 'op_1',
-  owner_email: 'me@example.com',
+  id: 'ws_1',
+  name: 'Personal',
+  is_personal: true,
   role: 'owner',
   active: true,
 };
 
 const viewerWorkspace: Workspace = {
-  owner_operator_id: 'op_9',
-  owner_email: 'boss@example.com',
+  id: 'ws_9',
+  name: 'Client X',
+  is_personal: false,
   role: 'viewer',
   active: true,
 };

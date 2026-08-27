@@ -1,5 +1,5 @@
 import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, Check, Server } from '@slideops/icons';
+import { ArrowRight, Building2, Check, Server } from '@slideops/icons';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { signUpUrl } from '../content/site';
@@ -28,9 +28,10 @@ const tiers: Tier[] = [
     blurb: 'See the whole flow on one server.',
     cta: 'Start free',
     features: [
+      'Unlimited Workspaces',
       '1 server',
       '1 Project',
-      '1 seat',
+      '1 seat per Workspace',
       'Core security on every server',
       'The full marketplace',
       '7 days of history',
@@ -45,9 +46,10 @@ const tiers: Tier[] = [
     cta: 'Get started',
     includes: 'Everything in Free, plus',
     features: [
+      'Unlimited Workspaces',
       '3 servers',
       '5 Projects',
-      '2 seats',
+      '2 seats per Workspace',
       'Automations and scheduling',
       '30 days of history',
       'Email support',
@@ -62,9 +64,10 @@ const tiers: Tier[] = [
     cta: 'Get started',
     includes: 'Everything in Starter, plus',
     features: [
+      'Unlimited Workspaces',
       '15 servers',
       '30 Projects',
-      '5 seats',
+      '5 seats per Workspace',
       'Advanced monitoring and reports',
       '1 year of history',
       'Audit trail',
@@ -78,6 +81,7 @@ const tiers: Tier[] = [
     cta: 'Talk to us',
     includes: 'Everything in Pro, plus',
     features: [
+      'Unlimited Workspaces',
       'Unlimited servers and Projects',
       'Unlimited seats',
       'Single sign-on',
@@ -120,7 +124,22 @@ export function Pricing() {
           <Text variant="body" tone="secondary" className="mt-5">
             Every Capability runs on your servers, never on ours, so we never cap the CPU, memory,
             or disk you already own. You use all of it. Your plan sets only what SlideOps provides:
-            the servers you connect, the Projects you run, your team seats, and your support.
+            the servers you connect, the Projects you run, the seats on your team, and your support.
+          </Text>
+        </div>
+
+        <div className="so-rise mt-8 flex items-start gap-3 rounded-lg border border-border bg-app p-4">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-subtle text-accent">
+            <Building2 width={16} height={16} aria-hidden />
+          </span>
+          <Text variant="body-sm" tone="secondary">
+            <strong className="font-medium text-ink">
+              Workspaces are free on every plan, starting today.
+            </strong>{' '}
+            Create as many as you like: a Personal one to start, and one for every team or client
+            you take on, each with its own servers, Projects, and people. Servers and Projects are
+            capped across your whole account, however many Workspaces you split them across; seats
+            are counted per Workspace, so a new Workspace always gets its own team allowance.
           </Text>
         </div>
 

@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   acceptInvitation,
+  createWorkspace,
+  deleteWorkspace,
   getInvitation,
   inviteTeamMember,
   listTeam,
   listWorkspaces,
   removeTeamMember,
+  renameWorkspace,
   switchWorkspace,
   updateTeamMemberRole,
 } from './workspaces';
@@ -27,13 +30,8 @@ describe('workspaces requests', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(200, {
         workspaces: [
-          { owner_operator_id: 'op_1', owner_email: 'me@example.com', role: 'owner', active: true },
-          {
-            owner_operator_id: 'op_2',
-            owner_email: 'them@example.com',
-            role: 'member',
-            active: false,
-          },
+          { id: 'ws_1', name: 'Personal', is_personal: true, role: 'owner', active: true },
+          { id: 'ws_2', name: 'Client X', is_personal: false, role: 'member', active: false },
         ],
       }),
     );
@@ -47,15 +45,57 @@ describe('workspaces requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/workspaces');
   });
 
+  it('creates a Workspace by name', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(201, {
+        workspace: { id: 'ws_3', name: 'Client Y', is_personal: false, role: 'owner', active: false },
+      }),
+    );
+
+    const workspace = await createWorkspace('Client Y');
+
+    expect(workspace.id).toBe('ws_3');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    const sent = JSON.parse(String(init?.body)) as { name: string };
+    expect(sent.name).toBe('Client Y');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/workspaces');
+  });
+
+  it('renames a Workspace', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        workspace: { id: 'ws_2', name: 'Client Z', is_personal: false, role: 'owner', active: false },
+      }),
+    );
+
+    const workspace = await renameWorkspace('ws_2', 'Client Z');
+
+    expect(workspace.name).toBe('Client Z');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PATCH');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/workspaces/ws_2');
+  });
+
+  it('deletes a Workspace', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+
+    await deleteWorkspace('ws_2');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('DELETE');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/workspaces/ws_2');
+  });
+
   it('switches the active Workspace', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
 
-    await switchWorkspace('op_2');
+    await switchWorkspace('ws_2');
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
-    const sent = JSON.parse(String(init?.body)) as { owner_operator_id: string };
-    expect(sent.owner_operator_id).toBe('op_2');
+    const sent = JSON.parse(String(init?.body)) as { workspace_id: string };
+    expect(sent.workspace_id).toBe('ws_2');
   });
 
   it('lists the active Workspace team', async () => {
@@ -132,11 +172,11 @@ describe('workspaces requests', () => {
 
   it('reads what an invitation offers without a session', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { workspace_email: 'owner@example.com', role: 'member' }),
+      jsonResponse(200, { workspace_name: 'Client X', role: 'member' }),
     );
 
     const invitation = await getInvitation('tok_abc');
-    expect(invitation.workspace_email).toBe('owner@example.com');
+    expect(invitation.workspace_name).toBe('Client X');
   });
 
   it('accepts an invitation', async () => {

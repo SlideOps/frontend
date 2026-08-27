@@ -31,6 +31,9 @@ import { useAuthStore } from './store/auth';
 const Workspace = lazy(() =>
   import('./app/screens/Workspace').then((m) => ({ default: m.Workspace })),
 );
+const WorkspaceHub = lazy(() =>
+  import('./app/screens/WorkspaceHub').then((m) => ({ default: m.WorkspaceHub })),
+);
 const Nodes = lazy(() => import('./app/screens/Nodes').then((m) => ({ default: m.Nodes })));
 const NodeRegister = lazy(() =>
   import('./app/screens/NodeRegister').then((m) => ({ default: m.NodeRegister })),
@@ -178,6 +181,7 @@ export function App() {
         {/* Operator area: any signed-in account. */}
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Workspace />} />
+          <Route path="workspaces" element={<WorkspaceHub />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="nodes/new" element={<NodeRegister />} />
           <Route path="ssh-keys" element={<SSHKeys />} />

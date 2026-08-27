@@ -82,7 +82,7 @@ export function InvitationAccept() {
     return (
       <AuthLayout
         title="You're in"
-        description={`You now have ${role} access in ${invitation.workspace_email}'s workspace.`}
+        description={`You now have ${role} access in ${invitation.workspace_name}.`}
       >
         <Button size="lg" className="w-full" onClick={() => navigate('/app', { replace: true })}>
           Open the workspace
@@ -95,7 +95,7 @@ export function InvitationAccept() {
     return (
       <AuthLayout
         title="You're invited"
-        description={`${invitation.workspace_email} invited you to their workspace as ${role.toLowerCase() === 'admin' ? 'an' : 'a'} ${role}. Sign in or create an account to accept.`}
+        description={`You were invited to ${invitation.workspace_name} as ${role.toLowerCase() === 'admin' ? 'an' : 'a'} ${role}. Sign in or create an account to accept.`}
       >
         <div className="flex flex-col gap-3">
           <Button size="lg" className="w-full" onClick={() => navigate('/login', { state: { next } })}>
@@ -117,7 +117,7 @@ export function InvitationAccept() {
   return (
     <AuthLayout
       title="You're invited"
-      description={`${invitation.workspace_email} invited you to their workspace as ${role.toLowerCase() === 'admin' ? 'an' : 'a'} ${role}.`}
+      description={`You were invited to ${invitation.workspace_name} as ${role.toLowerCase() === 'admin' ? 'an' : 'a'} ${role}.`}
     >
       <div className="flex flex-col gap-3">
         <Text variant="body-sm" tone="secondary">

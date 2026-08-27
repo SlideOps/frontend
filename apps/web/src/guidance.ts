@@ -9,9 +9,15 @@ import type { GuidanceRegistry } from '@slideops/tooltips';
 export const guidance: GuidanceRegistry = {
   'dashboard.workspace': {
     label: 'Workspace',
-    summary: 'Your Workspace gathers your Projects, Nodes, and recent Operations in one place.',
+    summary: 'A Workspace gathers its own Projects, Nodes, and recent Operations in one place.',
     detail:
-      'A Workspace is the home for your work. From here you reach every Project you own, the Nodes inside them, and the Operations you have run recently. Nothing here belongs to anyone else.',
+      'This Workspace is one self contained scope: every Project and Node here belongs to it, not to your account as a whole. You can create as many Workspaces as you need, one Personal one you always have plus any others for different teams or clients, and switch between them from the workspace switcher.',
+  },
+  'workspaces.hub': {
+    label: 'Workspaces',
+    summary: 'Every Workspace you can act in, and creating a new one.',
+    detail:
+      'A Workspace starts empty: no Node or Project until you add one. Create as many as you need, for different teams, clients, or purposes, and invite people into only the ones they should see. Deleting one is refused while it still owns a Node or a Project, and your Personal Workspace can never be deleted.',
   },
   'dashboard.nodes': {
     label: 'Nodes',
