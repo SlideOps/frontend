@@ -147,11 +147,13 @@ function CredentialSection({
 }) {
   const meta = [context.nodeName, context.projectName].filter(Boolean).join(' / ');
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-raised p-4">
+    <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Text variant="h4">{context.title}</Text>
-          <Text variant="body-sm" tone="secondary" className="mt-0.5">
+          <Text variant="body" className="font-medium text-ink">
+            {context.title}
+          </Text>
+          <Text variant="caption" tone="secondary" className="mt-0.5">
             {meta ? `${meta}` : 'No Node recorded'}
             {context.completedAt ? ` · ${context.completedAt}` : ''}
           </Text>
@@ -325,7 +327,7 @@ export function Credentials() {
             description="When a Capability creates a credential for you, such as a database password, it appears here so you can reveal it, copy it, and download it to use in another tool."
           />
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {downloadError ? (
               <div
                 role="alert"
@@ -336,7 +338,7 @@ export function Credentials() {
             ) : null}
 
             {usedProjectNames.length > 0 || hasUnassigned ? (
-              <label className="flex items-center gap-2 text-sm text-ink-muted">
+              <label className="flex items-center gap-2 border-b border-border pb-4 text-sm text-ink-muted">
                 <span>Project</span>
                 <select
                   className={selectClass}
@@ -362,14 +364,16 @@ export function Credentials() {
                 description="No stored credentials match this filter. Choose All Projects to see every credential SlideOps created for you."
               />
             ) : (
-              visible.map((context) => (
-                <CredentialSection
-                  key={context.operation.id}
-                  context={context}
-                  onDownload={() => void downloadOne(context)}
-                  downloading={downloading === context.operation.id}
-                />
-              ))
+              <div className="flex flex-col gap-8">
+                {visible.map((context) => (
+                  <CredentialSection
+                    key={context.operation.id}
+                    context={context}
+                    onDownload={() => void downloadOne(context)}
+                    downloading={downloading === context.operation.id}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )

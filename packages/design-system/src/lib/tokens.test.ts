@@ -22,7 +22,7 @@ describe('chart color from token', () => {
   it('falls back to the documented value when the token is unset', () => {
     const el = document.createElement('div');
     expect(readCssVar('--color-brand', el)).toBe('');
-    expect(chartColorFromToken('--color-brand', el)).toBe('#3b5bdb');
+    expect(chartColorFromToken('--color-brand', el)).toBe('#171717');
   });
 
   it('resolves a full palette with a distinct ordered series', () => {

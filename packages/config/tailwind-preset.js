@@ -82,9 +82,9 @@ const preset = {
         slow: 'var(--so-duration-slow)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },
   },

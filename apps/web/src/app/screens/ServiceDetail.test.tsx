@@ -145,10 +145,8 @@ describe('ServiceDetail', () => {
   it('shows the logs section, open, live, with the workload output in it', async () => {
     show();
 
-    expect(await screen.findByRole('button', { name: /^Logs and activity/ })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
+
     await screen.findByRole('log');
     FakeSocket.last!.openIt();
     FakeSocket.last!.message({ type: 'history', data: 'listening on :8000\nready' });
@@ -161,6 +159,7 @@ describe('ServiceDetail', () => {
   it('shows the activity trail beside the output', async () => {
     show();
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
     await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }));
 
     expect(await screen.findByText('Deployed, and the Service is running.')).toBeInTheDocument();
@@ -168,55 +167,62 @@ describe('ServiceDetail', () => {
   });
 
   /*
-   * Every section the Operator asked to be able to fold. Each is checked by its
-   * disclosure button, which is what actually makes it foldable: a heading that
-   * merely looks like one is the failure being guarded against.
+   * The sections that remain foldable now that each lives on its own tab
+   * rather than competing with everything else on one long page. Each is
+   * checked by its disclosure button, which is what actually makes it
+   * foldable: a heading that merely looks like one is the failure being
+   * guarded against.
    */
   it.each([
-    ['Logs and activity', true],
-    ['Command and environment', false],
-    ['Manage', true],
-    ['Shell', false],
-    ['Live usage', true],
-  ])('lets the Operator fold %s', async (title, startsOpen) => {
+    ['Live usage', 'Overview' as const],
+    ['Manage', 'Browse' as const],
+    ['Command and environment', 'Settings' as const],
+  ])('lets the Operator fold %s', async (title, tab) => {
     show();
+
+    if (tab !== 'Overview') {
+      await userEvent.click(await screen.findByRole('tab', { name: tab }));
+    }
 
     // Anchored, because a guidance tooltip beside a heading is also a button
-    // with aria-expanded and its name mentions the same section.
+    // with aria-expanded and its name mentions the same section. Every one of
+    // these starts open on its own tab now: an Operator who navigated here
+    // asked for exactly this, so nothing should greet them collapsed.
     const toggle = await screen.findByRole('button', { name: new RegExp('^' + title) });
-    expect(toggle).toHaveAttribute('aria-expanded', String(startsOpen));
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', String(!startsOpen)));
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'));
 
     await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', String(startsOpen)));
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
   });
 
-  // Folding the logs away must actually stop showing them, not merely hide them,
-  // or the polling and the open connections behind a section carry on.
-  it('takes the output away when the logs are folded', async () => {
+  // Leaving the Logs tab must actually stop the log view, not merely hide it,
+  // or the open websocket behind it carries on regardless of what is on screen.
+  it('takes the output away when the Logs tab is left', async () => {
     show();
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
     expect(await screen.findByRole('log')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Logs and activity/ }));
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Overview' }));
     await waitFor(() => expect(screen.queryByRole('log')).not.toBeInTheDocument());
   });
 
-  // It used to sit at the very bottom, under the whole environment editor, which
-  // is a large part of why it read as missing.
-  it('puts the logs above the configuration editor', async () => {
-    const { container } = show();
-    await screen.findByRole('log');
+  // Logs sits ahead of Settings in the tab order, so the section an Operator
+  // most often comes looking for when something is wrong is not the one they
+  // have to dig past everything else, including their own config editor, to
+  // reach.
+  it('puts the Logs tab ahead of Settings', async () => {
+    show();
 
-    const headings = Array.from(container.querySelectorAll('section')).map(
-      (s) => s.textContent?.slice(0, 40) ?? '',
-    );
-    const logs = headings.findIndex((h) => h.includes('Logs and activity'));
-    const config = headings.findIndex((h) => h.includes('Command and environment'));
+    const tabs = (await screen.findAllByRole('tab')).map((tab) => tab.textContent);
+    const logs = tabs.findIndex((label) => label === 'Logs');
+    const settings = tabs.findIndex((label) => label === 'Settings');
 
     expect(logs).toBeGreaterThanOrEqual(0);
-    expect(config).toBeGreaterThanOrEqual(0);
-    expect(logs).toBeLessThan(config);
+    expect(settings).toBeGreaterThanOrEqual(0);
+    expect(logs).toBeLessThan(settings);
   });
 });

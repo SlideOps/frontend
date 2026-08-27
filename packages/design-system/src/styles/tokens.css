@@ -1,49 +1,58 @@
 /*
  * SlideOps design tokens.
  *
- * A cool, neutral, dark-first palette is the only source of color. Brand
- * colors, a derived neutral ramp, and functional status colors are declared
- * once as primitives, then mapped to semantic tokens for the light and the
- * dark theme. Components only ever reference the semantic tokens, never the
- * raw values.
+ * A true neutral, black-and-white-first palette, in the mold of Vercel's own
+ * dashboard: almost everything is grayscale, and color is spent only on the
+ * few things that must carry meaning (status, focus, a link) rather than on
+ * decoration. Primitives are declared once, then mapped to semantic tokens
+ * for the light and the dark theme. Components only ever reference the
+ * semantic tokens, never the raw values.
  *
- * Token *names* are stable across the previous warm palette on purpose: a few
- * places (LogoLoader.tsx, marketing Hero.tsx) read primitives like
- * --so-marsala directly for brand artwork, so repainting values here repaints
- * them too, with nothing else to touch.
+ * Token *names* are stable across two previous palettes on purpose, so a
+ * future repaint only ever touches the values declared here. The mark
+ * (Mark.tsx, LogoLoader.tsx) intentionally does not read these primitives:
+ * it reads the semantic tokens below directly, so it inverts with the theme
+ * instead of staying one fixed color regardless of which one is active.
  */
 
 :root {
-  /* Brand palette */
-  --so-rose-quartz: #eef1ff;
-  --so-peach: #a5b4fc;
-  --so-cognac: #5c7cfa;
-  --so-marsala: #3b5bdb;
-  --so-ink: #10131a;
+  /* Brand palette: grayscale, not a hue. --so-marsala is the strongest mark
+     (near-black), --so-cognac and --so-peach step down toward white, --so-ink
+     is the deepest tone reserved for true black surfaces and overlays. */
+  --so-rose-quartz: #fafafa;
+  --so-peach: #d4d4d4;
+  --so-cognac: #737373;
+  --so-marsala: #171717;
+  --so-ink: #0a0a0a;
 
-  /* Cool neutral ramp */
+  /* True neutral ramp, the same channel value on every axis so nothing reads
+     as blue- or warm-tinted the way the two earlier palettes did. */
   --so-neutral-0: #ffffff;
-  --so-neutral-50: #f7f8fa;
-  --so-neutral-100: #eef1f5;
-  --so-neutral-200: #dde2e8;
-  --so-neutral-300: #c2c9d3;
-  --so-neutral-400: #98a2b3;
-  --so-neutral-500: #70798c;
-  --so-neutral-600: #525b6e;
-  --so-neutral-700: #394152;
-  --so-neutral-800: #23293a;
-  --so-neutral-900: #161b28;
-  --so-neutral-950: #0c0f17;
+  --so-neutral-50: #fafafa;
+  --so-neutral-100: #f5f5f5;
+  --so-neutral-200: #e5e5e5;
+  --so-neutral-300: #d4d4d4;
+  --so-neutral-400: #a3a3a3;
+  --so-neutral-500: #737373;
+  --so-neutral-600: #525252;
+  --so-neutral-700: #404040;
+  --so-neutral-800: #262626;
+  --so-neutral-900: #171717;
+  --so-neutral-950: #0a0a0a;
 
-  /* Functional status colors */
+  /* Functional status colors: the only hues left in the palette, spent
+     purely on meaning (a passed check, a warning, a failure). */
   --so-success: #2f9e5b;
   --so-warning: #c98a2e;
   --so-danger: #e5484d;
-  --so-info: #3b82c4;
+  /* Vercel's own signature blue, kept out of the brand/accent tokens above and
+     spent only on focus rings and links, exactly how their own dashboard
+     uses it: the one hue in an otherwise monochrome interface. */
+  --so-info: #0070f3;
 
   /* A fixed dark scrim behind a modal, independent of theme: a backdrop
      should not invert in light mode, so this is not a light/dark pair. */
-  --color-overlay: rgba(12, 15, 23, 0.6);
+  --color-overlay: rgba(0, 0, 0, 0.6);
 
   /* Spacing on a 4px base scale */
   --so-space-1: 0.25rem;
@@ -62,10 +71,10 @@
   --so-radius-xl: 1.5rem;
   --so-radius-pill: 9999px;
 
-  /* Cool-tinted shadows, never pure black */
-  --so-shadow-sm: 0 1px 2px rgba(12, 15, 23, 0.08);
-  --so-shadow-md: 0 4px 16px rgba(12, 15, 23, 0.12);
-  --so-shadow-lg: 0 12px 40px rgba(12, 15, 23, 0.2);
+  /* Neutral shadows: a hint of lift, not a colored glow. */
+  --so-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --so-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --so-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.16);
 
   /* Motion tokens */
   --so-duration-fast: 120ms;
@@ -76,22 +85,23 @@
   --so-ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
-/* Light theme (default) */
+/* Light theme (default): white surfaces, near-black text, hairline gray
+   borders doing the separating instead of shadows or tinted panels. */
 :root,
 :root[data-theme='light'] {
   --color-bg-app: var(--so-neutral-0);
   --color-bg-surface: var(--so-neutral-0);
   --color-bg-raised: var(--so-neutral-0);
   --color-bg-subtle: var(--so-rose-quartz);
-  --color-text-primary: #10131a;
-  --color-text-secondary: var(--so-neutral-600);
+  --color-text-primary: var(--so-ink);
+  --color-text-secondary: var(--so-neutral-500);
   --color-text-on-brand: #ffffff;
   --color-brand: var(--so-marsala);
-  --color-brand-hover: #2f4bc0;
-  --color-accent: var(--so-cognac);
-  --color-highlight: var(--so-peach);
+  --color-brand-hover: var(--so-neutral-800);
+  --color-accent: var(--so-neutral-600);
+  --color-highlight: var(--so-neutral-100);
   --color-border: var(--so-neutral-200);
-  --color-focus-ring: var(--so-cognac);
+  --color-focus-ring: var(--so-info);
   --color-success: var(--so-success);
   --color-warning: var(--so-warning);
   --color-danger: var(--so-danger);
@@ -99,48 +109,50 @@
   color-scheme: light;
 }
 
-/* Dark theme, primary: designed first, light is the derived second theme */
+/* Dark theme, primary: designed first, light is the derived second theme.
+   True near-black rather than a tinted navy, white text and a white primary
+   action, the same inversion Vercel's own dashboard makes. */
 :root[data-theme='dark'] {
-  --color-bg-app: var(--so-neutral-900);
-  --color-bg-surface: var(--so-neutral-800);
-  --color-bg-raised: var(--so-neutral-700);
-  --color-bg-subtle: #1c2333;
-  --color-text-primary: #edeff5;
-  --color-text-secondary: var(--so-neutral-300);
-  --color-text-on-brand: #ffffff;
-  --color-brand: #7c93f5;
-  --color-brand-hover: #8fa3ff;
-  --color-accent: #a3b3e0;
-  --color-highlight: rgba(124, 147, 245, 0.18);
-  --color-border: var(--so-neutral-700);
-  --color-focus-ring: #9db2ff;
+  --color-bg-app: #0a0a0a;
+  --color-bg-surface: #0a0a0a;
+  --color-bg-raised: var(--so-neutral-800);
+  --color-bg-subtle: var(--so-neutral-900);
+  --color-text-primary: #fafafa;
+  --color-text-secondary: var(--so-neutral-400);
+  --color-text-on-brand: #0a0a0a;
+  --color-brand: #fafafa;
+  --color-brand-hover: var(--so-neutral-300);
+  --color-accent: var(--so-neutral-400);
+  --color-highlight: var(--so-neutral-800);
+  --color-border: var(--so-neutral-800);
+  --color-focus-ring: #3291ff;
   --color-success: #4cb877;
   --color-warning: #e0a857;
   --color-danger: #f2555a;
-  --color-info: #5fa8de;
+  --color-info: #3291ff;
   color-scheme: dark;
 }
 
 /* Respect the system preference before a theme is explicitly chosen */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --color-bg-app: var(--so-neutral-900);
-    --color-bg-surface: var(--so-neutral-800);
-    --color-bg-raised: var(--so-neutral-700);
-    --color-bg-subtle: #1c2333;
-    --color-text-primary: #edeff5;
-    --color-text-secondary: var(--so-neutral-300);
-    --color-text-on-brand: #ffffff;
-    --color-brand: #7c93f5;
-    --color-brand-hover: #8fa3ff;
-    --color-accent: #a3b3e0;
-    --color-highlight: rgba(124, 147, 245, 0.18);
-    --color-border: var(--so-neutral-700);
-    --color-focus-ring: #9db2ff;
+    --color-bg-app: #0a0a0a;
+    --color-bg-surface: #0a0a0a;
+    --color-bg-raised: var(--so-neutral-800);
+    --color-bg-subtle: var(--so-neutral-900);
+    --color-text-primary: #fafafa;
+    --color-text-secondary: var(--so-neutral-400);
+    --color-text-on-brand: #0a0a0a;
+    --color-brand: #fafafa;
+    --color-brand-hover: var(--so-neutral-300);
+    --color-accent: var(--so-neutral-400);
+    --color-highlight: var(--so-neutral-800);
+    --color-border: var(--so-neutral-800);
+    --color-focus-ring: #3291ff;
     --color-success: #4cb877;
     --color-warning: #e0a857;
     --color-danger: #f2555a;
-    --color-info: #5fa8de;
+    --color-info: #3291ff;
     color-scheme: dark;
   }
 }

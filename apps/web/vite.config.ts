@@ -6,8 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // background colors mirror the design-system brand and app-background tokens.
 // They live here as literal values because a web app manifest cannot read CSS
 // variables; the source of truth remains the tokens.
-const BRAND = '#743930';
-const APP_BACKGROUND = '#faf6f4';
+const BRAND = '#171717';
+const APP_BACKGROUND = '#ffffff';
 
 // Where the dev server forwards /api to. It is read from the environment so the
 // backend can run wherever you like: in docker compose on :8090, bare on :8080,

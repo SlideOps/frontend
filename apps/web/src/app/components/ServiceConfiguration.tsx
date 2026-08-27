@@ -155,9 +155,6 @@ export function ServiceConfiguration({
       adornment={<Settings width={16} height={16} className="text-brand" aria-hidden />}
       description="Change what this Service runs and the variables it runs with. Saving records the change; because a container bakes these in when it is created, a redeploy is what applies it."
       collapsible
-      // Folded by default. It is the longest thing on the page, and the one edit
-      // it exists for is rare next to the reasons somebody opens a Service.
-      defaultOpen={false}
       summary={`${Object.keys(service.env ?? {}).length} variables`}
     >
       <div className="flex flex-col gap-2">

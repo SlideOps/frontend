@@ -95,7 +95,7 @@ export function useShellSession(urlFor: (cols: number, rows: number) => string):
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
       fontSize: 13,
       scrollback: 5000,
       theme: terminalTheme(),

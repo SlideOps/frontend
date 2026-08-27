@@ -17,18 +17,22 @@ import {
 import { Button, Card, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
+  Database,
+  FileText,
   Play,
   RefreshCw,
   Server,
   serviceIcon,
+  Settings as SettingsIcon,
   Square,
+  Terminal as TerminalIcon,
   Trash2,
   XCircle,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { DetailLayout } from '@slideops/ui';
+import { DetailLayout, PageHeader, TabNav, type TabNavTab } from '@slideops/ui';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -101,22 +105,18 @@ function sourceText(service: Service): string {
 
 
 /*
- * Logs and activity, together and folded away by default.
+ * Logs and activity, together, on their own tab.
  *
  * They answer one question between them and neither answers it alone: the output
  * says the application is unhappy, and the trail says what changed just before it
  * became unhappy. Splitting them across the page meant reading one, scrolling,
  * and trying to hold the other in your head.
- *
- * It starts open. This is the section an Operator came to the page for when
- * something is wrong, and a fold is the right way to put a long thing away, not
- * the right way to greet somebody with it hidden.
  */
 function LogsAndActivity({ id }: { id: string }) {
   const [tab, setTab] = useState<'logs' | 'activity'>('logs');
 
   return (
-    <Section title="Logs and activity" adornment={<Guidance for="service.logs" />} collapsible>
+    <Section title="Logs and activity" adornment={<Guidance for="service.logs" />} flush>
       <div
         role="tablist"
         aria-label="What to show"
@@ -147,12 +147,39 @@ function LogsAndActivity({ id }: { id: string }) {
   );
 }
 
+const SERVICE_TABS: TabNavTab[] = [
+  { key: 'overview', label: 'Overview', icon: Server },
+  { key: 'browse', label: 'Browse', icon: Database },
+  { key: 'shell', label: 'Shell', icon: TerminalIcon },
+  { key: 'logs', label: 'Logs', icon: FileText },
+  { key: 'settings', label: 'Settings', icon: SettingsIcon },
+];
+const DEFAULT_SERVICE_TAB = 'overview';
+
 /** The Service detail: summary, live metrics, lifecycle actions, and logs. */
 export function ServiceDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const canWrite = useCanWrite();
   const { state, reload } = useAsyncData((signal) => loadDetail(id, signal), [id]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = SERVICE_TABS.some((tab) => tab.key === searchParams.get('tab'))
+    ? (searchParams.get('tab') as string)
+    : DEFAULT_SERVICE_TAB;
+  const setActiveTab = (key: string) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (key === DEFAULT_SERVICE_TAB) {
+          next.delete('tab');
+        } else {
+          next.set('tab', key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -233,42 +260,19 @@ export function ServiceDetail() {
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {service ? (
         <>
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                <ServiceHeroIcon width={22} height={22} aria-hidden />
+          <PageHeader
+            title={service.name}
+            description={`${state.status === 'ready' ? (state.data.project?.name ?? 'Unknown Project') : ''} · ${state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}`}
+            tabs={<TabNav tabs={SERVICE_TABS} active={activeTab} onSelect={setActiveTab} />}
+            actions={
+              <span className="inline-flex items-center gap-3">
+                <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand sm:inline-flex">
+                  <ServiceHeroIcon width={18} height={18} aria-hidden />
+                </span>
+                <ServiceStatusBadge status={service.status} />
               </span>
-              <div className="min-w-0">
-                <Text variant="h1">{service.name}</Text>
-                <Text variant="body-sm" tone="secondary" className="mt-1">
-                  {state.status === 'ready' ? (state.data.project?.name ?? 'Unknown Project') : ''}{' '}
-                  · {state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}
-                </Text>
-              </div>
-            </div>
-            <ServiceStatusBadge status={service.status} />
-          </div>
-
-          <nav
-            aria-label="Service sections"
-            className="sticky top-[4.1rem] z-20 -mx-4 mb-8 flex gap-1 overflow-x-auto border-y border-border bg-app/95 px-4 py-1.5 backdrop-blur md:-mx-8 md:px-8"
-          >
-            {[
-              ['service-overview', 'Overview'],
-              ['service-browse', 'Browse'],
-              ['service-shell', 'Shell'],
-              ['service-logs', 'Logs'],
-              ['service-settings', 'Settings'],
-            ].map(([target, label], index) => (
-              <a
-                key={target}
-                href={`#${target}`}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${index === 0 ? 'bg-subtle text-ink' : 'text-ink-muted'}`}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
+            }
+          />
 
           {isDeploying ? (
             <div
@@ -294,78 +298,20 @@ export function ServiceDetail() {
             </div>
           ) : null}
 
+          {activeTab === 'overview' ? (
           <DetailLayout
             main={
               <>
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
-              <div id="service-overview" className="scroll-mt-24">
-                <ServiceEndpoint service={service} onChanged={reload} />
-              </div>
-
-              {/* Scoped to this Service, so a database server shared by several
-                  applications shows only the part this one uses. */}
-              <Section
-                title="Browse"
-                description="What is actually inside, a page at a time, searchable. Nothing here changes anything."
-                collapsible
-              >
-                <DatabaseExplorer
-                  capabilityKey="install-postgresql"
-                  nodeId={service.node_id}
-                  serviceId={service.id}
-                />
-              </Section>
-              <CapabilityManagement
-                capabilityKey="install-postgresql"
-                nodeId={service.node_id}
-                serviceId={service.id}
-                projectId={service.project_id}
-                installed
-                hideActionKeys={DATABASE_EXPLORER_ACTION_KEYS}
-              />
-
-              {/* Folded by default: a terminal is the least likely reason to
-                  open a Service page and the most expensive thing on it. */}
-              <div id="service-shell" className="scroll-mt-24">
-                <Section title="Shell" collapsible defaultOpen={false}>
-                  <ShellTerminal
-                  standalonePath={`/app/services/${service.id}/shell`}
-                  urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
-                  scopeLabel={
-                    service.runtime === 'systemd'
-                      ? 'This Service, on the server'
-                      : 'Inside this Service'
-                  }
-                  scopeDetail={
-                    service.runtime === 'systemd'
-                      ? 'A shell on the server in this Service\u2019s own directory. A systemd Service is not a container, so this one is not confined to it. Opening it is recorded in the audit trail.'
-                      : 'A shell inside this Service\u2019s own container, where only this application\u2019s files and processes are reachable. The rest of the server is not. Opening it is recorded in the audit trail.'
-                  }
-                  unavailableReason={
-                    service.status === 'running'
-                      ? undefined
-                      : `This Service is ${service.status}, so there is nothing running to open a shell in.`
-                  }
-                  />
-                </Section>
-              </div>
+              <ServiceEndpoint service={service} onChanged={reload} />
 
               <ServicePreview service={service} />
 
               <Section title="Live usage" adornment={<Guidance for="service.metrics" />} collapsible>
                 <ServiceMetricsPanel id={service.id} running={isRunning} />
               </Section>
-
-              {/* Above the configuration rather than below it. This is what an
-                  Operator opens the page for when something is wrong, and it used
-                  to sit at the very bottom, under the whole environment editor. */}
-              <div id="service-logs" className="scroll-mt-24">
-                <LogsAndActivity id={service.id} />
-              </div>
-
-              <ServiceConfiguration service={service} onChanged={reload} />
               </>
             }
             rail={
@@ -540,6 +486,58 @@ export function ServiceDetail() {
               </>
             }
           />
+          ) : null}
+
+          {activeTab === 'browse' ? (
+            <>
+              {/* Scoped to this Service, so a database server shared by several
+                  applications shows only the part this one uses. */}
+              <Section
+                title="Browse"
+                description="What is actually inside, a page at a time, searchable. Nothing here changes anything."
+              >
+                <DatabaseExplorer
+                  capabilityKey="install-postgresql"
+                  nodeId={service.node_id}
+                  serviceId={service.id}
+                />
+              </Section>
+              <CapabilityManagement
+                capabilityKey="install-postgresql"
+                nodeId={service.node_id}
+                serviceId={service.id}
+                projectId={service.project_id}
+                installed
+                hideActionKeys={DATABASE_EXPLORER_ACTION_KEYS}
+              />
+            </>
+          ) : null}
+
+          {activeTab === 'shell' ? (
+            <ShellTerminal
+              standalonePath={`/app/services/${service.id}/shell`}
+              urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
+              scopeLabel={
+                service.runtime === 'systemd' ? 'This Service, on the server' : 'Inside this Service'
+              }
+              scopeDetail={
+                service.runtime === 'systemd'
+                  ? 'A shell on the server in this Service’s own directory. A systemd Service is not a container, so this one is not confined to it. Opening it is recorded in the audit trail.'
+                  : 'A shell inside this Service’s own container, where only this application’s files and processes are reachable. The rest of the server is not. Opening it is recorded in the audit trail.'
+              }
+              unavailableReason={
+                service.status === 'running'
+                  ? undefined
+                  : `This Service is ${service.status}, so there is nothing running to open a shell in.`
+              }
+            />
+          ) : null}
+
+          {activeTab === 'logs' ? <LogsAndActivity id={service.id} /> : null}
+
+          {activeTab === 'settings' ? (
+            <ServiceConfiguration service={service} onChanged={reload} />
+          ) : null}
         </>
       ) : null}
     </OperatorShell>
