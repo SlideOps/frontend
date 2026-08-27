@@ -40,13 +40,13 @@ function OperationRow({
   const canWrite = useCanWrite();
   const when = operation.created_at ? new Date(operation.created_at).toLocaleString() : '';
   return (
-    <div className="flex w-full items-center gap-2 rounded-md border border-border bg-surface pr-2 transition-colors duration-fast ease-standard hover:bg-subtle">
+    <div className="group flex w-full items-center gap-2 border-b border-border bg-surface pr-2 transition-colors duration-fast ease-standard first:border-t hover:bg-subtle">
       <button
         type="button"
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-ink-muted transition-colors group-hover:text-ink">
           <Activity width={18} height={18} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
@@ -268,7 +268,7 @@ export function History() {
             />
           )
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="overflow-hidden border-y border-border bg-surface">
             {state.data.map((operation) => (
               <OperationRow
                 key={operation.id}

@@ -12,6 +12,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { catalogIcon } from '../components/CatalogIcon';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface PluginView {
@@ -94,13 +95,12 @@ export function PluginDetail() {
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
                       <PluginIcon width={22} height={22} aria-hidden />
                     </span>
-                    <div className="min-w-0">
-                      <Text variant="h1">{plugin.name}</Text>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <Text variant="caption" tone="secondary">
-                          {plugin.category} · v{plugin.version} · {plugin.author}
-                        </Text>
+                    <div className="min-w-0 pt-0.5">
+                      <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-ink-muted">
+                        <span>Plugin</span><span aria-hidden>·</span><span>{plugin.category}</span>
                       </div>
+                      <Text variant="h1">{plugin.name}</Text>
+                      <Text variant="body-sm" tone="secondary" className="mt-1">v{plugin.version} · by {plugin.author}</Text>
                     </div>
                   </div>
                   {isCore ? (
@@ -121,7 +121,7 @@ export function PluginDetail() {
                       </Section>
 
                       {plugin.provides && plugin.provides.length > 0 ? (
-                        <Section title="Capabilities it adds" guidanceKey="marketplace.provides">
+                        <div id="plugin-capabilities" className="scroll-mt-24"><Section title="Capabilities it adds" guidanceKey="marketplace.provides">
                           <div className="flex flex-col gap-2">
                             {plugin.provides.map((key) => {
                               const capability = byKey.get(key);
@@ -142,11 +142,11 @@ export function PluginDetail() {
                               );
                             })}
                           </div>
-                        </Section>
+                        </Section></div>
                       ) : null}
 
                       {plugin.permissions && plugin.permissions.length > 0 ? (
-                        <Section title="Permissions" guidanceKey="marketplace.permissions">
+                        <div id="plugin-permissions" className="scroll-mt-24"><Section title="Permissions" guidanceKey="marketplace.permissions">
                           <ul className="flex flex-col gap-2">
                             {plugin.permissions.map((permission) => (
                               <li key={permission} className="flex items-start gap-2">
@@ -162,7 +162,7 @@ export function PluginDetail() {
                               </li>
                             ))}
                           </ul>
-                        </Section>
+                        </Section></div>
                       ) : null}
                     </Card>
                   }

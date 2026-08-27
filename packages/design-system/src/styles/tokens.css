@@ -57,8 +57,8 @@
 
   /* Radii, subtle through pill */
   --so-radius-sm: 0.375rem;
-  --so-radius-md: 0.625rem;
-  --so-radius-lg: 1rem;
+  --so-radius-md: 0.5rem;
+  --so-radius-lg: 0.75rem;
   --so-radius-xl: 1.5rem;
   --so-radius-pill: 9999px;
 
@@ -79,7 +79,7 @@
 /* Light theme (default) */
 :root,
 :root[data-theme='light'] {
-  --color-bg-app: var(--so-neutral-50);
+  --color-bg-app: var(--so-neutral-0);
   --color-bg-surface: var(--so-neutral-0);
   --color-bg-raised: var(--so-neutral-0);
   --color-bg-subtle: var(--so-rose-quartz);
@@ -96,6 +96,14 @@
   --color-warning: var(--so-warning);
   --color-danger: var(--so-danger);
   --color-info: var(--so-info);
+  /* The fox mark's five tones, kept in step with the neutral brand direction
+     above rather than fixed to the old warm palette, so the logo never reads
+     as a leftover from a different theme. */
+  --color-mark-1: var(--so-neutral-800);
+  --color-mark-2: var(--so-neutral-600);
+  --color-mark-3: var(--so-neutral-300);
+  --color-mark-4: var(--so-neutral-0);
+  --color-mark-5: var(--so-neutral-950);
   color-scheme: light;
 }
 

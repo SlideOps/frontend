@@ -14,8 +14,9 @@ export interface PageHeaderProps {
 /** A consistent page heading with an optional guidance trigger and actions. */
 export function PageHeader({ title, description, guidanceKey, actions }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
       <div className="min-w-0">
+        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">SlideOps</div>
         <div className="flex items-center gap-2">
           <Text variant="h1">{title}</Text>
           {guidanceKey ? <Guidance for={guidanceKey} placement="bottom" /> : null}

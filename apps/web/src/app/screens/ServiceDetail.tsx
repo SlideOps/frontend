@@ -249,6 +249,27 @@ export function ServiceDetail() {
             <ServiceStatusBadge status={service.status} />
           </div>
 
+          <nav
+            aria-label="Service sections"
+            className="sticky top-[4.1rem] z-20 -mx-4 mb-8 flex gap-1 overflow-x-auto border-y border-border bg-app/95 px-4 py-1.5 backdrop-blur md:-mx-8 md:px-8"
+          >
+            {[
+              ['service-overview', 'Overview'],
+              ['service-browse', 'Browse'],
+              ['service-shell', 'Shell'],
+              ['service-logs', 'Logs'],
+              ['service-settings', 'Settings'],
+            ].map(([target, label], index) => (
+              <a
+                key={target}
+                href={`#${target}`}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${index === 0 ? 'bg-subtle text-ink' : 'text-ink-muted'}`}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+
           {isDeploying ? (
             <div
               role="status"
@@ -279,7 +300,9 @@ export function ServiceDetail() {
               {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
-              <ServiceEndpoint service={service} onChanged={reload} />
+              <div id="service-overview" className="scroll-mt-24">
+                <ServiceEndpoint service={service} onChanged={reload} />
+              </div>
 
               {/* Scoped to this Service, so a database server shared by several
                   applications shows only the part this one uses. */}
@@ -305,8 +328,9 @@ export function ServiceDetail() {
 
               {/* Folded by default: a terminal is the least likely reason to
                   open a Service page and the most expensive thing on it. */}
-              <Section title="Shell" collapsible defaultOpen={false}>
-                <ShellTerminal
+              <div id="service-shell" className="scroll-mt-24">
+                <Section title="Shell" collapsible defaultOpen={false}>
+                  <ShellTerminal
                   standalonePath={`/app/services/${service.id}/shell`}
                   urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
                   scopeLabel={
@@ -324,8 +348,9 @@ export function ServiceDetail() {
                       ? undefined
                       : `This Service is ${service.status}, so there is nothing running to open a shell in.`
                   }
-                />
-              </Section>
+                  />
+                </Section>
+              </div>
 
               <ServicePreview service={service} />
 
@@ -336,7 +361,9 @@ export function ServiceDetail() {
               {/* Above the configuration rather than below it. This is what an
                   Operator opens the page for when something is wrong, and it used
                   to sit at the very bottom, under the whole environment editor. */}
-              <LogsAndActivity id={service.id} />
+              <div id="service-logs" className="scroll-mt-24">
+                <LogsAndActivity id={service.id} />
+              </div>
 
               <ServiceConfiguration service={service} onChanged={reload} />
               </>

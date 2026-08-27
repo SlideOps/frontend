@@ -81,8 +81,8 @@ function NavButton({ item, dense }: { item: NavItem; dense: boolean }) {
 export function AppShell({ nav, surface, children, actions, dense = false }: AppShellProps) {
   return (
     <div className="flex min-h-dvh bg-app text-ink">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4 md:flex">
-        <div className="flex items-center gap-2 px-2 pb-6">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-2.5 py-3 md:flex">
+        <div className="flex items-center gap-2 px-2 pb-5">
           <Logo size={26} />
           <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
             {surface}
@@ -97,7 +97,7 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
             return (
               <Fragment key={item.key}>
                 {heading ? (
-                  <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  <div className="px-3 pb-1 pt-5 text-[11px] font-medium text-ink-muted">
                     {heading}
                   </div>
                 ) : null}

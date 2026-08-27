@@ -31,7 +31,6 @@ export function MarketingHome() {
       <Pricing />
       <Audience />
       <Faq />
-      <Docs />
       <ClosingCta />
     </>
   );

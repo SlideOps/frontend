@@ -3,6 +3,7 @@ import { Text } from '@slideops/design-system';
 import { capabilityIcon } from '@slideops/icons';
 import type { ReactNode } from 'react';
 import { PluginSourceBadge, RiskBadge } from './Badges';
+import { catalogIcon } from './CatalogIcon';
 
 /*
  * One Capability, as a row rather than a box.

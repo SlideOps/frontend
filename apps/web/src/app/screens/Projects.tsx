@@ -32,9 +32,9 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="group flex w-full items-center gap-4 border-b border-border px-3 py-4 text-left transition-colors duration-fast ease-standard first:border-t hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-ink-muted transition-colors group-hover:text-ink">
         <FolderKanban width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
@@ -207,7 +207,7 @@ export function Projects() {
             action={canWrite ? <Button onClick={() => setCreating(true)}>Create your first Project</Button> : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="overflow-hidden border-y border-border bg-surface">
             {state.data.map((project) => (
               <ProjectRow
                 key={project.id}

@@ -6,6 +6,7 @@ import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Collapsible } from '../components/Collapsible';
+import { catalogIcon } from '../components/CatalogIcon';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -39,7 +40,7 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
     ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
     : Boxes;
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="group flex flex-col gap-4 border-border transition-colors duration-fast ease-standard hover:border-ink-muted hover:bg-subtle/30">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
           <Icon width={18} height={18} aria-hidden />
@@ -67,7 +68,11 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
       </Text>
 
       {plugin.provides && plugin.provides.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div>
+          <Text variant="caption" tone="secondary" className="mb-2 block">
+            Provides
+          </Text>
+          <div className="flex flex-wrap gap-1.5">
           {plugin.provides.map((key) => (
             <span
               key={key}
@@ -76,6 +81,7 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
               {key}
             </span>
           ))}
+          </div>
         </div>
       ) : null}
 
@@ -140,7 +146,7 @@ export function Marketplace() {
         </Button>
       </Card>
 
-      <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">
+      <div className="mb-8 flex max-w-xl items-center gap-2 rounded-md border border-border bg-surface px-3 shadow-sm">
         <Search width={18} height={18} className="text-ink-muted" aria-hidden />
         <input
           type="search"

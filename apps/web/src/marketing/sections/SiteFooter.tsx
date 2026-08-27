@@ -87,7 +87,7 @@ export function SiteFooter() {
 
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 md:flex-row md:items-center">
           <Text variant="body-sm" tone="secondary">
-            Built for Operators who stay in control. slideops.com
+            Built for Operators who stay in control. useslideops.com
           </Text>
           <Text variant="body-sm" tone="secondary">
             &copy; {year} SlideOps

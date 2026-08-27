@@ -15,7 +15,7 @@ const APP_BACKGROUND = '#faf6f4';
 //
 // Development only. In production the app either shares an origin with the API,
 // or points at it directly through VITE_API_BASE_URL, and no proxy is involved.
-const DEFAULT_DEV_API_TARGET = 'http://localhost:8090';
+const DEFAULT_DEV_API_TARGET = 'http://localhost:8080';
 
 export default defineConfig(({ mode }) => {
   // loadEnv reads .env, .env.local, and the mode-specific files from the app

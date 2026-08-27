@@ -317,6 +317,10 @@ export function CapabilityDetail() {
                   <Guidance for="capability.category" size={14} />
                   <PluginSourceBadge capability={capabilityResult.state.data} />
                 </div>
+                <Text variant="h1">{capabilityResult.state.data.name}</Text>
+                <Text variant="body-sm" tone="secondary" className="mt-1 max-w-2xl">
+                  {capabilityResult.state.data.description}
+                </Text>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -408,7 +412,7 @@ export function CapabilityDetail() {
 
               {/* No frame around the document. These are parts of one page, and
                   a border around them said they were separate things. */}
-              <div className="flex flex-col divide-y divide-border">
+              <div id="capability-overview" className="scroll-mt-24 flex flex-col divide-y divide-border">
                 <Section title="Outcome" guidanceKey="capability.outcome">
                   <Text variant="body" tone="secondary">
                     {capabilityResult.state.data.description}
@@ -464,7 +468,8 @@ export function CapabilityDetail() {
 
                 {/* Only once it is installed here. Before that there is nothing
                     to manage, and the page stays the description it always was. */}
-                <CapabilityManagement
+                <div id="capability-management" className="scroll-mt-24">
+                  <CapabilityManagement
                   capabilityKey={key}
                   nodeId={preselectedNode ?? ''}
                   projectId={preselectedProject}
@@ -473,6 +478,7 @@ export function CapabilityDetail() {
                 />
 
                 {capabilityResult.state.data.verification_strategy ? (
+                  <div id="capability-verification" className="scroll-mt-24">
                   <Section title="How verification proves it" guidanceKey="capability.verification">
                     <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
                       <ShieldCheck
@@ -486,6 +492,7 @@ export function CapabilityDetail() {
                       </Text>
                     </div>
                   </Section>
+                  </div>
                 ) : null}
               </div>
               </>

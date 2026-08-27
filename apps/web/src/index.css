@@ -10,7 +10,7 @@
   body {
     background-color: var(--color-bg-app);
     color: var(--color-text-primary);
-    font-family: Inter, system-ui, sans-serif;
+    font-family: Geist, 'Geist Sans', Inter, ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 }

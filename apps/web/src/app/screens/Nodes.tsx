@@ -32,7 +32,7 @@ function NodeRow({
           : 'flex w-full items-center gap-4 border-b border-border py-3 text-left transition-colors duration-fast ease-standard last:border-b-0 hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
       }
     >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-ink-muted transition-colors group-hover:text-ink">
         <Server width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
@@ -57,7 +57,7 @@ function NodeRow({
         </Text>
       </span>
       <span className="hidden shrink-0 text-xs text-ink-muted sm:block">{discovered}</span>
-      <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
+      <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
     </button>
   );
 }

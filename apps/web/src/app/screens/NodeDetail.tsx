@@ -269,19 +269,21 @@ export function NodeDetail() {
 
               <NodeHealth nodeId={id} />
 
-              <Section title="Terminal">
-                <ShellTerminal
-                  standalonePath={`/app/nodes/${id}/shell`}
-                  urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
-                  scopeLabel="This whole server"
-                  scopeDetail="A shell on the server itself, as the SSH account SlideOps connects with: the same access you would have opening a terminal yourself. For a shell confined to one application, open it from that Service instead. Opening one is recorded in the audit trail."
-                  unavailableReason={
-                    nodeResult.state.data.status === 'unreachable'
-                      ? 'This server is unreachable, so there is nothing to open a shell onto.'
-                      : undefined
-                  }
-                />
-              </Section>
+              <div id="node-shell" className="scroll-mt-24">
+                <Section title="Terminal">
+                  <ShellTerminal
+                    standalonePath={`/app/nodes/${id}/shell`}
+                    urlFor={(cols, rows) => nodeShellUrl(id, cols, rows)}
+                    scopeLabel="This whole server"
+                    scopeDetail="A shell on the server itself, as the SSH account SlideOps connects with: the same access you would have opening a terminal yourself. For a shell confined to one application, open it from that Service instead. Opening one is recorded in the audit trail."
+                    unavailableReason={
+                      nodeResult.state.data.status === 'unreachable'
+                        ? 'This server is unreachable, so there is nothing to open a shell onto.'
+                        : undefined
+                    }
+                  />
+                </Section>
+              </div>
 
               <Section title="Discovery" adornment={<Guidance for="node.discover" />}>
                 {discovering ? <Loading label="Reading the Node, read only" /> : null}
@@ -299,7 +301,9 @@ export function NodeDetail() {
                 {discovery ? <DiscoveryScan result={discovery} /> : null}
               </Section>
 
-              <RunningHere nodeId={id} />
+              <div id="node-services" className="scroll-mt-24">
+                <RunningHere nodeId={id} />
+              </div>
 
               <div>
                 <div className="mb-3 flex items-center gap-2">
