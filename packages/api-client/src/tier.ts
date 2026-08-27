@@ -19,6 +19,7 @@ export interface TierLimits {
   nodes: number;
   projects: number;
   seats: number;
+  workspaces: number;
   history_days: number;
   automations: boolean;
   advanced_monitoring: boolean;
@@ -29,6 +30,7 @@ export interface TierLimits {
 export interface TierUsage {
   nodes: number;
   projects: number;
+  workspaces: number;
 }
 
 /** The tier read: the name, the ceilings, and current usage in one shape. */

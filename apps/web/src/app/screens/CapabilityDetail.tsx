@@ -317,7 +317,6 @@ export function CapabilityDetail() {
                   <Guidance for="capability.category" size={14} />
                   <PluginSourceBadge capability={capabilityResult.state.data} />
                 </div>
-                <Text variant="h1">{capabilityResult.state.data.name}</Text>
                 <Text variant="body-sm" tone="secondary" className="mt-1 max-w-2xl">
                   {capabilityResult.state.data.description}
                 </Text>
@@ -339,168 +338,171 @@ export function CapabilityDetail() {
           <DetailLayout
             main={
               <>
-              {done && isDetected(done) ? (
-                <CapabilityAlreadyPresent
-                  capabilityName={capabilityResult.state.data.name}
-                  capabilityKey={key}
-                  state={done}
-                />
-              ) : null}
-              {done && !isDetected(done) ? (
-                <CapabilityHere
-                  capabilityName={capabilityResult.state.data.name}
-                  capabilityKey={key}
-                  done={done}
-                  nodes={nodes}
-                />
-              ) : null}
-              {preselectedNode ? (
-                <CreateDatabaseCredentials
-                  capabilityKey={key}
-                  states={states}
-                  nodeId={preselectedNode ?? ''}
-                  projectId={preselectedProject}
-                />
-              ) : null}
-              {capabilityResult.state.data.requirements &&
-              capabilityResult.state.data.requirements.length > 0 ? (
-                <Card className="flex flex-col gap-4 border-warning">
-                  <div className="flex items-center gap-2">
-                    <ListChecks width={18} height={18} className="text-warning" aria-hidden />
-                    <Text variant="h4">Before you start</Text>
-                  </div>
-                  <Text variant="body-sm" tone="secondary">
-                    Set these up first so this Capability works the way you expect.
-                  </Text>
-                  <div className="flex flex-col gap-3">
-                    {capabilityResult.state.data.requirements.map((requirement) => (
-                      <div
-                        key={requirement.kind}
-                        className="rounded-md border border-border bg-subtle p-4"
-                      >
-                        <Text variant="body-sm" className="font-medium text-ink">
-                          {requirement.title}
-                        </Text>
-                        <Text variant="body-sm" tone="secondary" className="mt-1">
-                          {requirement.description}
-                        </Text>
-                        <Text variant="body-sm" tone="secondary" className="mt-2">
-                          <span className="font-medium text-ink">How: </span>
-                          {requirement.how_to}
-                        </Text>
-                        {requirement.setup_capability_key || requirement.setup_path ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(
-                                requirement.setup_capability_key
-                                  ? `/app/capabilities/${requirement.setup_capability_key}`
-                                  : (requirement.setup_path ?? '/app'),
-                              )
-                            }
-                            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                          >
-                            Set this up
-                            <ArrowRight width={15} height={15} aria-hidden />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              ) : null}
-
-              {/* No frame around the document. These are parts of one page, and
-                  a border around them said they were separate things. */}
-              <div id="capability-overview" className="scroll-mt-24 flex flex-col divide-y divide-border">
-                <Section title="Outcome" guidanceKey="capability.outcome">
-                  <Text variant="body" tone="secondary">
-                    {capabilityResult.state.data.description}
-                  </Text>
-                </Section>
-
-                {capabilityResult.state.data.intent ? (
-                  <Section title="Intent" guidanceKey="capability.intent">
-                    <Text variant="body-sm" tone="secondary">
-                      {capabilityResult.state.data.intent}
-                    </Text>
-                  </Section>
-                ) : null}
-
-                {capabilityResult.state.data.supported_platforms &&
-                capabilityResult.state.data.supported_platforms.length > 0 ? (
-                  <Section title="Supported platforms" guidanceKey="capability.platforms">
-                    <div className="flex flex-wrap gap-2">
-                      {capabilityResult.state.data.supported_platforms.map((platform) => (
-                        <span
-                          key={platform}
-                          className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-subtle px-3 py-1 text-xs font-medium text-ink"
-                        >
-                          <Server width={13} height={13} aria-hidden />
-                          {platform}
-                        </span>
-                      ))}
-                    </div>
-                  </Section>
-                ) : null}
-
-                {/* Only once it is installed here, and only for a database
-                    engine DatabaseExplorer knows how to draw. Before that
-                    there is nothing to browse yet. */}
-                {done && preselectedNode && isExplorableDatabase(key) ? (
-                  <Section title="Browse">
-                    <Text variant="body-sm" tone="secondary" className="mb-3 block">
-                      What is actually inside, a page at a time, searchable. Nothing here changes
-                      anything.
-                    </Text>
-                    <DatabaseExplorer capabilityKey={key} nodeId={preselectedNode} />
-                  </Section>
-                ) : null}
-
-                {/* The container runtime's own page is where "what is
-                    actually running here" should be visible, not only on a
-                    separate cross-server import screen. */}
-                {done && preselectedNode && key === 'enable-containers' ? (
-                  <Section title="Containers">
-                    <ContainerManager nodeId={preselectedNode} projectId={preselectedProject} />
-                  </Section>
-                ) : null}
-
-                {/* Only once it is installed here. Before that there is nothing
-                    to manage, and the page stays the description it always was. */}
-                <div id="capability-management" className="scroll-mt-24">
-                  <CapabilityManagement
+                {done && isDetected(done) ? (
+                  <CapabilityAlreadyPresent
+                    capabilityName={capabilityResult.state.data.name}
                     capabilityKey={key}
+                    state={done}
+                  />
+                ) : null}
+                {done && !isDetected(done) ? (
+                  <CapabilityHere
+                    capabilityName={capabilityResult.state.data.name}
+                    capabilityKey={key}
+                    done={done}
+                    nodes={nodes}
+                  />
+                ) : null}
+                {preselectedNode ? (
+                  <CreateDatabaseCredentials
+                    capabilityKey={key}
+                    states={states}
                     nodeId={preselectedNode ?? ''}
                     projectId={preselectedProject}
-                    installed={Boolean(done)}
-                    hideActionKeys={
-                      isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined
-                    }
                   />
-                </div>
+                ) : null}
+                {capabilityResult.state.data.requirements &&
+                capabilityResult.state.data.requirements.length > 0 ? (
+                  <Card className="flex flex-col gap-4 border-warning">
+                    <div className="flex items-center gap-2">
+                      <ListChecks width={18} height={18} className="text-warning" aria-hidden />
+                      <Text variant="h4">Before you start</Text>
+                    </div>
+                    <Text variant="body-sm" tone="secondary">
+                      Set these up first so this Capability works the way you expect.
+                    </Text>
+                    <div className="flex flex-col gap-3">
+                      {capabilityResult.state.data.requirements.map((requirement) => (
+                        <div
+                          key={requirement.kind}
+                          className="rounded-md border border-border bg-subtle p-4"
+                        >
+                          <Text variant="body-sm" className="font-medium text-ink">
+                            {requirement.title}
+                          </Text>
+                          <Text variant="body-sm" tone="secondary" className="mt-1">
+                            {requirement.description}
+                          </Text>
+                          <Text variant="body-sm" tone="secondary" className="mt-2">
+                            <span className="font-medium text-ink">How: </span>
+                            {requirement.how_to}
+                          </Text>
+                          {requirement.setup_capability_key || requirement.setup_path ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(
+                                  requirement.setup_capability_key
+                                    ? `/app/capabilities/${requirement.setup_capability_key}`
+                                    : (requirement.setup_path ?? '/app'),
+                                )
+                              }
+                              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                            >
+                              Set this up
+                              <ArrowRight width={15} height={15} aria-hidden />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ) : null}
 
-                {capabilityResult.state.data.verification_strategy ? (
-                  <div id="capability-verification" className="scroll-mt-24">
-                    <Section
-                      title="How verification proves it"
-                      guidanceKey="capability.verification"
-                    >
-                      <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
-                        <ShieldCheck
-                          width={18}
-                          height={18}
-                          className="mt-0.5 shrink-0 text-brand"
-                          aria-hidden
-                        />
-                        <Text variant="body-sm" tone="secondary">
-                          {capabilityResult.state.data.verification_strategy}
-                        </Text>
+                {/* No frame around the document. These are parts of one page, and
+                  a border around them said they were separate things. */}
+                <div
+                  id="capability-overview"
+                  className="scroll-mt-24 flex flex-col divide-y divide-border"
+                >
+                  <Section title="Outcome" guidanceKey="capability.outcome">
+                    <Text variant="body" tone="secondary">
+                      {capabilityResult.state.data.description}
+                    </Text>
+                  </Section>
+
+                  {capabilityResult.state.data.intent ? (
+                    <Section title="Intent" guidanceKey="capability.intent">
+                      <Text variant="body-sm" tone="secondary">
+                        {capabilityResult.state.data.intent}
+                      </Text>
+                    </Section>
+                  ) : null}
+
+                  {capabilityResult.state.data.supported_platforms &&
+                  capabilityResult.state.data.supported_platforms.length > 0 ? (
+                    <Section title="Supported platforms" guidanceKey="capability.platforms">
+                      <div className="flex flex-wrap gap-2">
+                        {capabilityResult.state.data.supported_platforms.map((platform) => (
+                          <span
+                            key={platform}
+                            className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-subtle px-3 py-1 text-xs font-medium text-ink"
+                          >
+                            <Server width={13} height={13} aria-hidden />
+                            {platform}
+                          </span>
+                        ))}
                       </div>
                     </Section>
+                  ) : null}
+
+                  {/* Only once it is installed here, and only for a database
+                    engine DatabaseExplorer knows how to draw. Before that
+                    there is nothing to browse yet. */}
+                  {done && preselectedNode && isExplorableDatabase(key) ? (
+                    <Section title="Browse">
+                      <Text variant="body-sm" tone="secondary" className="mb-3 block">
+                        What is actually inside, a page at a time, searchable. Nothing here changes
+                        anything.
+                      </Text>
+                      <DatabaseExplorer capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {/* The container runtime's own page is where "what is
+                    actually running here" should be visible, not only on a
+                    separate cross-server import screen. */}
+                  {done && preselectedNode && key === 'enable-containers' ? (
+                    <Section title="Containers">
+                      <ContainerManager nodeId={preselectedNode} projectId={preselectedProject} />
+                    </Section>
+                  ) : null}
+
+                  {/* Only once it is installed here. Before that there is nothing
+                    to manage, and the page stays the description it always was. */}
+                  <div id="capability-management" className="scroll-mt-24">
+                    <CapabilityManagement
+                      capabilityKey={key}
+                      nodeId={preselectedNode ?? ''}
+                      projectId={preselectedProject}
+                      installed={Boolean(done)}
+                      hideActionKeys={
+                        isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined
+                      }
+                    />
                   </div>
-                ) : null}
-              </div>
+
+                  {capabilityResult.state.data.verification_strategy ? (
+                    <div id="capability-verification" className="scroll-mt-24">
+                      <Section
+                        title="How verification proves it"
+                        guidanceKey="capability.verification"
+                      >
+                        <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
+                          <ShieldCheck
+                            width={18}
+                            height={18}
+                            className="mt-0.5 shrink-0 text-brand"
+                            aria-hidden
+                          />
+                          <Text variant="body-sm" tone="secondary">
+                            {capabilityResult.state.data.verification_strategy}
+                          </Text>
+                        </div>
+                      </Section>
+                    </div>
+                  ) : null}
+                </div>
               </>
             }
             rail={

@@ -67,15 +67,17 @@ function TierQuotas({ tier }: { tier: TierInfo }) {
     nodes: 0,
     projects: 0,
     seats: 0,
+    workspaces: 0,
     history_days: 0,
     automations: false,
     advanced_monitoring: false,
     audit_trail: false,
   };
-  const usage = tier.usage ?? { nodes: 0, projects: 0 };
+  const usage = tier.usage ?? { nodes: 0, projects: 0, workspaces: 0 };
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Quota label="Workspaces" used={usage.workspaces} limit={limits.workspaces} />
         <Quota label="Servers" used={usage.nodes} limit={limits.nodes} />
         <Quota label="Projects" used={usage.projects} limit={limits.projects} />
         <div className="rounded-lg border border-border bg-app px-3 py-2.5">
