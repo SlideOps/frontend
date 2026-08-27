@@ -5,6 +5,7 @@ import {
   getNode,
   getProject,
   getService,
+  purgeService,
   redeployService,
   removeService,
   restartService,
@@ -14,7 +15,7 @@ import {
   type Project,
   type Service,
 } from '@slideops/api-client';
-import { Button, Card, Text, Section } from '@slideops/design-system';
+import { Button, Card, Field, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
   Database,
@@ -40,10 +41,7 @@ import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { CapabilityManagement } from '../components/CapabilityManagement';
-import {
-  DatabaseExplorer,
-  DATABASE_EXPLORER_ACTION_KEYS,
-} from '../components/DatabaseExplorer';
+import { DatabaseExplorer, DATABASE_EXPLORER_ACTION_KEYS } from '../components/DatabaseExplorer';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -102,7 +100,6 @@ function sourceText(service: Service): string {
   }
   return service.source.repository_url ?? 'Repository';
 }
-
 
 /*
  * Logs and activity, together, on their own tab.
@@ -184,6 +181,10 @@ export function ServiceDetail() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeConfirmText, setPurgeConfirmText] = useState('');
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purgeWorking, setPurgeWorking] = useState(false);
   // A resize applies live, so reflect the new limits at once without a jarring
   // full refetch. This override is cleared whenever the Service being viewed changes.
   const [resized, setResized] = useState<Pick<
@@ -234,6 +235,20 @@ export function ServiceDetail() {
         error instanceof ApiError ? error.message : 'This Service could not be removed. Try again.',
       );
       setWorking(false);
+    }
+  };
+
+  const purge = async () => {
+    setPurgeWorking(true);
+    setPurgeError(null);
+    try {
+      await purgeService(id, purgeConfirmText);
+      navigate('/app/services');
+    } catch (error) {
+      setPurgeError(
+        error instanceof ApiError ? error.message : 'This Service could not be deleted. Try again.',
+      );
+      setPurgeWorking(false);
     }
   };
 
@@ -299,193 +314,261 @@ export function ServiceDetail() {
           ) : null}
 
           {activeTab === 'overview' ? (
-          <DetailLayout
-            main={
-              <>
-              {/* The address comes before the Preview on purpose. A Service that
+            <DetailLayout
+              main={
+                <>
+                  {/* The address comes before the Preview on purpose. A Service that
                   serves an API has nothing to show in an iframe, and its address is
                   the whole answer; a Service that renders a page has both. */}
-              <ServiceEndpoint service={service} onChanged={reload} />
+                  <ServiceEndpoint service={service} onChanged={reload} />
 
-              <ServicePreview service={service} />
+                  <ServicePreview service={service} />
 
-              <Section title="Live usage" adornment={<Guidance for="service.metrics" />} collapsible>
-                <ServiceMetricsPanel id={service.id} running={isRunning} />
-              </Section>
-              </>
-            }
-            rail={
-              <>
-              <Card className="h-fit">
-                <Text variant="h4">Summary</Text>
-                <dl className="mt-2 divide-y divide-border">
-                  <SummaryRow label="Node">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        state.status === 'ready' && state.data.node
-                          ? navigate(`/app/nodes/${state.data.node.id}`)
-                          : undefined
-                      }
-                      disabled={state.status !== 'ready' || !state.data.node}
-                      className="inline-flex items-center gap-1.5 text-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:text-ink-muted"
-                    >
-                      <Server width={14} height={14} aria-hidden />
-                      {state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}
-                    </button>
-                  </SummaryRow>
-                  <SummaryRow label="Runtime">
-                    {service.runtime === 'systemd' ? 'systemd unit' : 'Container'}
-                  </SummaryRow>
-                  <SummaryRow label="Source">{sourceText(service)}</SummaryRow>
-                  <SummaryRow label="CPU limit">{service.cpu_limit} vCPU</SummaryRow>
-                  <SummaryRow label="Memory limit">{memory(service.memory_mb)}</SummaryRow>
-                  {typeof service.pids_limit === 'number' ? (
-                    <SummaryRow label="Process limit">{service.pids_limit}</SummaryRow>
-                  ) : null}
-                  {service.ports && service.ports.length > 0 ? (
-                    <SummaryRow label="Ports">
-                      {service.ports.map((port) => `${port.host}:${port.container}`).join(', ')}
-                    </SummaryRow>
-                  ) : null}
-                  <SummaryRow label="Created">
-                    {new Date(service.created_at).toLocaleString()}
-                  </SummaryRow>
-                </dl>
-              </Card>
+                  <Section
+                    title="Live usage"
+                    adornment={<Guidance for="service.metrics" />}
+                    collapsible
+                  >
+                    <ServiceMetricsPanel id={service.id} running={isRunning} />
+                  </Section>
+                </>
+              }
+              rail={
+                <>
+                  <Card className="h-fit">
+                    <Text variant="h4">Summary</Text>
+                    <dl className="mt-2 divide-y divide-border">
+                      <SummaryRow label="Node">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            state.status === 'ready' && state.data.node
+                              ? navigate(`/app/nodes/${state.data.node.id}`)
+                              : undefined
+                          }
+                          disabled={state.status !== 'ready' || !state.data.node}
+                          className="inline-flex items-center gap-1.5 text-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:text-ink-muted"
+                        >
+                          <Server width={14} height={14} aria-hidden />
+                          {state.status === 'ready'
+                            ? (state.data.node?.name ?? 'Unknown Node')
+                            : ''}
+                        </button>
+                      </SummaryRow>
+                      <SummaryRow label="Runtime">
+                        {service.runtime === 'systemd' ? 'systemd unit' : 'Container'}
+                      </SummaryRow>
+                      <SummaryRow label="Source">{sourceText(service)}</SummaryRow>
+                      <SummaryRow label="CPU limit">{service.cpu_limit} vCPU</SummaryRow>
+                      <SummaryRow label="Memory limit">{memory(service.memory_mb)}</SummaryRow>
+                      {typeof service.pids_limit === 'number' ? (
+                        <SummaryRow label="Process limit">{service.pids_limit}</SummaryRow>
+                      ) : null}
+                      {service.ports && service.ports.length > 0 ? (
+                        <SummaryRow label="Ports">
+                          {service.ports.map((port) => `${port.host}:${port.container}`).join(', ')}
+                        </SummaryRow>
+                      ) : null}
+                      <SummaryRow label="Created">
+                        {new Date(service.created_at).toLocaleString()}
+                      </SummaryRow>
+                    </dl>
+                  </Card>
 
-              <ServiceResourcesPanel
-                service={service}
-                onUpdated={(updated) =>
-                  setResized({
-                    cpu_limit: updated.cpu_limit,
-                    memory_mb: updated.memory_mb,
-                    pids_limit: updated.pids_limit,
-                  })
-                }
-              />
+                  <ServiceResourcesPanel
+                    service={service}
+                    onUpdated={(updated) =>
+                      setResized({
+                        cpu_limit: updated.cpu_limit,
+                        memory_mb: updated.memory_mb,
+                        pids_limit: updated.pids_limit,
+                      })
+                    }
+                  />
 
-              <ServiceUpdatePanel service={service} onDeployed={reload} />
+                  <ServiceUpdatePanel service={service} onDeployed={reload} />
 
-              <Card className="h-fit">
-                <div className="flex items-center gap-2">
-                  <Text variant="h4">Actions</Text>
-                  <Guidance for="service.lifecycle" />
-                </div>
-                {!canWrite ? (
-                  <Text variant="body-sm" tone="secondary" className="mt-4">
-                    Starting, stopping, redeploying, or removing this Service needs a role above
-                    Viewer in this workspace.
-                  </Text>
-                ) : (
-                <div className="mt-4 flex flex-col gap-3">
-                  {/* While a deploy is running, stopping it is the only thing worth
+                  <Card className="h-fit">
+                    <div className="flex items-center gap-2">
+                      <Text variant="h4">Actions</Text>
+                      <Guidance for="service.lifecycle" />
+                    </div>
+                    {!canWrite ? (
+                      <Text variant="body-sm" tone="secondary" className="mt-4">
+                        Starting, stopping, redeploying, or removing this Service needs a role above
+                        Viewer in this workspace.
+                      </Text>
+                    ) : (
+                      <div className="mt-4 flex flex-col gap-3">
+                        {/* While a deploy is running, stopping it is the only thing worth
                       offering: the lifecycle actions have nothing settled to act on,
                       and Remove tears down a Service the Operator only wanted to stop
                       starting. */}
-                  {isDeploying ? (
-                    <Button
-                      variant="danger"
-                      onClick={() =>
-                        runAction(cancelServiceDeploy, 'The deploy could not be cancelled.')
-                      }
-                      disabled={working}
-                    >
-                      <XCircle width={15} height={15} aria-hidden />
-                      {working ? 'Cancelling' : 'Cancel this deploy'}
-                    </Button>
-                  ) : null}
-                  {isStopped ? (
-                    <Button
-                      onClick={() => runAction(startService, 'The Service could not start.')}
-                      disabled={working}
-                    >
-                      <Play width={15} height={15} aria-hidden />
-                      Start
-                    </Button>
-                  ) : null}
-                  {isRunning ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => runAction(stopService, 'The Service could not stop.')}
-                      disabled={working}
-                    >
-                      <Square width={15} height={15} aria-hidden />
-                      Stop
-                    </Button>
-                  ) : null}
-                  {/* Redeploying belongs beside the other lifecycle actions, not only
-                      in the deployment panel: it is what applies a configuration
-                      change, and an Operator looking for "apply my edit" looks here. */}
-                  {!isDeploying && !isAdopted ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        runAction(redeployService, 'The redeploy could not be started.')
-                      }
-                      disabled={working}
-                    >
-                      <RefreshCw width={15} height={15} aria-hidden />
-                      Redeploy
-                    </Button>
-                  ) : null}
-                  {isRunning || isStopped ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => runAction(restartService, 'The Service could not restart.')}
-                      disabled={working}
-                    >
-                      <RefreshCw width={15} height={15} aria-hidden />
-                      Restart
-                    </Button>
-                  ) : null}
-
-                  <div className="mt-2 border-t border-border pt-4">
-                    {confirmRemove ? (
-                      <div className="flex flex-col gap-3">
-                        <Text variant="body-sm" tone="secondary">
-                          {service.adopted
-                            ? 'Stop managing this Service? SlideOps did not create this workload, so it keeps running on your server exactly as it is; it simply disappears from here.'
-                            : 'Remove this Service? Its workload is stopped and removed, and the allocation is freed.'}
-                        </Text>
-                        <div className="flex items-center gap-2">
+                        {isDeploying ? (
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setConfirmRemove(false)}
+                            variant="danger"
+                            onClick={() =>
+                              runAction(cancelServiceDeploy, 'The deploy could not be cancelled.')
+                            }
                             disabled={working}
                           >
-                            Keep it
+                            <XCircle width={15} height={15} aria-hidden />
+                            {working ? 'Cancelling' : 'Cancel this deploy'}
                           </Button>
-                          <Button variant="danger" size="sm" onClick={remove} disabled={working}>
-                            {working ? 'Working' : service.adopted ? 'Stop managing it' : 'Remove'}
+                        ) : null}
+                        {isStopped ? (
+                          <Button
+                            onClick={() => runAction(startService, 'The Service could not start.')}
+                            disabled={working}
+                          >
+                            <Play width={15} height={15} aria-hidden />
+                            Start
                           </Button>
+                        ) : null}
+                        {isRunning ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() => runAction(stopService, 'The Service could not stop.')}
+                            disabled={working}
+                          >
+                            <Square width={15} height={15} aria-hidden />
+                            Stop
+                          </Button>
+                        ) : null}
+                        {/* Redeploying belongs beside the other lifecycle actions, not only
+                      in the deployment panel: it is what applies a configuration
+                      change, and an Operator looking for "apply my edit" looks here. */}
+                        {!isDeploying && !isAdopted ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              runAction(redeployService, 'The redeploy could not be started.')
+                            }
+                            disabled={working}
+                          >
+                            <RefreshCw width={15} height={15} aria-hidden />
+                            Redeploy
+                          </Button>
+                        ) : null}
+                        {isRunning || isStopped ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              runAction(restartService, 'The Service could not restart.')
+                            }
+                            disabled={working}
+                          >
+                            <RefreshCw width={15} height={15} aria-hidden />
+                            Restart
+                          </Button>
+                        ) : null}
+
+                        <div className="mt-2 border-t border-border pt-4">
+                          {confirmRemove ? (
+                            <div className="flex flex-col gap-3">
+                              <Text variant="body-sm" tone="secondary">
+                                {service.adopted
+                                  ? 'Stop managing this Service? SlideOps did not create this workload, so it keeps running on your server exactly as it is; it simply disappears from here.'
+                                  : 'Remove this Service? Its workload is stopped and removed, and the allocation is freed.'}
+                              </Text>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setConfirmRemove(false)}
+                                  disabled={working}
+                                >
+                                  Keep it
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={remove}
+                                  disabled={working}
+                                >
+                                  {working
+                                    ? 'Working'
+                                    : service.adopted
+                                      ? 'Stop managing it'
+                                      : 'Remove'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmRemove(true)}
+                              disabled={working}
+                            >
+                              <Trash2 width={15} height={15} aria-hidden />
+                              {service.adopted
+                                ? 'Stop managing this Service'
+                                : 'Remove this Service'}
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="mt-2 border-t border-border pt-4">
+                          {purging ? (
+                            <div className="flex flex-col gap-3">
+                              <Text variant="body-sm" className="text-danger">
+                                This permanently deletes this Service: its record, its activity, and
+                                any saved secret, wiped off the system for good. It cannot be undone
+                                and it can never be seen again.
+                              </Text>
+                              <Field
+                                label={`Type "delete ${service.name}" to confirm`}
+                                value={purgeConfirmText}
+                                onChange={(event) => setPurgeConfirmText(event.target.value)}
+                                placeholder={`delete ${service.name}`}
+                                error={purgeError ?? undefined}
+                                autoFocus
+                              />
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPurging(false);
+                                    setPurgeConfirmText('');
+                                    setPurgeError(null);
+                                  }}
+                                  disabled={purgeWorking}
+                                >
+                                  Keep it
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={purge}
+                                  disabled={
+                                    purgeWorking || purgeConfirmText !== `delete ${service.name}`
+                                  }
+                                >
+                                  {purgeWorking ? 'Deleting' : 'Delete forever'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button variant="ghost" size="sm" onClick={() => setPurging(true)}>
+                              <Trash2 width={15} height={15} aria-hidden className="text-danger" />
+                              Delete this Service forever
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmRemove(true)}
-                        disabled={working}
-                      >
-                        <Trash2 width={15} height={15} aria-hidden />
-                        {service.adopted ? 'Stop managing this Service' : 'Remove this Service'}
-                      </Button>
                     )}
-                  </div>
-                </div>
-                )}
 
-                {actionError ? (
-                  <p role="alert" className="mt-3 text-sm text-danger">
-                    {actionError}
-                  </p>
-                ) : null}
-              </Card>
-              </>
-            }
-          />
+                    {actionError ? (
+                      <p role="alert" className="mt-3 text-sm text-danger">
+                        {actionError}
+                      </p>
+                    ) : null}
+                  </Card>
+                </>
+              }
+            />
           ) : null}
 
           {activeTab === 'browse' ? (
@@ -518,7 +601,9 @@ export function ServiceDetail() {
               standalonePath={`/app/services/${service.id}/shell`}
               urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
               scopeLabel={
-                service.runtime === 'systemd' ? 'This Service, on the server' : 'Inside this Service'
+                service.runtime === 'systemd'
+                  ? 'This Service, on the server'
+                  : 'Inside this Service'
               }
               scopeDetail={
                 service.runtime === 'systemd'

@@ -250,9 +250,23 @@ export function restartService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}/restart`, { method: 'POST' });
 }
 
-/** Stop and remove a Service's workload, freeing its allocation. */
+/** Stop and remove a Service's workload, freeing its allocation. The Service
+ * stays on record, so it can still be seen and never be redeployed. */
 export function removeService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Permanently delete a Service: its record, its activity trail, and any
+ * secret it holds for an environment variable, all gone for good. Unlike
+ * removeService, there is no coming back from this.
+ *
+ * Refused with confirmation_mismatch unless confirm is exactly
+ * `"delete " + the Service's own name`, read back from what the Operator
+ * typed rather than a checkbox, since this cannot be undone.
+ */
+export function purgeService(id: string, confirm: string): Promise<void> {
+  return apiRequest<void>(`/services/${id}/purge`, { method: 'DELETE', body: { confirm } });
 }
 
 /**

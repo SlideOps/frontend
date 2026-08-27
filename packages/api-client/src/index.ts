@@ -227,6 +227,7 @@ export {
   stopService,
   restartService,
   removeService,
+  purgeService,
   getServiceLogs,
   getServiceActivity,
   getServiceMetrics,

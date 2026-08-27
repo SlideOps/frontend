@@ -20,6 +20,7 @@ const getServiceActivity = vi.fn();
 const getServiceMetrics = vi.fn();
 const listCapabilityActions = vi.fn();
 const checkServiceUpdate = vi.fn();
+const purgeService = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -30,6 +31,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   getServiceMetrics: (...a: unknown[]) => getServiceMetrics(...a),
   listCapabilityActions: (...a: unknown[]) => listCapabilityActions(...a),
   checkServiceUpdate: (...a: unknown[]) => checkServiceUpdate(...a),
+  purgeService: (...a: unknown[]) => purgeService(...a),
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
@@ -135,6 +137,7 @@ describe('ServiceDetail', () => {
       },
     ]);
     checkServiceUpdate.mockReset().mockResolvedValue({ behind: false });
+    purgeService.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -224,5 +227,30 @@ describe('ServiceDetail', () => {
     expect(logs).toBeGreaterThanOrEqual(0);
     expect(settings).toBeGreaterThanOrEqual(0);
     expect(logs).toBeLessThan(settings);
+  });
+
+  // Purging is the strong, irreversible delete: it must never fire on a
+  // mistyped or incomplete confirmation, only on the exact phrase.
+  it('deletes the Service forever only once the exact name is typed', async () => {
+    show();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete this Service forever' }),
+    );
+    const confirmButton = await screen.findByRole('button', { name: 'Delete forever' });
+    expect(confirmButton).toBeDisabled();
+
+    const input = screen.getByLabelText(/Type "delete prudent-journal-backend" to confirm/);
+    await userEvent.type(input, 'delete something-else');
+    expect(confirmButton).toBeDisabled();
+
+    await userEvent.clear(input);
+    await userEvent.type(input, 'delete prudent-journal-backend');
+    expect(confirmButton).toBeEnabled();
+
+    await userEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend'),
+    );
   });
 });
