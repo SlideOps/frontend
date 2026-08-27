@@ -192,6 +192,7 @@ export { getSampleApp, type SampleApp } from './sample-app';
 export {
   getSubscription,
   startCheckout,
+  quoteCheckout,
   cancelSubscription,
   validatePromo,
   listPromoCodes,
@@ -200,6 +201,7 @@ export {
   deletePromoCode,
   type PurchasableTier,
   type PaymentProvider,
+  type PayCurrency,
   type SubscriptionStatus,
   type Subscription,
   type BillingSubscription,
@@ -209,6 +211,8 @@ export {
   type PromoEffect,
   type PromoPreview,
   type ValidatePromoInput,
+  type QuoteInput,
+  type Quote,
   type PromoCode,
   type CreatePromoCodeInput,
 } from './billing';

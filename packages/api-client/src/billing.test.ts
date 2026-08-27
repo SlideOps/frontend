@@ -5,6 +5,7 @@ import {
   deletePromoCode,
   getSubscription,
   listPromoCodes,
+  quoteCheckout,
   setPromoCodeEnabled,
   startCheckout,
   validatePromo,
@@ -83,6 +84,51 @@ describe('billing requests', () => {
     expect(sent.provider).toBe('flutterwave');
     expect(sent.promo_code).toBe('WELCOME');
     expect(sent.term_months).toBe(3);
+  });
+
+  it('starts a checkout in the requested pay currency', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        checkout_url: 'https://pay.example/redirect',
+        reference: 'ref_2',
+        provider: 'paystack',
+        granted: false,
+      }),
+    );
+
+    await startCheckout({ tier: 'pro', provider: 'paystack', currency: 'NGN' });
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    const sent = JSON.parse(String(init?.body)) as { currency: string };
+    expect(sent.currency).toBe('NGN');
+  });
+
+  it('quotes a checkout and unwraps the quote envelope', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        quote: {
+          tier: 'pro',
+          currency: 'NGN',
+          term_months: 1,
+          base_amount_minor: 7350000,
+          fee_label: 'VAT',
+          fee_amount_minor: 735000,
+          total_amount_minor: 8085000,
+          fx_rate: 1500,
+          promo_applied: false,
+          promo_descriptions: [],
+          free_grant: false,
+        },
+      }),
+    );
+
+    const quote = await quoteCheckout({ tier: 'pro', currency: 'NGN' });
+
+    expect(quote.total_amount_minor).toBe(8085000);
+    expect(quote.fx_rate).toBe(1500);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/billing/quote');
   });
 
   it('cancels the subscription as a POST', async () => {

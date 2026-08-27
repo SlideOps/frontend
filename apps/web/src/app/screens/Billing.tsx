@@ -2,18 +2,21 @@ import {
   ApiError,
   cancelSubscription,
   getSubscription,
+  quoteCheckout,
   startCheckout,
   validatePromo,
+  type PayCurrency,
   type PaymentProvider,
   type PromoPreview,
   type PurchasableTier,
+  type Quote,
   type Subscription,
   type SubscriptionStatus,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
 import { Check, CreditCard, Globe, Sparkles, TicketPercent } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -97,6 +100,37 @@ const PROVIDERS: ProviderDescriptor[] = [
     icon: Globe,
   },
 ];
+
+interface CurrencyDescriptor {
+  currency: PayCurrency;
+  name: string;
+  helper: string;
+}
+
+// Dollar acceptance through Paystack is limited on our live account right now,
+// so its checkout runs through our normal Naira conversion instead; the plan
+// price stays in dollars regardless. Flip this back once dollar charges are
+// confirmed working end to end again on that gateway.
+const paystackUSDDisabled = true;
+
+/** The currencies a gateway can actually charge right now. A gateway with more
+ *  than one lets the Operator choose; one with exactly one charges it without
+ *  asking, since there is nothing to choose between. */
+function currenciesFor(provider: PaymentProvider): CurrencyDescriptor[] {
+  if (provider === 'paystack') {
+    const naira: CurrencyDescriptor = {
+      currency: 'NGN',
+      name: 'Naira',
+      helper: 'Converted from the dollar price at the live exchange rate when you check out.',
+    };
+    if (paystackUSDDisabled) {
+      return [naira];
+    }
+    return [{ currency: 'USD', name: 'US Dollar', helper: 'The plan price shown above.' }, naira];
+  }
+  // Flutterwave is the international gateway: dollars, at the plan's own price.
+  return [{ currency: 'USD', name: 'US Dollar', helper: 'The plan price shown above.' }];
+}
 
 const statusLabel: Record<SubscriptionStatus, string> = {
   active: 'Active',
@@ -297,6 +331,45 @@ function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
   );
 }
 
+/** The itemized price panel: the plan subtotal, the platform fee, the total, and
+ *  the exchange rate when converted to Naira. Shown before the Operator commits
+ *  to pay, so the fee and any conversion are never a surprise at checkout. */
+function PriceQuotePanel({ quote }: { quote: Quote }) {
+  return (
+    <div className="rounded-lg border border-border bg-subtle p-4">
+      <div className="flex items-center justify-between gap-2">
+        <Text as="span" variant="body-sm" tone="secondary">
+          Subtotal
+        </Text>
+        <Text as="span" variant="body-sm">
+          {formatMoney(quote.base_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <Text as="span" variant="body-sm" tone="secondary">
+          {quote.fee_label ?? 'Fee'} (10%)
+        </Text>
+        <Text as="span" variant="body-sm">
+          {formatMoney(quote.fee_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <Text as="span" variant="body-sm" className="font-medium">
+          Total charged today
+        </Text>
+        <Text as="span" variant="h4">
+          {formatMoney(quote.total_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      {quote.fx_rate ? (
+        <Text variant="caption" tone="secondary" className="mt-2 block">
+          Converted at the live rate: 1 USD = {quote.fx_rate.toLocaleString()} NGN.
+        </Text>
+      ) : null}
+    </div>
+  );
+}
+
 /** The Operator billing screen: current plan, the plans, and the upgrade flow. */
 export function Billing() {
   const operator = useAuthStore((state) => state.operator);
@@ -308,6 +381,8 @@ export function Billing() {
 
   const [selectedTier, setSelectedTier] = useState<PurchasableTier>('pro');
   const [provider, setProvider] = useState<PaymentProvider>('paystack');
+  const [currency, setCurrency] = useState<PayCurrency>(currenciesFor('paystack')[0]!.currency);
+  const availableCurrencies = currenciesFor(provider);
   const [promoCode, setPromoCode] = useState('');
   const [preview, setPreview] = useState<PromoPreview | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -316,6 +391,8 @@ export function Billing() {
   const [upgrading, setUpgrading] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [grantNotice, setGrantNotice] = useState<string | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const data = state.status === 'ready' ? state.data : null;
   const configured = data?.configured ?? false;
@@ -326,6 +403,34 @@ export function Billing() {
     setPreview(null);
     setPromoError(null);
   };
+
+  // The itemized total (subtotal, platform fee, and grand total) is priced fresh
+  // whenever the plan or pay currency changes, so the Operator always sees the
+  // exact amount before committing, including a live Naira conversion.
+  useEffect(() => {
+    if (!configured || admin) {
+      return;
+    }
+    let cancelled = false;
+    setQuoteError(null);
+    quoteCheckout({ tier: selectedTier, currency })
+      .then((result) => {
+        if (!cancelled) {
+          setQuote(result);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setQuote(null);
+          setQuoteError(
+            error instanceof ApiError ? error.message : 'The price could not be loaded.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, admin, selectedTier, currency]);
 
   const dismissReturnNotice = () => {
     const next = new URLSearchParams(searchParams);
@@ -363,6 +468,7 @@ export function Billing() {
       const result = await startCheckout({
         tier: selectedTier,
         provider,
+        currency,
         promo_code: code || undefined,
       });
       if (result.granted || !result.checkout_url) {
@@ -534,7 +640,13 @@ export function Billing() {
                           name="payment-provider"
                           value={entry.provider}
                           checked={active}
-                          onChange={() => setProvider(entry.provider)}
+                          onChange={() => {
+                            setProvider(entry.provider);
+                            // The currency choice belongs to the gateway: switching
+                            // gateways always lands on that gateway's own default.
+                            setCurrency(currenciesFor(entry.provider)[0]!.currency);
+                            clearPreview();
+                          }}
                           className="sr-only"
                         />
                         <Icon
@@ -564,6 +676,67 @@ export function Billing() {
                   })}
                 </div>
               </fieldset>
+
+              {availableCurrencies.length > 1 ? (
+                <fieldset className="mt-5">
+                  <legend className="text-sm font-medium text-ink">Currency</legend>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {availableCurrencies.map((entry) => {
+                      const active = currency === entry.currency;
+                      return (
+                        <label
+                          key={entry.currency}
+                          className={cn(
+                            'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors duration-fast ease-standard',
+                            'focus-within:ring-2 focus-within:ring-focus',
+                            active ? 'border-brand bg-brand-subtle' : 'border-border hover:bg-subtle',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="pay-currency"
+                            value={entry.currency}
+                            checked={active}
+                            onChange={() => {
+                              setCurrency(entry.currency);
+                              clearPreview();
+                            }}
+                            className="sr-only"
+                          />
+                          <span>
+                            <Text as="span" variant="body-sm" className="block font-medium">
+                              {entry.name}
+                            </Text>
+                            <Text
+                              as="span"
+                              variant="body-sm"
+                              tone="secondary"
+                              className="mt-0.5 block"
+                            >
+                              {entry.helper}
+                            </Text>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : (
+                <Text variant="caption" tone="secondary" className="mt-5 block">
+                  {PROVIDERS.find((p) => p.provider === provider)?.name} charges in{' '}
+                  {availableCurrencies[0]!.name}. {availableCurrencies[0]!.helper}
+                </Text>
+              )}
+
+              <div className="mt-5">
+                {quote ? (
+                  <PriceQuotePanel quote={quote} />
+                ) : quoteError ? (
+                  <p role="alert" className="text-sm text-danger">
+                    {quoteError}
+                  </p>
+                ) : null}
+              </div>
 
               <div className="mt-5">
                 <label htmlFor="promo-code" className="text-sm font-medium text-ink">
@@ -605,6 +778,12 @@ export function Billing() {
               {preview ? (
                 <div className="mt-4">
                   <PromoPreviewPanel preview={preview} />
+                  {!preview.free_grant ? (
+                    <Text variant="caption" tone="secondary" className="mt-2 block">
+                      The {quote?.fee_label ?? 'fee'} above still applies on top of this discounted
+                      amount.
+                    </Text>
+                  ) : null}
                 </div>
               ) : null}
 
