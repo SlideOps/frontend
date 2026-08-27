@@ -96,14 +96,6 @@
   --color-warning: var(--so-warning);
   --color-danger: var(--so-danger);
   --color-info: var(--so-info);
-  /* The fox mark's five tones, kept in step with the neutral brand direction
-     above rather than fixed to the old warm palette, so the logo never reads
-     as a leftover from a different theme. */
-  --color-mark-1: var(--so-neutral-800);
-  --color-mark-2: var(--so-neutral-600);
-  --color-mark-3: var(--so-neutral-300);
-  --color-mark-4: var(--so-neutral-0);
-  --color-mark-5: var(--so-neutral-950);
   color-scheme: light;
 }
 

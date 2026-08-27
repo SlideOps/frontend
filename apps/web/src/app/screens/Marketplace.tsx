@@ -6,7 +6,6 @@ import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Collapsible } from '../components/Collapsible';
-import { catalogIcon } from '../components/CatalogIcon';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';

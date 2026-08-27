@@ -470,28 +470,34 @@ export function CapabilityDetail() {
                     to manage, and the page stays the description it always was. */}
                 <div id="capability-management" className="scroll-mt-24">
                   <CapabilityManagement
-                  capabilityKey={key}
-                  nodeId={preselectedNode ?? ''}
-                  projectId={preselectedProject}
-                  installed={Boolean(done)}
-                  hideActionKeys={isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined}
-                />
+                    capabilityKey={key}
+                    nodeId={preselectedNode ?? ''}
+                    projectId={preselectedProject}
+                    installed={Boolean(done)}
+                    hideActionKeys={
+                      isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined
+                    }
+                  />
+                </div>
 
                 {capabilityResult.state.data.verification_strategy ? (
                   <div id="capability-verification" className="scroll-mt-24">
-                  <Section title="How verification proves it" guidanceKey="capability.verification">
-                    <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
-                      <ShieldCheck
-                        width={18}
-                        height={18}
-                        className="mt-0.5 shrink-0 text-brand"
-                        aria-hidden
-                      />
-                      <Text variant="body-sm" tone="secondary">
-                        {capabilityResult.state.data.verification_strategy}
-                      </Text>
-                    </div>
-                  </Section>
+                    <Section
+                      title="How verification proves it"
+                      guidanceKey="capability.verification"
+                    >
+                      <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
+                        <ShieldCheck
+                          width={18}
+                          height={18}
+                          className="mt-0.5 shrink-0 text-brand"
+                          aria-hidden
+                        />
+                        <Text variant="body-sm" tone="secondary">
+                          {capabilityResult.state.data.verification_strategy}
+                        </Text>
+                      </div>
+                    </Section>
                   </div>
                 ) : null}
               </div>

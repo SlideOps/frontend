@@ -12,7 +12,6 @@ import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import { catalogIcon } from '../components/CatalogIcon';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 interface PluginView {
