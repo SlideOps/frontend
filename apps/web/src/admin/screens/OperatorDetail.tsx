@@ -4,11 +4,12 @@ import {
   unsuspendOperator,
   setOperatorRole,
   adminSetTier,
+  adminSetFreeSeason,
   ApiError,
   type TierName,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ShieldCheck, Users } from '@slideops/icons';
+import { ArrowLeft, ShieldCheck, Unlock, Users } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
@@ -50,12 +51,14 @@ export function OperatorDetail() {
   const [confirming, setConfirming] = useState(false);
   const [roleConfirming, setRoleConfirming] = useState(false);
   const [pendingTier, setPendingTier] = useState<TierName | null>(null);
+  const [freeSeasonConfirming, setFreeSeasonConfirming] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const operator = state.status === 'ready' ? state.data : null;
   const isSuspended = operator?.status === 'suspended';
   const isAdmin = operator?.role === 'admin';
   const currentTier = operator?.tier ?? null;
+  const hasFreeSeason = operator?.free_season ?? false;
 
   const runTierAction = async () => {
     if (!operator || !pendingTier) {
@@ -71,6 +74,23 @@ export function OperatorDetail() {
         error instanceof ApiError ? error.message : 'That action did not go through. Try again.',
       );
       setPendingTier(null);
+    }
+  };
+
+  const runFreeSeasonAction = async () => {
+    if (!operator) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await adminSetFreeSeason(operator.id, !hasFreeSeason);
+      setFreeSeasonConfirming(false);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That action did not go through. Try again.',
+      );
+      setFreeSeasonConfirming(false);
     }
   };
 
@@ -159,6 +179,13 @@ export function OperatorDetail() {
                   </select>
                 </label>
                 <Guidance for="operators.tier" />
+                <Button
+                  variant={hasFreeSeason ? 'primary' : 'secondary'}
+                  onClick={() => setFreeSeasonConfirming(true)}
+                >
+                  <Unlock width={16} height={16} aria-hidden />
+                  {hasFreeSeason ? 'End free season' : 'Grant free season'}
+                </Button>
                 <Button variant="secondary" onClick={() => setRoleConfirming(true)}>
                   {isAdmin ? 'Revoke admin' : 'Make admin'}
                 </Button>
@@ -195,6 +222,7 @@ export function OperatorDetail() {
                 />
                 <SummaryRow label="Role" value={isAdmin ? 'Administrator' : 'Operator'} />
                 <SummaryRow label="Tier" value={currentTier ? tierLabel[currentTier] : 'Not set'} />
+                <SummaryRow label="Free season" value={hasFreeSeason ? 'Granted' : 'Not granted'} />
                 <SummaryRow label="Nodes" value={String(operator.node_count)} />
                 <SummaryRow label="Operations" value={String(operator.operation_count)} />
                 <SummaryRow
@@ -280,6 +308,20 @@ export function OperatorDetail() {
         confirmVariant="primary"
         onConfirm={runTierAction}
         onCancel={() => setPendingTier(null)}
+      />
+
+      <ConfirmDialog
+        open={freeSeasonConfirming}
+        title={hasFreeSeason ? "End this Operator's free season?" : 'Grant a free season?'}
+        description={
+          hasFreeSeason
+            ? "They return to their own tier's quotas and feature gates immediately. Anything they built over the limit stays in place but they cannot add more. This is written to the audit trail."
+            : 'Lifts every tier quota and feature gate for this Operator alone, immediately, with no payment required, independent of the platform-wide free season on the Emergency screen. It lasts until you end it. This is written to the audit trail.'
+        }
+        confirmLabel={hasFreeSeason ? 'End free season' : 'Grant free season'}
+        confirmVariant={hasFreeSeason ? 'primary' : 'danger'}
+        onConfirm={runFreeSeasonAction}
+        onCancel={() => setFreeSeasonConfirming(false)}
       />
 
       <ConfirmDialog

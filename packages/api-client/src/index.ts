@@ -149,6 +149,7 @@ export {
   updateAdminTier,
   getEmergencyState,
   setEmergencyControl,
+  setFreeSeason,
   emergencyLockdown,
   emergencyReleaseAll,
   revokeAllSessions,
@@ -214,6 +215,7 @@ export {
 export {
   getTier,
   adminSetTier,
+  adminSetFreeSeason,
   type TierName,
   type TierInfo,
   type TierLimits,

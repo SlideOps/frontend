@@ -38,6 +38,10 @@ export interface TierInfo {
   tier: TierName;
   limits: TierLimits;
   usage: TierUsage;
+  /** Whether a free season currently lifts these limits, granted on this
+   *  account or platform-wide. False for an admin, who is unlimited by role
+   *  rather than by a season. */
+  free_season: boolean;
 }
 
 /** Read the Operator's tier, its limits, and current usage. */
@@ -51,4 +55,16 @@ export function getTier(signal?: AbortSignal): Promise<TierInfo> {
 /** Move an Operator to a tier. Admin only, audited by the backend. */
 export function adminSetTier(id: string, tier: TierName): Promise<void> {
   return apiRequest<void>(`/admin/operators/${id}/tier`, { method: 'POST', body: { tier } });
+}
+
+/**
+ * Grant or revoke one Operator's per-account free season: every tier quota and
+ * feature gate lifted for them alone, with no payment required, independent of
+ * the platform-wide free season on the Emergency screen. Admin only, audited.
+ */
+export function adminSetFreeSeason(id: string, enabled: boolean): Promise<void> {
+  return apiRequest<void>(`/admin/operators/${id}/free-season`, {
+    method: 'POST',
+    body: { enabled },
+  });
 }

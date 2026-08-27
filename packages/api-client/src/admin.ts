@@ -40,6 +40,9 @@ export interface AdminOperator {
   node_count: number;
   operation_count: number;
   last_active: string | null;
+  /** Whether this Operator carries a per-account free season: every tier quota
+   *  and feature gate lifted for them alone, with no payment required. */
+  free_season: boolean;
 }
 
 /** One cross-tenant Operation, enriched with the Operator email where cheap. */
@@ -269,6 +272,13 @@ export interface EmergencyState {
   any_engaged: boolean;
   /** The executions control under its original name, for older clients. */
   executions_paused: boolean;
+  /**
+   * The platform-wide free season: whether it is engaged, and its title and
+   * description. Kept apart from `controls` because its effect is the opposite
+   * of theirs: it opens access up rather than holding it back, is off by
+   * default, and is never touched by lockdown or release-all.
+   */
+  free_season: EmergencyControl;
 }
 
 /** Read every emergency control and its current state. */
@@ -283,6 +293,21 @@ export function setEmergencyControl(name: string, engaged: boolean): Promise<Eme
     `/admin/emergency/controls/${encodeURIComponent(name)}/${action}`,
     { method: 'POST' },
   );
+}
+
+/**
+ * Engage or release the platform-wide free season: lifts every tier quota and
+ * feature gate for every Operator, with no payment required, as if every
+ * account carried the richest tier. Admins are unaffected; they are unlimited
+ * by role regardless. Off by default, and a dedicated pair of routes rather
+ * than `setEmergencyControl`, since its effect is the opposite of every other
+ * control.
+ */
+export function setFreeSeason(engaged: boolean): Promise<EmergencyState> {
+  const action = engaged ? 'engage' : 'release';
+  return apiRequest<EmergencyState>(`/admin/emergency/free-season/${action}`, {
+    method: 'POST',
+  });
 }
 
 /**
