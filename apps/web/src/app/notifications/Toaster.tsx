@@ -68,7 +68,8 @@ export function Toaster() {
       {active.map((toast) => {
         const actionRequired = toast.kind === 'action_required';
         const Icon = actionRequired ? AlertTriangle : toneIcon[toast.tone];
-        const target = toast.href ?? `/app/operations/${toast.operationId}`;
+        const target =
+          toast.href ?? (toast.operationId ? `/app/operations/${toast.operationId}` : '/app');
         return (
           <div
             key={toast.id}
@@ -98,7 +99,7 @@ export function Toaster() {
                 }}
                 className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
-                <p className="text-sm font-medium text-ink">{toast.title}</p>
+                <p className="truncate text-sm font-medium text-ink">{toast.title}</p>
                 <p className="mt-0.5 truncate text-sm text-ink-muted">{toast.body}</p>
               </button>
               {toast.href ? (
