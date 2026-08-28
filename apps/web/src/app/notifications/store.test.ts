@@ -1,6 +1,11 @@
-import type { OperationEvent } from '@slideops/api-client';
+import type { InboxNotification, OperationEvent } from '@slideops/api-client';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { isPastApproval, notificationFromEvent, useNotificationsStore } from './store';
+import {
+  isPastApproval,
+  notificationFromEvent,
+  notificationFromInbox,
+  useNotificationsStore,
+} from './store';
 
 /** Build an Operation event with sensible defaults for a notification test. */
 function event(over: Partial<OperationEvent>): OperationEvent {
@@ -127,6 +132,40 @@ describe('notificationFromEvent', () => {
   });
 });
 
+describe('notificationFromInbox', () => {
+  function inbox(over: Partial<InboxNotification>): InboxNotification {
+    return {
+      id: 'n_1',
+      type: 'workspace.invited',
+      title: 'You were invited to Acme',
+      body: 'You were invited to join Acme as member.',
+      link: '/invitations/tok',
+      read: false,
+      created_at: '2026-07-23T00:00:00Z',
+      ...over,
+    };
+  }
+
+  it('carries the remote id so it can be marked read on the server too', () => {
+    const result = notificationFromInbox(inbox({}));
+    expect(result.id).toBe('inbox:n_1');
+    expect(result.remoteId).toBe('n_1');
+    expect(result.kind).toBe('inbox');
+    expect(result.href).toBe('/invitations/tok');
+    expect(result.read).toBe(false);
+  });
+
+  it('carries the read state the backend already reports', () => {
+    const result = notificationFromInbox(inbox({ read: true }));
+    expect(result.read).toBe(true);
+  });
+
+  it('has no href when the backend sent no link', () => {
+    const result = notificationFromInbox(inbox({ link: '' }));
+    expect(result.href).toBeUndefined();
+  });
+});
+
 describe('useNotificationsStore', () => {
   beforeEach(() => {
     useNotificationsStore.getState().clear();
@@ -168,5 +207,37 @@ describe('useNotificationsStore', () => {
     useNotificationsStore.getState().markAllRead();
 
     expect(useNotificationsStore.getState().unread).toBe(0);
+  });
+
+  it('marks exactly one notification read by id, leaving the rest untouched', () => {
+    const store = useNotificationsStore.getState();
+    const first = notificationFromInbox({
+      id: 'n_1',
+      type: 't',
+      title: 'one',
+      body: '',
+      link: '',
+      read: false,
+      created_at: '2026-07-23T00:00:00Z',
+    });
+    const second = notificationFromInbox({
+      id: 'n_2',
+      type: 't',
+      title: 'two',
+      body: '',
+      link: '',
+      read: false,
+      created_at: '2026-07-23T00:00:01Z',
+    });
+    store.push(first);
+    store.push(second);
+    expect(useNotificationsStore.getState().unread).toBe(2);
+
+    useNotificationsStore.getState().markOneRead(first.id);
+
+    const state = useNotificationsStore.getState();
+    expect(state.unread).toBe(1);
+    expect(state.items.find((item) => item.id === first.id)?.read).toBe(true);
+    expect(state.items.find((item) => item.id === second.id)?.read).toBe(false);
   });
 });

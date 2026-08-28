@@ -1,10 +1,11 @@
-import { ApiError, createWorkspace } from '@slideops/api-client';
+import { ApiError, createWorkspace, listMyInvitations } from '@slideops/api-client';
 import { Button, cn, Field } from '@slideops/design-system';
-import { Building2, Check, ChevronsUpDown, Plus, Settings } from '@slideops/icons';
+import { Building2, Check, ChevronsUpDown, Mail, Plus, Settings } from '@slideops/icons';
 import { Popover } from '@slideops/tooltips';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activeWorkspace, useWorkspaceStore } from '../../store/workspace';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 const roleLabel: Record<string, string> = {
   owner: 'Owner',
@@ -33,6 +34,12 @@ export function WorkspaceSwitcher() {
   const [name, setName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // A pending invitation is easy to miss if the only place it shows is the
+  // Workspaces hub; a count here, wherever the switcher already is, catches
+  // it the moment the Operator opens it.
+  const { state: invitationsState } = useAsyncData((signal) => listMyInvitations(signal), []);
+  const pendingCount = invitationsState.status === 'ready' ? invitationsState.data.length : 0;
 
   if (workspaces.length === 0) {
     return null;
@@ -77,17 +84,30 @@ export function WorkspaceSwitcher() {
       trigger={(props) => (
         <button
           type="button"
-          className="inline-flex h-9 max-w-48 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="relative inline-flex h-9 max-w-48 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           {...props}
         >
           <Building2 width={16} height={16} className="shrink-0 text-ink-muted" aria-hidden />
           <span className="min-w-0 truncate">{active?.name}</span>
-          <ChevronsUpDown width={14} height={14} className="ml-auto shrink-0 text-ink-muted" aria-hidden />
+          <ChevronsUpDown
+            width={14}
+            height={14}
+            className="ml-auto shrink-0 text-ink-muted"
+            aria-hidden
+          />
+          {pendingCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-[10px] font-semibold text-brand-fg">
+              {pendingCount > 9 ? '9+' : pendingCount}
+            </span>
+          ) : null}
         </button>
       )}
     >
       {creating ? (
-        <form className="flex w-64 flex-col gap-3 p-1" onSubmit={(event) => void submitCreate(event)}>
+        <form
+          className="flex w-64 flex-col gap-3 p-1"
+          onSubmit={(event) => void submitCreate(event)}
+        >
           <Field
             label="Workspace name"
             autoFocus
@@ -97,7 +117,12 @@ export function WorkspaceSwitcher() {
             error={createError ?? undefined}
           />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" className="flex-1" disabled={submitting || name.trim() === ''}>
+            <Button
+              type="submit"
+              size="sm"
+              className="flex-1"
+              disabled={submitting || name.trim() === ''}
+            >
               {submitting ? 'Creating' : 'Create'}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)}>
@@ -107,6 +132,18 @@ export function WorkspaceSwitcher() {
         </form>
       ) : (
         <div className="flex w-64 flex-col gap-1">
+          {pendingCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => navigate('/app/workspaces')}
+              className="mb-1 flex items-center gap-2 rounded-md border border-brand bg-brand-subtle px-2 py-2 text-left text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <Mail width={15} height={15} className="shrink-0 text-brand" aria-hidden />
+              {pendingCount === 1
+                ? 'You have 1 pending invitation'
+                : `You have ${pendingCount} pending invitations`}
+            </button>
+          ) : null}
           <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             Workspaces
           </p>

@@ -39,6 +39,15 @@ export interface Invitation {
   role: WorkspaceRole;
 }
 
+/** One invitation still waiting for the signed in Operator's own email to
+ * accept, discoverable without the emailed link. */
+export interface PendingInvitation {
+  token: string;
+  workspace_name: string;
+  role: WorkspaceRole;
+  invited_at: string;
+}
+
 /** Every Workspace the signed in Operator can act in: every one they created,
  * plus every one they hold an active membership in. */
 export function listWorkspaces(signal?: AbortSignal): Promise<Workspace[]> {
@@ -112,5 +121,19 @@ export function getInvitation(token: string, signal?: AbortSignal): Promise<Invi
 export function acceptInvitation(token: string): Promise<Member> {
   return apiRequest<unknown>(`/invitations/${token}/accept`, { method: 'POST' }).then((r) =>
     unwrap<Member>(r, 'member'),
+  );
+}
+
+/** Decline an invitation on your own initiative. Refused with email_mismatch
+ * when the account's email is not the one invited. */
+export function declineInvitation(token: string): Promise<void> {
+  return apiRequest<void>(`/invitations/${token}/decline`, { method: 'POST' });
+}
+
+/** Every invitation still waiting for the signed in Operator's own email to
+ * accept, across every Workspace: what surfaces one without the emailed link. */
+export function listMyInvitations(signal?: AbortSignal): Promise<PendingInvitation[]> {
+  return apiRequest<unknown>('/invitations', { signal }).then((r) =>
+    unwrap<PendingInvitation[]>(r, 'invitations'),
   );
 }

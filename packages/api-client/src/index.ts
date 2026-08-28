@@ -311,11 +311,22 @@ export {
   removeTeamMember,
   getInvitation,
   acceptInvitation,
+  declineInvitation,
+  listMyInvitations,
   type Workspace,
   type WorkspaceRole,
   type Member,
   type Invitation,
+  type PendingInvitation,
 } from './workspaces';
+export {
+  listNotifications,
+  unreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  type InboxNotification,
+  type NotificationInbox,
+} from './notifications';
 export type {
   Operator,
   OperatorRole,

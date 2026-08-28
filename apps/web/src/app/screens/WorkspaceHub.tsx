@@ -1,18 +1,23 @@
 import {
+  acceptInvitation,
   ApiError,
   createWorkspace,
+  declineInvitation,
   deleteWorkspace,
+  listMyInvitations,
   renameWorkspace,
+  type PendingInvitation,
   type Workspace,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Building2, Check, Pencil, Plus, Trash2 } from '@slideops/icons';
+import { Building2, Check, Mail, Pencil, Plus, Trash2, X } from '@slideops/icons';
 import { PageHeader, Drawer } from '@slideops/ui';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { Loading } from '../components/Feedback';
+import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 const roleLabel: Record<string, string> = {
   owner: 'Owner',
@@ -133,6 +138,52 @@ function WorkspaceCard({
 }
 
 /**
+ * One pending invitation, discoverable here without the emailed link: which
+ * workspace, at what role, and a one-click accept or decline. This is the fix
+ * for the gap where an invited Operator had no way to see they had been
+ * invited to anything short of finding the email.
+ */
+function PendingInvitationCard({
+  invitation,
+  busy,
+  onAccept,
+  onDecline,
+}: {
+  invitation: PendingInvitation;
+  busy: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <Card className="flex flex-col gap-3 border-brand bg-brand-subtle">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface text-brand">
+          <Mail width={16} height={16} aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <Text variant="body" className="truncate font-medium">
+            {invitation.workspace_name}
+          </Text>
+          <Text variant="caption" tone="secondary">
+            Invited as {roleLabel[invitation.role] ?? invitation.role}
+          </Text>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={busy} onClick={onAccept}>
+          <Check width={14} height={14} aria-hidden />
+          Accept
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onDecline}>
+          <X width={14} height={14} aria-hidden />
+          Decline
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * Every workspace the Operator can act in: their Personal one, and as many
  * more as they have created or been invited into. Creating one here never
  * requires a Node or a Project first; it starts empty, and can be switched
@@ -148,11 +199,52 @@ export function WorkspaceHub() {
     void refresh();
   }, [refresh]);
 
+  const { state: invitationsState, reload: reloadInvitations } = useAsyncData(
+    (signal) => listMyInvitations(signal),
+    [],
+  );
+  const invitations = invitationsState.status === 'ready' ? invitationsState.data : [];
+  const [invitationBusy, setInvitationBusy] = useState('');
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+
+  const doAccept = async (invitation: PendingInvitation) => {
+    setInvitationBusy(invitation.token);
+    setInvitationError(null);
+    try {
+      await acceptInvitation(invitation.token);
+      await Promise.all([reloadInvitations(), refresh()]);
+    } catch (caught) {
+      setInvitationError(
+        caught instanceof ApiError ? caught.message : 'That invitation could not be accepted.',
+      );
+    } finally {
+      setInvitationBusy('');
+    }
+  };
+
+  const doDecline = async (invitation: PendingInvitation) => {
+    setInvitationBusy(invitation.token);
+    setInvitationError(null);
+    try {
+      await declineInvitation(invitation.token);
+      await reloadInvitations();
+    } catch (caught) {
+      setInvitationError(
+        caught instanceof ApiError ? caught.message : 'That invitation could not be declined.',
+      );
+    } finally {
+      setInvitationBusy('');
+    }
+  };
+
   const [switching, setSwitching] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [renaming, setRenaming] = useState<Workspace | null>(null);
   const [deleting, setDeleting] = useState<Workspace | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const owned = workspaces.filter((w) => w.role === 'owner');
+  const shared = workspaces.filter((w) => w.role !== 'owner');
 
   const doSwitch = async (workspace: Workspace) => {
     setSwitching(workspace.id);
@@ -208,22 +300,79 @@ export function WorkspaceHub() {
         }
       />
 
+      {invitationError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {invitationError}
+        </p>
+      ) : null}
+      {invitationsState.status === 'error' ? <ErrorNote error={invitationsState.error} /> : null}
+      {invitations.length > 0 ? (
+        <div className="mb-6">
+          <Text variant="h4" className="mb-3">
+            Waiting for you
+          </Text>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {invitations.map((invitation) => (
+              <PendingInvitationCard
+                key={invitation.token}
+                invitation={invitation}
+                busy={invitationBusy === invitation.token}
+                onAccept={() => void doAccept(invitation)}
+                onDecline={() => void doDecline(invitation)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {!loaded ? <Loading label="Reading your workspaces" /> : null}
       {loaded ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {workspaces.map((workspace) => (
-            <WorkspaceCard
-              key={workspace.id}
-              workspace={workspace}
-              switching={switching === workspace.id}
-              onSwitch={() => void doSwitch(workspace)}
-              onRename={() => setRenaming(workspace)}
-              onDelete={() => {
-                setDeleteError(null);
-                setDeleting(workspace);
-              }}
-            />
-          ))}
+        <div className="flex flex-col gap-6">
+          <div>
+            {shared.length > 0 ? (
+              <Text variant="h4" className="mb-3">
+                Your workspaces
+              </Text>
+            ) : null}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {owned.map((workspace) => (
+                <WorkspaceCard
+                  key={workspace.id}
+                  workspace={workspace}
+                  switching={switching === workspace.id}
+                  onSwitch={() => void doSwitch(workspace)}
+                  onRename={() => setRenaming(workspace)}
+                  onDelete={() => {
+                    setDeleteError(null);
+                    setDeleting(workspace);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {shared.length > 0 ? (
+            <div>
+              <Text variant="h4" className="mb-3">
+                Shared with you
+              </Text>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {shared.map((workspace) => (
+                  <WorkspaceCard
+                    key={workspace.id}
+                    workspace={workspace}
+                    switching={switching === workspace.id}
+                    onSwitch={() => void doSwitch(workspace)}
+                    onRename={() => setRenaming(workspace)}
+                    onDelete={() => {
+                      setDeleteError(null);
+                      setDeleting(workspace);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

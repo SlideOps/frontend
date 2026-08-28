@@ -1,3 +1,4 @@
+import { markAllNotificationsRead, markNotificationRead } from '@slideops/api-client';
 import { cn } from '@slideops/design-system';
 import {
   AlertTriangle,
@@ -113,6 +114,27 @@ export function NotificationsBell() {
   const items = useNotificationsStore((state) => state.items);
   const unread = useNotificationsStore((state) => state.unread);
   const markAllRead = useNotificationsStore((state) => state.markAllRead);
+  const markOneRead = useNotificationsStore((state) => state.markOneRead);
+
+  const openItem = (item: AppNotification) => {
+    markOneRead(item.id);
+    if (item.remoteId) {
+      // Best effort: the local read state already updated regardless of
+      // whether this persists, the same way every other background sync here
+      // is treated.
+      void markNotificationRead(item.remoteId);
+    }
+    const target = item.href ?? (item.operationId ? `/app/operations/${item.operationId}` : '/app');
+    navigate(target);
+  };
+
+  const onMarkAllRead = () => {
+    const hadRemote = items.some((item) => item.remoteId && !item.read);
+    markAllRead();
+    if (hadRemote) {
+      void markAllNotificationsRead();
+    }
+  };
 
   return (
     <Popover
@@ -147,7 +169,7 @@ export function NotificationsBell() {
           {items.length > 0 && unread > 0 ? (
             <button
               type="button"
-              onClick={markAllRead}
+              onClick={onMarkAllRead}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <CheckCheck width={14} height={14} aria-hidden />
@@ -158,19 +180,19 @@ export function NotificationsBell() {
 
         {items.length === 0 ? (
           <p className="mt-3 text-sm text-ink-muted">
-            No notifications yet. Results from your Operations will appear here.
+            No notifications yet. Results from your Operations, and things like a workspace
+            invitation, will appear here.
           </p>
         ) : (
           <ul className="mt-2 flex max-h-80 flex-col divide-y divide-border overflow-y-auto">
             {items.slice(0, 12).map((item) => {
               const { Icon, color } = notificationIcon(item);
-              const target = item.href ?? `/app/operations/${item.operationId}`;
               const pending = item.kind === 'action_required';
               return (
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => navigate(target)}
+                    onClick={() => openItem(item)}
                     className={cn(
                       'flex w-full items-start gap-2 py-2 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                       item.read ? undefined : 'font-medium',

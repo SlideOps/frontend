@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type Workspace } from '@slideops/api-client';
+import { ApiError, type PendingInvitation, type Workspace } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
@@ -30,11 +30,21 @@ const memberWorkspace: Workspace = {
   active: false,
 };
 
+const pendingInvitation: PendingInvitation = {
+  token: 'tok_1',
+  workspace_name: 'Agency Shared',
+  role: 'member',
+  invited_at: '2026-07-23T00:00:00Z',
+};
+
 let workspaces: Workspace[] = [personal];
+let invitations: PendingInvitation[] = [];
 const createWorkspaceMock = vi.fn(async (_name: string) => clientX);
 const renameWorkspaceMock = vi.fn(async (_id: string, name: string) => ({ ...clientX, name }));
 const deleteWorkspaceMock = vi.fn(async (_id: string) => undefined);
 const switchWorkspaceMock = vi.fn(async (_id: string) => undefined);
+const acceptInvitationMock = vi.fn(async (_token: string) => undefined);
+const declineInvitationMock = vi.fn(async (_token: string) => undefined);
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -43,6 +53,9 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   renameWorkspace: (...args: [string, string]) => renameWorkspaceMock(...args),
   deleteWorkspace: (...args: [string]) => deleteWorkspaceMock(...args),
   switchWorkspace: (...args: [string]) => switchWorkspaceMock(...args),
+  listMyInvitations: async () => invitations,
+  acceptInvitation: (...args: [string]) => acceptInvitationMock(...args),
+  declineInvitation: (...args: [string]) => declineInvitationMock(...args),
 }));
 
 const { WorkspaceHub } = await import('./WorkspaceHub');
@@ -58,10 +71,13 @@ function renderHub() {
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [], loaded: false });
   workspaces = [personal];
+  invitations = [];
   createWorkspaceMock.mockClear();
   renameWorkspaceMock.mockClear();
   deleteWorkspaceMock.mockClear();
   switchWorkspaceMock.mockClear();
+  acceptInvitationMock.mockClear();
+  declineInvitationMock.mockClear();
 });
 
 describe('WorkspaceHub', () => {
@@ -144,7 +160,11 @@ describe('WorkspaceHub', () => {
   it('shows the backend refusal when delete is refused', async () => {
     workspaces = [personal, clientX];
     deleteWorkspaceMock.mockRejectedValueOnce(
-      new ApiError(409, 'workspace_not_empty', 'this workspace still has servers or projects in it'),
+      new ApiError(
+        409,
+        'workspace_not_empty',
+        'this workspace still has servers or projects in it',
+      ),
     );
     renderHub();
     await screen.findByText('Client X');
@@ -157,5 +177,56 @@ describe('WorkspaceHub', () => {
     expect(
       await screen.findByText('this workspace still has servers or projects in it'),
     ).toBeInTheDocument();
+  });
+
+  // This is the exact gap an invited Operator hit in production: nothing
+  // anywhere told them they had been invited. The hub is the fix.
+  it('shows a pending invitation and accepts it', async () => {
+    invitations = [pendingInvitation];
+    renderHub();
+
+    await screen.findByText('Agency Shared');
+    expect(screen.getByText('Invited as Member')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Accept/i }));
+
+    await waitFor(() => expect(acceptInvitationMock).toHaveBeenCalledWith('tok_1'));
+  });
+
+  it('declines a pending invitation without accepting it', async () => {
+    invitations = [pendingInvitation];
+    renderHub();
+
+    await screen.findByText('Agency Shared');
+    await userEvent.click(screen.getByRole('button', { name: /Decline/i }));
+
+    await waitFor(() => expect(declineInvitationMock).toHaveBeenCalledWith('tok_1'));
+    expect(acceptInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it('separates workspaces you own from ones shared with you', async () => {
+    workspaces = [personal, clientX, memberWorkspace];
+    renderHub();
+
+    const ownedHeading = await screen.findByText('Your workspaces');
+    const sharedHeading = screen.getByText('Shared with you');
+    expect(ownedHeading).toBeInTheDocument();
+    expect(sharedHeading).toBeInTheDocument();
+
+    // "Agency Shared" (held as a member) must appear after the "Shared with
+    // you" heading, not mixed in among the owned workspaces.
+    const ownedPosition = ownedHeading.compareDocumentPosition(screen.getByText('Client X'));
+    const sharedPosition = sharedHeading.compareDocumentPosition(screen.getByText('Agency Shared'));
+    expect(ownedPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sharedPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no section headings when every workspace is owned', async () => {
+    workspaces = [personal, clientX];
+    renderHub();
+
+    await screen.findByText('Client X');
+    expect(screen.queryByText('Your workspaces')).not.toBeInTheDocument();
+    expect(screen.queryByText('Shared with you')).not.toBeInTheDocument();
   });
 });

@@ -1,22 +1,31 @@
-import type { OperationEvent } from '@slideops/api-client';
+import type { InboxNotification, OperationEvent } from '@slideops/api-client';
 import { create } from 'zustand';
 
 /*
- * Notifications surface the results of Operations as they happen. They are fed
- * by the same live event stream that drives the terminal, so completion and
- * verification results reach the Operator without a refresh. The pure
- * notificationFromEvent decides which events become a notification and what it
- * says; the store holds the list, the unread count, and the browser-push
- * opt-in. Keeping the decision pure makes the behavior easy to test.
+ * Notifications surface two things: the results of Operations as they happen,
+ * fed by the same live event stream that drives the terminal, so completion
+ * and verification results reach the Operator without a refresh; and the
+ * durable in-app inbox the backend now keeps, which is how something that
+ * happened while the Operator was offline (a workspace invitation, most
+ * notably) still reaches them, the way a professional notification inbox
+ * survives a reload or a new session. The pure notificationFromEvent and
+ * notificationFromInbox decide what each source becomes; the store holds the
+ * merged list, the unread count, and the browser-push opt-in. Keeping the
+ * decision pure makes the behavior easy to test.
  */
 
 export type NotificationTone = 'success' | 'danger' | 'info';
 
 export interface AppNotification {
-  /** Stable id from the Operation and event seq, so a replayed event never doubles. */
+  /** Stable id: for an Operation event, from its operation and seq, so a
+   *  replayed event never doubles; for an inbox notification, its own id. */
   id: string;
-  operationId: string;
-  kind: 'completion' | 'verification' | 'action_required';
+  /** Present only for an Operation-derived notification. */
+  operationId?: string;
+  /** Present only for one backed by the durable backend inbox: what read and
+   *  read-all send back to the server to persist there too. */
+  remoteId?: string;
+  kind: 'completion' | 'verification' | 'action_required' | 'inbox';
   tone: NotificationTone;
   title: string;
   body: string;
@@ -26,6 +35,21 @@ export interface AppNotification {
   href?: string;
   /** A notification that waits until it is acted on rather than easing away. */
   persistent?: boolean;
+}
+
+/** Turn one durable inbox notification into the shape the bell renders. */
+export function notificationFromInbox(n: InboxNotification): AppNotification {
+  return {
+    id: `inbox:${n.id}`,
+    remoteId: n.id,
+    kind: 'inbox',
+    tone: 'info',
+    title: n.title,
+    body: n.body,
+    at: n.created_at,
+    read: n.read,
+    href: n.link || undefined,
+  };
 }
 
 /** Read a string field from an event's open data bag, or undefined. */
@@ -128,6 +152,8 @@ interface NotificationsState {
   /** Add a notification, ignoring one whose id is already present. */
   push: (notification: AppNotification) => void;
   markAllRead: () => void;
+  /** Mark one notification read, by its local id. */
+  markOneRead: (id: string) => void;
   dismiss: (id: string) => void;
   /**
    * Clear any pending action-required notification for an Operation once it is no
@@ -175,6 +201,12 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
       items: state.items.map((item) => (item.read ? item : { ...item, read: true })),
       unread: 0,
     }));
+  },
+  markOneRead(id) {
+    set((state) => {
+      const items = state.items.map((item) => (item.id === id ? { ...item, read: true } : item));
+      return { items, unread: unreadCount(items) };
+    });
   },
   dismiss(id) {
     set((state) => {

@@ -1,4 +1,4 @@
-import { ApiError, acceptInvitation, getInvitation } from '@slideops/api-client';
+import { ApiError, acceptInvitation, declineInvitation, getInvitation } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -36,6 +36,9 @@ export function InvitationAccept() {
   const [accepting, setAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [declineError, setDeclineError] = useState<string | null>(null);
+  const [declined, setDeclined] = useState(false);
 
   const next = `/invitations/${token}`;
 
@@ -52,6 +55,21 @@ export function InvitationAccept() {
       );
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const decline = async () => {
+    setDeclining(true);
+    setDeclineError(null);
+    try {
+      await declineInvitation(token);
+      setDeclined(true);
+    } catch (caught) {
+      setDeclineError(
+        caught instanceof ApiError ? caught.message : 'This invitation could not be declined.',
+      );
+    } finally {
+      setDeclining(false);
     }
   };
 
@@ -91,6 +109,19 @@ export function InvitationAccept() {
     );
   }
 
+  if (declined) {
+    return (
+      <AuthLayout
+        title="Invitation declined"
+        description={`You will not join ${invitation.workspace_name}. Nothing else changes.`}
+      >
+        <Button size="lg" className="w-full" onClick={() => navigate('/app', { replace: true })}>
+          Go to SlideOps
+        </Button>
+      </AuthLayout>
+    );
+  }
+
   if (authStatus === 'anonymous') {
     return (
       <AuthLayout
@@ -98,7 +129,11 @@ export function InvitationAccept() {
         description={`You were invited to ${invitation.workspace_name} as ${role.toLowerCase() === 'admin' ? 'an' : 'a'} ${role}. Sign in or create an account to accept.`}
       >
         <div className="flex flex-col gap-3">
-          <Button size="lg" className="w-full" onClick={() => navigate('/login', { state: { next } })}>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => navigate('/login', { state: { next } })}
+          >
             Sign in to accept
           </Button>
           <Button
@@ -128,8 +163,27 @@ export function InvitationAccept() {
             {acceptError}
           </p>
         ) : null}
-        <Button size="lg" className="w-full" disabled={accepting} onClick={() => void accept()}>
+        {declineError ? (
+          <p role="alert" className="text-sm text-danger">
+            {declineError}
+          </p>
+        ) : null}
+        <Button
+          size="lg"
+          className="w-full"
+          disabled={accepting || declining}
+          onClick={() => void accept()}
+        >
           {accepting ? 'Accepting' : 'Accept invitation'}
+        </Button>
+        <Button
+          size="lg"
+          variant="secondary"
+          className="w-full"
+          disabled={accepting || declining}
+          onClick={() => void decline()}
+        >
+          {declining ? 'Declining' : 'Decline'}
         </Button>
         <button
           type="button"

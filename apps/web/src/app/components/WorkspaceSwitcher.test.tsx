@@ -5,7 +5,18 @@ import { MemoryRouter } from 'react-router-dom';
 import { renderInApp } from '../../test/render';
 import { useAuthStore } from '../../store/auth';
 import { useWorkspaceStore } from '../../store/workspace';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+
+// listMyInvitations is mocked directly rather than through the raw fetch
+// queue every other test here drives: it fires on every mount, ahead of any
+// user interaction, and would otherwise consume whichever queued response a
+// test meant for the action it is actually exercising.
+const listMyInvitationsMock = vi.fn(async () => [] as { token: string }[]);
+vi.mock('@slideops/api-client', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  listMyInvitations: () => listMyInvitationsMock(),
+}));
+
+const { WorkspaceSwitcher } = await import('./WorkspaceSwitcher');
 
 function renderSwitcher() {
   return renderInApp(
@@ -23,7 +34,13 @@ function jsonResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-const own = { id: 'ws_1', name: 'Personal', is_personal: true, role: 'owner' as const, active: true };
+const own = {
+  id: 'ws_1',
+  name: 'Personal',
+  is_personal: true,
+  role: 'owner' as const,
+  active: true,
+};
 const shared = {
   id: 'ws_2',
   name: 'Client X',
@@ -83,7 +100,12 @@ describe('WorkspaceSwitcher', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse(204, undefined))
       .mockResolvedValueOnce(
-        jsonResponse(200, { workspaces: [{ ...own, active: false }, { ...shared, active: true }] }),
+        jsonResponse(200, {
+          workspaces: [
+            { ...own, active: false },
+            { ...shared, active: true },
+          ],
+        }),
       );
 
     renderSwitcher();
@@ -102,13 +124,22 @@ describe('WorkspaceSwitcher', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
         jsonResponse(201, {
-          workspace: { id: 'ws_3', name: 'Client Y', is_personal: false, role: 'owner', active: false },
+          workspace: {
+            id: 'ws_3',
+            name: 'Client Y',
+            is_personal: false,
+            role: 'owner',
+            active: false,
+          },
         }),
       )
       .mockResolvedValueOnce(jsonResponse(204, undefined))
       .mockResolvedValueOnce(
         jsonResponse(200, {
-          workspaces: [{ ...own, active: false }, { id: 'ws_3', name: 'Client Y', is_personal: false, role: 'owner', active: true }],
+          workspaces: [
+            { ...own, active: false },
+            { id: 'ws_3', name: 'Client Y', is_personal: false, role: 'owner', active: true },
+          ],
         }),
       );
 
