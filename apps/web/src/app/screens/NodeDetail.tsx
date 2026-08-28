@@ -46,6 +46,7 @@ import { DiscoveryScan } from '../components/DiscoveryScan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { NodeCapacity } from '../components/NodeCapacity';
 import { NodeHealth } from '../components/NodeHealth';
+import { NodeTransferControl } from '../components/NodeTransferControl';
 import { OperatorShell } from '../components/OperatorShell';
 import { RevealValue } from '../components/RevealValue';
 import { SecureServer, ServerPosture } from '../components/SecureServer';
@@ -376,6 +377,7 @@ export function NodeDetail() {
               />
               <ServerUsers nodeId={id} node={nodeResult.state.data} />
               <TagsEditor node={nodeResult.state.data} onSaved={() => nodeResult.reload()} />
+              <NodeTransferControl node={nodeResult.state.data} />
             </div>
           ) : null}
         </>

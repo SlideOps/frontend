@@ -1,16 +1,20 @@
 import {
   acceptInvitation,
+  acceptNodeTransfer,
   ApiError,
   createWorkspace,
   declineInvitation,
+  declineNodeTransfer,
   deleteWorkspace,
+  listIncomingNodeTransfers,
   listMyInvitations,
   renameWorkspace,
+  type IncomingNodeTransfer,
   type PendingInvitation,
   type Workspace,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Building2, Check, Mail, Pencil, Plus, Trash2, X } from '@slideops/icons';
+import { ArrowRightLeft, Building2, Check, Mail, Pencil, Plus, Trash2, X } from '@slideops/icons';
 import { PageHeader, Drawer } from '@slideops/ui';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspace';
@@ -184,6 +188,53 @@ function PendingInvitationCard({
 }
 
 /**
+ * One node transfer still waiting for this account's email to decide: which
+ * node, offered by which workspace, and a one-click accept (into the
+ * Personal workspace) or decline. Accepting into a different workspace this
+ * account owns needs the fuller review at the transfer's own link, which
+ * this card does not shortcut.
+ */
+function IncomingNodeTransferCard({
+  transfer,
+  busy,
+  onAccept,
+  onDecline,
+}: {
+  transfer: IncomingNodeTransfer;
+  busy: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <Card className="flex flex-col gap-3 border-brand bg-brand-subtle">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface text-brand">
+          <ArrowRightLeft width={16} height={16} aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <Text variant="body" className="truncate font-medium">
+            {transfer.node_name}
+          </Text>
+          <Text variant="caption" tone="secondary">
+            Offered by {transfer.from_workspace_name}
+          </Text>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={busy} onClick={onAccept}>
+          <Check width={14} height={14} aria-hidden />
+          Accept
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onDecline}>
+          <X width={14} height={14} aria-hidden />
+          Decline
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * Every workspace the Operator can act in: their Personal one, and as many
  * more as they have created or been invited into. Creating one here never
  * requires a Node or a Project first; it starts empty, and can be switched
@@ -234,6 +285,44 @@ export function WorkspaceHub() {
       );
     } finally {
       setInvitationBusy('');
+    }
+  };
+
+  const { state: nodeTransfersState, reload: reloadNodeTransfers } = useAsyncData(
+    (signal) => listIncomingNodeTransfers(signal),
+    [],
+  );
+  const nodeTransfers = nodeTransfersState.status === 'ready' ? nodeTransfersState.data : [];
+  const [nodeTransferBusy, setNodeTransferBusy] = useState('');
+  const [nodeTransferError, setNodeTransferError] = useState<string | null>(null);
+
+  const doAcceptNodeTransfer = async (transfer: IncomingNodeTransfer) => {
+    setNodeTransferBusy(transfer.token);
+    setNodeTransferError(null);
+    try {
+      await acceptNodeTransfer(transfer.token);
+      await Promise.all([reloadNodeTransfers(), refresh()]);
+    } catch (caught) {
+      setNodeTransferError(
+        caught instanceof ApiError ? caught.message : 'That transfer could not be accepted.',
+      );
+    } finally {
+      setNodeTransferBusy('');
+    }
+  };
+
+  const doDeclineNodeTransfer = async (transfer: IncomingNodeTransfer) => {
+    setNodeTransferBusy(transfer.token);
+    setNodeTransferError(null);
+    try {
+      await declineNodeTransfer(transfer.token);
+      await reloadNodeTransfers();
+    } catch (caught) {
+      setNodeTransferError(
+        caught instanceof ApiError ? caught.message : 'That transfer could not be declined.',
+      );
+    } finally {
+      setNodeTransferBusy('');
     }
   };
 
@@ -319,6 +408,31 @@ export function WorkspaceHub() {
                 busy={invitationBusy === invitation.token}
                 onAccept={() => void doAccept(invitation)}
                 onDecline={() => void doDecline(invitation)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {nodeTransferError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {nodeTransferError}
+        </p>
+      ) : null}
+      {nodeTransfersState.status === 'error' ? <ErrorNote error={nodeTransfersState.error} /> : null}
+      {nodeTransfers.length > 0 ? (
+        <div className="mb-6">
+          <Text variant="h4" className="mb-3">
+            Nodes offered to you
+          </Text>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {nodeTransfers.map((transfer) => (
+              <IncomingNodeTransferCard
+                key={transfer.token}
+                transfer={transfer}
+                busy={nodeTransferBusy === transfer.token}
+                onAccept={() => void doAcceptNodeTransfer(transfer)}
+                onDecline={() => void doDeclineNodeTransfer(transfer)}
               />
             ))}
           </div>

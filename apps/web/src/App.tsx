@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { InvitationAccept } from './auth/InvitationAccept';
+import { NodeTransferAccept } from './auth/NodeTransferAccept';
 import { Login } from './auth/Login';
 import { MfaVerify } from './auth/MfaVerify';
 import { Register } from './auth/Register';
@@ -177,6 +178,7 @@ export function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/mfa" element={<MfaVerify />} />
         <Route path="/invitations/:token" element={<InvitationAccept />} />
+        <Route path="/node-transfers/:token" element={<NodeTransferAccept />} />
 
         {/* Operator area: any signed-in account. */}
         <Route path="/app" element={<RequireAuth />}>

@@ -320,6 +320,19 @@ export {
   type PendingInvitation,
 } from './workspaces';
 export {
+  initiateNodeTransfer,
+  getPendingNodeTransfer,
+  cancelNodeTransfer,
+  getNodeTransferPreview,
+  acceptNodeTransfer,
+  declineNodeTransfer,
+  listIncomingNodeTransfers,
+  type NodeTransfer,
+  type NodeTransferStatus,
+  type NodeTransferPreview,
+  type IncomingNodeTransfer,
+} from './nodeTransfers';
+export {
   listNotifications,
   unreadNotificationCount,
   markNotificationRead,

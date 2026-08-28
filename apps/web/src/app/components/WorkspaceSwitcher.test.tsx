@@ -6,14 +6,17 @@ import { renderInApp } from '../../test/render';
 import { useAuthStore } from '../../store/auth';
 import { useWorkspaceStore } from '../../store/workspace';
 
-// listMyInvitations is mocked directly rather than through the raw fetch
-// queue every other test here drives: it fires on every mount, ahead of any
-// user interaction, and would otherwise consume whichever queued response a
-// test meant for the action it is actually exercising.
+// listMyInvitations and listIncomingNodeTransfers are mocked directly rather
+// than through the raw fetch queue every other test here drives: both fire
+// on every mount, ahead of any user interaction, and would otherwise consume
+// whichever queued response a test meant for the action it is actually
+// exercising.
 const listMyInvitationsMock = vi.fn(async () => [] as { token: string }[]);
+const listIncomingNodeTransfersMock = vi.fn(async () => [] as { token: string }[]);
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   listMyInvitations: () => listMyInvitationsMock(),
+  listIncomingNodeTransfers: () => listIncomingNodeTransfersMock(),
 }));
 
 const { WorkspaceSwitcher } = await import('./WorkspaceSwitcher');

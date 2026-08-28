@@ -278,6 +278,13 @@ export const guidance: GuidanceRegistry = {
     summary:
       'The new password or private key. It is stored encrypted the moment it arrives and never shown again.',
   },
+  'server.transfer': {
+    label: 'Transfer ownership',
+    summary:
+      'Hand this node, and everything on it, to a different Operator account entirely. Nothing moves until they accept.',
+    detail:
+      'This offers the node, its project if it has one to itself, every service on it, installed plugins, history, and its credential, to another Operator account by email, whether or not that account is in this workspace. Nothing changes until the receiving Operator accepts, and they can decline instead. A node whose project is also assigned to another node, or that has an operation still running, cannot be offered until that is resolved.',
+  },
   'server.users': {
     label: 'Server accounts',
     summary:

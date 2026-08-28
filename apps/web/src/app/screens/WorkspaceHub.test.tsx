@@ -2,7 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, type PendingInvitation, type Workspace } from '@slideops/api-client';
+import {
+  ApiError,
+  type IncomingNodeTransfer,
+  type PendingInvitation,
+  type Workspace,
+} from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
@@ -37,14 +42,25 @@ const pendingInvitation: PendingInvitation = {
   invited_at: '2026-07-23T00:00:00Z',
 };
 
+const incomingTransfer: IncomingNodeTransfer = {
+  token: 'nt_tok_1',
+  node_name: 'client-vps',
+  from_workspace_name: 'Agency Shared',
+  message: '',
+  created_at: '2026-08-28T00:00:00Z',
+};
+
 let workspaces: Workspace[] = [personal];
 let invitations: PendingInvitation[] = [];
+let nodeTransfers: IncomingNodeTransfer[] = [];
 const createWorkspaceMock = vi.fn(async (_name: string) => clientX);
 const renameWorkspaceMock = vi.fn(async (_id: string, name: string) => ({ ...clientX, name }));
 const deleteWorkspaceMock = vi.fn(async (_id: string) => undefined);
 const switchWorkspaceMock = vi.fn(async (_id: string) => undefined);
 const acceptInvitationMock = vi.fn(async (_token: string) => undefined);
 const declineInvitationMock = vi.fn(async (_token: string) => undefined);
+const acceptNodeTransferMock = vi.fn(async (_token: string) => undefined);
+const declineNodeTransferMock = vi.fn(async (_token: string) => undefined);
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -56,6 +72,9 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listMyInvitations: async () => invitations,
   acceptInvitation: (...args: [string]) => acceptInvitationMock(...args),
   declineInvitation: (...args: [string]) => declineInvitationMock(...args),
+  listIncomingNodeTransfers: async () => nodeTransfers,
+  acceptNodeTransfer: (...args: [string]) => acceptNodeTransferMock(...args),
+  declineNodeTransfer: (...args: [string]) => declineNodeTransferMock(...args),
 }));
 
 const { WorkspaceHub } = await import('./WorkspaceHub');
@@ -72,12 +91,15 @@ beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [], loaded: false });
   workspaces = [personal];
   invitations = [];
+  nodeTransfers = [];
   createWorkspaceMock.mockClear();
   renameWorkspaceMock.mockClear();
   deleteWorkspaceMock.mockClear();
   switchWorkspaceMock.mockClear();
   acceptInvitationMock.mockClear();
   declineInvitationMock.mockClear();
+  acceptNodeTransferMock.mockClear();
+  declineNodeTransferMock.mockClear();
 });
 
 describe('WorkspaceHub', () => {
@@ -202,6 +224,31 @@ describe('WorkspaceHub', () => {
 
     await waitFor(() => expect(declineInvitationMock).toHaveBeenCalledWith('tok_1'));
     expect(acceptInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a node transfer offered to it and accepts it', async () => {
+    nodeTransfers = [incomingTransfer];
+    renderHub();
+
+    await screen.findByText('client-vps');
+    expect(screen.getByText('Offered by Agency Shared')).toBeInTheDocument();
+
+    const section = screen.getByText('Nodes offered to you').closest('div') as HTMLElement;
+    await userEvent.click(within(section).getByRole('button', { name: /Accept/i }));
+
+    await waitFor(() => expect(acceptNodeTransferMock).toHaveBeenCalledWith('nt_tok_1'));
+  });
+
+  it('declines a node transfer without accepting it', async () => {
+    nodeTransfers = [incomingTransfer];
+    renderHub();
+
+    await screen.findByText('client-vps');
+    const section = screen.getByText('Nodes offered to you').closest('div') as HTMLElement;
+    await userEvent.click(within(section).getByRole('button', { name: /Decline/i }));
+
+    await waitFor(() => expect(declineNodeTransferMock).toHaveBeenCalledWith('nt_tok_1'));
+    expect(acceptNodeTransferMock).not.toHaveBeenCalled();
   });
 
   it('separates workspaces you own from ones shared with you', async () => {

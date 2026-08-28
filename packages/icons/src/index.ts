@@ -4,6 +4,7 @@ export {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  ArrowRightLeft,
   ArrowUpRight,
   Maximize2,
   Minimize2,

@@ -1,4 +1,9 @@
-import { ApiError, createWorkspace, listMyInvitations } from '@slideops/api-client';
+import {
+  ApiError,
+  createWorkspace,
+  listIncomingNodeTransfers,
+  listMyInvitations,
+} from '@slideops/api-client';
 import { Button, cn, Field } from '@slideops/design-system';
 import { Building2, Check, ChevronsUpDown, Mail, Plus, Settings } from '@slideops/icons';
 import { Popover } from '@slideops/tooltips';
@@ -39,7 +44,16 @@ export function WorkspaceSwitcher() {
   // Workspaces hub; a count here, wherever the switcher already is, catches
   // it the moment the Operator opens it.
   const { state: invitationsState } = useAsyncData((signal) => listMyInvitations(signal), []);
-  const pendingCount = invitationsState.status === 'ready' ? invitationsState.data.length : 0;
+  // A node transfer is addressed to this account's email, exactly like an
+  // invitation, so it is folded into the same "waiting for you" count and
+  // banner rather than a second, competing indicator in the header.
+  const { state: nodeTransfersState } = useAsyncData(
+    (signal) => listIncomingNodeTransfers(signal),
+    [],
+  );
+  const pendingCount =
+    (invitationsState.status === 'ready' ? invitationsState.data.length : 0) +
+    (nodeTransfersState.status === 'ready' ? nodeTransfersState.data.length : 0);
 
   if (workspaces.length === 0) {
     return null;
@@ -140,8 +154,8 @@ export function WorkspaceSwitcher() {
             >
               <Mail width={15} height={15} className="shrink-0 text-brand" aria-hidden />
               {pendingCount === 1
-                ? 'You have 1 pending invitation'
-                : `You have ${pendingCount} pending invitations`}
+                ? 'You have 1 thing waiting for you'
+                : `You have ${pendingCount} things waiting for you`}
             </button>
           ) : null}
           <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
