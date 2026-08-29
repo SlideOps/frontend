@@ -21,6 +21,8 @@ const getServiceMetrics = vi.fn();
 const listCapabilityActions = vi.fn();
 const checkServiceUpdate = vi.fn();
 const purgeService = vi.fn();
+const listMarketplacePlugins = vi.fn();
+const listInstalledPlugins = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -32,6 +34,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listCapabilityActions: (...a: unknown[]) => listCapabilityActions(...a),
   checkServiceUpdate: (...a: unknown[]) => checkServiceUpdate(...a),
   purgeService: (...a: unknown[]) => purgeService(...a),
+  listMarketplacePlugins: (...a: unknown[]) => listMarketplacePlugins(...a),
+  listInstalledPlugins: (...a: unknown[]) => listInstalledPlugins(...a),
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
@@ -138,6 +142,23 @@ describe('ServiceDetail', () => {
     ]);
     checkServiceUpdate.mockReset().mockResolvedValue({ behind: false });
     purgeService.mockReset().mockResolvedValue(undefined);
+    listMarketplacePlugins.mockReset().mockResolvedValue([
+      {
+        id: 'postgresql',
+        name: 'PostgreSQL',
+        version: '1.0.0',
+        author: 'SlideOps',
+        category: 'database',
+        description: 'A PostgreSQL server.',
+        provides: ['install-postgresql'],
+        config: [],
+        permissions: [],
+        installed: true,
+      },
+    ]);
+    listInstalledPlugins.mockReset().mockResolvedValue([
+      { id: 'inst-1', plugin_id: 'postgresql', enabled: true, installed_at: '2026-01-01' },
+    ]);
   });
 
   afterEach(() => {
@@ -231,6 +252,16 @@ describe('ServiceDetail', () => {
     expect(logs).toBeGreaterThanOrEqual(0);
     expect(settings).toBeGreaterThanOrEqual(0);
     expect(logs).toBeLessThan(settings);
+  });
+
+  it('has a Stack tab showing what is installed on this Service, not everything', async () => {
+    show();
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByRole('tab', { name: /Stack/ }));
+
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(listMarketplacePlugins).toHaveBeenCalledWith(service.project_id, expect.anything());
   });
 
   // Purging is the strong, irreversible delete: it must never fire on a

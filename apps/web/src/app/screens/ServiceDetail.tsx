@@ -18,6 +18,7 @@ import {
 import { Button, Card, Field, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
+  Boxes,
   Database,
   FileText,
   Play,
@@ -42,6 +43,7 @@ import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { CapabilityManagement } from '../components/CapabilityManagement';
 import { DatabaseExplorer, DATABASE_EXPLORER_ACTION_KEYS } from '../components/DatabaseExplorer';
+import { ProjectStack } from '../components/ProjectStack';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -146,6 +148,7 @@ function LogsAndActivity({ id }: { id: string }) {
 
 const SERVICE_TABS: TabNavTab[] = [
   { key: 'overview', label: 'Overview', icon: Server },
+  { key: 'stack', label: 'Stack', icon: Boxes },
   { key: 'browse', label: 'Browse', icon: Database },
   { key: 'shell', label: 'Shell', icon: TerminalIcon },
   { key: 'logs', label: 'Logs', icon: FileText },
@@ -569,6 +572,10 @@ export function ServiceDetail() {
                 </>
               }
             />
+          ) : null}
+
+          {activeTab === 'stack' ? (
+            <ProjectStack projectId={service.project_id} nodeId={service.node_id} />
           ) : null}
 
           {activeTab === 'browse' ? (
