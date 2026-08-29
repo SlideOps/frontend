@@ -14,11 +14,13 @@ import type { Workload } from '@slideops/api-client';
 
 const listNodeWorkloads = vi.fn();
 const adoptWorkload = vi.fn();
+const getServiceMetrics = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   listNodeWorkloads: (...args: unknown[]) => listNodeWorkloads(...args),
   adoptWorkload: (...args: unknown[]) => adoptWorkload(...args),
+  getServiceMetrics: (...args: unknown[]) => getServiceMetrics(...args),
 }));
 
 const { ContainerManager } = await import('./ContainerManager');
@@ -50,6 +52,25 @@ describe('ContainerManager', () => {
   beforeEach(() => {
     listNodeWorkloads.mockReset();
     adoptWorkload.mockReset();
+    getServiceMetrics.mockReset();
+  });
+
+  it('shows live CPU and memory usage for an adopted container', async () => {
+    listNodeWorkloads.mockResolvedValue([workload({ adopted: true, service_id: 'svc-1' })]);
+    getServiceMetrics.mockResolvedValue({ cpu_percent: 12.4, memory_used_mb: 340, memory_limit_mb: 1024 });
+    show('proj-1');
+
+    expect(await screen.findByText('12%')).toBeInTheDocument();
+    expect(screen.getByText('340 / 1024 MB')).toBeInTheDocument();
+    expect(getServiceMetrics).toHaveBeenCalledWith('svc-1', expect.anything());
+  });
+
+  it('shows a dash for CPU and memory on a container that is not adopted', async () => {
+    listNodeWorkloads.mockResolvedValue([workload({ adopted: false, service_id: undefined })]);
+    show('proj-1');
+
+    await screen.findByText('app');
+    expect(getServiceMetrics).not.toHaveBeenCalled();
   });
 
   it('lists only containers, not systemd units', async () => {

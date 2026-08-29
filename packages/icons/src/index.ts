@@ -42,6 +42,7 @@ export {
   FileText,
   FolderKanban,
   Fingerprint,
+  Folder,
   Gauge,
   GitBranch,
   Globe,

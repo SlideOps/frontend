@@ -335,6 +335,12 @@ export const guidance: GuidanceRegistry = {
     label: 'Category',
     summary: 'The area of work a Capability belongs to, such as security or networking.',
   },
+  'capability.security-posture': {
+    label: 'Security posture',
+    summary: 'The four security Capabilities together, so you can see what is set up and what is not at a glance.',
+    detail:
+      'Fail2ban, automatic security updates, key-only SSH, and a server audit each answer a different part of "is this server secure." Rather than checking each Capability page one at a time, this shows all four together and links straight to whichever one needs attention.',
+  },
   'capability.outcome': {
     label: 'Outcome',
     summary:

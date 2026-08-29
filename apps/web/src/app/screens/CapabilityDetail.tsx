@@ -46,9 +46,20 @@ import {
   isExplorableDatabase,
 } from '../components/DatabaseExplorer';
 import { ContainerManager } from '../components/ContainerManager';
+import { WebSitesManager, isWebSitesCapability } from '../components/WebSitesManager';
+import { MessagingManager, isMessagingCapability } from '../components/MessagingManager';
+import { StorageExplorer, isStorageCapability } from '../components/StorageExplorer';
+import { SearchIndexManager, isSearchIndexCapability } from '../components/SearchIndexManager';
+import { RuntimeManager, isRuntimeCapability } from '../components/RuntimeManager';
+import { NetworkingManager, isNetworkingCapability } from '../components/NetworkingManager';
+import { SecurityPosturePanel } from '../components/SecurityPosturePanel';
+import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+/** The four security Capabilities SecurityPosturePanel shows together. */
+const SECURITY_CHECKLIST_KEYS = ['install-fail2ban', 'enable-auto-updates', 'enforce-key-only-ssh', 'server-audit'];
 
 function Section({
   title,
@@ -465,6 +476,63 @@ export function CapabilityDetail() {
                   {done && preselectedNode && key === 'enable-containers' ? (
                     <Section title="Containers">
                       <ContainerManager nodeId={preselectedNode} projectId={preselectedProject} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isWebSitesCapability(key) ? (
+                    <Section title="Sites">
+                      <WebSitesManager capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isMessagingCapability(key) ? (
+                    <Section title={key === 'install-nats' ? 'Streams' : 'Queues'}>
+                      <MessagingManager capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isStorageCapability(key) ? (
+                    <Section title="Buckets">
+                      <StorageExplorer capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isSearchIndexCapability(key) ? (
+                    <Section title="Indexes">
+                      <SearchIndexManager capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isRuntimeCapability(key) ? (
+                    <Section title="Running now">
+                      <RuntimeManager capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isNetworkingCapability(key) ? (
+                    <Section title="Peers">
+                      <NetworkingManager capabilityKey={key} nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {/* Shown on any of the four security Capability pages, so
+                    an Operator looking at one sees the whole posture rather
+                    than only this one item. */}
+                  {preselectedNode && SECURITY_CHECKLIST_KEYS.includes(key) ? (
+                    <Section title="Security posture" guidanceKey="capability.security-posture">
+                      <SecurityPosturePanel
+                        states={states}
+                        nodeId={preselectedNode}
+                        projectId={preselectedProject}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {/* The existing Node health panel, wired here instead of
+                    living only as its own separate dashboard area. */}
+                  {preselectedNode && key === 'enable-monitoring' ? (
+                    <Section title="Health">
+                      <NodeHealth nodeId={preselectedNode} />
                     </Section>
                   ) : null}
 

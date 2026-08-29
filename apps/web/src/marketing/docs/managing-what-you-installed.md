@@ -1,7 +1,7 @@
 ## Managing what you installed
 
-Installing a database is the beginning. This is what SlideOps can do with it
-afterwards.
+Installing something is the beginning. This is what SlideOps can do with it
+afterwards, for a database and for everything else in the marketplace.
 
 ### A Capability's page becomes its management page
 
@@ -98,6 +98,29 @@ else is refused.
 
 That is not a detail of the screen. The narrowing is done by the server, from the
 Service's own configuration, so it holds however the request was made.
+
+### Every category gets a real management page, not just databases
+
+The same idea, a page that turns from a description into a place to work once
+something is installed, holds for every category in the marketplace, not only a
+database:
+
+|              | What you see                                                          |
+| ------------ | ---------------------------------------------------------------------- |
+| Containers   | Every container running on the server, adopt one with a click, its live logs, shell, environment, and resource use on its own page |
+| Web servers  | The sites or frontends nginx, Apache, or HAProxy have configured, and what each one listens on |
+| Messaging    | RabbitMQ's queues, or a NATS server's JetStream streams, each with how much is waiting |
+| Storage      | MinIO's buckets, browsable down to each object's size |
+| Search       | A Meilisearch server's indexes, with their document counts |
+| Runtimes     | A Node.js or Python installation's own version, and every process of it running right now |
+| Networking   | A WireGuard interface's peers, with when each was last seen |
+| Security     | Fail2ban, automatic updates, key-only SSH, and a server audit, together as one checklist |
+| Monitoring   | The same live health panel as the server dashboard, right on the Capability's own page |
+
+None of it needs a shell, a client tool, or knowing the underlying command.
+Every read changes nothing and runs the moment you open the page; anything that
+would change something, an edit, a restore, still goes through a plan you
+approve, exactly as any other Operation does.
 
 ### Core and marketplace
 
