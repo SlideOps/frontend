@@ -130,6 +130,36 @@ export interface Service {
   public_urls?: string[];
   created_at: string;
   updated_at?: string;
+  /** This Service's automatic deployment configuration. Off by default. */
+  cicd: ServiceCICD;
+}
+
+/** Where a BuildModeExternal Service's running image actually comes from. */
+export type ServiceBuildMode = 'slideops' | 'external';
+
+/**
+ * A Service's automatic deployment settings, as read back. Never carries a
+ * secret plaintext: `*_configured` says whether one is stored, not what it is.
+ */
+export interface ServiceCICD {
+  auto_deploy: boolean;
+  build_mode: ServiceBuildMode;
+  /**
+   * Whether a GitHub push webhook was successfully registered. False with
+   * auto_deploy true means the polling fallback is what is actually running
+   * it; the CI/CD tab explains why.
+   */
+  webhook_configured: boolean;
+  /**
+   * Whether a deploy hook token has been rotated at least once. The token
+   * itself is only ever returned once, at the moment it is rotated.
+   */
+  deploy_hook_configured: boolean;
+  registry_url?: string;
+  registry_username?: string;
+  registry_configured: boolean;
+  /** The image the most recent deploy hook call or artifact upload deployed. */
+  last_external_image?: string;
 }
 
 /**
@@ -339,6 +369,87 @@ export function checkServiceUpdate(id: string, signal?: AbortSignal): Promise<Se
   return apiRequest<unknown>(`/services/${id}/update-check`, { signal }).then((r) =>
     unwrap<ServiceUpdate>(r, 'update'),
   );
+}
+
+/**
+ * What the CI/CD tab's settings form edits together.
+ *
+ * `registry_password` follows the same convention a secret env value does:
+ * omit it to leave a stored credential untouched, since a sealed value cannot
+ * be read back into the form to show unchanged; send an empty string to
+ * clear it; send anything else to replace it.
+ */
+export interface UpdateServiceCICDInput {
+  auto_deploy: boolean;
+  build_mode: ServiceBuildMode;
+  registry_url: string;
+  registry_username: string;
+  registry_password?: string;
+}
+
+/**
+ * Update a Service's automatic deployment settings. Turning auto-deploy on in
+ * slideops mode for a repository this platform can reach on GitHub tries to
+ * register a push webhook; if that fails, auto-deploy is still turned on,
+ * backed by the polling fallback, and why is on `listServiceDeployEvents`.
+ */
+export function updateServiceCICD(id: string, input: UpdateServiceCICDInput): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/cicd`, {
+    method: 'PUT',
+    body: input,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** A newly rotated deploy hook token, and the Service it belongs to. */
+export interface DeployHookToken {
+  service: Service;
+  /** The plaintext bearer token, shown exactly once. It cannot be read back
+   *  after this call; rotate again to replace it. */
+  token: string;
+}
+
+/**
+ * Rotate a Service's deploy hook token, replacing any existing one. Put the
+ * returned token wherever an external CI's deploy hook or artifact upload
+ * call authenticates from; it is never shown again after this call returns.
+ */
+export function rotateDeployHookToken(id: string): Promise<DeployHookToken> {
+  return apiRequest<DeployHookToken>(`/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`, {
+    method: 'POST',
+  });
+}
+
+/** What caused a deploy attempt to run, for the CI/CD activity trail. */
+export type DeployEventTrigger = 'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
+
+/** What happened once that trigger fired. */
+export type DeployEventOutcome = 'redeploy_started' | 'skipped' | 'error';
+
+/** One entry in a Service's CI/CD activity trail. */
+export interface DeployEvent {
+  id: string;
+  trigger: DeployEventTrigger;
+  commit_sha?: string;
+  image?: string;
+  outcome: DeployEventOutcome;
+  detail?: string;
+  created_at: string;
+}
+
+/**
+ * A Service's CI/CD activity trail, newest first: what triggered a deploy
+ * attempt and what happened. This is what explains a skipped or failed
+ * automatic deploy once a webhook, not a click, is what starts one.
+ */
+export function listServiceDeployEvents(
+  id: string,
+  limit?: number,
+  signal?: AbortSignal,
+): Promise<DeployEvent[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/cicd/deploy-events`, {
+    query: { limit },
+    signal,
+  }).then((r) => unwrap<DeployEvent[]>(r, 'events'));
 }
 
 /**

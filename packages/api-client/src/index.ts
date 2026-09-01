@@ -246,6 +246,9 @@ export {
   exposeService,
   updateServiceResources,
   updateServiceConfiguration,
+  updateServiceCICD,
+  rotateDeployHookToken,
+  listServiceDeployEvents,
   type Service,
   type ServiceSource,
   type ServicePort,
@@ -260,6 +263,13 @@ export {
   type ServiceResources,
   type ServiceUpdate,
   type DeployServiceInput,
+  type ServiceBuildMode,
+  type ServiceCICD,
+  type UpdateServiceCICDInput,
+  type DeployHookToken,
+  type DeployEvent,
+  type DeployEventTrigger,
+  type DeployEventOutcome,
 } from './services';
 export {
   getReport,

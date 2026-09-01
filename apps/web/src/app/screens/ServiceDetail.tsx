@@ -21,6 +21,7 @@ import {
   Boxes,
   Database,
   FileText,
+  GitBranch,
   Play,
   RefreshCw,
   Server,
@@ -50,6 +51,7 @@ import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
+import { ServiceCICDPanel } from '../components/ServiceCICDPanel';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -152,6 +154,7 @@ const SERVICE_TABS: TabNavTab[] = [
   { key: 'browse', label: 'Browse', icon: Database },
   { key: 'shell', label: 'Shell', icon: TerminalIcon },
   { key: 'logs', label: 'Logs', icon: FileText },
+  { key: 'cicd', label: 'CI/CD', icon: GitBranch },
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 const DEFAULT_SERVICE_TAB = 'overview';
@@ -615,6 +618,8 @@ export function ServiceDetail() {
           ) : null}
 
           {activeTab === 'logs' ? <LogsAndActivity id={service.id} /> : null}
+
+          {activeTab === 'cicd' ? <ServiceCICDPanel service={service} onChanged={reload} /> : null}
 
           {activeTab === 'settings' ? (
             <>
