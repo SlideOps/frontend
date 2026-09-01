@@ -158,8 +158,22 @@ function StackCard({
  * which is where its real visual manager (Sites, Queues, the Database
  * Explorer, and so on) actually lives; without one there is nowhere to send
  * that link, so it falls back to the read-only Marketplace catalog entry.
+ *
+ * serviceId is optional too, carried the same way. When mounted from a
+ * Service's own page it is that Service's id, and it rides along in the
+ * Manage link's query string so the management page it opens can narrow a
+ * database engine's Browse tab and credentials down to what this one Service
+ * actually uses, instead of everything on the whole Node.
  */
-export function ProjectStack({ projectId, nodeId }: { projectId: string; nodeId?: string }) {
+export function ProjectStack({
+  projectId,
+  nodeId,
+  serviceId,
+}: {
+  projectId: string;
+  nodeId?: string;
+  serviceId?: string;
+}) {
   const navigate = useNavigate();
   const { state, reload } = useAsyncData((signal) => loadStack(projectId, signal), [projectId]);
 
@@ -226,7 +240,7 @@ export function ProjectStack({ projectId, nodeId }: { projectId: string; nodeId?
   function openFor(plugin: StackPlugin): { onOpen: () => void; label: 'Manage' | 'Details' } {
     const installed = plugin.is_core || plugin.installed;
     if (installed && nodeId && plugin.provides && plugin.provides.length > 0) {
-      const query = `?node=${nodeId}&project=${projectId}`;
+      const query = `?node=${nodeId}&project=${projectId}${serviceId ? `&service=${serviceId}` : ''}`;
       return { onOpen: () => navigate(`/app/capabilities/${plugin.provides[0]}${query}`), label: 'Manage' };
     }
     return { onOpen: () => navigate(`/app/marketplace/${plugin.id}`), label: 'Details' };

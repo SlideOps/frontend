@@ -50,10 +50,10 @@ function installedEntry(overrides: Partial<InstalledPlugin> = {}): InstalledPlug
   return { id: 'inst-1', plugin_id: 'postgresql', enabled: true, installed_at: '2026-01-01', ...overrides };
 }
 
-function show(nodeId?: string) {
+function show(nodeId?: string, serviceId?: string) {
   return renderInApp(
     <MemoryRouter>
-      <ProjectStack projectId="proj-1" nodeId={nodeId} />
+      <ProjectStack projectId="proj-1" nodeId={nodeId} serviceId={serviceId} />
     </MemoryRouter>,
   );
 }
@@ -96,6 +96,20 @@ describe('ProjectStack', () => {
 
     await operator.click(await screen.findByRole('button', { name: /Manage/ }));
     expect(navigate).toHaveBeenCalledWith('/app/capabilities/install-postgresql?node=node-1&project=proj-1');
+  });
+
+  it('carries the Service along so its management page can scope Browse and credentials to it', async () => {
+    listMarketplacePlugins.mockResolvedValue([
+      plugin({ id: 'postgresql', name: 'PostgreSQL', installed: true, provides: ['install-postgresql'] }),
+    ]);
+    listInstalledPlugins.mockResolvedValue([installedEntry({ plugin_id: 'postgresql' })]);
+    const operator = userEvent.setup();
+    show('node-1', 'service-1');
+
+    await operator.click(await screen.findByRole('button', { name: /Manage/ }));
+    expect(navigate).toHaveBeenCalledWith(
+      '/app/capabilities/install-postgresql?node=node-1&project=proj-1&service=service-1',
+    );
   });
 
   it('falls back to the Marketplace catalog entry when no Node is known', async () => {

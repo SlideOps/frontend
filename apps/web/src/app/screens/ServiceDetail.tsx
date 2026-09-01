@@ -576,7 +576,7 @@ export function ServiceDetail() {
           ) : null}
 
           {activeTab === 'stack' ? (
-            <ProjectStack projectId={service.project_id} nodeId={service.node_id} />
+            <ProjectStack projectId={service.project_id} nodeId={service.node_id} serviceId={service.id} />
           ) : null}
 
           {activeTab === 'browse' ? (

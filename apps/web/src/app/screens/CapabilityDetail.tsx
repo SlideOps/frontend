@@ -1,9 +1,12 @@
 import {
+  ApiError,
   getCapability,
   getCapabilityStates,
   getNode,
   getOperation,
   listNodes,
+  listOperations,
+  runCapabilityAction,
   type Capability,
   type CapabilityState,
   type Node,
@@ -198,6 +201,164 @@ function CapabilityHere({
   );
 }
 
+/** The Manage link to the Capability that creates a database, an account, and a password. */
+function manageStepHref(manageKey: string, nodeId: string, projectId?: string, serviceId?: string): string {
+  return `/app/capabilities/${manageKey}?node=${nodeId}${projectId ? `&project=${projectId}` : ''}${
+    serviceId ? `&service=${serviceId}` : ''
+  }`;
+}
+
+/** The calm callout pointing at the manage step, shown when there is nothing yet to show a credential for. */
+function OneMoreStepForACredential({
+  databaseName,
+  manageHref,
+  description,
+}: {
+  databaseName: string;
+  manageHref: string;
+  description: string;
+}) {
+  const navigate = useNavigate();
+  return (
+    <Card className="flex flex-col gap-4 border-brand">
+      <div className="flex items-center gap-2">
+        <Database width={18} height={18} className="text-brand" aria-hidden />
+        <Text variant="h4">One more step for a credential</Text>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        {databaseName} {description}
+      </Text>
+      <div>
+        <Button size="sm" onClick={() => navigate(manageHref)}>
+          <KeyRound width={15} height={15} aria-hidden />
+          Create database and account
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * The newest completed manage Operation that created the named database on this
+ * Node, or null when nothing recorded ever created one by that name. A database
+ * found by name but never created through SlideOps (set up by hand, or by
+ * something else) has no Operation behind it and so no secret to reveal.
+ */
+function newestOperationFor(operations: Operation[], manageKey: string, database: string): Operation | null {
+  let newest: Operation | null = null;
+  for (const operation of operations) {
+    if (operation.capability_key !== manageKey || operation.parameters?.database !== database) {
+      continue;
+    }
+    const at = operation.completed_at ?? operation.created_at ?? '';
+    const newestAt = newest ? (newest.completed_at ?? newest.created_at ?? '') : '';
+    if (!newest || at.localeCompare(newestAt) > 0) {
+      newest = operation;
+    }
+  }
+  return newest;
+}
+
+/**
+ * The credential for the one database (or few) this Service actually points at,
+ * on a database server that usually carries one per application. Reading Browse's
+ * own scoped list-databases Action, rather than a separate notion of "what this
+ * Service uses", means this always agrees with what Browse shows: the same
+ * database server can host several Services, so a Service page must show only
+ * the database it uses, not the manage step's platform-wide done state, which
+ * says nothing about which Service asked.
+ */
+function ServiceDatabaseCredentials({
+  capabilityKey,
+  nodeId,
+  serviceId,
+  projectId,
+  host,
+}: {
+  capabilityKey: string;
+  nodeId: string;
+  serviceId: string;
+  projectId?: string;
+  host?: string;
+}) {
+  const step = databaseManageStep(capabilityKey);
+  const [databases, setDatabases] = useState<string[] | null>(null);
+  const [operations, setOperations] = useState<Operation[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!step) {
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      runCapabilityAction(capabilityKey, 'list-databases', { node_id: nodeId, service_id: serviceId }),
+      listOperations({ node_id: nodeId, status: 'completed' }, controller.signal),
+    ])
+      .then(([table, ops]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setDatabases(table.rows.map((row) => row[0]).filter((name): name is string => Boolean(name)));
+        setOperations(ops);
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(caught instanceof ApiError ? caught : new ApiError(0, 'unknown_error', 'This did not load.'));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [capabilityKey, nodeId, serviceId, step]);
+
+  if (!step) {
+    return null;
+  }
+  if (loading) {
+    return <Loading label="Loading this Service's database credentials" />;
+  }
+  if (error) {
+    return <ErrorNote error={error} />;
+  }
+
+  const manageHref = manageStepHref(step.manageKey, nodeId, projectId, serviceId);
+
+  if (!databases || databases.length === 0) {
+    return (
+      <OneMoreStepForACredential
+        databaseName={step.name}
+        manageHref={manageHref}
+        description="is installed and running, but this Service does not point at a database here yet. Create one, then add its connection details to this Service's environment to get a credential."
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {databases.map((name) => {
+        const operation = newestOperationFor(operations ?? [], step.manageKey, name);
+        return operation ? (
+          <CredentialsCard key={name} operation={operation} host={host} />
+        ) : (
+          <Card key={name} className="flex flex-col gap-2 border-warning">
+            <Text variant="body-sm" tone="secondary">
+              This Service uses a database called &ldquo;{name}&rdquo;, but SlideOps has no recorded
+              credential for it. It was likely created outside SlideOps.
+            </Text>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * The next step after a database server is installed. Installing a database
  * starts the server but creates no application database, account, or password, so
@@ -207,50 +368,59 @@ function CapabilityHere({
  * its manage step is not yet done there; once the manage step is done, the
  * credentials appear on their own and this steps aside. It renders nothing when
  * the Capability is not a database install, so a non-database page is untouched.
+ *
+ * When the Operator arrived from a Service, this instead shows the credential (or
+ * the nudge) scoped to that one Service, since the platform-wide manage state
+ * cannot say which Service, of possibly several sharing this server, is the one
+ * being looked at.
  */
 function CreateDatabaseCredentials({
   capabilityKey,
   states,
   nodeId,
   projectId,
+  serviceId,
+  host,
 }: {
   capabilityKey: string;
   states: Record<string, CapabilityState>;
   nodeId: string;
   projectId?: string;
+  serviceId?: string;
+  host?: string;
 }) {
-  const navigate = useNavigate();
   const step = databaseManageStep(capabilityKey);
   if (!step) {
     return null;
   }
   const installDone = Boolean(states[capabilityKey]);
-  const manageDone = Boolean(states[step.manageKey]);
-  if (!installDone || manageDone) {
+  if (!installDone) {
     return null;
   }
 
-  const manageHref = `/app/capabilities/${step.manageKey}?node=${nodeId}${
-    projectId ? `&project=${projectId}` : ''
-  }`;
+  if (serviceId) {
+    return (
+      <ServiceDatabaseCredentials
+        capabilityKey={capabilityKey}
+        nodeId={nodeId}
+        serviceId={serviceId}
+        projectId={projectId}
+        host={host}
+      />
+    );
+  }
+
+  const manageDone = Boolean(states[step.manageKey]);
+  if (manageDone) {
+    return null;
+  }
 
   return (
-    <Card className="flex flex-col gap-4 border-brand">
-      <div className="flex items-center gap-2">
-        <Database width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">One more step for a credential</Text>
-      </div>
-      <Text variant="body-sm" tone="secondary">
-        {step.name} is installed and running. Create a database and account to get connection
-        credentials, including a password, that you can use in your app.
-      </Text>
-      <div>
-        <Button size="sm" onClick={() => navigate(manageHref)}>
-          <KeyRound width={15} height={15} aria-hidden />
-          Create database and account
-        </Button>
-      </div>
-    </Card>
+    <OneMoreStepForACredential
+      databaseName={step.name}
+      manageHref={manageStepHref(step.manageKey, nodeId, projectId)}
+      description="is installed and running. Create a database and account to get connection credentials, including a password, that you can use in your app."
+    />
   );
 }
 
@@ -271,6 +441,11 @@ export function CapabilityDetail() {
   // A Plugin Capability started from a Project carries ?project=; a Core
   // Capability carries none, so this stays undefined and no project_id is sent.
   const preselectedProject = searchParams.get('project') ?? undefined;
+  // Present only when the Operator arrived from a Service's own Stack tab. It
+  // narrows a database engine's Browse tab and credentials to what that one
+  // Service actually uses; every other manager already ignores an unrecognized
+  // Service scope on the backend, so passing it along here is always safe.
+  const preselectedService = searchParams.get('service') ?? undefined;
 
   const capabilityResult = useAsyncData<Capability>((signal) => getCapability(key, signal), [key]);
   const nodesResult = useAsyncData<Node[]>((signal) => listNodes(signal), []);
@@ -370,6 +545,8 @@ export function CapabilityDetail() {
                     states={states}
                     nodeId={preselectedNode ?? ''}
                     projectId={preselectedProject}
+                    serviceId={preselectedService}
+                    host={nodes.find((node) => node.id === preselectedNode)?.address}
                   />
                 ) : null}
                 {capabilityResult.state.data.requirements &&
@@ -466,7 +643,11 @@ export function CapabilityDetail() {
                         What is actually inside, a page at a time, searchable. Nothing here changes
                         anything.
                       </Text>
-                      <DatabaseExplorer capabilityKey={key} nodeId={preselectedNode} />
+                      <DatabaseExplorer
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
                     </Section>
                   ) : null}
 
@@ -481,37 +662,45 @@ export function CapabilityDetail() {
 
                   {done && preselectedNode && isWebSitesCapability(key) ? (
                     <Section title="Sites">
-                      <WebSitesManager capabilityKey={key} nodeId={preselectedNode} />
+                      <WebSitesManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
                     </Section>
                   ) : null}
 
                   {done && preselectedNode && isMessagingCapability(key) ? (
                     <Section title={key === 'install-nats' ? 'Streams' : 'Queues'}>
-                      <MessagingManager capabilityKey={key} nodeId={preselectedNode} />
+                      <MessagingManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
                     </Section>
                   ) : null}
 
                   {done && preselectedNode && isStorageCapability(key) ? (
                     <Section title="Buckets">
-                      <StorageExplorer capabilityKey={key} nodeId={preselectedNode} />
+                      <StorageExplorer capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
                     </Section>
                   ) : null}
 
                   {done && preselectedNode && isSearchIndexCapability(key) ? (
                     <Section title="Indexes">
-                      <SearchIndexManager capabilityKey={key} nodeId={preselectedNode} />
+                      <SearchIndexManager
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
                     </Section>
                   ) : null}
 
                   {done && preselectedNode && isRuntimeCapability(key) ? (
                     <Section title="Running now">
-                      <RuntimeManager capabilityKey={key} nodeId={preselectedNode} />
+                      <RuntimeManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
                     </Section>
                   ) : null}
 
                   {done && preselectedNode && isNetworkingCapability(key) ? (
                     <Section title="Peers">
-                      <NetworkingManager capabilityKey={key} nodeId={preselectedNode} />
+                      <NetworkingManager
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
                     </Section>
                   ) : null}
 
@@ -543,6 +732,7 @@ export function CapabilityDetail() {
                       capabilityKey={key}
                       nodeId={preselectedNode ?? ''}
                       projectId={preselectedProject}
+                      serviceId={preselectedService}
                       installed={Boolean(done)}
                       hideActionKeys={
                         isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined
