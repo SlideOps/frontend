@@ -63,8 +63,8 @@ export function disconnectGitHub(): Promise<void> {
 /**
  * List every repository the connected Operator can reach, always read fresh
  * from GitHub. This is the full account, meant for browsing and searching to
- * find one to add; see `listSelectedGitHubRepos` for the smaller, curated
- * list an Operator has actually added, which is what a deploy picker reads.
+ * find one to add or remove; see `getGitHubRepositoryAccess` for what
+ * SlideOps currently actually offers, which is what a deploy picker reads.
  */
 export function listGitHubRepos(signal?: AbortSignal): Promise<GitHubRepo[]> {
   return apiRequest<unknown>('/github/repos', { signal }).then((r) =>
@@ -72,31 +72,55 @@ export function listGitHubRepos(signal?: AbortSignal): Promise<GitHubRepo[]> {
   );
 }
 
+/** Whether SlideOps offers every repository a connection can reach, or only
+ *  a curated `selected` subset of it. Never a GitHub-side permission: the
+ *  OAuth app SlideOps connects through grants its token everything at
+ *  connect time either way, since it has no per-repository consent screen
+ *  the way a GitHub App's installation picker does. */
+export type GitHubAccessMode = 'all' | 'selected';
+
 /**
- * List the repositories the Operator has explicitly added to SlideOps, out of
- * everything their connected account can reach. Empty until
- * `setSelectedGitHubRepos` has been called at least once. Each one is read
- * back fresh: one that was renamed, deleted, or is no longer reachable simply
- * does not appear.
+ * What SlideOps currently offers out of a connected account. In `all` mode,
+ * `repos` is empty and not meaningful. In `selected` mode, `repos` is every
+ * added repository still reachable right now, read fresh from GitHub rather
+ * than from anything stored; `unavailable` names anything previously added
+ * that GitHub can no longer reach at all (renamed, deleted, access revoked)
+ * — it is surfaced, never silently dropped from what was configured.
  */
-export function listSelectedGitHubRepos(signal?: AbortSignal): Promise<GitHubRepo[]> {
-  return apiRequest<unknown>('/github/repos/selected', { signal }).then((r) =>
-    unwrap<GitHubRepo[]>(r, 'repos'),
-  );
+export interface GitHubRepositoryAccess {
+  mode: GitHubAccessMode;
+  repos: GitHubRepo[];
+  unavailable: string[];
 }
 
 /**
- * Replace the whole set of repositories added to SlideOps with fullNames.
- * This is how both adding one and removing one are done: send the complete
- * list to keep, not just the change. Call it again at any time to add a
- * repository created after connecting; GitHub has no separate per-repository
- * consent step for the OAuth app SlideOps uses, so there is nothing to grant
- * on GitHub's side first. Only a name the connected token can actually reach
- * right now is kept.
+ * Read what SlideOps currently offers: the access mode, and, in `selected`
+ * mode, the curated repository list. This is a persistent, reconfigurable
+ * setting on the one GitHub connection, read fresh every time — never a
+ * one-time choice made at connect.
  */
-export function setSelectedGitHubRepos(fullNames: string[]): Promise<GitHubRepo[]> {
-  return apiRequest<unknown>('/github/repos/selected', {
+export function getGitHubRepositoryAccess(signal?: AbortSignal): Promise<GitHubRepositoryAccess> {
+  return apiRequest<GitHubRepositoryAccess>('/github/repos/selected', { signal });
+}
+
+/**
+ * Set the access mode and, in `selected` mode, the whole set of repositories
+ * to keep added, together, replacing whatever was configured before. This is
+ * a reconfiguration of the existing connection, never a new one: call it
+ * again at any time — to add a repository created after connecting, to
+ * remove one, or to switch modes entirely — with no need to reconnect
+ * GitHub first. Only a name the connected token can actually reach right now
+ * is kept; anything else is silently dropped rather than stored as a broken
+ * reference. Switching to `all` and back to `selected` later restores
+ * whatever `repos` a prior `selected` save had, regardless of what `repos`
+ * is passed on the switch to `all` (send an empty array; it is ignored).
+ */
+export function setGitHubRepositoryAccess(
+  mode: GitHubAccessMode,
+  repos: string[],
+): Promise<GitHubRepositoryAccess> {
+  return apiRequest<GitHubRepositoryAccess>('/github/repos/selected', {
     method: 'PUT',
-    body: { repos: fullNames },
-  }).then((r) => unwrap<GitHubRepo[]>(r, 'repos'));
+    body: { mode, repos },
+  });
 }

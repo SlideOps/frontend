@@ -2,16 +2,17 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GitHubStatus, GitHubRepo, Node, Project, Workspace } from '@slideops/api-client';
+import type { GitHubStatus, GitHubRepo, GitHubRepositoryAccess, Node, Project, Workspace } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
 /*
- * Picking a GitHub repository to deploy from: this form only ever offers
- * what an Operator has already added to SlideOps from the Project page's
- * GitHub section (see ProjectGitHub.test.tsx for adding one), not every
- * repository the connected account can reach. That curated, and usually
- * much shorter, list is read fresh every time this screen loads.
+ * Picking a GitHub repository to deploy from: this form reads whatever is
+ * currently configured on the Project page's GitHub section (see
+ * ProjectGitHub.test.tsx for configuring it) — every repository the
+ * connected account can reach in "all" mode, or only the curated list in
+ * "selected" mode — never a one-time snapshot from when GitHub was first
+ * connected.
  */
 
 const project: Project = { id: 'p1', name: 'apollo' } as Project;
@@ -30,7 +31,14 @@ function repo(fullName: string): GitHubRepo {
 
 const repos = [repo('acme/web'), repo('acme/worker'), repo('personal/blog')];
 
-const listSelectedGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
+const getGitHubRepositoryAccessMock = vi.fn(
+  async (..._args: unknown[]): Promise<GitHubRepositoryAccess> => ({
+    mode: 'selected',
+    repos,
+    unavailable: [],
+  }),
+);
+const listGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
 
 const ownerWorkspace: Workspace = {
   id: 'ws_1',
@@ -45,7 +53,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listProjects: async () => [project],
   listNodes: async () => [node],
   getGitHubStatus: async () => connectedStatus,
-  listSelectedGitHubRepos: (...a: unknown[]) => listSelectedGitHubReposMock(...a),
+  getGitHubRepositoryAccess: (...a: unknown[]) => getGitHubRepositoryAccessMock(...a),
+  listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
 }));
 
 const { ServiceDeploy } = await import('./ServiceDeploy');
@@ -60,7 +69,8 @@ function show() {
 
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
-  listSelectedGitHubReposMock.mockReset().mockResolvedValue(repos);
+  getGitHubRepositoryAccessMock.mockReset().mockResolvedValue({ mode: 'selected', repos, unavailable: [] });
+  listGitHubReposMock.mockReset().mockResolvedValue(repos);
 });
 
 async function chooseRepositorySource() {
@@ -68,12 +78,21 @@ async function chooseRepositorySource() {
 }
 
 describe('ServiceDeploy: GitHub repository picker', () => {
-  it('offers every repository added to SlideOps', async () => {
+  it('offers what is configured in selected mode', async () => {
     show();
     await chooseRepositorySource();
     expect(await screen.findByText('acme/web')).toBeInTheDocument();
     expect(screen.getByText('acme/worker')).toBeInTheDocument();
     expect(screen.getByText('personal/blog')).toBeInTheDocument();
+    expect(listGitHubReposMock).not.toHaveBeenCalled();
+  });
+
+  it('offers the full connected account in all mode', async () => {
+    getGitHubRepositoryAccessMock.mockResolvedValue({ mode: 'all', repos: [], unavailable: [] });
+    show();
+    await chooseRepositorySource();
+    expect(await screen.findByText('acme/web')).toBeInTheDocument();
+    expect(listGitHubReposMock).toHaveBeenCalled();
   });
 
   it('searches the list rather than only ever showing every repository', async () => {
@@ -102,18 +121,18 @@ describe('ServiceDeploy: GitHub repository picker', () => {
 
   it('says plainly when the repository list itself could not be read', async () => {
     const { ApiError } = await import('@slideops/api-client');
-    listSelectedGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
+    getGitHubRepositoryAccessMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
     show();
     await chooseRepositorySource();
     expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
   });
 
-  it('points at the Project GitHub section when nothing has been added yet', async () => {
-    listSelectedGitHubReposMock.mockResolvedValue([]);
+  it('points at Configure repositories when nothing has been configured yet', async () => {
+    getGitHubRepositoryAccessMock.mockResolvedValue({ mode: 'selected', repos: [], unavailable: [] });
     show();
     await chooseRepositorySource();
-    // With none added, the picker itself is not offered; a repository URL
-    // can still be typed in by hand.
+    // With none configured, the picker itself is not offered; a repository
+    // URL can still be typed in by hand.
     expect(screen.queryByLabelText('From GitHub (optional)')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('https://github.com/you/app.git')).toBeInTheDocument();
   });

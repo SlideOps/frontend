@@ -107,10 +107,12 @@ export {
   githubAuthorizeUrl,
   disconnectGitHub,
   listGitHubRepos,
-  listSelectedGitHubRepos,
-  setSelectedGitHubRepos,
+  getGitHubRepositoryAccess,
+  setGitHubRepositoryAccess,
   type GitHubStatus,
   type GitHubRepo,
+  type GitHubAccessMode,
+  type GitHubRepositoryAccess,
 } from './github';
 export {
   listAutomations,

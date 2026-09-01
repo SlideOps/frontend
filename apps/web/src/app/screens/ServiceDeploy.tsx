@@ -2,8 +2,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ApiError,
   deployService,
+  getGitHubRepositoryAccess,
   getGitHubStatus,
-  listSelectedGitHubRepos,
+  listGitHubRepos,
   listNodes,
   listProjects,
   type GitHubRepo,
@@ -36,10 +37,10 @@ interface DeployData {
   projects: Project[];
   nodes: Node[];
   github: GitHubStatus;
-  // The repositories the Operator has added to SlideOps, out of everything
-  // their connected account can reach. Add more, or add the first one, from
-  // the Project page's GitHub section; this form only ever offers what has
-  // already been added there.
+  // What the connected account offers this form to pick from: every
+  // repository the account can reach in "all" mode, or only what has been
+  // added on the Project page's GitHub section in "selected" mode. Configure
+  // that there; this form only ever reads the current configuration.
   repos: GitHubRepo[];
   // Set when connected but the repository list itself could not be read, so
   // the picker can say that plainly instead of just not appearing, which
@@ -59,7 +60,10 @@ async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
     return { projects, nodes, github, repos: [], reposError: null };
   }
   try {
-    const repos = await listSelectedGitHubRepos(signal);
+    const access = await getGitHubRepositoryAccess(signal);
+    // "All" mode has nothing meaningful under access.repos (it is never
+    // populated for that mode), so the picker itself needs the live account.
+    const repos = access.mode === 'all' ? await listGitHubRepos(signal) : access.repos;
     return { projects, nodes, github, repos, reposError: null };
   } catch (error) {
     return {
@@ -378,9 +382,9 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
                   <GitBranch width={14} height={14} aria-hidden />
                   Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository
-                  fills the URL and branch below. Don&apos;t see one you expect? Add it from the
-                  Project page&apos;s GitHub section &mdash; this only offers what has already been
-                  added there.
+                  fills the URL and branch below. Don&apos;t see one you expect? Configure
+                  repositories on the Project page&apos;s GitHub section &mdash; this only offers
+                  what is currently configured there.
                 </Text>
               </div>
             ) : null}

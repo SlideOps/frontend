@@ -1,19 +1,16 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GitHubStatus, GitHubRepo, Workspace } from '@slideops/api-client';
+import type { GitHubStatus, GitHubRepo, GitHubRepositoryAccess, Workspace } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
 /*
- * Curating which of a connected account's repositories a Service can deploy
- * from, out of everything the OAuth token can reach.
- *
- * GitHub's classic OAuth app has no per-repository consent step the way a
- * GitHub App's installation picker does, so the account's full list is
- * always live and always complete the moment it is read; the only thing
- * that was actually missing was a way to add more of it to SlideOps at any
- * time, not just once.
+ * Connecting GitHub and configuring which repositories SlideOps offers are
+ * two separate operations. Connecting shows a persistent summary of the
+ * current configuration, not a one-time wizard; Configure repositories
+ * reopens a staged editor at any time, never requiring a Reconnect to add,
+ * remove, or wholesale switch between All and Selected.
  */
 
 const connectedStatus: GitHubStatus = { configured: true, connected: true, login: 'octocat' };
@@ -29,15 +26,22 @@ function repo(fullName: string, overrides: Partial<GitHubRepo> = {}): GitHubRepo
   };
 }
 
-const added = [repo('octocat/hello-world')];
 const everything = [repo('octocat/hello-world'), repo('octocat/spoon-knife'), repo('acme/worker')];
 
 const disconnectGitHubMock = vi.fn(async () => undefined);
-const listSelectedGitHubReposMock = vi.fn(async (..._a: unknown[]) => added);
-const listGitHubReposMock = vi.fn(async (..._a: unknown[]) => everything);
-const setSelectedGitHubReposMock = vi.fn(async (fullNames: string[]) =>
-  everything.filter((r) => fullNames.includes(r.full_name)),
+const getGitHubRepositoryAccessMock = vi.fn(
+  async (..._a: unknown[]): Promise<GitHubRepositoryAccess> => ({
+    mode: 'selected',
+    repos: [repo('octocat/hello-world')],
+    unavailable: [],
+  }),
 );
+const listGitHubReposMock = vi.fn(async (..._a: unknown[]) => everything);
+const setGitHubRepositoryAccessMock = vi.fn(async (mode: 'all' | 'selected', names: string[]) => ({
+  mode,
+  repos: mode === 'selected' ? everything.filter((r) => names.includes(r.full_name)) : [],
+  unavailable: [] as string[],
+}));
 
 const ownerWorkspace: Workspace = {
   id: 'ws_1',
@@ -58,9 +62,10 @@ const viewerWorkspace: Workspace = {
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getGitHubStatus: async () => connectedStatus,
-  listSelectedGitHubRepos: (...a: unknown[]) => listSelectedGitHubReposMock(...a),
+  getGitHubRepositoryAccess: (...a: unknown[]) => getGitHubRepositoryAccessMock(...a),
   listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
-  setSelectedGitHubRepos: (fullNames: string[]) => setSelectedGitHubReposMock(fullNames),
+  setGitHubRepositoryAccess: (mode: 'all' | 'selected', names: string[]) =>
+    setGitHubRepositoryAccessMock(mode, names),
   disconnectGitHub: () => disconnectGitHubMock(),
   githubAuthorizeUrl: () => '/api/v1/github/authorize',
 }));
@@ -70,27 +75,36 @@ const { ProjectGitHub } = await import('./ProjectGitHub');
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
   disconnectGitHubMock.mockClear();
-  listSelectedGitHubReposMock.mockReset().mockResolvedValue(added);
-  listGitHubReposMock.mockReset().mockResolvedValue(everything);
-  setSelectedGitHubReposMock
+  getGitHubRepositoryAccessMock
     .mockReset()
-    .mockImplementation(async (fullNames: string[]) => everything.filter((r) => fullNames.includes(r.full_name)));
+    .mockResolvedValue({ mode: 'selected', repos: [repo('octocat/hello-world')], unavailable: [] });
+  listGitHubReposMock.mockReset().mockResolvedValue(everything);
+  setGitHubRepositoryAccessMock.mockReset().mockImplementation(async (mode, names) => ({
+    mode,
+    repos: mode === 'selected' ? everything.filter((r) => names.includes(r.full_name)) : [],
+    unavailable: [],
+  }));
 });
+
+async function openConfigure() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Configure repositories' }));
+}
 
 describe('ProjectGitHub', () => {
   it('offers Reconnect and Disconnect to an Owner', async () => {
     renderInApp(<ProjectGitHub />);
-    expect(await screen.findByText('octocat/hello-world')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
   });
 
   it('hides Reconnect and Disconnect for a Viewer, who would 403 on either', async () => {
     useWorkspaceStore.setState({ workspaces: [viewerWorkspace], loaded: true });
     renderInApp(<ProjectGitHub />);
-    await screen.findByText('octocat/hello-world');
+    await screen.findByText(/Connected as/);
     expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
+    // Nor can a Viewer reconfigure repository access.
+    expect(screen.queryByRole('button', { name: 'Configure repositories' })).not.toBeInTheDocument();
   });
 
   it('an Owner can disconnect after confirming', async () => {
@@ -101,76 +115,128 @@ describe('ProjectGitHub', () => {
     await waitFor(() => expect(disconnectGitHubMock).toHaveBeenCalled());
   });
 
-  it('shows only what was added, not everything the account can reach', async () => {
+  it('shows the current configuration as a persistent summary, not a one-time setup', async () => {
     renderInApp(<ProjectGitHub />);
-    expect(await screen.findByText('octocat/hello-world')).toBeInTheDocument();
-    // The full account list is not fetched at all until Add repositories is
-    // opened: the two other repos must not appear here.
-    expect(screen.queryByText('acme/worker')).not.toBeInTheDocument();
+    expect(await screen.findByText(/Selected repositories\./)).toBeInTheDocument();
+    expect(screen.getByText(/1 selected\./)).toBeInTheDocument();
+    // The full account is not fetched at all until Configure is opened.
     expect(listGitHubReposMock).not.toHaveBeenCalled();
   });
 
-  it('searches what has been added', async () => {
-    listSelectedGitHubReposMock.mockResolvedValue(everything);
-    renderInApp(<ProjectGitHub />);
-    await screen.findByText('octocat/hello-world');
-
-    await userEvent.type(screen.getByLabelText('Search your added repositories'), 'worker');
-
-    expect(screen.queryByText('octocat/hello-world')).not.toBeInTheDocument();
-    expect(screen.getByText('acme/worker')).toBeInTheDocument();
-  });
-
-  it('says plainly when nothing has been added yet', async () => {
-    listSelectedGitHubReposMock.mockResolvedValue([]);
-    renderInApp(<ProjectGitHub />);
-    expect(await screen.findByText(/haven.t added a repository yet/)).toBeInTheDocument();
-  });
-
-  it('says plainly when the added list itself could not be read', async () => {
+  it('says plainly when the configuration itself could not be read', async () => {
     const { ApiError } = await import('@slideops/api-client');
-    listSelectedGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
+    getGitHubRepositoryAccessMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
     renderInApp(<ProjectGitHub />);
     expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
   });
 
-  it('opens Add repositories, browses the full account, and adds one', async () => {
+  it('warns when a previously added repository is no longer available, without hiding it silently', async () => {
+    getGitHubRepositoryAccessMock.mockResolvedValue({
+      mode: 'selected',
+      repos: [],
+      unavailable: ['octocat/gone'],
+    });
     renderInApp(<ProjectGitHub />);
-    await screen.findByText('octocat/hello-world');
+    expect(await screen.findByText(/1 selected repository is no longer available/)).toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add repositories' }));
-    expect(await screen.findByText('acme/worker')).toBeInTheDocument();
-    // Already added, so it must not be offered a second time in the add panel:
-    // one occurrence, in the added list above, and no more.
-    expect(screen.getAllByText('octocat/hello-world')).toHaveLength(1);
+  it('shows All repositories plainly when that is the current mode', async () => {
+    getGitHubRepositoryAccessMock.mockResolvedValue({ mode: 'all', repos: [], unavailable: [] });
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText(/All repositories\./)).toBeInTheDocument();
+  });
 
-    const row = screen.getByText('acme/worker').closest('li')!;
-    await userEvent.click(within(row).getByRole('button', { name: /Add/ }));
+  it('opens Configure with the current selection already checked, staged, not yet saved', async () => {
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
+
+    const helloWorldRow = await screen.findByText('octocat/hello-world');
+    const checkbox = within(helloWorldRow.closest('li')!).getByRole('checkbox');
+    expect(checkbox).toBeChecked();
+    expect(setGitHubRepositoryAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('does not call the API until Save changes, and Cancel discards the staged edit', async () => {
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
+    const workerRow = await screen.findByText('acme/worker');
+    await userEvent.click(within(workerRow.closest('li')!).getByRole('checkbox'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(setGitHubRepositoryAccessMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+  });
+
+  it('saves the staged selection as one call, adding and keeping what was checked', async () => {
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
+    const workerRow = await screen.findByText('acme/worker');
+    await userEvent.click(within(workerRow.closest('li')!).getByRole('checkbox'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() =>
-      expect(setSelectedGitHubReposMock).toHaveBeenCalledWith(['octocat/hello-world', 'acme/worker']),
+      expect(setGitHubRepositoryAccessMock).toHaveBeenCalledWith(
+        'selected',
+        expect.arrayContaining(['octocat/hello-world', 'acme/worker']),
+      ),
     );
   });
 
-  it('searches the add panel separately from the added list', async () => {
+  it('unchecking a previously added repository removes it on save', async () => {
     renderInApp(<ProjectGitHub />);
-    await screen.findByText('octocat/hello-world');
-    await userEvent.click(screen.getByRole('button', { name: 'Add repositories' }));
+    await openConfigure();
+    const helloWorldRow = await screen.findByText('octocat/hello-world');
+    await userEvent.click(within(helloWorldRow.closest('li')!).getByRole('checkbox'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(setGitHubRepositoryAccessMock).toHaveBeenCalledWith('selected', []));
+  });
+
+  it('switches to All repositories without requiring any selection', async () => {
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
+
+    await userEvent.click(screen.getByRole('radio', { name: /All repositories/ }));
+    // The checkbox list disappears; nothing more to pick in this mode.
+    expect(screen.queryByText('octocat/hello-world')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(setGitHubRepositoryAccessMock).toHaveBeenCalledWith('all', []));
+  });
+
+  it('switching back to Selected after opening shows the prior selection restored from the server', async () => {
+    getGitHubRepositoryAccessMock.mockResolvedValue({ mode: 'all', repos: [], unavailable: [] });
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
+
+    expect(screen.getByRole('radio', { name: /All repositories/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('radio', { name: /Selected repositories/ }));
+    // Reveals the checkbox list again, built from the live account.
+    expect(await screen.findByText('octocat/hello-world')).toBeInTheDocument();
+  });
+
+  it('searches the configure panel', async () => {
+    renderInApp(<ProjectGitHub />);
+    await openConfigure();
     await screen.findByText('acme/worker');
 
-    await userEvent.type(screen.getByLabelText('Search repositories to add'), 'spoon');
+    await userEvent.type(screen.getByLabelText('Search repositories to configure'), 'spoon');
 
     expect(screen.queryByText('acme/worker')).not.toBeInTheDocument();
     expect(screen.getByText('octocat/spoon-knife')).toBeInTheDocument();
   });
 
-  it('removes an added repository', async () => {
-    listSelectedGitHubReposMock.mockResolvedValue([repo('octocat/hello-world'), repo('acme/worker')]);
+  it('refreshes the live list on demand', async () => {
     renderInApp(<ProjectGitHub />);
+    await openConfigure();
     await screen.findByText('acme/worker');
+    expect(listGitHubReposMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove acme/worker' }));
-
-    await waitFor(() => expect(setSelectedGitHubReposMock).toHaveBeenCalledWith(['octocat/hello-world']));
+    await userEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+    await waitFor(() => expect(listGitHubReposMock).toHaveBeenCalledTimes(2));
   });
 });
