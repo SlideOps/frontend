@@ -108,7 +108,7 @@ export function notificationFromEvent(event: OperationEvent): AppNotification | 
     const cancelled = status === 'cancelled';
     const tone: NotificationTone = failed ? 'danger' : cancelled ? 'info' : 'success';
     const title = failed
-      ? 'Operation failed and was rolled back'
+      ? 'Operation failed'
       : cancelled
         ? 'Operation cancelled'
         : 'Operation completed and verified';

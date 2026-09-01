@@ -208,6 +208,12 @@ export function OperationDetail() {
   const isRunning = RUNNING.includes(status);
   const hasExecution =
     isRunning || status === 'completed' || status === 'failed' || status === 'cancelled';
+  // A rollback only genuinely ran when the engine's own rollback step marked
+  // its event this way. An Operation that failed before ever executing, or
+  // one caught by restart recovery (whose process died before any rollback
+  // could run), never gets one, so this must not be assumed from "failed"
+  // alone: that would claim an undo that never happened.
+  const rolledBack = events.some((e) => e.data?.rollback === true);
 
   return (
     <OperatorShell active="operations">
@@ -251,7 +257,7 @@ export function OperationDetail() {
           <XCircle width={18} height={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
           <div>
             <Text variant="body-sm" className="font-medium">
-              The Operation failed and was rolled back
+              {rolledBack ? 'The Operation failed and was rolled back' : 'The Operation failed'}
             </Text>
             <Text variant="body-sm" tone="secondary" className="mt-0.5">
               {operation.error}
