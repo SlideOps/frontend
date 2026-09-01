@@ -5,26 +5,39 @@ import type { GitHubStatus, GitHubRepo, Workspace } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
+/*
+ * Curating which of a connected account's repositories a Service can deploy
+ * from, out of everything the OAuth token can reach.
+ *
+ * GitHub's classic OAuth app has no per-repository consent step the way a
+ * GitHub App's installation picker does, so the account's full list is
+ * always live and always complete the moment it is read; the only thing
+ * that was actually missing was a way to add more of it to SlideOps at any
+ * time, not just once.
+ */
+
 const connectedStatus: GitHubStatus = { configured: true, connected: true, login: 'octocat' };
-const repos: GitHubRepo[] = [
-  {
-    full_name: 'octocat/hello-world',
-    html_url: 'https://github.com/octocat/hello-world',
-    clone_url: 'https://github.com/octocat/hello-world.git',
+
+function repo(fullName: string, overrides: Partial<GitHubRepo> = {}): GitHubRepo {
+  return {
+    full_name: fullName,
+    html_url: `https://github.com/${fullName}`,
+    clone_url: `https://github.com/${fullName}.git`,
     default_branch: 'main',
     private: false,
-  },
-  {
-    full_name: 'octocat/spoon-knife',
-    html_url: 'https://github.com/octocat/spoon-knife',
-    clone_url: 'https://github.com/octocat/spoon-knife.git',
-    default_branch: 'main',
-    private: false,
-  },
-];
+    ...overrides,
+  };
+}
+
+const added = [repo('octocat/hello-world')];
+const everything = [repo('octocat/hello-world'), repo('octocat/spoon-knife'), repo('acme/worker')];
 
 const disconnectGitHubMock = vi.fn(async () => undefined);
-const listGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
+const listSelectedGitHubReposMock = vi.fn(async (..._a: unknown[]) => added);
+const listGitHubReposMock = vi.fn(async (..._a: unknown[]) => everything);
+const setSelectedGitHubReposMock = vi.fn(async (fullNames: string[]) =>
+  everything.filter((r) => fullNames.includes(r.full_name)),
+);
 
 const ownerWorkspace: Workspace = {
   id: 'ws_1',
@@ -45,7 +58,9 @@ const viewerWorkspace: Workspace = {
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getGitHubStatus: async () => connectedStatus,
+  listSelectedGitHubRepos: (...a: unknown[]) => listSelectedGitHubReposMock(...a),
   listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
+  setSelectedGitHubRepos: (fullNames: string[]) => setSelectedGitHubReposMock(fullNames),
   disconnectGitHub: () => disconnectGitHubMock(),
   githubAuthorizeUrl: () => '/api/v1/github/authorize',
 }));
@@ -55,7 +70,11 @@ const { ProjectGitHub } = await import('./ProjectGitHub');
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
   disconnectGitHubMock.mockClear();
-  listGitHubReposMock.mockReset().mockResolvedValue(repos);
+  listSelectedGitHubReposMock.mockReset().mockResolvedValue(added);
+  listGitHubReposMock.mockReset().mockResolvedValue(everything);
+  setSelectedGitHubReposMock
+    .mockReset()
+    .mockImplementation(async (fullNames: string[]) => everything.filter((r) => fullNames.includes(r.full_name)));
 });
 
 describe('ProjectGitHub', () => {
@@ -82,34 +101,76 @@ describe('ProjectGitHub', () => {
     await waitFor(() => expect(disconnectGitHubMock).toHaveBeenCalled());
   });
 
-  it('searches the repository list rather than only ever showing every one', async () => {
+  it('shows only what was added, not everything the account can reach', async () => {
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText('octocat/hello-world')).toBeInTheDocument();
+    // The full account list is not fetched at all until Add repositories is
+    // opened: the two other repos must not appear here.
+    expect(screen.queryByText('acme/worker')).not.toBeInTheDocument();
+    expect(listGitHubReposMock).not.toHaveBeenCalled();
+  });
+
+  it('searches what has been added', async () => {
+    listSelectedGitHubReposMock.mockResolvedValue(everything);
     renderInApp(<ProjectGitHub />);
     await screen.findByText('octocat/hello-world');
-    expect(screen.getByText('octocat/spoon-knife')).toBeInTheDocument();
 
-    await userEvent.type(screen.getByPlaceholderText('Search repositories...'), 'spoon');
+    await userEvent.type(screen.getByLabelText('Search your added repositories'), 'worker');
 
     expect(screen.queryByText('octocat/hello-world')).not.toBeInTheDocument();
+    expect(screen.getByText('acme/worker')).toBeInTheDocument();
+  });
+
+  it('says plainly when nothing has been added yet', async () => {
+    listSelectedGitHubReposMock.mockResolvedValue([]);
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText(/haven.t added a repository yet/)).toBeInTheDocument();
+  });
+
+  it('says plainly when the added list itself could not be read', async () => {
+    const { ApiError } = await import('@slideops/api-client');
+    listSelectedGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
+  });
+
+  it('opens Add repositories, browses the full account, and adds one', async () => {
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText('octocat/hello-world');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add repositories' }));
+    expect(await screen.findByText('acme/worker')).toBeInTheDocument();
+    // Already added, so it must not be offered a second time in the add panel:
+    // one occurrence, in the added list above, and no more.
+    expect(screen.getAllByText('octocat/hello-world')).toHaveLength(1);
+
+    const row = screen.getByText('acme/worker').closest('li')!;
+    await userEvent.click(within(row).getByRole('button', { name: /Add/ }));
+
+    await waitFor(() =>
+      expect(setSelectedGitHubReposMock).toHaveBeenCalledWith(['octocat/hello-world', 'acme/worker']),
+    );
+  });
+
+  it('searches the add panel separately from the added list', async () => {
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText('octocat/hello-world');
+    await userEvent.click(screen.getByRole('button', { name: 'Add repositories' }));
+    await screen.findByText('acme/worker');
+
+    await userEvent.type(screen.getByLabelText('Search repositories to add'), 'spoon');
+
+    expect(screen.queryByText('acme/worker')).not.toBeInTheDocument();
     expect(screen.getByText('octocat/spoon-knife')).toBeInTheDocument();
   });
 
-  // A repository just created on GitHub is not visible until the list is read
-  // again; there has to be a way to ask for that without leaving the page.
-  it('rereads the repository list on Refresh, so a newly created repository can appear', async () => {
+  it('removes an added repository', async () => {
+    listSelectedGitHubReposMock.mockResolvedValue([repo('octocat/hello-world'), repo('acme/worker')]);
     renderInApp(<ProjectGitHub />);
-    await screen.findByText('octocat/hello-world');
-    expect(listGitHubReposMock).toHaveBeenCalledTimes(1);
+    await screen.findByText('acme/worker');
 
-    await userEvent.click(screen.getByRole('button', { name: /Refresh/ }));
-    await waitFor(() => expect(listGitHubReposMock).toHaveBeenCalledTimes(2));
-  });
+    await userEvent.click(screen.getByRole('button', { name: 'Remove acme/worker' }));
 
-  // A failure to read the list used to be swallowed into "no repositories",
-  // indistinguishable from an account that truly has none.
-  it('says plainly when the repository list itself could not be read', async () => {
-    const { ApiError } = await import('@slideops/api-client');
-    listGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
-    renderInApp(<ProjectGitHub />);
-    expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
+    await waitFor(() => expect(setSelectedGitHubReposMock).toHaveBeenCalledWith(['octocat/hello-world']));
   });
 });

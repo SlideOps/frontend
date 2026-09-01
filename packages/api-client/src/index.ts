@@ -107,6 +107,8 @@ export {
   githubAuthorizeUrl,
   disconnectGitHub,
   listGitHubRepos,
+  listSelectedGitHubRepos,
+  setSelectedGitHubRepos,
   type GitHubStatus,
   type GitHubRepo,
 } from './github';

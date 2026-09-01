@@ -60,9 +60,43 @@ export function disconnectGitHub(): Promise<void> {
   return apiRequest<void>('/github', { method: 'DELETE' });
 }
 
-/** List the repositories the connected Operator can reach. */
+/**
+ * List every repository the connected Operator can reach, always read fresh
+ * from GitHub. This is the full account, meant for browsing and searching to
+ * find one to add; see `listSelectedGitHubRepos` for the smaller, curated
+ * list an Operator has actually added, which is what a deploy picker reads.
+ */
 export function listGitHubRepos(signal?: AbortSignal): Promise<GitHubRepo[]> {
   return apiRequest<unknown>('/github/repos', { signal }).then((r) =>
     unwrap<GitHubRepo[]>(r, 'repos'),
   );
+}
+
+/**
+ * List the repositories the Operator has explicitly added to SlideOps, out of
+ * everything their connected account can reach. Empty until
+ * `setSelectedGitHubRepos` has been called at least once. Each one is read
+ * back fresh: one that was renamed, deleted, or is no longer reachable simply
+ * does not appear.
+ */
+export function listSelectedGitHubRepos(signal?: AbortSignal): Promise<GitHubRepo[]> {
+  return apiRequest<unknown>('/github/repos/selected', { signal }).then((r) =>
+    unwrap<GitHubRepo[]>(r, 'repos'),
+  );
+}
+
+/**
+ * Replace the whole set of repositories added to SlideOps with fullNames.
+ * This is how both adding one and removing one are done: send the complete
+ * list to keep, not just the change. Call it again at any time to add a
+ * repository created after connecting; GitHub has no separate per-repository
+ * consent step for the OAuth app SlideOps uses, so there is nothing to grant
+ * on GitHub's side first. Only a name the connected token can actually reach
+ * right now is kept.
+ */
+export function setSelectedGitHubRepos(fullNames: string[]): Promise<GitHubRepo[]> {
+  return apiRequest<unknown>('/github/repos/selected', {
+    method: 'PUT',
+    body: { repos: fullNames },
+  }).then((r) => unwrap<GitHubRepo[]>(r, 'repos'));
 }

@@ -3,7 +3,7 @@ import {
   ApiError,
   deployService,
   getGitHubStatus,
-  listGitHubRepos,
+  listSelectedGitHubRepos,
   listNodes,
   listProjects,
   type GitHubRepo,
@@ -36,6 +36,10 @@ interface DeployData {
   projects: Project[];
   nodes: Node[];
   github: GitHubStatus;
+  // The repositories the Operator has added to SlideOps, out of everything
+  // their connected account can reach. Add more, or add the first one, from
+  // the Project page's GitHub section; this form only ever offers what has
+  // already been added there.
   repos: GitHubRepo[];
   // Set when connected but the repository list itself could not be read, so
   // the picker can say that plainly instead of just not appearing, which
@@ -55,7 +59,7 @@ async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
     return { projects, nodes, github, repos: [], reposError: null };
   }
   try {
-    const repos = await listGitHubRepos(signal);
+    const repos = await listSelectedGitHubRepos(signal);
     return { projects, nodes, github, repos, reposError: null };
   } catch (error) {
     return {
@@ -374,8 +378,9 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
                   <GitBranch width={14} height={14} aria-hidden />
                   Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository
-                  fills the URL and branch below. {data.repos.length} repositories total; just
-                  created one? Reload this page to see it.
+                  fills the URL and branch below. Don&apos;t see one you expect? Add it from the
+                  Project page&apos;s GitHub section &mdash; this only offers what has already been
+                  added there.
                 </Text>
               </div>
             ) : null}

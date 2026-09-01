@@ -7,14 +7,11 @@ import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
 /*
- * Picking a GitHub repository to deploy from.
- *
- * The list is read fresh every time this screen loads, never cached and
- * never limited to a one-time selection made at connect: a repository
- * created on GitHub after connecting is exactly as reachable as one that
- * existed before, on the very next load. What was missing was a way to find
- * one in a long list, and a way to know the list itself failed to load
- * rather than reading as an account with nothing in it.
+ * Picking a GitHub repository to deploy from: this form only ever offers
+ * what an Operator has already added to SlideOps from the Project page's
+ * GitHub section (see ProjectGitHub.test.tsx for adding one), not every
+ * repository the connected account can reach. That curated, and usually
+ * much shorter, list is read fresh every time this screen loads.
  */
 
 const project: Project = { id: 'p1', name: 'apollo' } as Project;
@@ -33,7 +30,7 @@ function repo(fullName: string): GitHubRepo {
 
 const repos = [repo('acme/web'), repo('acme/worker'), repo('personal/blog')];
 
-const listGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
+const listSelectedGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
 
 const ownerWorkspace: Workspace = {
   id: 'ws_1',
@@ -48,7 +45,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listProjects: async () => [project],
   listNodes: async () => [node],
   getGitHubStatus: async () => connectedStatus,
-  listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
+  listSelectedGitHubRepos: (...a: unknown[]) => listSelectedGitHubReposMock(...a),
 }));
 
 const { ServiceDeploy } = await import('./ServiceDeploy');
@@ -63,7 +60,7 @@ function show() {
 
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
-  listGitHubReposMock.mockReset().mockResolvedValue(repos);
+  listSelectedGitHubReposMock.mockReset().mockResolvedValue(repos);
 });
 
 async function chooseRepositorySource() {
@@ -71,7 +68,7 @@ async function chooseRepositorySource() {
 }
 
 describe('ServiceDeploy: GitHub repository picker', () => {
-  it('offers every connected repository, not a one-time selection', async () => {
+  it('offers every repository added to SlideOps', async () => {
     show();
     await chooseRepositorySource();
     expect(await screen.findByText('acme/web')).toBeInTheDocument();
@@ -105,9 +102,19 @@ describe('ServiceDeploy: GitHub repository picker', () => {
 
   it('says plainly when the repository list itself could not be read', async () => {
     const { ApiError } = await import('@slideops/api-client');
-    listGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
+    listSelectedGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
     show();
     await chooseRepositorySource();
     expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
+  });
+
+  it('points at the Project GitHub section when nothing has been added yet', async () => {
+    listSelectedGitHubReposMock.mockResolvedValue([]);
+    show();
+    await chooseRepositorySource();
+    // With none added, the picker itself is not offered; a repository URL
+    // can still be typed in by hand.
+    expect(screen.queryByLabelText('From GitHub (optional)')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('https://github.com/you/app.git')).toBeInTheDocument();
   });
 });
