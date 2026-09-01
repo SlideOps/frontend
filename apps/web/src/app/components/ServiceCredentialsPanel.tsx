@@ -17,10 +17,12 @@ export function ServiceCredentialsPanel({
   nodeId,
   projectId,
   host,
+  dockerBridgeAddress,
 }: {
   nodeId: string;
   projectId: string;
   host?: string;
+  dockerBridgeAddress?: string;
 }) {
   const [refs, setRefs] = useState<InstalledCapabilityRef[] | null>(null);
   const [states, setStates] = useState<Record<string, CapabilityState>>({});
@@ -79,6 +81,7 @@ export function ServiceCredentialsPanel({
             pluginName={ref.pluginName}
             operationId={states[ref.key]!.last_operation_id!}
             host={host}
+            dockerBridgeAddress={dockerBridgeAddress}
           />
         ))}
       </div>

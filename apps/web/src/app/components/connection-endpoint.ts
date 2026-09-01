@@ -76,6 +76,14 @@ function paramPort(parameters: Record<string, unknown>): number | null {
 export interface ResolvedEndpoint {
   scheme: EndpointScheme;
   host: string | null;
+  /**
+   * Where a container on this same Node reaches this service — the Docker
+   * bridge address, never `host` above, which is the Node's own address and
+   * is correctly unreachable from a container by design once a firewall is
+   * in place. Always null for `ssh`: a login account is what you reach the
+   * Node itself with, never something a container on it calls.
+   */
+  privateHost: string | null;
   port: number;
   username: string | null;
   database: string | null;
@@ -85,11 +93,16 @@ export interface ResolvedEndpoint {
  * Resolve the service endpoint for an Operation, or null when its Capability is
  * not one whose endpoint SlideOps knows. A null result means the card still
  * shows whatever parameters exist but offers no connection string.
+ *
+ * dockerBridgeAddress is the Node's own Docker bridge address, from its most
+ * recent Discovery. It becomes privateHost for a data store family, and is
+ * never applied to `ssh`, which is never something a container reaches.
  */
 export function resolveEndpoint(
   capabilityKey: string,
   parameters: Record<string, unknown>,
   host: string | null,
+  dockerBridgeAddress?: string | null,
 ): ResolvedEndpoint | null {
   const family = FAMILIES.find((candidate) => candidate.matches(capabilityKey));
   if (!family) {
@@ -98,6 +111,7 @@ export function resolveEndpoint(
   return {
     scheme: family.scheme,
     host: firstString(parameters, HOST_PARAM_KEYS) ?? host,
+    privateHost: family.scheme === 'ssh' ? null : (dockerBridgeAddress ?? null),
     port: paramPort(parameters) ?? family.defaultPort,
     username: firstString(parameters, USER_PARAM_KEYS),
     database: firstString(parameters, DATABASE_PARAM_KEYS),

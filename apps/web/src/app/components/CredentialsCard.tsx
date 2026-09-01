@@ -206,10 +206,61 @@ function ConnectionString({
 }
 
 /**
- * The connection section for a known endpoint: for a data store, the masked and
- * revealable connection string; for a server login account, the SSH sign in
- * command and a pointer to the revealable password below. Renders nothing when
- * the endpoint has no host, since a connection cannot be formed without one.
+ * One connection string block: a heading, a one-line explanation of when this
+ * particular host is the right one, and the masked-until-revealed string
+ * itself. Shared by the two hosts a data store endpoint can have, so the two
+ * blocks read identically apart from which host and words apply.
+ */
+function ConnectionStringBlock({
+  title,
+  description,
+  operation,
+  endpoint,
+  host,
+  secretKey,
+}: {
+  title: string;
+  description: string;
+  operation: Operation;
+  endpoint: ResolvedEndpoint;
+  host: string;
+  secretKey: string;
+}) {
+  const template = connectionUrlTemplate(endpoint, host, MASKED_SECRET);
+  const build = () =>
+    revealOperationSecret(operation.id, secretKey).then((revealed) =>
+      buildConnectionUrl(endpoint, host, revealed.value),
+    );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Text variant="body-sm" className="font-medium text-ink">
+        {title}
+      </Text>
+      <Text variant="body-sm" tone="secondary">
+        {description}
+      </Text>
+      <ConnectionString template={template} build={build} />
+    </div>
+  );
+}
+
+/**
+ * The connection section for a known endpoint.
+ *
+ * A server login account gets the SSH sign in command and a pointer to the
+ * revealable password above — never a second, "from a container" variant,
+ * since nothing containerized ever calls SSH.
+ *
+ * A data store gets up to two connection strings, so which host to use is
+ * never something to guess at or come back and ask about: privateHost, the
+ * Docker bridge address, is what an app running as a Service on this same
+ * Node reaches it at, and is shown first since that is the common case this
+ * card exists for; host, the Node's own public address, works only if this
+ * Node's firewall has been opened for a remote connection, which is not the
+ * default and is called out as such. Either may be absent — a Node with no
+ * saved Discovery has no privateHost yet, for instance — and only what is
+ * actually known is ever shown.
  */
 function EndpointConnection({
   operation,
@@ -222,11 +273,11 @@ function EndpointConnection({
   secretKey: string | null;
 }) {
   const host = endpoint.host;
-  if (!host) {
-    return null;
-  }
 
   if (endpoint.scheme === 'ssh') {
+    if (!host) {
+      return null;
+    }
     return (
       <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
         <Text variant="body-sm" className="font-medium text-ink">
@@ -244,25 +295,40 @@ function EndpointConnection({
     );
   }
 
-  if (!secretKey) {
+  if (!secretKey || (!host && !endpoint.privateHost)) {
     return null;
   }
 
-  const template = connectionUrlTemplate(endpoint, host, MASKED_SECRET);
-  const build = () =>
-    revealOperationSecret(operation.id, secretKey).then((revealed) =>
-      buildConnectionUrl(endpoint, host, revealed.value),
-    );
-
   return (
-    <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
-      <Text variant="body-sm" className="font-medium text-ink">
-        Connection string
-      </Text>
-      <Text variant="body-sm" tone="secondary">
-        The password stays hidden until you reveal it. Revealing copies the full string.
-      </Text>
-      <ConnectionString template={template} build={build} />
+    <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
+      {endpoint.privateHost ? (
+        <ConnectionStringBlock
+          title="Connection string — from a container on this Node"
+          description="Use this in a Service's environment. A database or cache installed on this Node is not reachable at its public address by design; this is the address a container reaches it at instead."
+          operation={operation}
+          endpoint={endpoint}
+          host={endpoint.privateHost}
+          secretKey={secretKey}
+        />
+      ) : null}
+      {host ? (
+        <ConnectionStringBlock
+          title={
+            endpoint.privateHost
+              ? 'Connection string — from outside this Node'
+              : 'Connection string'
+          }
+          description={
+            endpoint.privateHost
+              ? "Only reachable if this Node's firewall was explicitly configured to allow a remote connection. Not the default, and not what a Service on this Node should use."
+              : 'The password stays hidden until you reveal it. Revealing copies the full string.'
+          }
+          operation={operation}
+          endpoint={endpoint}
+          host={host}
+          secretKey={secretKey}
+        />
+      ) : null}
     </div>
   );
 }
@@ -279,19 +345,42 @@ function EndpointConnection({
  * the card still shows every parameter, only without a host row or a connection
  * string that would need one.
  */
-export function CredentialsCard({ operation, host }: { operation: Operation; host?: string }) {
+export function CredentialsCard({
+  operation,
+  host,
+  dockerBridgeAddress,
+}: {
+  operation: Operation;
+  host?: string;
+  /** The Node's Docker bridge address, from its most recent Discovery — where
+   *  a container on this Node reaches a data store installed on it. Passed
+   *  through to resolveEndpoint; see ResolvedEndpoint.privateHost. */
+  dockerBridgeAddress?: string;
+}) {
   const parameters = operation.parameters ?? {};
 
   const secretKeys = Object.keys(parameters).filter(
     (key) => parameters[key] === SECRET_PLACEHOLDER,
   );
 
-  const endpoint = resolveEndpoint(operation.capability_key, parameters, host ?? null);
+  const endpoint = resolveEndpoint(
+    operation.capability_key,
+    parameters,
+    host ?? null,
+    dockerBridgeAddress ?? null,
+  );
 
   const plainRows: PlainRow[] = [];
   if (endpoint) {
     if (endpoint.host) {
       plainRows.push({ key: 'host', label: 'Host', value: endpoint.host });
+    }
+    if (endpoint.privateHost) {
+      plainRows.push({
+        key: 'private_host',
+        label: 'From a container',
+        value: endpoint.privateHost,
+      });
     }
     plainRows.push({ key: 'port', label: 'Port', value: String(endpoint.port) });
     if (endpoint.database) {
@@ -324,7 +413,7 @@ export function CredentialsCard({ operation, host }: { operation: Operation; hos
   }
 
   const connectionSecretKey = secretKeys[0] ?? null;
-  const showConnection = endpoint !== null && Boolean(endpoint.host);
+  const showConnection = endpoint !== null && Boolean(endpoint.host || endpoint.privateHost);
 
   if (secretKeys.length === 0 && plainRows.length === 0 && !showConnection) {
     return null;

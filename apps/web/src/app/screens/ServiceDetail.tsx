@@ -628,6 +628,7 @@ export function ServiceDetail() {
                 nodeId={service.node_id}
                 projectId={service.project_id}
                 host={node?.address}
+                dockerBridgeAddress={node?.docker_bridge_address}
               />
             </>
           ) : null}

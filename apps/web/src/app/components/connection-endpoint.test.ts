@@ -16,10 +16,28 @@ describe('resolveEndpoint', () => {
     expect(endpoint).toEqual({
       scheme: 'postgresql',
       host: '169.58.53.167',
+      privateHost: null,
       port: 5432,
       username: 'storefront_app',
       database: 'storefront',
     });
+  });
+
+  it('carries the Docker bridge address as privateHost for a data store family', () => {
+    const endpoint = resolveEndpoint('manage-postgresql', {}, '169.58.53.167', '10.0.0.1');
+    expect(endpoint?.privateHost).toBe('10.0.0.1');
+    // The public address is untouched: both are offered, never one replacing
+    // the other.
+    expect(endpoint?.host).toBe('169.58.53.167');
+  });
+
+  it('never carries a privateHost for ssh, which nothing containerized calls', () => {
+    const endpoint = resolveEndpoint('manage-server-user', { username: 'deploy' }, 'h', '10.0.0.1');
+    expect(endpoint?.privateHost).toBeNull();
+  });
+
+  it('leaves privateHost null when no Docker bridge address is known', () => {
+    expect(resolveEndpoint('manage-postgresql', {}, 'h')?.privateHost).toBeNull();
   });
 
   it('maps MySQL and MariaDB to the same scheme and port', () => {
@@ -69,6 +87,7 @@ describe('buildConnectionUrl', () => {
   const base = {
     scheme: 'postgresql' as const,
     host: '169.58.53.167',
+    privateHost: null,
     port: 5432,
     username: 'storefront_app',
     database: 'storefront',
@@ -90,6 +109,7 @@ describe('buildConnectionUrl', () => {
     const redis = {
       scheme: 'redis' as const,
       host: '10.0.0.4',
+      privateHost: null,
       port: 6379,
       username: null,
       database: null,
@@ -103,6 +123,7 @@ describe('connectionUrlTemplate', () => {
     const endpoint = {
       scheme: 'postgresql' as const,
       host: '169.58.53.167',
+      privateHost: null,
       port: 5432,
       username: 'storefront_app',
       database: 'storefront',
@@ -118,6 +139,7 @@ describe('buildSshSignIn', () => {
     const endpoint = {
       scheme: 'ssh' as const,
       host: '203.0.113.7',
+      privateHost: null,
       port: 22,
       username: 'deploy',
       database: null,

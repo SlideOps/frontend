@@ -80,6 +80,8 @@ interface CredentialContext {
   nodeName: string | null;
   /** The Node's address, so the card can form a real connection. */
   host: string | null;
+  /** The Node's Docker bridge address, from its most recent Discovery. */
+  dockerBridgeAddress: string | null;
   projectName: string | null;
   completedAt: string | null;
 }
@@ -171,7 +173,11 @@ function CredentialSection({
           {downloading ? 'Preparing' : 'Download'}
         </Button>
       </div>
-      <CredentialsCard operation={context.operation} host={context.host ?? undefined} />
+      <CredentialsCard
+        operation={context.operation}
+        host={context.host ?? undefined}
+        dockerBridgeAddress={context.dockerBridgeAddress ?? undefined}
+      />
     </section>
   );
 }
@@ -327,6 +333,7 @@ export function Credentials() {
           title: capabilityName(operation.capability_key),
           nodeName: node?.name ?? null,
           host: node?.address ?? null,
+          dockerBridgeAddress: node?.docker_bridge_address ?? null,
           projectName: project?.name ?? null,
           completedAt: operation.completed_at
             ? new Date(operation.completed_at).toLocaleString()

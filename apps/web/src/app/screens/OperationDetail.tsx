@@ -82,6 +82,9 @@ export function OperationDetail() {
   // connection. It never blocks the page: if it cannot be fetched, the card
   // simply shows no host.
   const [nodeHost, setNodeHost] = useState<string | undefined>(undefined);
+  const [nodeDockerBridgeAddress, setNodeDockerBridgeAddress] = useState<string | undefined>(
+    undefined,
+  );
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -142,6 +145,7 @@ export function OperationDetail() {
       .then((node) => {
         if (active) {
           setNodeHost(node.address);
+          setNodeDockerBridgeAddress(node.docker_bridge_address);
         }
       })
       .catch(() => {
@@ -388,7 +392,11 @@ export function OperationDetail() {
             ) : null}
 
             {status === 'completed' ? (
-              <CredentialsCard operation={operation} host={nodeHost} />
+              <CredentialsCard
+                operation={operation}
+                host={nodeHost}
+                dockerBridgeAddress={nodeDockerBridgeAddress}
+              />
             ) : null}
           </div>
         </div>

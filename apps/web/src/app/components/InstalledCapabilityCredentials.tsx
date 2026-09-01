@@ -18,10 +18,12 @@ export function InstalledCapabilityCredentials({
   pluginName,
   operationId,
   host,
+  dockerBridgeAddress,
 }: {
   pluginName: string;
   operationId: string;
   host?: string;
+  dockerBridgeAddress?: string;
 }) {
   const result = useAsyncData<Operation>((signal) => getOperation(operationId, signal), [operationId]);
 
@@ -34,7 +36,11 @@ export function InstalledCapabilityCredentials({
       {result.state.status === 'loading' ? <Loading label={`Reading ${pluginName}'s configuration`} /> : null}
       {result.state.status === 'error' ? <ErrorNote error={result.state.error} /> : null}
       {result.state.status === 'ready' ? (
-        <CredentialsCard operation={result.state.data} host={host} />
+        <CredentialsCard
+          operation={result.state.data}
+          host={host}
+          dockerBridgeAddress={dockerBridgeAddress}
+        />
       ) : null}
     </Card>
   );

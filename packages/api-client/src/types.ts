@@ -73,6 +73,17 @@ export interface Node {
   tags: string[];
   last_discovered_at: string | null;
   created_at: string;
+  /**
+   * Where a container on this Node reaches a database or cache installed
+   * directly on the host — never `address` above, which a correctly
+   * configured firewall keeps such a service unreachable from on purpose.
+   * From the Node's most recent Discovery; empty until one has run, or on a
+   * Node without Docker. Never assume Docker's textbook 172.17.0.1 default
+   * in its place — a Node already running other containers commonly has
+   * this reconfigured, and that default is exactly the wrong address there.
+   */
+  docker_bridge_address?: string;
+  docker_bridge_subnet?: string;
 }
 
 /** The risk a Capability or a plan step carries. */

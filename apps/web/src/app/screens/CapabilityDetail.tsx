@@ -152,8 +152,13 @@ function CapabilityHere({
   // comes from the already-loaded Nodes when present, and is fetched only as a
   // fallback. It never blocks the card: an unresolved host just omits the host.
   const nodeId = operation?.node_id;
-  const knownHost = nodeId ? nodes.find((node) => node.id === nodeId)?.address : undefined;
+  const knownNode = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
+  const knownHost = knownNode?.address;
+  const knownDockerBridgeAddress = knownNode?.docker_bridge_address;
   const [fetchedHost, setFetchedHost] = useState<string | undefined>(undefined);
+  const [fetchedDockerBridgeAddress, setFetchedDockerBridgeAddress] = useState<
+    string | undefined
+  >(undefined);
   useEffect(() => {
     if (!nodeId || knownHost) {
       return;
@@ -163,6 +168,7 @@ function CapabilityHere({
       .then((node) => {
         if (active) {
           setFetchedHost(node.address);
+          setFetchedDockerBridgeAddress(node.docker_bridge_address);
         }
       })
       .catch(() => {
@@ -173,6 +179,7 @@ function CapabilityHere({
     };
   }, [nodeId, knownHost]);
   const host = knownHost ?? fetchedHost;
+  const dockerBridgeAddress = knownDockerBridgeAddress ?? fetchedDockerBridgeAddress;
 
   return (
     <Card className="flex flex-col gap-4 border-success">
@@ -196,7 +203,9 @@ function CapabilityHere({
         {capabilityName} is already done on this server. Its details and any credentials it created
         are below; you can run it again from the panel on the right if you need to.
       </Text>
-      {operation ? <CredentialsCard operation={operation} host={host} /> : null}
+      {operation ? (
+        <CredentialsCard operation={operation} host={host} dockerBridgeAddress={dockerBridgeAddress} />
+      ) : null}
     </Card>
   );
 }
@@ -274,12 +283,14 @@ function ServiceDatabaseCredentials({
   serviceId,
   projectId,
   host,
+  dockerBridgeAddress,
 }: {
   capabilityKey: string;
   nodeId: string;
   serviceId: string;
   projectId?: string;
   host?: string;
+  dockerBridgeAddress?: string;
 }) {
   const step = databaseManageStep(capabilityKey);
   const [databases, setDatabases] = useState<string[] | null>(null);
@@ -345,7 +356,12 @@ function ServiceDatabaseCredentials({
       {databases.map((name) => {
         const operation = newestOperationFor(operations ?? [], step.manageKey, name);
         return operation ? (
-          <CredentialsCard key={name} operation={operation} host={host} />
+          <CredentialsCard
+            key={name}
+            operation={operation}
+            host={host}
+            dockerBridgeAddress={dockerBridgeAddress}
+          />
         ) : (
           <Card key={name} className="flex flex-col gap-2 border-warning">
             <Text variant="body-sm" tone="secondary">
@@ -381,6 +397,7 @@ function CreateDatabaseCredentials({
   projectId,
   serviceId,
   host,
+  dockerBridgeAddress,
 }: {
   capabilityKey: string;
   states: Record<string, CapabilityState>;
@@ -388,6 +405,7 @@ function CreateDatabaseCredentials({
   projectId?: string;
   serviceId?: string;
   host?: string;
+  dockerBridgeAddress?: string;
 }) {
   const step = databaseManageStep(capabilityKey);
   if (!step) {
@@ -406,6 +424,7 @@ function CreateDatabaseCredentials({
         serviceId={serviceId}
         projectId={projectId}
         host={host}
+        dockerBridgeAddress={dockerBridgeAddress}
       />
     );
   }
@@ -547,6 +566,9 @@ export function CapabilityDetail() {
                     projectId={preselectedProject}
                     serviceId={preselectedService}
                     host={nodes.find((node) => node.id === preselectedNode)?.address}
+                    dockerBridgeAddress={
+                      nodes.find((node) => node.id === preselectedNode)?.docker_bridge_address
+                    }
                   />
                 ) : null}
                 {capabilityResult.state.data.requirements &&
