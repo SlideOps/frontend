@@ -271,6 +271,7 @@ export {
 export {
   createOperation,
   listOperations,
+  listOperationsPage,
   getOperation,
   approveOperation,
   cancelOperation,
@@ -279,6 +280,8 @@ export {
   clearOperations,
   type CreateOperationInput,
   type OperationFilter,
+  type OperationPageFilter,
+  type OperationPage,
   type RevealedSecret,
 } from './operations';
 export {

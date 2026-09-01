@@ -64,6 +64,22 @@ export interface InstalledPlugin {
   manifest?: PluginManifest;
 }
 
+/**
+ * The manifest exactly as the backend sends it over the wire: the Capability
+ * keys a Plugin adds are named `capabilities` there (see
+ * pluginManifestView in the backend), not `provides`. Every screen in this
+ * app reads `provides`, so toManifest below is the one place that name is
+ * translated; nothing else should read raw JSON for a manifest directly.
+ */
+interface RawPluginManifest extends Omit<PluginManifest, 'provides'> {
+  capabilities: string[];
+}
+
+function toManifest(raw: RawPluginManifest): PluginManifest {
+  const { capabilities, ...rest } = raw;
+  return { ...rest, provides: capabilities ?? [] };
+}
+
 /** The values supplied when installing a Plugin. */
 export interface InstallPluginInput {
   plugin_id: string;
@@ -82,7 +98,7 @@ export interface UpdatePluginInput {
  * state. We flatten it into a Plugin so screens read a single flat object.
  */
 interface CatalogEntry {
-  manifest: PluginManifest;
+  manifest: RawPluginManifest;
   core?: boolean;
   installed?: boolean;
   enabled?: boolean;
@@ -90,7 +106,7 @@ interface CatalogEntry {
 
 /** Flatten a catalog entry into the flat Plugin the screens read. */
 function toPlugin(raw: CatalogEntry): Plugin {
-  return { ...raw.manifest, installed: Boolean(raw.installed), is_core: Boolean(raw.core) };
+  return { ...toManifest(raw.manifest), installed: Boolean(raw.installed), is_core: Boolean(raw.core) };
 }
 
 /**
@@ -124,17 +140,26 @@ export function getMarketplacePlugin(
     .then(toPlugin);
 }
 
+/** The wire shape of an installed Plugin: its embedded manifest, if any, is raw. */
+interface RawInstalledPlugin extends Omit<InstalledPlugin, 'manifest'> {
+  manifest?: RawPluginManifest;
+}
+
 /** List a Project's installed Plugins, with config redacted. */
 export function listInstalledPlugins(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<InstalledPlugin[]> {
-  return apiRequest<unknown>(`/projects/${projectId}/plugins`, { signal }).then((r) =>
-    unwrap<InstalledPlugin[]>(r, 'plugins'),
-  );
+  return apiRequest<unknown>(`/projects/${projectId}/plugins`, { signal })
+    .then((r) => unwrap<RawInstalledPlugin[]>(r, 'plugins'))
+    .then((list) => list.map((p) => ({ ...p, manifest: p.manifest ? toManifest(p.manifest) : undefined })));
 }
 
 /** Install a Plugin into a Project, optionally with its configuration. */
+function toInstalledPlugin(raw: RawInstalledPlugin): InstalledPlugin {
+  return { ...raw, manifest: raw.manifest ? toManifest(raw.manifest) : undefined };
+}
+
 export function installPlugin(
   projectId: string,
   input: InstallPluginInput,
@@ -142,7 +167,9 @@ export function installPlugin(
   return apiRequest<unknown>(`/projects/${projectId}/plugins`, {
     method: 'POST',
     body: input,
-  }).then((r) => unwrap<InstalledPlugin>(r, 'plugin'));
+  })
+    .then((r) => unwrap<RawInstalledPlugin>(r, 'plugin'))
+    .then(toInstalledPlugin);
 }
 
 /**
@@ -157,7 +184,9 @@ export function updatePlugin(
   return apiRequest<unknown>(`/projects/${projectId}/plugins/${pluginId}`, {
     method: 'PATCH',
     body: input,
-  }).then((r) => unwrap<InstalledPlugin>(r, 'plugin'));
+  })
+    .then((r) => unwrap<RawInstalledPlugin>(r, 'plugin'))
+    .then(toInstalledPlugin);
 }
 
 /** Uninstall a Plugin from a Project. The Core bundle cannot be uninstalled. */
