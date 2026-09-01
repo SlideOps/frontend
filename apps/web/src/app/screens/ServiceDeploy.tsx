@@ -12,16 +12,17 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Container, GitBranch, Lock } from '@slideops/icons';
+import { Container, GitBranch, Lock, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import { ComposeStackPlan } from '../components/ComposeStackPlan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { filterGitHubRepos } from '../github-repos';
 import {
   buildServiceSchema,
   parseEnv,
@@ -36,6 +37,10 @@ interface DeployData {
   nodes: Node[];
   github: GitHubStatus;
   repos: GitHubRepo[];
+  // Set when connected but the repository list itself could not be read, so
+  // the picker can say that plainly instead of just not appearing, which
+  // otherwise reads as "nothing is connected" rather than "this failed".
+  reposError: ApiError | null;
 }
 
 async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
@@ -46,8 +51,22 @@ async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
     // block the deploy form; fall back to an unconnected status.
     getGitHubStatus(signal).catch(() => ({ configured: false, connected: false }) as GitHubStatus),
   ]);
-  const repos = github.connected ? await listGitHubRepos(signal).catch(() => []) : [];
-  return { projects, nodes, github, repos };
+  if (!github.connected) {
+    return { projects, nodes, github, repos: [], reposError: null };
+  }
+  try {
+    const repos = await listGitHubRepos(signal);
+    return { projects, nodes, github, repos, reposError: null };
+  } catch (error) {
+    return {
+      projects,
+      nodes,
+      github,
+      repos: [],
+      reposError:
+        error instanceof ApiError ? error : new ApiError(0, 'unknown_error', 'The repositories could not be read.'),
+    };
+  }
 }
 
 const inputClass =
@@ -57,6 +76,8 @@ const inputClass =
 function DeployForm({ data, initialProjectId }: { data: DeployData; initialProjectId?: string }) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
+  const [repoSearch, setRepoSearch] = useState('');
+  const filteredRepos = useMemo(() => filterGitHubRepos(data.repos, repoSearch), [data.repos, repoSearch]);
 
   // Preselect the Project only when it is one the Operator owns, so a stray
   // param never selects nothing.
@@ -315,14 +336,35 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                   </label>
                   <Guidance for="service.githubRepo" />
                 </div>
+                <label className="relative block">
+                  <Search
+                    width={14}
+                    height={14}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                    aria-hidden
+                  />
+                  <input
+                    type="search"
+                    value={repoSearch}
+                    onChange={(event) => setRepoSearch(event.target.value)}
+                    placeholder="Search repositories..."
+                    aria-label="Search GitHub repositories"
+                    className={`${inputClass} pl-8`}
+                  />
+                </label>
                 <select
                   id="github_repo"
+                  size={Math.min(8, Math.max(3, filteredRepos.length))}
                   className={inputClass}
                   defaultValue=""
                   onChange={(event) => onPickRepo(event.target.value)}
                 >
-                  <option value="">Choose a repository to fill the URL and branch</option>
-                  {data.repos.map((repo) => (
+                  {filteredRepos.length === 0 ? (
+                    <option value="" disabled>
+                      No repository matches &ldquo;{repoSearch}&rdquo;
+                    </option>
+                  ) : null}
+                  {filteredRepos.map((repo) => (
                     <option key={repo.full_name} value={repo.full_name}>
                       {repo.full_name}
                       {repo.private ? ' (private)' : ''}
@@ -332,10 +374,12 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
                   <GitBranch width={14} height={14} aria-hidden />
                   Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository
-                  fills the URL and branch below.
+                  fills the URL and branch below. {data.repos.length} repositories total; just
+                  created one? Reload this page to see it.
                 </Text>
               </div>
             ) : null}
+            {data.github.connected && data.reposError ? <ErrorNote error={data.reposError} /> : null}
             <Field
               label="Repository URL"
               placeholder="https://github.com/you/app.git"

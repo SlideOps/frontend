@@ -14,9 +14,17 @@ const repos: GitHubRepo[] = [
     default_branch: 'main',
     private: false,
   },
+  {
+    full_name: 'octocat/spoon-knife',
+    html_url: 'https://github.com/octocat/spoon-knife',
+    clone_url: 'https://github.com/octocat/spoon-knife.git',
+    default_branch: 'main',
+    private: false,
+  },
 ];
 
 const disconnectGitHubMock = vi.fn(async () => undefined);
+const listGitHubReposMock = vi.fn(async (..._args: unknown[]) => repos);
 
 const ownerWorkspace: Workspace = {
   id: 'ws_1',
@@ -37,7 +45,7 @@ const viewerWorkspace: Workspace = {
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getGitHubStatus: async () => connectedStatus,
-  listGitHubRepos: async () => repos,
+  listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
   disconnectGitHub: () => disconnectGitHubMock(),
   githubAuthorizeUrl: () => '/api/v1/github/authorize',
 }));
@@ -47,6 +55,7 @@ const { ProjectGitHub } = await import('./ProjectGitHub');
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
   disconnectGitHubMock.mockClear();
+  listGitHubReposMock.mockReset().mockResolvedValue(repos);
 });
 
 describe('ProjectGitHub', () => {
@@ -71,5 +80,36 @@ describe('ProjectGitHub', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
     await waitFor(() => expect(disconnectGitHubMock).toHaveBeenCalled());
+  });
+
+  it('searches the repository list rather than only ever showing every one', async () => {
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText('octocat/hello-world');
+    expect(screen.getByText('octocat/spoon-knife')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText('Search repositories...'), 'spoon');
+
+    expect(screen.queryByText('octocat/hello-world')).not.toBeInTheDocument();
+    expect(screen.getByText('octocat/spoon-knife')).toBeInTheDocument();
+  });
+
+  // A repository just created on GitHub is not visible until the list is read
+  // again; there has to be a way to ask for that without leaving the page.
+  it('rereads the repository list on Refresh, so a newly created repository can appear', async () => {
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText('octocat/hello-world');
+    expect(listGitHubReposMock).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+    await waitFor(() => expect(listGitHubReposMock).toHaveBeenCalledTimes(2));
+  });
+
+  // A failure to read the list used to be swallowed into "no repositories",
+  // indistinguishable from an account that truly has none.
+  it('says plainly when the repository list itself could not be read', async () => {
+    const { ApiError } = await import('@slideops/api-client');
+    listGitHubReposMock.mockRejectedValue(new ApiError(500, 'internal', 'the repositories could not be read'));
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText(/the repositories could not be read/)).toBeInTheDocument();
   });
 });
