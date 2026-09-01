@@ -23,6 +23,8 @@ const checkServiceUpdate = vi.fn();
 const purgeService = vi.fn();
 const listMarketplacePlugins = vi.fn();
 const listInstalledPlugins = vi.fn();
+const getCapabilityStates = vi.fn();
+const getOperation = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -36,6 +38,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   purgeService: (...a: unknown[]) => purgeService(...a),
   listMarketplacePlugins: (...a: unknown[]) => listMarketplacePlugins(...a),
   listInstalledPlugins: (...a: unknown[]) => listInstalledPlugins(...a),
+  getCapabilityStates: (...a: unknown[]) => getCapabilityStates(...a),
+  getOperation: (...a: unknown[]) => getOperation(...a),
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
@@ -159,6 +163,28 @@ describe('ServiceDetail', () => {
     listInstalledPlugins.mockReset().mockResolvedValue([
       { id: 'inst-1', plugin_id: 'postgresql', enabled: true, installed_at: '2026-01-01' },
     ]);
+    getCapabilityStates.mockReset().mockResolvedValue({
+      'install-postgresql': {
+        status: 'done',
+        source: 'slideops',
+        last_operation_id: 'op-1',
+        last_completed_at: '2026-01-01T00:00:00Z',
+      },
+    });
+    getOperation.mockReset().mockResolvedValue({
+      id: 'op-1',
+      node_id: 'n-1',
+      capability_key: 'install-postgresql',
+      status: 'completed',
+      plan: null,
+      verification: null,
+      error: null,
+      parameters: {},
+      created_at: '2026-01-01T00:00:00Z',
+      approved_at: null,
+      started_at: null,
+      completed_at: '2026-01-01T00:00:00Z',
+    });
   });
 
   afterEach(() => {
@@ -224,6 +250,39 @@ describe('ServiceDetail', () => {
 
     await userEvent.click(toggle);
     await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
+  });
+
+  // Browse used to be hard coded to install-postgresql regardless of what
+  // this Service's Project actually has installed. It now asks what is
+  // really there and draws whichever real visual manager applies.
+  it('shows the real visual manager for whatever is actually installed on Browse', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Browse' }));
+
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(listMarketplacePlugins).toHaveBeenCalledWith(service.project_id, expect.anything());
+    expect(getCapabilityStates).toHaveBeenCalledWith(service.node_id, service.project_id, expect.anything());
+  });
+
+  it('shows nothing to browse when the Project has nothing with a visual manager installed', async () => {
+    listMarketplacePlugins.mockResolvedValue([]);
+    getCapabilityStates.mockResolvedValue({});
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Browse' }));
+
+    expect(await screen.findByText('Nothing to browse yet')).toBeInTheDocument();
+  });
+
+  // Settings used to show only the Service's own env and resource
+  // configuration, with no way to find a database password or a master key
+  // without already knowing which Capability page it lived on.
+  it('shows an installed app’s credentials on Settings', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }));
+
+    expect(await screen.findByText('Installed apps')).toBeInTheDocument();
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(getOperation).toHaveBeenCalledWith('op-1', expect.anything());
   });
 
   // Leaving the Logs tab must actually stop the log view, not merely hide it,

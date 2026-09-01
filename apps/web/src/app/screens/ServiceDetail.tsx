@@ -41,9 +41,9 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
-import { CapabilityManagement } from '../components/CapabilityManagement';
-import { DatabaseExplorer, DATABASE_EXPLORER_ACTION_KEYS } from '../components/DatabaseExplorer';
 import { ProjectStack } from '../components/ProjectStack';
+import { ServiceBrowsePanel } from '../components/ServiceBrowsePanel';
+import { ServiceCredentialsPanel } from '../components/ServiceCredentialsPanel';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -201,6 +201,7 @@ export function ServiceDetail() {
 
   const baseService = state.status === 'ready' ? state.data.service : null;
   const service = baseService && resized ? { ...baseService, ...resized } : baseService;
+  const node = state.status === 'ready' ? state.data.node : null;
   const status = service?.status;
 
   // While a Service is deploying, poll until it settles at running or failed.
@@ -579,28 +580,16 @@ export function ServiceDetail() {
           ) : null}
 
           {activeTab === 'browse' ? (
-            <>
-              {/* Scoped to this Service, so a database server shared by several
-                  applications shows only the part this one uses. */}
-              <Section
-                title="Browse"
-                description="What is actually inside, a page at a time, searchable. Nothing here changes anything."
-              >
-                <DatabaseExplorer
-                  capabilityKey="install-postgresql"
-                  nodeId={service.node_id}
-                  serviceId={service.id}
-                />
-              </Section>
-              <CapabilityManagement
-                capabilityKey="install-postgresql"
+            <Section
+              title="Browse"
+              description="What every installed app with a visual manager actually holds, a page at a time, searchable. Nothing here changes anything. A database is scoped to what this Service itself uses; everything else shows this server's whole picture."
+            >
+              <ServiceBrowsePanel
                 nodeId={service.node_id}
-                serviceId={service.id}
                 projectId={service.project_id}
-                installed
-                hideActionKeys={DATABASE_EXPLORER_ACTION_KEYS}
+                serviceId={service.id}
               />
-            </>
+            </Section>
           ) : null}
 
           {activeTab === 'shell' ? (
@@ -628,7 +617,14 @@ export function ServiceDetail() {
           {activeTab === 'logs' ? <LogsAndActivity id={service.id} /> : null}
 
           {activeTab === 'settings' ? (
-            <ServiceConfiguration service={service} onChanged={reload} />
+            <>
+              <ServiceConfiguration service={service} onChanged={reload} />
+              <ServiceCredentialsPanel
+                nodeId={service.node_id}
+                projectId={service.project_id}
+                host={node?.address}
+              />
+            </>
           ) : null}
         </>
       ) : null}
