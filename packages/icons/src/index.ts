@@ -39,6 +39,7 @@ export {
   Table,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
   FolderKanban,
   Fingerprint,

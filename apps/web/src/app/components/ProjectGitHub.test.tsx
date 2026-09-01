@@ -28,6 +28,7 @@ function repo(fullName: string, overrides: Partial<GitHubRepo> = {}): GitHubRepo
 
 const everything = [repo('octocat/hello-world'), repo('octocat/spoon-knife'), repo('acme/worker')];
 
+const getGitHubStatusMock = vi.fn(async (..._a: unknown[]): Promise<GitHubStatus> => connectedStatus);
 const disconnectGitHubMock = vi.fn(async () => undefined);
 const getGitHubRepositoryAccessMock = vi.fn(
   async (..._a: unknown[]): Promise<GitHubRepositoryAccess> => ({
@@ -61,7 +62,7 @@ const viewerWorkspace: Workspace = {
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getGitHubStatus: async () => connectedStatus,
+  getGitHubStatus: (...a: unknown[]) => getGitHubStatusMock(...a),
   getGitHubRepositoryAccess: (...a: unknown[]) => getGitHubRepositoryAccessMock(...a),
   listGitHubRepos: (...a: unknown[]) => listGitHubReposMock(...a),
   setGitHubRepositoryAccess: (mode: 'all' | 'selected', names: string[]) =>
@@ -74,6 +75,7 @@ const { ProjectGitHub } = await import('./ProjectGitHub');
 
 beforeEach(() => {
   useWorkspaceStore.setState({ workspaces: [ownerWorkspace], loaded: true });
+  getGitHubStatusMock.mockReset().mockResolvedValue(connectedStatus);
   disconnectGitHubMock.mockClear();
   getGitHubRepositoryAccessMock
     .mockReset()
@@ -236,7 +238,42 @@ describe('ProjectGitHub', () => {
     await screen.findByText('acme/worker');
     expect(listGitHubReposMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() => expect(listGitHubReposMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('offers a top-level Refresh repositories action alongside the summary, outside Configure', async () => {
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText(/Selected repositories\./);
+    expect(getGitHubRepositoryAccessMock).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh repositories' }));
+    await waitFor(() => expect(getGitHubRepositoryAccessMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('links Manage GitHub Access to GitHub’s own authorization page, not a SlideOps modal', async () => {
+    getGitHubStatusMock.mockResolvedValue({ ...connectedStatus, manage_url: 'https://github.com/settings/connections/applications/client-id' });
+    renderInApp(<ProjectGitHub />);
+    const link = await screen.findByRole('link', { name: 'Manage GitHub Access' });
+    expect(link).toHaveAttribute('href', 'https://github.com/settings/connections/applications/client-id');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('does not offer Manage GitHub Access when the connection carries no manage_url', async () => {
+    getGitHubStatusMock.mockResolvedValue(connectedStatus);
+    renderInApp(<ProjectGitHub />);
+    await screen.findByText(/Connected as/);
+    expect(screen.queryByRole('link', { name: 'Manage GitHub Access' })).not.toBeInTheDocument();
+  });
+
+  it('points the unavailable-repository warning at Manage GitHub Access, not Reconnect', async () => {
+    getGitHubStatusMock.mockResolvedValue({ ...connectedStatus, manage_url: 'https://github.com/settings/connections/applications/client-id' });
+    getGitHubRepositoryAccessMock.mockResolvedValue({
+      mode: 'selected',
+      repos: [],
+      unavailable: ['octocat/gone'],
+    });
+    renderInApp(<ProjectGitHub />);
+    expect(await screen.findByText(/Manage GitHub Access above is/)).toBeInTheDocument();
   });
 });

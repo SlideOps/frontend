@@ -18,6 +18,15 @@ export interface GitHubStatus {
   configured: boolean;
   connected: boolean;
   login?: string;
+  /**
+   * GitHub's own page for this connection, once connected: which
+   * organizations have approved it, and revoking it entirely. This is what
+   * actually grants access to an organization-owned repository — classic
+   * OAuth withholds an organization's repositories from every app until an
+   * org owner approves that app for that org there, regardless of the
+   * `repo` scope the connection's own token already carries.
+   */
+  manage_url?: string;
 }
 
 /** One repository the connected Operator can reach, enough to select and clone it. */

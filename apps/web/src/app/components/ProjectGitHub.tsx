@@ -11,7 +11,7 @@ import {
   type GitHubStatus,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { AlertTriangle, GitBranch, Lock, RefreshCw, Search, Settings } from '@slideops/icons';
+import { AlertTriangle, ExternalLink, GitBranch, Lock, RefreshCw, Search, Settings } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useEffect, useMemo, useState } from 'react';
 import { useCanWrite } from '../../store/workspace';
@@ -257,7 +257,7 @@ function ConfigurePanel({
  */
 export function ProjectGitHub() {
   const canWrite = useCanWrite();
-  const { state, reload } = useAsyncData((signal) => loadGitHub(signal), []);
+  const { state, reload, refreshing } = useAsyncData((signal) => loadGitHub(signal), []);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [configuring, setConfiguring] = useState(false);
@@ -347,6 +347,17 @@ export function ProjectGitHub() {
               </Text>
               {canWrite ? (
                 <div className="flex shrink-0 items-center gap-2">
+                  {state.data.status.manage_url ? (
+                    <a
+                      href={state.data.status.manage_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-medium text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                      <ExternalLink width={14} height={14} aria-hidden />
+                      Manage GitHub Access
+                    </a>
+                  ) : null}
                   <Button variant="secondary" size="sm" onClick={connect}>
                     <GitBranch width={14} height={14} aria-hidden />
                     Reconnect
@@ -357,6 +368,24 @@ export function ProjectGitHub() {
                 </div>
               ) : null}
             </div>
+
+            {state.data.status.manage_url ? (
+              <Text variant="caption" tone="secondary">
+                Missing a repository that lives in an organization? GitHub keeps organization access
+                separate from your own: an org owner has to approve this connection for that
+                organization on{' '}
+                <a
+                  href={state.data.status.manage_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-brand hover:text-ink"
+                >
+                  GitHub&apos;s own Manage GitHub Access page
+                </a>
+                {' '}before it can appear here at all &mdash; no SlideOps setting can substitute for
+                that.
+              </Text>
+            ) : null}
 
             {state.data.accessError ? (
               <ErrorNote error={state.data.accessError} />
@@ -376,17 +405,23 @@ export function ProjectGitHub() {
                       </>
                     )}
                   </Text>
-                  {canWrite ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setConfiguring((v) => !v)}
-                      aria-expanded={configuring}
-                    >
-                      <Settings width={14} height={14} aria-hidden />
-                      Configure repositories
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={reload} disabled={refreshing}>
+                      <RefreshCw width={14} height={14} aria-hidden />
+                      {refreshing ? 'Refreshing' : 'Refresh repositories'}
                     </Button>
-                  ) : null}
+                    {canWrite ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setConfiguring((v) => !v)}
+                        aria-expanded={configuring}
+                      >
+                        <Settings width={14} height={14} aria-hidden />
+                        Configure repositories
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
 
                 {state.data.access.unavailable.length > 0 ? (
@@ -395,8 +430,8 @@ export function ProjectGitHub() {
                     <Text variant="body-sm" tone="secondary">
                       {state.data.access.unavailable.length} selected repositor
                       {state.data.access.unavailable.length === 1 ? 'y is' : 'ies are'} no longer available
-                      through GitHub. Configure repositories to review, or Reconnect if this account lost
-                      access to a whole organisation.
+                      through GitHub. If it lives in an organization, Manage GitHub Access above is
+                      what restores it; Configure repositories only edits SlideOps&apos; own list.
                     </Text>
                   </div>
                 ) : null}
