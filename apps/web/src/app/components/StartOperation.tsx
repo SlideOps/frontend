@@ -144,6 +144,8 @@ export function StartOperation({
         parameters={parameters}
         register={register}
         errors={errors}
+        nodeId={nodeId}
+        capabilityKey={capability.key}
       />
 
       <div className="flex flex-wrap items-center gap-3">

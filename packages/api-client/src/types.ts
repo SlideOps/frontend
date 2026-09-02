@@ -96,7 +96,22 @@ export type RiskLevel = 'low' | 'medium' | 'high';
  * public key. Types stay open ended so a new one never breaks rendering.
  */
 export type CapabilityParameterType =
-  'string' | 'text' | 'number' | 'boolean' | 'domain' | 'path' | 'public_key';
+  | 'string'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'domain'
+  | 'path'
+  | 'public_key'
+  | 'password'
+  /**
+   * A choice among the versions a Node's own package sources actually offer
+   * right now for this Capability, fetched live from
+   * getAvailableVersions rather than typed freely. Left unset, the
+   * Capability installs whatever the distribution's default package
+   * resolves to, exactly as it always has.
+   */
+  | 'version';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the

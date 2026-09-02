@@ -171,7 +171,7 @@ export function NodeDetail() {
       return (
         <div className="flex flex-col gap-2">
           <Text variant="caption" tone="secondary">
-            {completedHint(key, state.last_completed_at ?? '')}
+            {completedHint(key, state.last_completed_at ?? '', state.version)}
           </Text>
           <div className="flex flex-wrap items-center gap-2">
             <Button

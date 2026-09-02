@@ -1,16 +1,19 @@
 import {
   serviceShellUrl,
+  addServiceCapability,
   ApiError,
   cancelServiceDeploy,
   getNode,
   getProject,
   getService,
+  listCapabilities,
   purgeService,
   redeployService,
   removeService,
   restartService,
   startService,
   stopService,
+  type Capability,
   type Node,
   type Project,
   type Service,
@@ -19,11 +22,13 @@ import { Button, Card, Field, Text, Section } from '@slideops/design-system';
 import {
   ArrowLeft,
   Boxes,
+  CheckCircle2,
   Database,
   FileText,
   GitBranch,
   Play,
   RefreshCw,
+  Plus,
   Server,
   serviceIcon,
   Settings as SettingsIcon,
@@ -34,7 +39,7 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { DetailLayout, PageHeader, TabNav, type TabNavTab } from '@slideops/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import { ServiceStatusBadge } from '../components/Badges';
@@ -54,6 +59,11 @@ import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceCICDPanel } from '../components/ServiceCICDPanel';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
+import {
+  CapabilityParamsBlock,
+  SUPPORTED_CAPABILITY_KEYS,
+  type CapabilityParamsHandle,
+} from './ServiceDeployCapabilities';
 
 interface DetailData {
   service: Service;
@@ -99,10 +109,177 @@ function sourceText(service: Service): string {
       ? `${service.source.image} (already running when SlideOps found it)`
       : 'Already running when SlideOps found it';
   }
+  if (service.source.type === 'capability') {
+    const count = service.capabilities?.length ?? 0;
+    return count === 1 ? '1 capability' : `${count} capabilities`;
+  }
   if (service.source.type === 'image') {
     return service.source.image ?? 'Image';
   }
   return service.source.repository_url ?? 'Repository';
+}
+
+/** A friendly label for a tracked Capability's key, falling back to the raw
+ * key when the catalog has not loaded yet. */
+function capabilityLabel(catalog: Capability[], key: string): string {
+  return catalog.find((c) => c.key === key)?.name ?? key;
+}
+
+/** One tracked Capability's status icon: ready, starting, or failed. */
+function CapabilityStatusIcon({ status }: { status: string }) {
+  if (status === 'done') {
+    return <CheckCircle2 width={15} height={15} className="shrink-0 text-success" aria-hidden />;
+  }
+  if (status === 'failed') {
+    return <XCircle width={15} height={15} className="shrink-0 text-danger" aria-hidden />;
+  }
+  return <RefreshCw width={15} height={15} className="shrink-0 animate-spin text-brand" aria-hidden />;
+}
+
+/**
+ * Growing a Capability Service: pick one more supported engine not already
+ * tracked, configure it, and add it the same way the initial deploy put each
+ * one in place -- its own real Operation.
+ */
+function AddCapabilityForm({
+  serviceId,
+  nodeId,
+  existing,
+  catalog,
+  onDone,
+  onCancel,
+}: {
+  serviceId: string;
+  nodeId: string;
+  existing: string[];
+  catalog: Capability[];
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const choices = catalog.filter((c) => !existing.includes(c.key));
+  const [key, setKey] = useState(choices[0]?.key ?? '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const paramsRef = useRef<CapabilityParamsHandle | null>(null);
+  const chosen = choices.find((c) => c.key === key);
+
+  if (choices.length === 0) {
+    return (
+      <Text variant="body-sm" tone="secondary" className="mt-3">
+        Every supported capability is already part of this service.
+      </Text>
+    );
+  }
+
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const params = paramsRef.current ? await paramsRef.current.submit() : {};
+      if (params === null) {
+        setSubmitting(false);
+        return;
+      }
+      await addServiceCapability(serviceId, {
+        capability_key: key,
+        parameters: Object.keys(params).length > 0 ? params : undefined,
+      });
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'The capability could not be added.');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 flex flex-col gap-3 rounded-md border border-border p-3">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="add-capability-key" className="text-sm font-medium text-ink">
+          Capability
+        </label>
+        <select
+          id="add-capability-key"
+          className="h-10 w-full rounded-md border border-border bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          value={key}
+          onChange={(event) => setKey(event.target.value)}
+        >
+          {choices.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {chosen ? (
+        <CapabilityParamsBlock key={chosen.key} capability={chosen} nodeId={nodeId} ref={paramsRef} />
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Button size="sm" onClick={submit} disabled={submitting}>
+          {submitting ? 'Adding' : 'Add'}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
+          Cancel
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** What a Capability Service tracks, with the action to grow it. */
+function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged: () => void }) {
+  const [adding, setAdding] = useState(false);
+  const { state: catalogState } = useAsyncData(async (signal) => {
+    const all = await listCapabilities({}, signal);
+    const byKey = new Map(all.map((c) => [c.key, c]));
+    return SUPPORTED_CAPABILITY_KEYS.map((k) => byKey.get(k)).filter((c): c is Capability => Boolean(c));
+  }, []);
+  const catalog = catalogState.status === 'ready' ? catalogState.data : [];
+  const tracked = service.capabilities ?? [];
+
+  return (
+    <Card className="h-fit">
+      <Text variant="h4">Capabilities</Text>
+      {tracked.length === 0 ? (
+        <Text variant="body-sm" tone="secondary" className="mt-2">
+          Nothing tracked yet.
+        </Text>
+      ) : (
+        <ul className="mt-2 flex flex-col divide-y divide-border">
+          {tracked.map((c) => (
+            <li key={c.capability_key} className="flex items-center gap-2 py-2">
+              <CapabilityStatusIcon status={c.status} />
+              <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                {capabilityLabel(catalog, c.capability_key)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {adding ? (
+        <AddCapabilityForm
+          serviceId={service.id}
+          nodeId={service.node_id}
+          existing={tracked.map((c) => c.capability_key)}
+          catalog={catalog}
+          onDone={() => {
+            setAdding(false);
+            onChanged();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => setAdding(true)}>
+          <Plus width={15} height={15} aria-hidden />
+          Add Capability
+        </Button>
+      )}
+    </Card>
+  );
 }
 
 /*
@@ -206,6 +383,13 @@ export function ServiceDetail() {
   const service = baseService && resized ? { ...baseService, ...resized } : baseService;
   const node = state.status === 'ready' ? state.data.node : null;
   const status = service?.status;
+  // A Capability Service has no application build/CI-CD path and no single
+  // container or unit to open a shell into -- it is a group of Capabilities,
+  // each already reachable through Browse and its own History entry.
+  const isCapabilityService = service?.deployment_type === 'capability';
+  const visibleTabs = isCapabilityService
+    ? SERVICE_TABS.filter((tab) => tab.key !== 'cicd' && tab.key !== 'shell')
+    : SERVICE_TABS;
 
   // While a Service is deploying, poll until it settles at running or failed.
   useEffect(() => {
@@ -285,7 +469,7 @@ export function ServiceDetail() {
           <PageHeader
             title={service.name}
             description={`${state.status === 'ready' ? (state.data.project?.name ?? 'Unknown Project') : ''} · ${state.status === 'ready' ? (state.data.node?.name ?? 'Unknown Node') : ''}`}
-            tabs={<TabNav tabs={SERVICE_TABS} active={activeTab} onSelect={setActiveTab} />}
+            tabs={<TabNav tabs={visibleTabs} active={activeTab} onSelect={setActiveTab} />}
             actions={
               <span className="inline-flex items-center gap-3">
                 <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand sm:inline-flex">
@@ -323,22 +507,29 @@ export function ServiceDetail() {
           {activeTab === 'overview' ? (
             <DetailLayout
               main={
-                <>
-                  {/* The address comes before the Preview on purpose. A Service that
-                  serves an API has nothing to show in an iframe, and its address is
-                  the whole answer; a Service that renders a page has both. */}
-                  <ServiceEndpoint service={service} onChanged={reload} />
+                isCapabilityService ? (
+                  <Text variant="body-sm" tone="secondary">
+                    This service has no address or live usage of its own: each Capability
+                    listed in the rail is its own managed engine, reachable through Browse.
+                  </Text>
+                ) : (
+                  <>
+                    {/* The address comes before the Preview on purpose. A Service that
+                    serves an API has nothing to show in an iframe, and its address is
+                    the whole answer; a Service that renders a page has both. */}
+                    <ServiceEndpoint service={service} onChanged={reload} />
 
-                  <ServicePreview service={service} />
+                    <ServicePreview service={service} />
 
-                  <Section
-                    title="Live usage"
-                    adornment={<Guidance for="service.metrics" />}
-                    collapsible
-                  >
-                    <ServiceMetricsPanel id={service.id} running={isRunning} />
-                  </Section>
-                </>
+                    <Section
+                      title="Live usage"
+                      adornment={<Guidance for="service.metrics" />}
+                      collapsible
+                    >
+                      <ServiceMetricsPanel id={service.id} running={isRunning} />
+                    </Section>
+                  </>
+                )
               }
               rail={
                 <>
@@ -362,38 +553,52 @@ export function ServiceDetail() {
                             : ''}
                         </button>
                       </SummaryRow>
-                      <SummaryRow label="Runtime">
-                        {service.runtime === 'systemd' ? 'systemd unit' : 'Container'}
-                      </SummaryRow>
-                      <SummaryRow label="Source">{sourceText(service)}</SummaryRow>
-                      <SummaryRow label="CPU limit">{service.cpu_limit} vCPU</SummaryRow>
-                      <SummaryRow label="Memory limit">{memory(service.memory_mb)}</SummaryRow>
-                      {typeof service.pids_limit === 'number' ? (
-                        <SummaryRow label="Process limit">{service.pids_limit}</SummaryRow>
-                      ) : null}
-                      {service.ports && service.ports.length > 0 ? (
-                        <SummaryRow label="Ports">
-                          {service.ports.map((port) => `${port.host}:${port.container}`).join(', ')}
+                      {isCapabilityService ? null : (
+                        <SummaryRow label="Runtime">
+                          {service.runtime === 'systemd' ? 'systemd unit' : 'Container'}
                         </SummaryRow>
-                      ) : null}
+                      )}
+                      <SummaryRow label="Source">{sourceText(service)}</SummaryRow>
+                      {isCapabilityService ? null : (
+                        <>
+                          <SummaryRow label="CPU limit">{service.cpu_limit} vCPU</SummaryRow>
+                          <SummaryRow label="Memory limit">{memory(service.memory_mb)}</SummaryRow>
+                          {typeof service.pids_limit === 'number' ? (
+                            <SummaryRow label="Process limit">{service.pids_limit}</SummaryRow>
+                          ) : null}
+                          {service.ports && service.ports.length > 0 ? (
+                            <SummaryRow label="Ports">
+                              {service.ports
+                                .map((port) => `${port.host}:${port.container}`)
+                                .join(', ')}
+                            </SummaryRow>
+                          ) : null}
+                        </>
+                      )}
                       <SummaryRow label="Created">
                         {new Date(service.created_at).toLocaleString()}
                       </SummaryRow>
                     </dl>
                   </Card>
 
-                  <ServiceResourcesPanel
-                    service={service}
-                    onUpdated={(updated) =>
-                      setResized({
-                        cpu_limit: updated.cpu_limit,
-                        memory_mb: updated.memory_mb,
-                        pids_limit: updated.pids_limit,
-                      })
-                    }
-                  />
+                  {isCapabilityService ? (
+                    <CapabilitiesCard service={service} onChanged={reload} />
+                  ) : (
+                    <>
+                      <ServiceResourcesPanel
+                        service={service}
+                        onUpdated={(updated) =>
+                          setResized({
+                            cpu_limit: updated.cpu_limit,
+                            memory_mb: updated.memory_mb,
+                            pids_limit: updated.pids_limit,
+                          })
+                        }
+                      />
 
-                  <ServiceUpdatePanel service={service} onDeployed={reload} />
+                      <ServiceUpdatePanel service={service} onDeployed={reload} />
+                    </>
+                  )}
 
                   <Card className="h-fit">
                     <div className="flex items-center gap-2">
@@ -423,7 +628,7 @@ export function ServiceDetail() {
                             {working ? 'Cancelling' : 'Cancel this deploy'}
                           </Button>
                         ) : null}
-                        {isStopped ? (
+                        {isStopped && !isCapabilityService ? (
                           <Button
                             onClick={() => runAction(startService, 'The Service could not start.')}
                             disabled={working}
@@ -432,7 +637,7 @@ export function ServiceDetail() {
                             Start
                           </Button>
                         ) : null}
-                        {isRunning ? (
+                        {isRunning && !isCapabilityService ? (
                           <Button
                             variant="secondary"
                             onClick={() => runAction(stopService, 'The Service could not stop.')}
@@ -444,8 +649,10 @@ export function ServiceDetail() {
                         ) : null}
                         {/* Redeploying belongs beside the other lifecycle actions, not only
                       in the deployment panel: it is what applies a configuration
-                      change, and an Operator looking for "apply my edit" looks here. */}
-                        {!isDeploying && !isAdopted ? (
+                      change, and an Operator looking for "apply my edit" looks here. A
+                      Capability Service has nothing to rebuild -- Add Capability grows
+                      it instead. */}
+                        {!isDeploying && !isAdopted && !isCapabilityService ? (
                           <Button
                             variant="secondary"
                             onClick={() =>
@@ -457,7 +664,7 @@ export function ServiceDetail() {
                             Redeploy
                           </Button>
                         ) : null}
-                        {isRunning || isStopped ? (
+                        {(isRunning || isStopped) && !isCapabilityService ? (
                           <Button
                             variant="secondary"
                             onClick={() =>
@@ -595,7 +802,7 @@ export function ServiceDetail() {
             </Section>
           ) : null}
 
-          {activeTab === 'shell' ? (
+          {activeTab === 'shell' && !isCapabilityService ? (
             <ShellTerminal
               standalonePath={`/app/services/${service.id}/shell`}
               urlFor={(cols, rows) => serviceShellUrl(service.id, cols, rows)}
@@ -619,11 +826,15 @@ export function ServiceDetail() {
 
           {activeTab === 'logs' ? <LogsAndActivity id={service.id} /> : null}
 
-          {activeTab === 'cicd' ? <ServiceCICDPanel service={service} onChanged={reload} /> : null}
+          {activeTab === 'cicd' && !isCapabilityService ? (
+            <ServiceCICDPanel service={service} onChanged={reload} />
+          ) : null}
 
           {activeTab === 'settings' ? (
             <>
-              <ServiceConfiguration service={service} onChanged={reload} />
+              {isCapabilityService ? null : (
+                <ServiceConfiguration service={service} onChanged={reload} />
+              )}
               <ServiceCredentialsPanel
                 nodeId={service.node_id}
                 projectId={service.project_id}

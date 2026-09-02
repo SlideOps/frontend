@@ -187,7 +187,7 @@ function CapabilityHere({
         <div className="flex items-center gap-2">
           <CompletionBadge label={completionLabel(capabilityKey)} />
           <Text variant="body-sm" tone="secondary">
-            {completedHint(capabilityKey, done.last_completed_at ?? '')}
+            {completedHint(capabilityKey, done.last_completed_at ?? '', done.version)}
           </Text>
         </div>
         <Button

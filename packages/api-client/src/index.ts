@@ -246,6 +246,9 @@ export {
   cancelServiceDeploy,
   planComposeStack,
   deployComposeStack,
+  deployCapabilities,
+  addServiceCapability,
+  listServiceCapabilities,
   AUTO_HOST_PORT,
   exposeService,
   updateServiceResources,
@@ -274,6 +277,11 @@ export {
   type DeployEvent,
   type DeployEventTrigger,
   type DeployEventOutcome,
+  type ServiceDeploymentType,
+  type ServiceCapability,
+  type ServiceCapabilityStatus,
+  type CapabilitySelectionInput,
+  type DeployCapabilitiesInput,
 } from './services';
 export {
   getReport,
@@ -300,10 +308,12 @@ export {
 } from './operations';
 export {
   getCapabilityStates,
+  getAvailableVersions,
   getReadiness,
   type CapabilityState,
   type CapabilityStateStatus,
   type CapabilityStateSource,
+  type AvailableVersions,
   type Readiness,
   type ReadinessMeasure,
   type ReadinessSeverity,

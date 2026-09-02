@@ -44,10 +44,12 @@ interface NewData {
  */
 function ParameterSection({
   capability,
+  nodeId,
   submitting,
   onValid,
 }: {
   capability: Capability;
+  nodeId: string;
   submitting: boolean;
   onValid: (parameters: Record<string, unknown>) => void;
 }) {
@@ -76,6 +78,8 @@ function ParameterSection({
             parameters={parameters}
             register={register}
             errors={errors}
+            nodeId={nodeId || undefined}
+            capabilityKey={capability.key}
           />
         </div>
       ) : (
@@ -247,6 +251,7 @@ export function AutomationNew() {
                 <ParameterSection
                   key={capability.key}
                   capability={capability}
+                  nodeId={nodeId}
                   submitting={submitting}
                   onValid={create}
                 />

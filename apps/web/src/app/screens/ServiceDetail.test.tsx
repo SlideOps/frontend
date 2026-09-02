@@ -25,6 +25,8 @@ const listMarketplacePlugins = vi.fn();
 const listInstalledPlugins = vi.fn();
 const getCapabilityStates = vi.fn();
 const getOperation = vi.fn();
+const listCapabilities = vi.fn();
+const addServiceCapability = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -40,6 +42,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listInstalledPlugins: (...a: unknown[]) => listInstalledPlugins(...a),
   getCapabilityStates: (...a: unknown[]) => getCapabilityStates(...a),
   getOperation: (...a: unknown[]) => getOperation(...a),
+  listCapabilities: (...a: unknown[]) => listCapabilities(...a),
+  addServiceCapability: (...a: unknown[]) => addServiceCapability(...a),
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
@@ -345,6 +349,74 @@ describe('ServiceDetail', () => {
     await userEvent.click(confirmButton);
     await waitFor(() =>
       expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend'),
+    );
+  });
+});
+
+const capabilityService = {
+  ...service,
+  deployment_type: 'capability',
+  runtime: '',
+  source: { type: 'capability' },
+  capabilities: [
+    { capability_key: 'install-postgresql', operation_id: 'op-1', status: 'done', created_at: '2026-07-30T10:00:00Z' },
+    { capability_key: 'install-redis', operation_id: 'op-2', status: 'running', created_at: '2026-07-30T10:01:00Z' },
+  ],
+};
+
+const catalog = [
+  { key: 'install-postgresql', name: 'PostgreSQL', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+  { key: 'install-redis', name: 'Redis', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+  { key: 'install-mongodb', name: 'MongoDB', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+];
+
+describe('ServiceDetail: a Capability Service', () => {
+  beforeEach(() => {
+    FakeSocket.last = null;
+    vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket);
+    getService.mockReset().mockResolvedValue(capabilityService);
+    getProject.mockReset().mockResolvedValue({ id: 'p-1', name: 'Kenpoly' });
+    getNode.mockReset().mockResolvedValue({ id: 'n-1', name: 'contabo vps' });
+    getServiceActivity.mockReset().mockResolvedValue([]);
+    listCapabilityActions.mockReset().mockResolvedValue([]);
+    listMarketplacePlugins.mockReset().mockResolvedValue([]);
+    listInstalledPlugins.mockReset().mockResolvedValue([]);
+    getCapabilityStates.mockReset().mockResolvedValue({});
+    listCapabilities.mockReset().mockResolvedValue(catalog);
+    addServiceCapability.mockReset().mockResolvedValue({ ...capabilityService });
+  });
+
+  it('shows the tracked capabilities and their status, not resource/build panels', async () => {
+    show();
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(screen.getByText('Redis')).toBeInTheDocument();
+    // Nothing software-shaped: no CPU/memory summary rows, no CI/CD tab.
+    expect(screen.queryByText('CPU limit')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /CI\/CD/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Shell/ })).not.toBeInTheDocument();
+  });
+
+  it('offers no Start, Stop, or Redeploy actions', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redeploy' })).not.toBeInTheDocument();
+  });
+
+  it('adds another capability without disturbing what is already tracked', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+    await userEvent.click(await screen.findByRole('button', { name: /Add Capability/ }));
+
+    // Only the untracked engine is offered.
+    const select = await screen.findByLabelText('Capability');
+    expect(select).toHaveValue('install-mongodb');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(addServiceCapability).toHaveBeenCalledWith('svc-1', expect.objectContaining({ capability_key: 'install-mongodb' })),
     );
   });
 });

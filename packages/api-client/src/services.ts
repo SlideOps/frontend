@@ -25,6 +25,13 @@ export type ServiceRuntime = 'container' | 'systemd' | 'compose';
 export type ServiceStatus = 'deploying' | 'running' | 'stopped' | 'failed' | 'removed';
 
 /**
+ * software is an application an Operator deploys and runs; capability is
+ * infrastructure a Project depends on (a database, a cache), deployed
+ * through deployCapabilities rather than deployService.
+ */
+export type ServiceDeploymentType = 'software' | 'capability';
+
+/**
  * Where a Service's workload comes from. An image source runs a prebuilt image;
  * a repository source clones the repository and builds it first. `command` is
  * the entrypoint for a systemd unit or an override for a container.
@@ -33,9 +40,12 @@ export interface ServiceSource {
   /**
    * `adopted` marks a workload that was already running when SlideOps found it,
    * so there is no image or repository to rebuild it from; the image, where the
-   * runtime reports one, is kept for display only.
+   * runtime reports one, is kept for display only. `capability` marks a
+   * Capability Service: there is nothing here to build either, for the
+   * opposite reason -- what is running is several independently tracked
+   * Capabilities, not one workload this shape could describe.
    */
-  type: 'image' | 'repository' | 'adopted';
+  type: 'image' | 'repository' | 'adopted' | 'capability';
   image?: string;
   repository_url?: string;
   /** The branch to clone and pull for a repository source. Defaults to main. */
@@ -75,6 +85,8 @@ export interface Service {
   name: string;
   project_id: string;
   node_id: string;
+  /** software or capability. */
+  deployment_type: ServiceDeploymentType;
   runtime: ServiceRuntime;
   source: ServiceSource;
   cpu_limit: number;
@@ -132,6 +144,22 @@ export interface Service {
   updated_at?: string;
   /** This Service's automatic deployment configuration. Off by default. */
   cicd: ServiceCICD;
+  /**
+   * What a Capability Service tracks: which engines compose it, and how
+   * each is doing. Undefined for a software Service, which tracks none.
+   */
+  capabilities?: ServiceCapability[];
+}
+
+/** How one Capability a Capability Service tracks is doing. */
+export type ServiceCapabilityStatus = 'running' | 'done' | 'failed';
+
+/** One Capability tracked as part of a Capability Service. */
+export interface ServiceCapability {
+  capability_key: string;
+  operation_id: string;
+  status: ServiceCapabilityStatus;
+  created_at: string;
 }
 
 /** Where a BuildModeExternal Service's running image actually comes from. */
@@ -262,6 +290,66 @@ export function getService(id: string, signal?: AbortSignal): Promise<Service> {
 export function deployService(input: DeployServiceInput): Promise<Service> {
   return apiRequest<unknown>('/services', { method: 'POST', body: input }).then((r) =>
     unwrap<Service>(r, 'service'),
+  );
+}
+
+/** One Capability to install as part of a Capability Service. */
+export interface CapabilitySelectionInput {
+  capability_key: string;
+  parameters?: Record<string, unknown>;
+}
+
+/** The fields required to deploy a Capability Service. */
+export interface DeployCapabilitiesInput {
+  name: string;
+  project_id?: string;
+  node_id: string;
+  capabilities: CapabilitySelectionInput[];
+}
+
+/**
+ * Deploy a Capability Service: several infrastructure Capabilities put in
+ * place together as one named Service a Project depends on, instead of one
+ * unrelated Service per engine.
+ *
+ * Each Capability still runs as its own real Operation -- planned, approved,
+ * executed, verified, recorded in History -- exactly as starting it on its
+ * own would. They do not depend on each other, so one failing does not stop
+ * the rest: the Service ends up running with whichever succeeded, and
+ * `last_error` names whichever did not.
+ *
+ * Returns immediately with the Service at `deploying`. Watch it complete with
+ * getService or the realtime stream.
+ */
+export function deployCapabilities(input: DeployCapabilitiesInput): Promise<Service> {
+  return apiRequest<unknown>('/services/capabilities', { method: 'POST', body: input }).then((r) =>
+    unwrap<Service>(r, 'service'),
+  );
+}
+
+/**
+ * Add one more Capability to an existing Capability Service, run the same
+ * way the initial deploy ran each one. Refused for a software Service, and
+ * refused for a Capability the Service already tracks -- reconfiguring an
+ * existing one is that Capability's own Configure action, not this one.
+ */
+export function addServiceCapability(
+  serviceId: string,
+  selection: CapabilitySelectionInput,
+): Promise<Service> {
+  return apiRequest<unknown>(`/services/${serviceId}/capabilities`, {
+    method: 'POST',
+    body: selection,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** What a Capability Service currently tracks. */
+export function listServiceCapabilities(
+  serviceId: string,
+  signal?: AbortSignal,
+): Promise<ServiceCapability[]> {
+  return apiRequest<unknown>(`/services/${serviceId}/capabilities`, { signal }).then((r) =>
+    unwrap<ServiceCapability[]>(r, 'capabilities'),
   );
 }
 

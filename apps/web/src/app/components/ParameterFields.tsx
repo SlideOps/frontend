@@ -1,7 +1,8 @@
-import type { CapabilityParameter } from '@slideops/api-client';
+import { getAvailableVersions, type CapabilityParameter } from '@slideops/api-client';
 import { CircleHelp } from '@slideops/icons';
 import { Tooltip } from '@slideops/tooltips';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
  * The generated parameter form fields, one control per Capability parameter,
@@ -31,16 +32,94 @@ function FieldHelp({ text, label }: { text: string; label: string }) {
   );
 }
 
+/**
+ * A `type: 'version'` parameter's control: a select populated live from
+ * GET .../capabilities/{key}/versions, never a hardcoded list, so an
+ * Operator can only ever choose a version this Node can actually install.
+ * Falls back to a plain text field, same as an unrecognized type would,
+ * when the Node has not been chosen yet or this Capability turns out not to
+ * have version discovery after all — the frontend's own catalog and the
+ * backend's registry could in principle drift, and a broken empty select is
+ * worse than the ordinary fallback every other unknown type already gets.
+ */
+function VersionField({
+  fieldId,
+  nodeId,
+  capabilityKey,
+  className,
+  register,
+  registerKey,
+}: {
+  fieldId: string;
+  nodeId: string | undefined;
+  capabilityKey: string;
+  className: string;
+  register: UseFormRegister<Record<string, unknown>>;
+  registerKey: string;
+}) {
+  const result = useAsyncData(
+    (signal) =>
+      nodeId
+        ? getAvailableVersions(nodeId, capabilityKey, signal)
+        : Promise.resolve({ supported: false, versions: [] }),
+    [nodeId, capabilityKey],
+  );
+
+  if (result.state.status !== 'ready' || !result.state.data.supported) {
+    return (
+      <input
+        id={fieldId}
+        type="text"
+        className={className}
+        placeholder="Leave blank for the distribution's default"
+        {...register(registerKey)}
+      />
+    );
+  }
+
+  const { versions, latest } = result.state.data;
+
+  return (
+    <select id={fieldId} className={className} {...register(registerKey)}>
+      <option value="">
+        {versions.length > 0
+          ? `Distribution default${latest ? ` (currently ${latest})` : ''}`
+          : "Distribution default (no other version found on this Node's own sources)"}
+      </option>
+      {versions.map((v) => (
+        <option key={v} value={v}>
+          {v === latest ? `${v} (latest available)` : v}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export interface ParameterFieldsProps {
   /** A stable prefix that keeps field ids unique when more than one form is on a page. */
   idPrefix: string;
   parameters: readonly CapabilityParameter[];
   register: UseFormRegister<Record<string, unknown>>;
   errors: FieldErrors<Record<string, unknown>>;
+  /**
+   * The Node a `type: 'version'` parameter's live discovery reads from.
+   * Undefined until an Operator has chosen one, in which case the version
+   * field falls back to its plain text shape rather than fetching nothing.
+   */
+  nodeId?: string;
+  /** The Capability this form belongs to, for the same live discovery call. */
+  capabilityKey?: string;
 }
 
 /** Render the controls for a Capability's parameters from its metadata. */
-export function ParameterFields({ idPrefix, parameters, register, errors }: ParameterFieldsProps) {
+export function ParameterFields({
+  idPrefix,
+  parameters,
+  register,
+  errors,
+  nodeId,
+  capabilityKey,
+}: ParameterFieldsProps) {
   return (
     <>
       {parameters.map((param) => {
@@ -78,6 +157,15 @@ export function ParameterFields({ idPrefix, parameters, register, errors }: Para
                     placeholder={param.placeholder}
                     aria-invalid={errorText ? true : undefined}
                     {...register(param.key)}
+                  />
+                ) : param.type === 'version' && capabilityKey ? (
+                  <VersionField
+                    fieldId={fieldId}
+                    nodeId={nodeId}
+                    capabilityKey={capabilityKey}
+                    className={inputClass}
+                    register={register}
+                    registerKey={param.key}
                   />
                 ) : (
                   <input

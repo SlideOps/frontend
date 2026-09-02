@@ -122,7 +122,7 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
     return (
       <div className="flex flex-col gap-2">
         <Text variant="caption" tone="secondary">
-          {completedHint(capability.key, state.last_completed_at ?? '')}
+          {completedHint(capability.key, state.last_completed_at ?? '', state.version)}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}>

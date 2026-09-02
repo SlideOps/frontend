@@ -133,3 +133,28 @@ describe('CapabilityDetail: Service scoped database credentials', () => {
     expect(await screen.findByText('One more step for a credential')).toBeInTheDocument();
   });
 });
+
+describe('CapabilityDetail: installed version', () => {
+  it('shows the version the completing Operation actually ran with', async () => {
+    getCapability.mockResolvedValue(capability());
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({ 'install-postgresql': done({ version: '16' }) });
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1');
+
+    expect(await screen.findByText(/version 16/)).toBeInTheDocument();
+  });
+
+  it('names no version for a Capability installed before version selection existed', async () => {
+    getCapability.mockResolvedValue(capability());
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({ 'install-postgresql': done() });
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1');
+
+    await screen.findByText(/Already installed/);
+    expect(screen.queryByText(/version/)).not.toBeInTheDocument();
+  });
+});

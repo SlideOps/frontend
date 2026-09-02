@@ -13,7 +13,7 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Container, GitBranch, Lock, Search } from '@slideops/icons';
+import { ArrowRight, Boxes, Container, Database, GitBranch, Lock, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
@@ -32,6 +32,7 @@ import {
   type ServiceFormValues,
 } from '../service-schema';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { ServiceDeployCapabilities } from './ServiceDeployCapabilities';
 
 interface DeployData {
   projects: Project[];
@@ -48,14 +49,25 @@ interface DeployData {
   reposError: ApiError | null;
 }
 
-async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
-  const [projects, nodes, github] = await Promise.all([
-    listProjects(signal),
-    listNodes(signal),
-    // GitHub is optional here, so a failure or an unconfigured platform must not
-    // block the deploy form; fall back to an unconnected status.
-    getGitHubStatus(signal).catch(() => ({ configured: false, connected: false }) as GitHubStatus),
-  ]);
+/**
+ * Loads what the chosen path needs. GitHub is only ever relevant to the
+ * Software path, so it stays unfetched until that path is actually chosen --
+ * the Capabilities path has nothing to do with the GitHub integration and
+ * must never touch it, not even as an unused prefetch.
+ */
+async function loadDeployData(
+  deployType: 'software' | 'capabilities' | null,
+  signal: AbortSignal,
+): Promise<DeployData> {
+  const [projects, nodes] = await Promise.all([listProjects(signal), listNodes(signal)]);
+  if (deployType !== 'software') {
+    return { projects, nodes, github: { configured: false, connected: false }, repos: [], reposError: null };
+  }
+  // GitHub is optional here, so a failure or an unconfigured platform must not
+  // block the deploy form; fall back to an unconnected status.
+  const github = await getGitHubStatus(signal).catch(
+    () => ({ configured: false, connected: false }) as GitHubStatus,
+  );
   if (!github.connected) {
     return { projects, nodes, github, repos: [], reposError: null };
   }
@@ -550,13 +562,61 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
 }
 
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */
+/**
+ * The choice between a Software deploy (the existing GitHub/image driven
+ * form, unchanged below) and a Capabilities deploy (several infrastructure
+ * Capabilities put in place together as one Service). Shown first so an
+ * Operator picks the shape of what they are deploying before filling in
+ * anything specific to it.
+ */
+function DeployTypeChooser({ onChoose }: { onChoose: (type: 'software' | 'capabilities') => void }) {
+  return (
+    <div className="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+      <Card className="flex flex-col gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-subtle text-brand">
+          <Container width={18} height={18} aria-hidden />
+        </span>
+        <Text variant="h4">Software</Text>
+        <Text variant="body-sm" tone="secondary">
+          Deploy an application, API, frontend, or worker from a repository or an
+          image.
+        </Text>
+        <Button className="self-start" onClick={() => onChoose('software')}>
+          Continue
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      </Card>
+      <Card className="flex flex-col gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-subtle text-brand">
+          <Boxes width={18} height={18} aria-hidden />
+        </span>
+        <Text variant="h4">Capabilities</Text>
+        <Text variant="body-sm" tone="secondary">
+          Add infrastructure your Project depends on -- PostgreSQL, Redis, and more
+          -- deployed together as one Service.
+        </Text>
+        <Button className="self-start" onClick={() => onChoose('capabilities')}>
+          Continue
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
 export function ServiceDeploy() {
   const navigate = useNavigate();
   const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   // Deploying from inside a Project preselects it here via ?project=.
   const initialProjectId = searchParams.get('project') ?? undefined;
-  const { state } = useAsyncData((signal) => loadDeployData(signal), []);
+  // ?type= lets a link jump straight past the chooser (used by the "Add a
+  // Capability" flow from an existing Capability Service, for example).
+  const initialType = searchParams.get('type');
+  const [deployType, setDeployType] = useState<'software' | 'capabilities' | null>(
+    initialType === 'software' || initialType === 'capabilities' ? initialType : null,
+  );
+  const { state } = useAsyncData((signal) => loadDeployData(deployType, signal), [deployType]);
 
   if (!canWrite) {
     return (
@@ -582,7 +642,10 @@ export function ServiceDeploy() {
 
       {state.status === 'loading' ? <Loading label="Preparing the deploy form" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
-      {state.status === 'ready' ? (
+      {state.status === 'ready' && !deployType ? (
+        <DeployTypeChooser onChoose={setDeployType} />
+      ) : null}
+      {state.status === 'ready' && deployType === 'software' ? (
         state.data.projects.length === 0 || state.data.nodes.length === 0 ? (
           <Card className="max-w-2xl">
             <div className="flex items-start gap-3">
@@ -609,6 +672,35 @@ export function ServiceDeploy() {
           </Card>
         ) : (
           <DeployForm data={state.data} initialProjectId={initialProjectId} />
+        )
+      ) : null}
+      {state.status === 'ready' && deployType === 'capabilities' ? (
+        state.data.nodes.length === 0 ? (
+          <Card className="max-w-2xl">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+                <Database width={18} height={18} aria-hidden />
+              </span>
+              <div>
+                <Text variant="h4">A Node comes first</Text>
+                <Text variant="body-sm" tone="secondary" className="mt-1">
+                  A Capability Service runs on a Node. Connect one before deploying.
+                </Text>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button onClick={() => navigate('/app/nodes/new')}>Connect a Node</Button>
+                  <Button variant="ghost" onClick={() => navigate('/app/services')}>
+                    Back to Services
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <ServiceDeployCapabilities
+            projects={state.data.projects}
+            nodes={state.data.nodes}
+            initialProjectId={initialProjectId}
+          />
         )
       ) : null}
     </OperatorShell>

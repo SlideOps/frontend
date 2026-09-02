@@ -29,6 +29,13 @@ export interface CapabilityState {
   /** When that Operation completed, as an RFC 3339 timestamp. */
   last_completed_at?: string;
   /**
+   * The version the completing Operation actually ran with, when it recorded
+   * one. Absent for a Capability with no version selection, and for one
+   * installed before version selection existed: an Operation from before this
+   * feature never stored a version, and none is invented for it here.
+   */
+  version?: string;
+  /**
    * Why a `detected` state was reported, in plain language, for example
    * "Docker is already installed on this server and is running".
    */
@@ -61,6 +68,37 @@ export function getCapabilityStates(
     `/nodes/${encodeURIComponent(nodeId)}/capability-states`,
     { query: { project_id: projectId }, signal },
   ).then((r) => r.states ?? {});
+}
+
+/**
+ * The versions a Node's own currently configured package sources actually
+ * offer for a Capability, read live. `supported` is false for a Capability
+ * with no version discovery at all, in which case a version selector should
+ * not be shown; true with an empty `versions` means this Node's sources
+ * genuinely offer none right now, which is itself worth showing rather than
+ * a selector with nothing real in it.
+ */
+export interface AvailableVersions {
+  supported: boolean;
+  versions: string[];
+  latest?: string;
+}
+
+/**
+ * Read the real versions a Node can actually install for a Capability right
+ * now, live from the Node's own package sources, never a hardcoded or
+ * assumed list. The session cookie authorizes it, like every other secured
+ * call.
+ */
+export function getAvailableVersions(
+  nodeId: string,
+  capabilityKey: string,
+  signal?: AbortSignal,
+): Promise<AvailableVersions> {
+  return apiRequest<{ available_versions: AvailableVersions }>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/versions`,
+    { signal },
+  ).then((r) => r.available_versions ?? { supported: false, versions: [] });
 }
 
 /*
