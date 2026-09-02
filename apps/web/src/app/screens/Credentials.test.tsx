@@ -181,8 +181,11 @@ describe('Credentials: Node connections', () => {
 
     show();
 
+    // The row itself, in the list.
     expect(await screen.findByText('web-1')).toBeInTheDocument();
-    expect(screen.getByText('ubuntu')).toBeInTheDocument();
+    // Selecting it opens the full detail, including the username.
+    await userEvent.click(screen.getByText('web-1'));
+    expect(await screen.findByText('ubuntu')).toBeInTheDocument();
   });
 
   it('reveals the stored secret only once asked, fetched lazily', async () => {
@@ -192,7 +195,7 @@ describe('Credentials: Node connections', () => {
     revealNodeCredential.mockResolvedValue({ auth_kind: 'password', secret: 'super-secret-password' });
 
     show();
-    await screen.findByText('db-server');
+    await userEvent.click(await screen.findByText('db-server'));
     expect(revealNodeCredential).not.toHaveBeenCalled();
 
     const operator = userEvent.setup();
@@ -227,6 +230,7 @@ describe('Credentials: bare installs with no secret', () => {
     show();
 
     expect(await screen.findByText('Install redis')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Install redis'));
     // CredentialsCard resolves the family's default port even with nothing
     // in the parameters naming one.
     expect(await screen.findByText('6379')).toBeInTheDocument();
@@ -269,7 +273,7 @@ describe('Credentials: capability actions', () => {
     listProjects.mockResolvedValue([]);
 
     show();
-    await screen.findByText('Manage postgresql');
+    await userEvent.click(await screen.findByText('Manage postgresql'));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
     await waitFor(() =>
@@ -293,6 +297,7 @@ describe('Credentials: capability actions', () => {
     listProjects.mockResolvedValue([]);
 
     show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
     await userEvent.click(await screen.findByRole('button', { name: 'Manage' }));
 
     expect(navigateMock).toHaveBeenCalledWith(
@@ -306,7 +311,7 @@ describe('Credentials: capability actions', () => {
     listProjects.mockResolvedValue([]);
 
     show();
-    await screen.findByText('Manage postgresql');
+    await userEvent.click(await screen.findByText('Manage postgresql'));
 
     // Nothing is removed by clicking Delete alone.
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -332,6 +337,7 @@ describe('Credentials: capability actions', () => {
     listProjects.mockResolvedValue([]);
 
     show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     await userEvent.click(screen.getByRole('checkbox', { name: /Also delete its data/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Start removal' }));
@@ -369,7 +375,7 @@ describe('Credentials: connect', () => {
     ]);
 
     show();
-    await screen.findByText('Manage postgresql');
+    await userEvent.click(await screen.findByText('Manage postgresql'));
 
     const picker = await screen.findByLabelText('Connect to a Service');
     expect(within(picker).getByRole('option', { name: 'api' })).toBeInTheDocument();
@@ -384,7 +390,7 @@ describe('Credentials: connect', () => {
     listServices.mockResolvedValue([service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' })]);
 
     show();
-    await screen.findByText('Manage postgresql');
+    await userEvent.click(await screen.findByText('Manage postgresql'));
 
     const picker = await screen.findByLabelText('Connect to a Service');
     await userEvent.selectOptions(picker, 'svc-same');
@@ -418,8 +424,80 @@ describe('Credentials: connect', () => {
     ]);
 
     show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
 
     expect(await screen.findByText('Used by: api')).toBeInTheDocument();
     expect(getCapabilityConnections).toHaveBeenCalledWith('n-1', 'install-postgresql', expect.anything());
+  });
+});
+
+/*
+ * The master-detail redesign: a list of every credential, a detail pane for
+ * whichever one is selected, and a search box that narrows the list without
+ * ever hiding itself, so a query that matches nothing is still easy to undo.
+ */
+describe('Credentials: master-detail list and search', () => {
+  it('shows no detail content until a credential is selected', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    expect(screen.getByText('Select a credential from the list to view it.')).toBeInTheDocument();
+    // The detail's own action row must not exist yet, only the row in the list.
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+  });
+
+  it('shows one credential at a time, switching cleanly between them', async () => {
+    listOperations.mockResolvedValue([
+      op({ id: 'op-a', node_id: 'n-1', capability_key: 'manage-postgresql' }),
+      op({ id: 'op-b', node_id: 'n-1', capability_key: 'manage-redis' }),
+    ]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
+    expect(await screen.findByRole('button', { name: 'Manage' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Manage redis'));
+    // Selecting the other credential swaps the detail; Postgres's own actions
+    // are gone, not stacked underneath Redis's.
+    expect(await screen.findByRole('button', { name: 'Manage' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Manage' })).toHaveLength(1);
+  });
+
+  it('narrows the list by search without hiding the search box itself', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node({ name: 'web-1' })]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    const search = screen.getByLabelText('Search credentials');
+    await userEvent.type(search, 'redis');
+
+    expect(await screen.findByText(/Nothing matches/)).toBeInTheDocument();
+    // The box that got them here is still visible and still editable.
+    expect(screen.getByLabelText('Search credentials')).toHaveValue('redis');
+    expect(screen.queryByText('Manage postgresql')).not.toBeInTheDocument();
+    expect(screen.queryByText('web-1')).not.toBeInTheDocument();
+  });
+
+  it('matches a Node by its own row when searched by name', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node({ id: 'n-2', name: 'cache-server', address: '10.0.0.9' })]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await screen.findByText('cache-server');
+
+    await userEvent.type(screen.getByLabelText('Search credentials'), 'cache');
+
+    expect(screen.getByText('cache-server')).toBeInTheDocument();
+    expect(screen.queryByText('Manage postgresql')).not.toBeInTheDocument();
   });
 });

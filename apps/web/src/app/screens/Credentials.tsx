@@ -18,16 +18,29 @@ import {
   type Service,
   type ServiceConnection,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { KeyRound, Server, Waypoints } from '@slideops/icons';
+import { Button, Text, cn } from '@slideops/design-system';
+import { ArrowLeft, KeyRound, Search, Server, Waypoints, capabilityIcon } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useMemo, useState } from 'react';
+import { type ComponentType, type ReactNode, type SVGProps, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { RevealValue } from '../components/RevealValue';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+/*
+ * Credentials, as a classic master-detail app: a searchable list of every
+ * Server and every credential a Capability created, and a detail pane beside
+ * it (below it, on a narrow screen) for whichever one is selected. Nothing
+ * about what this page shows or does changed in this pass, only how it is
+ * found and read: a page that used to lay out every credential's full card,
+ * one after another, down a long scroll, now shows a scannable list first and
+ * the full detail on demand, the way a password manager or a mail client
+ * does.
+ */
+
+type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 /**
  * The literal a secret parameter carries in an Operation's `parameters`. A
@@ -108,6 +121,18 @@ function shortId(id: string): string {
   return id.replace(/[^A-Za-z0-9]+/g, '').slice(0, 8) || 'credential';
 }
 
+/** A row's search text is not what it happens to render, so a match still
+ *  works if the visible strings are later reworded. */
+function matchesQuery(haystack: (string | null | undefined)[], query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return true;
+  }
+  return haystack
+    .filter((part): part is string => Boolean(part))
+    .some((part) => part.toLowerCase().includes(needle));
+}
+
 interface CredentialContext {
   operation: Operation;
   title: string;
@@ -175,7 +200,6 @@ function downloadText(fileName: string, text: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** A labelled wrapper naming what a credential is for, above its reveal card. */
 /**
  * Manage, Start, Stop, Restart, and Delete for a database engine's own
  * credential card -- reaching the running thing the credential is for, not
@@ -240,7 +264,7 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+    <div className="flex flex-col gap-2 border-t border-border pt-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="ghost"
@@ -334,51 +358,6 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   );
 }
 
-function CredentialSection({
-  context,
-  services,
-  onDownload,
-  downloading,
-}: {
-  context: CredentialContext;
-  services: Service[];
-  onDownload: () => void;
-  downloading: boolean;
-}) {
-  const meta = [context.nodeName, context.projectName].filter(Boolean).join(' / ');
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Text variant="body" className="font-medium text-ink">
-            {context.title}
-          </Text>
-          <Text variant="caption" tone="secondary" className="mt-0.5">
-            {meta ? `${meta}` : 'No Node recorded'}
-            {context.completedAt ? ` · ${context.completedAt}` : ''}
-          </Text>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onDownload}
-          disabled={downloading}
-          aria-busy={downloading || undefined}
-        >
-          {downloading ? 'Preparing' : 'Download'}
-        </Button>
-      </div>
-      <CredentialsCard
-        operation={context.operation}
-        host={context.host ?? undefined}
-        dockerBridgeAddress={context.dockerBridgeAddress ?? undefined}
-      />
-      <CapabilityActionsRow context={context} />
-      <ConnectSection context={context} services={services} />
-    </section>
-  );
-}
-
 /**
  * Wire this Capability's credentials straight into a Service's environment,
  * one click -- the "Connect" side of the Connect feature. Also shows "Used
@@ -449,7 +428,7 @@ function ConnectSection({ context, services }: { context: CredentialContext; ser
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+    <div className="flex flex-col gap-2 border-t border-border pt-4">
       <div className="flex items-center gap-1.5">
         <Waypoints width={14} height={14} className="text-ink-muted" aria-hidden />
         <Text variant="caption" tone="secondary">
@@ -497,6 +476,50 @@ function ConnectSection({ context, services }: { context: CredentialContext; ser
   );
 }
 
+const selectClass =
+  'h-10 rounded-md border border-border bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+
+/**
+ * The header every detail pane opens with: what is selected, where it lives,
+ * a primary action on the right, and, only on a narrow screen where the list
+ * and the detail never share the screen, a way back to it.
+ */
+function DetailHeader({
+  title,
+  meta,
+  onBack,
+  action,
+}: {
+  title: string;
+  meta?: string | null;
+  onBack: () => void;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-2 flex items-center gap-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:hidden"
+        >
+          <ArrowLeft width={14} height={14} aria-hidden />
+          All credentials
+        </button>
+        <Text variant="h4" className="truncate">
+          {title}
+        </Text>
+        {meta ? (
+          <Text variant="caption" tone="secondary" className="mt-0.5 block">
+            {meta}
+          </Text>
+        ) : null}
+      </div>
+      {action}
+    </div>
+  );
+}
+
 /**
  * One Node's own SSH connection credential: the password or private key the
  * Operator gave SlideOps to reach it, revealed on demand. This is the
@@ -506,7 +529,15 @@ function ConnectSection({ context, services }: { context: CredentialContext; ser
  * before even though it is exactly the kind of thing this page exists to
  * hold.
  */
-function NodeConnectionSection({ node, projectName }: { node: Node; projectName: string | null }) {
+function NodeDetailPanel({
+  node,
+  projectName,
+  onBack,
+}: {
+  node: Node;
+  projectName: string | null;
+  onBack: () => void;
+}) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<Error | null>(null);
   const meta = [node.address, projectName].filter(Boolean).join(' / ');
@@ -536,72 +567,170 @@ function NodeConnectionSection({ node, projectName }: { node: Node; projectName:
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Text variant="body" className="font-medium text-ink">
-            {node.name}
-          </Text>
-          <Text variant="caption" tone="secondary" className="mt-0.5">
-            {meta || 'No Project recorded'}
-          </Text>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void download()}
-          disabled={downloading}
-          aria-busy={downloading || undefined}
-        >
-          {downloading ? 'Preparing' : 'Download'}
-        </Button>
-      </div>
+    <div className="flex flex-col gap-4">
+      <DetailHeader
+        title={node.name}
+        meta={meta || 'No Project recorded'}
+        onBack={onBack}
+        action={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void download()}
+            disabled={downloading}
+            aria-busy={downloading || undefined}
+          >
+            {downloading ? 'Preparing' : 'Download'}
+          </Button>
+        }
+      />
       {downloadError ? (
         <p role="alert" className="text-sm text-danger">
           {downloadError.message}
         </p>
       ) : null}
-      <Card>
-        <div className="mb-2 flex items-center gap-2">
-          <Server width={18} height={18} className="text-brand" aria-hidden />
-          <Text variant="h4">Server login</Text>
+      <div className="flex items-center gap-2">
+        <Server width={18} height={18} className="text-brand" aria-hidden />
+        <Text variant="h4">Server login</Text>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        The credential SlideOps itself uses to sign in to this Node over SSH.
+      </Text>
+      <dl className="flex flex-col divide-y divide-border rounded-md border border-border px-4">
+        <div className="grid gap-1 py-3 first:pt-3 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
+          <dt className="text-xs font-medium text-ink-muted">Host</dt>
+          <dd className="min-w-0">
+            <RevealValue value={`${node.address}:${node.port}`} label="host" sensitive={false} />
+          </dd>
         </div>
-        <Text variant="body-sm" tone="secondary" className="mb-4">
-          The credential SlideOps itself uses to sign in to this Node over SSH.
-        </Text>
-        <dl className="flex flex-col divide-y divide-border">
-          <div className="grid gap-1 py-3 first:pt-0 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
-            <dt className="text-xs font-medium text-ink-muted">Host</dt>
-            <dd className="min-w-0">
-              <RevealValue value={`${node.address}:${node.port}`} label="host" sensitive={false} />
-            </dd>
-          </div>
-          <div className="grid gap-1 py-3 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
-            <dt className="text-xs font-medium text-ink-muted">Username</dt>
-            <dd className="min-w-0">
-              <RevealValue value={node.ssh_username} label="username" sensitive={false} />
-            </dd>
-          </div>
-          <div className="grid gap-1 py-3 last:pb-0 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
-            <dt className="text-xs font-medium text-ink-muted">
-              {node.auth_kind === 'password' ? 'Password' : 'Private key'}
-            </dt>
-            <dd className="min-w-0">
-              <RevealValue
-                label={node.auth_kind === 'password' ? 'password' : 'private key'}
-                sensitive
-                onReveal={() => revealNodeCredential(node.id).then((c: NodeCredential) => c.secret)}
-              />
-            </dd>
-          </div>
-        </dl>
-      </Card>
-    </section>
+        <div className="grid gap-1 py-3 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
+          <dt className="text-xs font-medium text-ink-muted">Username</dt>
+          <dd className="min-w-0">
+            <RevealValue value={node.ssh_username} label="username" sensitive={false} />
+          </dd>
+        </div>
+        <div className="grid gap-1 py-3 last:pb-3 sm:grid-cols-[8rem_1fr] sm:items-center sm:gap-3">
+          <dt className="text-xs font-medium text-ink-muted">
+            {node.auth_kind === 'password' ? 'Password' : 'Private key'}
+          </dt>
+          <dd className="min-w-0">
+            <RevealValue
+              label={node.auth_kind === 'password' ? 'password' : 'private key'}
+              sensitive
+              onReveal={() => revealNodeCredential(node.id).then((c: NodeCredential) => c.secret)}
+            />
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
-const selectClass =
-  'h-10 rounded-md border border-border bg-surface px-3 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
+/** A database Capability's full detail: its credentials, the engine it
+ *  controls, and the Connect surface -- everything the equivalent card used
+ *  to show at once, now the content of the selected row. */
+function CapabilityDetailPanel({
+  context,
+  services,
+  onBack,
+  onDownload,
+  downloading,
+}: {
+  context: CredentialContext;
+  services: Service[];
+  onBack: () => void;
+  onDownload: () => void;
+  downloading: boolean;
+}) {
+  const meta = [context.nodeName, context.projectName].filter(Boolean).join(' / ');
+  return (
+    <div className="flex flex-col gap-4">
+      <DetailHeader
+        title={context.title}
+        meta={`${meta || 'No Node recorded'}${context.completedAt ? ` · ${context.completedAt}` : ''}`}
+        onBack={onBack}
+        action={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onDownload}
+            disabled={downloading}
+            aria-busy={downloading || undefined}
+          >
+            {downloading ? 'Preparing' : 'Download'}
+          </Button>
+        }
+      />
+      <CredentialsCard
+        operation={context.operation}
+        host={context.host ?? undefined}
+        dockerBridgeAddress={context.dockerBridgeAddress ?? undefined}
+      />
+      <CapabilityActionsRow context={context} />
+      <ConnectSection context={context} services={services} />
+    </div>
+  );
+}
+
+/** One row in the list pane: an icon, a title, an optional subtitle, and a
+ *  selected state, matching the classic list-then-detail pattern of a
+ *  password manager or a mail client. */
+function ListRow({
+  icon: Icon,
+  title,
+  subtitle,
+  selected,
+  onClick,
+}: {
+  icon: IconComponent;
+  title: string;
+  subtitle?: string | null;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={selected ? 'true' : undefined}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors duration-fast ease-standard',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+        selected ? 'bg-brand-subtle' : 'hover:bg-subtle',
+      )}
+    >
+      <span
+        className={cn(
+          'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md',
+          selected ? 'bg-surface text-brand' : 'bg-subtle text-ink-muted',
+        )}
+      >
+        <Icon width={16} height={16} aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <Text as="span" variant="body-sm" className="block truncate font-medium text-ink">
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text as="span" variant="caption" tone="secondary" className="block truncate">
+            {subtitle}
+          </Text>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+/** The icon for a database Capability's own row: its engine's brand mark when
+ *  the key names one of the five known engines, a plain key otherwise. */
+function capabilityRowIcon(capabilityKey: string): IconComponent {
+  return capabilityIcon({ key: capabilityKey, category: 'security' });
+}
+
+/** A selected row, addressed by which list it came from and its own id, so a
+ *  Node and a Capability credential can never collide even if their ids ever
+ *  happened to match. */
+type SelectedRow = { kind: 'node'; id: string } | { kind: 'capability'; id: string };
 
 /**
  * Credentials: every secret SlideOps created for the Operator while running a
@@ -610,6 +739,11 @@ const selectClass =
  * (database passwords, service secrets, connection details), not SSH private
  * keys, which SlideOps never holds because create-app-user takes a public key
  * the Operator provides.
+ *
+ * Presented as a classic master-detail app: a searchable list on the left (or
+ * on top, on a narrow screen), the full detail for whichever one is selected
+ * beside it. Nothing about what is shown or what it does changed from the
+ * card-per-credential layout this replaces, only how it is found and read.
  */
 export function Credentials() {
   const { state } = useAsyncData(
@@ -629,6 +763,8 @@ export function Credentials() {
   );
 
   const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<SelectedRow | null>(null);
   // Which credential is being prepared for download; 'all' covers the whole set.
   const [downloading, setDownloading] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<Error | null>(null);
@@ -742,7 +878,11 @@ export function Credentials() {
     });
   }, [data]);
 
-  const visible = useMemo(() => {
+  // Filtered by Project only, independent of the search box: this is what
+  // decides whether the Project filter has anything at all to show, so
+  // switching to an empty search never has to fight with switching to an
+  // empty Project for which empty state wins.
+  const byProject = useMemo(() => {
     if (projectFilter === 'all') {
       return contexts;
     }
@@ -751,6 +891,14 @@ export function Credentials() {
     }
     return contexts.filter((context) => context.projectName === projectFilter);
   }, [contexts, projectFilter]);
+
+  const visible = useMemo(
+    () =>
+      byProject.filter((context) =>
+        matchesQuery([context.title, context.nodeName, context.projectName], query),
+      ),
+    [byProject, query],
+  );
 
   // Every Node has its own SSH connection credential regardless of what, if
   // anything, Operations have created on it, so this is built straight from
@@ -766,7 +914,7 @@ export function Credentials() {
       .sort((a, b) => a.node.name.localeCompare(b.node.name));
   }, [data]);
 
-  const visibleNodes = useMemo(() => {
+  const nodesByProject = useMemo(() => {
     if (projectFilter === 'all') {
       return nodeContexts;
     }
@@ -775,6 +923,14 @@ export function Credentials() {
     }
     return nodeContexts.filter((entry) => entry.projectName === projectFilter);
   }, [nodeContexts, projectFilter]);
+
+  const visibleNodes = useMemo(
+    () =>
+      nodesByProject.filter((entry) =>
+        matchesQuery([entry.node.name, entry.node.address, entry.projectName], query),
+      ),
+    [nodesByProject, query],
+  );
 
   const usedProjectNames = useMemo(() => {
     const names = new Set<string>();
@@ -833,6 +989,14 @@ export function Credentials() {
     }
   }
 
+  const selectedNode =
+    selected?.kind === 'node' ? (visibleNodes.find((entry) => entry.node.id === selected.id) ?? null) : null;
+  const selectedCapability =
+    selected?.kind === 'capability'
+      ? (visible.find((context) => context.operation.id === selected.id) ?? null)
+      : null;
+  const hasSelection = Boolean(selectedNode || selectedCapability);
+
   return (
     <OperatorShell active="credentials">
       <PageHeader
@@ -864,7 +1028,7 @@ export function Credentials() {
             description="Connect a Node, or have a Capability create a credential for you, such as a database password, and it appears here so you can reveal it, copy it, and download it to use in another tool."
           />
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {downloadError ? (
               <div
                 role="alert"
@@ -875,12 +1039,15 @@ export function Credentials() {
             ) : null}
 
             {usedProjectNames.length > 0 || hasUnassigned ? (
-              <label className="flex items-center gap-2 border-b border-border pb-4 text-sm text-ink-muted">
+              <label className="flex items-center gap-2 text-sm text-ink-muted">
                 <span>Project</span>
                 <select
                   className={selectClass}
                   value={projectFilter}
-                  onChange={(event) => setProjectFilter(event.target.value)}
+                  onChange={(event) => {
+                    setProjectFilter(event.target.value);
+                    setSelected(null);
+                  }}
                   aria-label="Filter credentials by Project"
                 >
                   <option value="all">All Projects</option>
@@ -894,50 +1061,135 @@ export function Credentials() {
               </label>
             ) : null}
 
-            {visible.length === 0 && visibleNodes.length === 0 ? (
+            {byProject.length === 0 && nodesByProject.length === 0 ? (
               <EmptyState
                 icon={KeyRound}
                 title="No credentials in this Project"
                 description="No stored credentials match this filter. Choose All Projects to see every credential in your workspace."
               />
             ) : (
-              <>
-                {visibleNodes.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    <Text variant="caption" tone="secondary">
-                      Servers
-                    </Text>
-                    <div className="flex flex-col gap-8">
-                      {visibleNodes.map((entry) => (
-                        <NodeConnectionSection
-                          key={entry.node.id}
-                          node={entry.node}
-                          projectName={entry.projectName}
-                        />
-                      ))}
+              <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface lg:h-[70vh] lg:flex-row">
+                <div
+                  className={cn(
+                    'flex-col border-border lg:flex lg:w-80 lg:shrink-0 lg:border-r lg:overflow-y-auto',
+                    hasSelection ? 'hidden lg:flex' : 'flex',
+                  )}
+                >
+                  <div className="border-b border-border p-3">
+                    <div className="relative">
+                      <Search
+                        width={15}
+                        height={15}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                        aria-hidden
+                      />
+                      <label htmlFor="credentials-search" className="sr-only">
+                        Search credentials
+                      </label>
+                      <input
+                        id="credentials-search"
+                        type="text"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search credentials"
+                        className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      />
                     </div>
                   </div>
-                ) : null}
 
-                {visible.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    <Text variant="caption" tone="secondary">
-                      Capabilities
-                    </Text>
-                    <div className="flex flex-col gap-8">
-                      {visible.map((context) => (
-                        <CredentialSection
-                          key={context.operation.id}
-                          context={context}
-                          services={data.services}
-                          onDownload={() => void downloadOne(context)}
-                          downloading={downloading === context.operation.id}
-                        />
-                      ))}
+                  {visible.length === 0 && visibleNodes.length === 0 ? (
+                    <div className="flex-1 px-4 py-8 text-center">
+                      <Text variant="body-sm" tone="secondary">
+                        Nothing matches &ldquo;{query}&rdquo;.
+                      </Text>
                     </div>
-                  </div>
-                ) : null}
-              </>
+                  ) : (
+                    <div className="flex flex-1 flex-col gap-4 p-3">
+                      {visibleNodes.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          <Text
+                            variant="caption"
+                            tone="secondary"
+                            className="px-3 pb-1 font-medium uppercase tracking-wide"
+                          >
+                            Servers
+                          </Text>
+                          {visibleNodes.map((entry) => (
+                            <ListRow
+                              key={entry.node.id}
+                              icon={Server}
+                              title={entry.node.name}
+                              subtitle={[entry.node.address, entry.projectName]
+                                .filter(Boolean)
+                                .join(' · ')}
+                              selected={selected?.kind === 'node' && selected.id === entry.node.id}
+                              onClick={() => setSelected({ kind: 'node', id: entry.node.id })}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {visible.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          <Text
+                            variant="caption"
+                            tone="secondary"
+                            className="px-3 pb-1 font-medium uppercase tracking-wide"
+                          >
+                            Databases
+                          </Text>
+                          {visible.map((context) => (
+                            <ListRow
+                              key={context.operation.id}
+                              icon={capabilityRowIcon(context.operation.capability_key)}
+                              title={context.title}
+                              subtitle={[context.nodeName, context.projectName]
+                                .filter(Boolean)
+                                .join(' · ')}
+                              selected={
+                                selected?.kind === 'capability' && selected.id === context.operation.id
+                              }
+                              onClick={() =>
+                                setSelected({ kind: 'capability', id: context.operation.id })
+                              }
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={cn(
+                    'flex-1 p-6 lg:overflow-y-auto',
+                    hasSelection ? 'flex flex-col' : 'hidden lg:flex',
+                  )}
+                >
+                  {selectedNode ? (
+                    <NodeDetailPanel
+                      node={selectedNode.node}
+                      projectName={selectedNode.projectName}
+                      onBack={() => setSelected(null)}
+                    />
+                  ) : selectedCapability ? (
+                    <CapabilityDetailPanel
+                      context={selectedCapability}
+                      services={data.services}
+                      onBack={() => setSelected(null)}
+                      onDownload={() => void downloadOne(selectedCapability)}
+                      downloading={downloading === selectedCapability.operation.id}
+                    />
+                  ) : (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+                      <KeyRound width={28} height={28} className="text-ink-muted" aria-hidden />
+                      <Text variant="body-sm" tone="secondary">
+                        Select a credential from the list to view it.
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )
