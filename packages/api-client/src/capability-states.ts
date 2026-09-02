@@ -101,6 +101,29 @@ export function getAvailableVersions(
   ).then((r) => r.available_versions ?? { supported: false, versions: [] });
 }
 
+/** How to control an installed Capability's own service. */
+export type CapabilityControlAction = 'start' | 'stop' | 'restart';
+
+/**
+ * Start, stop, or restart an already-installed Capability's own service,
+ * live over SSH. Not a planned and approved Operation: nothing about the
+ * Node's desired state changes, only whether it is currently running, the
+ * same reasoning a Service's own Start/Stop/Restart already stays outside
+ * the Operations engine for. Only the database Capabilities with a known
+ * service are controllable this way; anything else rejects with a plain
+ * error rather than guessing at a service to act on.
+ */
+export function controlCapability(
+  nodeId: string,
+  capabilityKey: string,
+  action: CapabilityControlAction,
+): Promise<void> {
+  return apiRequest<void>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/control`,
+    { method: 'POST', body: { action } },
+  );
+}
+
 /*
  * Server readiness: what a secure, usable server has, against what this one
  * already has.

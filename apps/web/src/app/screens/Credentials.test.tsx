@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { renderInApp } from '../../test/render';
 import type { Node, Operation } from '@slideops/api-client';
@@ -25,6 +25,9 @@ const listOperations = vi.fn();
 const listNodes = vi.fn();
 const listProjects = vi.fn();
 const revealNodeCredential = vi.fn();
+const controlCapability = vi.fn();
+const createOperation = vi.fn();
+const navigateMock = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -32,6 +35,13 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listNodes: (...a: unknown[]) => listNodes(...a),
   listProjects: (...a: unknown[]) => listProjects(...a),
   revealNodeCredential: (...a: unknown[]) => revealNodeCredential(...a),
+  controlCapability: (...a: unknown[]) => controlCapability(...a),
+  createOperation: (...a: unknown[]) => createOperation(...a),
+}));
+
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => navigateMock,
 }));
 
 const { Credentials } = await import('./Credentials');
@@ -74,6 +84,12 @@ function show() {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  controlCapability.mockReset().mockResolvedValue(undefined);
+  createOperation.mockReset().mockResolvedValue({ id: 'remove-op-1' });
+  navigateMock.mockReset();
+});
 
 describe('Credentials', () => {
   it('shows only the latest run when the same Capability ran on the same Node more than once', async () => {
@@ -159,5 +175,146 @@ describe('Credentials: Node connections', () => {
 
     expect(await screen.findByText('super-secret-password')).toBeInTheDocument();
     expect(revealNodeCredential).toHaveBeenCalledWith('n-1');
+  });
+});
+
+/*
+ * Redis has no manage step the way Postgres, MySQL, MariaDB, and MongoDB do
+ * (there is no per-app database and account to create), so a bare
+ * install-redis never stores a secret at all. That must not mean it is
+ * invisible: it is a real, reachable database an Operator could easily
+ * forget they left running, which is exactly the credentials page's job to
+ * surface. The same applies to any of the five engines before its first
+ * manage-X run.
+ */
+describe('Credentials: bare installs with no secret', () => {
+  it('shows a bare install of an engine with no manage step, no secret needed', async () => {
+    listOperations.mockResolvedValue([
+      op({
+        id: 'op-redis',
+        capability_key: 'install-redis',
+        parameters: { version: '7.2.4' },
+      }),
+    ]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+
+    expect(await screen.findByText('Install redis')).toBeInTheDocument();
+    // CredentialsCard resolves the family's default port even with nothing
+    // in the parameters naming one.
+    expect(await screen.findByText('6379')).toBeInTheDocument();
+  });
+
+  it('does not shadow a real credential with its own bare install record', async () => {
+    listOperations.mockResolvedValue([
+      op({
+        id: 'op-install',
+        capability_key: 'install-postgresql',
+        parameters: { version: '16' },
+        completed_at: '2026-07-31T00:00:00Z',
+      }),
+      op({
+        id: 'op-manage',
+        capability_key: 'manage-postgresql',
+        parameters: { database: 'app_db', password: '[stored securely]' },
+        completed_at: '2026-07-31T01:00:00Z',
+      }),
+    ]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+
+    expect(await screen.findByText('Manage postgresql')).toBeInTheDocument();
+    expect(screen.queryByText('Install postgresql')).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * Reaching the running thing a credential is for, not only the secret: start,
+ * stop, restart it directly, manage it on its own page, or delete it through
+ * the same planned-and-approved path any other Capability removal takes.
+ */
+describe('Credentials: capability actions', () => {
+  it('starts, stops, and restarts the engine behind a credential', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'start'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await waitFor(() =>
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'stop'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restart' }));
+    await waitFor(() =>
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'restart'),
+    );
+  });
+
+  it('navigates to the install Capability’s own management page', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage' }));
+
+    expect(navigateMock).toHaveBeenCalledWith(
+      expect.stringContaining('/app/capabilities/install-postgresql?node=n-1'),
+    );
+  });
+
+  it('deletes only after confirming, and hands the Operator the real Operation to approve', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    // Nothing is removed by clicking Delete alone.
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    expect(createOperation).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start removal' }));
+
+    await waitFor(() =>
+      expect(createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          node_id: 'n-1',
+          capability_key: 'remove-postgresql',
+          parameters: { drop_data: false },
+        }),
+      ),
+    );
+    expect(navigateMock).toHaveBeenCalledWith('/app/operations/remove-op-1');
+  });
+
+  it('sends drop_data true only when the checkbox was checked', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Also delete its data/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start removal' }));
+
+    await waitFor(() =>
+      expect(createOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ parameters: { drop_data: true } }),
+      ),
+    );
   });
 });

@@ -1,9 +1,13 @@
 import {
+  ApiError,
+  controlCapability,
+  createOperation,
   listNodes,
   listOperations,
   listProjects,
   revealNodeCredential,
   revealOperationSecret,
+  type CapabilityControlAction,
   type Node,
   type NodeCredential,
   type Operation,
@@ -13,6 +17,7 @@ import { Button, Card, Text } from '@slideops/design-system';
 import { KeyRound, Server } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -45,6 +50,30 @@ const ALL_FILE_NAME = 'slideops-credentials.env';
 function hasStoredSecret(operation: Operation): boolean {
   const parameters = operation.parameters ?? {};
   return Object.values(parameters).some((value) => value === SECRET_PLACEHOLDER);
+}
+
+/**
+ * The database engine a Capability key belongs to, or null when it is not
+ * one of the five SlideOps knows how to install, manage, and control. Every
+ * key for one engine (install-X, configure-X, manage-X, remove-X) shares the
+ * same suffix, so this is what lets a bare install and a later manage-X
+ * credential be recognised as the same engine rather than two unrelated
+ * things.
+ */
+const ENGINE_FAMILIES = ['postgresql', 'redis', 'mariadb', 'mysql', 'mongodb'] as const;
+type EngineFamily = (typeof ENGINE_FAMILIES)[number];
+
+function engineFamilyOf(capabilityKey: string): EngineFamily | null {
+  // mariadb checked before mysql: install-mariadb would otherwise never match,
+  // since it contains no "mysql" substring, but checking mysql first would be
+  // fine too -- this order just keeps the two visually paired with their own
+  // install-mariadb / install-mysql keys above.
+  return ENGINE_FAMILIES.find((family) => capabilityKey.includes(family)) ?? null;
+}
+
+/** Whether a Capability key is one of the five engines' own install step. */
+function isEngineInstall(capabilityKey: string): boolean {
+  return capabilityKey.startsWith('install-') && engineFamilyOf(capabilityKey) !== null;
 }
 
 /** A readable Capability name from its key, in Operator language. */
@@ -83,6 +112,7 @@ interface CredentialContext {
   /** The Node's Docker bridge address, from its most recent Discovery. */
   dockerBridgeAddress: string | null;
   projectName: string | null;
+  projectId: string | null;
   completedAt: string | null;
 }
 
@@ -141,6 +171,164 @@ function downloadText(fileName: string, text: string): void {
 }
 
 /** A labelled wrapper naming what a credential is for, above its reveal card. */
+/**
+ * Manage, Start, Stop, Restart, and Delete for a database engine's own
+ * credential card -- reaching the running thing the credential is for, not
+ * only the secret itself. Shown for the five engines SlideOps knows how to
+ * control; absent for anything else, including a Node's own SSH login,
+ * which has no engine to control.
+ *
+ * Start/Stop/Restart act directly, live over SSH, the same way a Service's
+ * own lifecycle actions already do -- there is no separate "pause": a
+ * systemd service has nothing in between running and stopped, so Stop is
+ * what a pause actually is here, and is not duplicated under another name.
+ *
+ * Delete does not tear anything down itself. It creates the real Remove-X
+ * Operation and hands the Operator straight to it, to review the plan and
+ * approve, exactly like starting any other Capability -- deleting a database
+ * is not something this page decides on its own behalf.
+ */
+function CapabilityActionsRow({ context }: { context: CredentialContext }) {
+  const navigate = useNavigate();
+  const family = engineFamilyOf(context.operation.capability_key);
+  const [working, setWorking] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [dropData, setDropData] = useState(false);
+
+  if (!family) {
+    return null;
+  }
+  const installKey = `install-${family}`;
+  const nodeId = context.operation.node_id;
+
+  async function control(action: CapabilityControlAction) {
+    setWorking(action);
+    setError(null);
+    setMessage(null);
+    try {
+      await controlCapability(nodeId, installKey, action);
+      setMessage(action === 'start' ? 'Started.' : action === 'stop' ? 'Stopped.' : 'Restarted.');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : `Could not ${action} it.`);
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function remove() {
+    setWorking('delete');
+    setError(null);
+    try {
+      const operation = await createOperation({
+        node_id: nodeId,
+        project_id: context.projectId ?? undefined,
+        capability_key: `remove-${family}`,
+        parameters: { drop_data: dropData },
+      });
+      navigate(`/app/operations/${operation.id}`);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'This could not be removed.');
+      setWorking(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            navigate(
+              `/app/capabilities/${installKey}?node=${encodeURIComponent(nodeId)}${
+                context.projectId ? `&project=${encodeURIComponent(context.projectId)}` : ''
+              }`,
+            )
+          }
+        >
+          Manage
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={working !== null}
+          onClick={() => void control('start')}
+        >
+          {working === 'start' ? 'Starting' : 'Start'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={working !== null}
+          onClick={() => void control('stop')}
+        >
+          {working === 'stop' ? 'Stopping' : 'Stop'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={working !== null}
+          onClick={() => void control('restart')}
+        >
+          {working === 'restart' ? 'Restarting' : 'Restart'}
+        </Button>
+        {!confirmingDelete ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-danger"
+            disabled={working !== null}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Delete
+          </Button>
+        ) : null}
+      </div>
+      {confirmingDelete ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-subtle px-3 py-2">
+          <label className="flex items-center gap-2 text-xs text-ink-muted">
+            <input
+              type="checkbox"
+              checked={dropData}
+              onChange={(event) => setDropData(event.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            />
+            Also delete its data
+          </label>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={working !== null}
+            onClick={() => void remove()}
+          >
+            {working === 'delete' ? 'Starting removal' : 'Start removal'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={working !== null}
+            onClick={() => setConfirmingDelete(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+      {message ? (
+        <p role="status" className="text-xs text-ink-muted">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function CredentialSection({
   context,
   onDownload,
@@ -178,6 +366,7 @@ function CredentialSection({
         host={context.host ?? undefined}
         dockerBridgeAddress={context.dockerBridgeAddress ?? undefined}
       />
+      <CapabilityActionsRow context={context} />
     </section>
   );
 }
@@ -324,7 +513,18 @@ export function Credentials() {
       // attempt left a sealed value but no usable result, so it must not appear
       // (which is what showed a failed run as a duplicate of the real one).
       .filter((operation) => operation.status === 'completed')
-      .filter(hasStoredSecret)
+      // A run that stored a secret always belongs here. So does a bare
+      // install of one of the five database engines, even with no secret at
+      // all: install-redis has no password parameter of its own (Redis has
+      // no manage step the way the SQL and document engines do, so a
+      // password is only ever set later, optionally, by configure-redis),
+      // and every engine reads the same way before its first manage-X run
+      // creates an actual database. Omitting those left a running, reachable
+      // database Operator-invisible on the one page meant to show every
+      // credential SlideOps holds -- worse than showing a card with no
+      // secret on it, which is exactly what CredentialsCard already renders
+      // correctly once given a host and a recognised Capability family.
+      .filter((operation) => hasStoredSecret(operation) || isEngineInstall(operation.capability_key))
       .map((operation) => {
         const node = nodeById.get(operation.node_id) ?? null;
         const project = node?.project_id ? (projectById.get(node.project_id) ?? null) : null;
@@ -335,6 +535,7 @@ export function Credentials() {
           host: node?.address ?? null,
           dockerBridgeAddress: node?.docker_bridge_address ?? null,
           projectName: project?.name ?? null,
+          projectId: project?.id ?? null,
           completedAt: operation.completed_at
             ? new Date(operation.completed_at).toLocaleString()
             : null,
@@ -360,15 +561,40 @@ export function Credentials() {
     // is what made stored credentials vanish rather than merely stop
     // repeating. The database or username a run created is what actually
     // names the resource; only Operations naming the same one collapse.
-    // Nothing to key on (no database or username parameter at all) means
-    // every run is treated as its own resource, since collapsing distinct
-    // things by mistake loses a real credential, and that is worse than an
-    // occasional duplicate.
+    //
+    // A bare install with no resource and no secret is different again: it
+    // is not a distinct resource each time, it is the same engine reported
+    // again, so it collapses on Node and engine family alone, to the most
+    // recent run -- and is dropped entirely once a richer entry (a real
+    // secret or a named resource) exists for that same engine on that same
+    // Node, so a database that was actually configured is not shadowed by
+    // its own, less informative, bare install record.
+    const richFamilies = new Set<string>();
+    for (const context of sorted) {
+      const parameters = context.operation.parameters ?? {};
+      const resource = parameters.database ?? parameters.username;
+      const family = engineFamilyOf(context.operation.capability_key);
+      if (resource || hasStoredSecret(context.operation)) {
+        if (family) {
+          richFamilies.add(`${context.operation.node_id}:${family}`);
+        }
+      }
+    }
+
     const seen = new Set<string>();
     return sorted.filter((context) => {
       const parameters = context.operation.parameters ?? {};
-      const resource = parameters.database ?? parameters.username ?? context.operation.id;
-      const key = `${context.operation.node_id}:${context.operation.capability_key}:${resource}`;
+      const resource = parameters.database ?? parameters.username;
+      const family = engineFamilyOf(context.operation.capability_key);
+      const isBare = !resource && !hasStoredSecret(context.operation);
+
+      if (isBare && family && richFamilies.has(`${context.operation.node_id}:${family}`)) {
+        return false;
+      }
+
+      const key = isBare
+        ? `${context.operation.node_id}:${family ?? context.operation.capability_key}:__bare__`
+        : `${context.operation.node_id}:${context.operation.capability_key}:${resource ?? context.operation.id}`;
       if (seen.has(key)) {
         return false;
       }

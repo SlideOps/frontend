@@ -309,11 +309,13 @@ export {
 export {
   getCapabilityStates,
   getAvailableVersions,
+  controlCapability,
   getReadiness,
   type CapabilityState,
   type CapabilityStateStatus,
   type CapabilityStateSource,
   type AvailableVersions,
+  type CapabilityControlAction,
   type Readiness,
   type ReadinessMeasure,
   type ReadinessSeverity,
