@@ -145,6 +145,13 @@ export interface QuoteInput {
  * and the total. It changes nothing; it is what the checkout UI shows before the
  * Operator commits to pay. When free_grant is true the promo code activates a
  * tier with no charge at all, and the amount fields are zero.
+ *
+ * annual_discount_applied is true when the automatic first-time discount for
+ * paying a full year (12 months) or more straight through checkout applies to
+ * this quote, with annual_discount_minor naming how much it takes off. It is
+ * a one-time deal, granted once per Operator ever, and never combines with a
+ * promo code: a code supplied at the same time is what wins instead, in which
+ * case this stays false.
  */
 export interface Quote {
   tier: string;
@@ -161,6 +168,8 @@ export interface Quote {
   free_grant: boolean;
   grant_tier?: string;
   free_days?: number;
+  annual_discount_applied: boolean;
+  annual_discount_minor?: number;
 }
 
 /**

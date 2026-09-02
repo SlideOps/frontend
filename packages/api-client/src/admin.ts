@@ -378,6 +378,9 @@ export interface AdminPayment {
   status: 'pending' | 'success' | 'failed';
   promo_code?: string;
   term_months: number;
+  /** How much of this payment's base amount the automatic first-time annual
+   *  discount took off; absent or zero when it did not apply. */
+  annual_discount_minor?: number;
   created_at: string;
 }
 

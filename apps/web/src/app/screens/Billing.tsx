@@ -107,6 +107,23 @@ interface CurrencyDescriptor {
   helper: string;
 }
 
+interface TermOption {
+  months: number;
+  label: string;
+}
+
+/** How many months a checkout pays for at once: the ordinary monthly charge, or
+ *  a full year and above paid straight through in one charge. The exact total
+ *  is always the monthly price multiplied by the months chosen, confirmed by
+ *  the quote below before committing; a first-time year-or-longer choice also
+ *  earns the automatic annual discount, shown on that same quote. */
+const TERM_OPTIONS: TermOption[] = [
+  { months: 1, label: 'Monthly' },
+  { months: 12, label: '1 year' },
+  { months: 24, label: '2 years' },
+  { months: 36, label: '3 years' },
+];
+
 // Dollar acceptance through Paystack is limited on our live account right now,
 // so its checkout runs through our normal Naira conversion instead; the plan
 // price stays in dollars regardless. Flip this back once dollar charges are
@@ -331,17 +348,39 @@ function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
   );
 }
 
-/** The itemized price panel: the plan subtotal, the platform fee, the total, and
- *  the exchange rate when converted to Naira. Shown before the Operator commits
- *  to pay, so the fee and any conversion are never a surprise at checkout. */
+/** The itemized price panel: the plan subtotal, the automatic annual discount
+ *  when it applies, the platform fee, the total, and the exchange rate when
+ *  converted to Naira. Shown before the Operator commits to pay, so the fee,
+ *  any conversion, and any savings are never a surprise at checkout. */
 function PriceQuotePanel({ quote }: { quote: Quote }) {
+  const discount = quote.annual_discount_minor ?? 0;
+  const listPrice = quote.base_amount_minor + discount;
   return (
     <div className="rounded-lg border border-border bg-subtle p-4">
+      {quote.annual_discount_applied && discount > 0 ? (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-success/40 bg-surface px-3 py-2">
+          <Sparkles width={15} height={15} className="mt-0.5 shrink-0 text-success" aria-hidden />
+          <div>
+            <Text variant="body-sm" className="font-medium text-success">
+              You saved {formatMoney(discount, quote.currency)}
+            </Text>
+            <Text variant="caption" tone="secondary" className="mt-0.5 block">
+              Your first-time discount for paying a full year or more straight through checkout.
+              This applies once, the first time; after this it is not offered again.
+            </Text>
+          </div>
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <Text as="span" variant="body-sm" tone="secondary">
-          Subtotal
+          Subtotal{quote.term_months > 1 ? ` (${quote.term_months} months)` : ''}
         </Text>
         <Text as="span" variant="body-sm">
+          {quote.annual_discount_applied && discount > 0 ? (
+            <span className="mr-1.5 text-ink-muted line-through">
+              {formatMoney(listPrice, quote.currency)}
+            </span>
+          ) : null}
           {formatMoney(quote.base_amount_minor, quote.currency)}
         </Text>
       </div>
@@ -380,6 +419,7 @@ export function Billing() {
   const returnStatus = searchParams.get('status');
 
   const [selectedTier, setSelectedTier] = useState<PurchasableTier>('pro');
+  const [termMonths, setTermMonths] = useState<number>(1);
   const [provider, setProvider] = useState<PaymentProvider>('paystack');
   const [currency, setCurrency] = useState<PayCurrency>(currenciesFor('paystack')[0]!.currency);
   const availableCurrencies = currenciesFor(provider);
@@ -413,7 +453,7 @@ export function Billing() {
     }
     let cancelled = false;
     setQuoteError(null);
-    quoteCheckout({ tier: selectedTier, currency })
+    quoteCheckout({ tier: selectedTier, currency, term_months: termMonths })
       .then((result) => {
         if (!cancelled) {
           setQuote(result);
@@ -430,7 +470,7 @@ export function Billing() {
     return () => {
       cancelled = true;
     };
-  }, [configured, admin, selectedTier, currency]);
+  }, [configured, admin, selectedTier, currency, termMonths]);
 
   const dismissReturnNotice = () => {
     const next = new URLSearchParams(searchParams);
@@ -447,7 +487,7 @@ export function Billing() {
     setValidating(true);
     setPromoError(null);
     try {
-      const result = await validatePromo({ code, tier: selectedTier });
+      const result = await validatePromo({ code, tier: selectedTier, term_months: termMonths });
       setPreview(result);
     } catch (error) {
       setPreview(null);
@@ -470,6 +510,7 @@ export function Billing() {
         provider,
         currency,
         promo_code: code || undefined,
+        term_months: termMonths,
       });
       if (result.granted || !result.checkout_url) {
         // A free tier-grant promo activated the tier with no payment; there is no
@@ -619,6 +660,50 @@ export function Billing() {
                 You are subscribing to the {tierLabel[selectedTier]} plan. Choose how you would like
                 to pay.
               </Text>
+
+              <fieldset className="mt-5">
+                <legend className="text-sm font-medium text-ink">Billing cycle</legend>
+                <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                  {TERM_OPTIONS.map((option) => {
+                    const active = termMonths === option.months;
+                    return (
+                      <label
+                        key={option.months}
+                        className={cn(
+                          'flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors duration-fast ease-standard',
+                          'focus-within:ring-2 focus-within:ring-focus',
+                          active ? 'border-brand bg-brand-subtle' : 'border-border hover:bg-subtle',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="billing-cycle"
+                          value={option.months}
+                          checked={active}
+                          onChange={() => {
+                            setTermMonths(option.months);
+                            clearPreview();
+                          }}
+                          className="sr-only"
+                        />
+                        <Text as="span" variant="body-sm" className="font-medium">
+                          {option.label}
+                        </Text>
+                        {option.months >= 12 ? (
+                          <Text as="span" variant="caption" tone="secondary">
+                            {option.months} months at once
+                          </Text>
+                        ) : null}
+                      </label>
+                    );
+                  })}
+                </div>
+                <Text variant="caption" tone="secondary" className="mt-2 block">
+                  Pay for more than one month at once: the price is simply the monthly price times
+                  the months you choose. The first time you pay for a full year or more straight
+                  through checkout, you get a one-time 2% discount, shown below.
+                </Text>
+              </fieldset>
 
               <fieldset className="mt-5">
                 <legend className="text-sm font-medium text-ink">Payment provider</legend>

@@ -98,6 +98,7 @@ export function SubscriberDetail() {
                 <TH className="text-right">Amount</TH>
                 <TH>Term</TH>
                 <TH>Promo</TH>
+                <TH>Annual discount</TH>
                 <TH>Provider reference</TH>
               </THead>
               <TBody>
@@ -117,6 +118,11 @@ export function SubscriberDetail() {
                       {payment.term_months} {payment.term_months === 1 ? 'month' : 'months'}
                     </TD>
                     <TD className="text-ink-muted">{payment.promo_code || ''}</TD>
+                    <TD className="text-ink-muted">
+                      {payment.annual_discount_minor
+                        ? `-${formatAmount(payment.annual_discount_minor, payment.currency)}`
+                        : ''}
+                    </TD>
                     <TD className="font-mono text-xs text-ink-muted">{payment.reference}</TD>
                   </TR>
                 ))}
