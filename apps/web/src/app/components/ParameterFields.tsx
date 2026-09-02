@@ -1,6 +1,7 @@
 import { getAvailableVersions, type CapabilityParameter } from '@slideops/api-client';
 import { CircleHelp } from '@slideops/icons';
 import { Tooltip } from '@slideops/tooltips';
+import { useState } from 'react';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -111,7 +112,96 @@ export interface ParameterFieldsProps {
   capabilityKey?: string;
 }
 
-/** Render the controls for a Capability's parameters from its metadata. */
+/** One parameter's control, shared by both the always-visible and Advanced groups below. */
+function ParameterField({
+  param,
+  fieldId,
+  errorText,
+  nodeId,
+  capabilityKey,
+  register,
+}: {
+  param: CapabilityParameter;
+  fieldId: string;
+  errorText: string | undefined;
+  nodeId: string | undefined;
+  capabilityKey: string | undefined;
+  register: UseFormRegister<Record<string, unknown>>;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {param.type === 'boolean' ? (
+        <label htmlFor={fieldId} className="flex items-center gap-3">
+          <input
+            id={fieldId}
+            type="checkbox"
+            className="h-4 w-4 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            {...register(param.key)}
+          />
+          <span className="text-sm font-medium text-ink">{param.label}</span>
+          <FieldHelp text={param.help} label={param.label} />
+        </label>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <label htmlFor={fieldId} className="text-sm font-medium text-ink">
+              {param.label}
+              {param.required ? null : (
+                <span className="ml-1 text-xs font-normal text-ink-muted">optional</span>
+              )}
+            </label>
+            <FieldHelp text={param.help} label={param.label} />
+          </div>
+          {param.type === 'text' || param.type === 'public_key' ? (
+            <textarea
+              id={fieldId}
+              className={textareaClass}
+              placeholder={param.placeholder}
+              aria-invalid={errorText ? true : undefined}
+              {...register(param.key)}
+            />
+          ) : param.type === 'version' && capabilityKey ? (
+            <VersionField
+              fieldId={fieldId}
+              nodeId={nodeId}
+              capabilityKey={capabilityKey}
+              className={inputClass}
+              register={register}
+              registerKey={param.key}
+            />
+          ) : (
+            <input
+              id={fieldId}
+              type="text"
+              inputMode={param.type === 'number' ? 'numeric' : undefined}
+              className={inputClass}
+              placeholder={param.placeholder}
+              aria-invalid={errorText ? true : undefined}
+              {...register(param.key)}
+            />
+          )}
+        </>
+      )}
+      {errorText ? (
+        <p className="text-sm text-danger" role="alert">
+          {errorText}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Render the controls for a Capability's parameters from its metadata.
+ *
+ * Required parameters and the version field (choosing a version is the point
+ * of Basic vs Advanced elsewhere in the product, so it never hides) always
+ * show. Every other optional parameter -- Redis's max memory or eviction
+ * policy, pgvector, and the like -- sits behind an "Advanced options"
+ * disclosure, collapsed by default, so a first-time Operator sees only what
+ * they must decide. Nothing here changes what an unopened Advanced field
+ * submits as: every default stays exactly what it is today.
+ */
 export function ParameterFields({
   idPrefix,
   parameters,
@@ -120,74 +210,45 @@ export function ParameterFields({
   nodeId,
   capabilityKey,
 }: ParameterFieldsProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const primary = parameters.filter((param) => param.required || param.type === 'version');
+  const advanced = parameters.filter((param) => !param.required && param.type !== 'version');
+
+  const renderField = (param: CapabilityParameter) => {
+    const fieldId = `${idPrefix}-${param.key}`;
+    const message = errors[param.key]?.message;
+    const errorText = typeof message === 'string' ? message : undefined;
+    return (
+      <ParameterField
+        key={param.key}
+        param={param}
+        fieldId={fieldId}
+        errorText={errorText}
+        nodeId={nodeId}
+        capabilityKey={capabilityKey}
+        register={register}
+      />
+    );
+  };
+
   return (
     <>
-      {parameters.map((param) => {
-        const fieldId = `${idPrefix}-${param.key}`;
-        const message = errors[param.key]?.message;
-        const errorText = typeof message === 'string' ? message : undefined;
-        return (
-          <div key={param.key} className="flex flex-col gap-2">
-            {param.type === 'boolean' ? (
-              <label htmlFor={fieldId} className="flex items-center gap-3">
-                <input
-                  id={fieldId}
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                  {...register(param.key)}
-                />
-                <span className="text-sm font-medium text-ink">{param.label}</span>
-                <FieldHelp text={param.help} label={param.label} />
-              </label>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <label htmlFor={fieldId} className="text-sm font-medium text-ink">
-                    {param.label}
-                    {param.required ? null : (
-                      <span className="ml-1 text-xs font-normal text-ink-muted">optional</span>
-                    )}
-                  </label>
-                  <FieldHelp text={param.help} label={param.label} />
-                </div>
-                {param.type === 'text' || param.type === 'public_key' ? (
-                  <textarea
-                    id={fieldId}
-                    className={textareaClass}
-                    placeholder={param.placeholder}
-                    aria-invalid={errorText ? true : undefined}
-                    {...register(param.key)}
-                  />
-                ) : param.type === 'version' && capabilityKey ? (
-                  <VersionField
-                    fieldId={fieldId}
-                    nodeId={nodeId}
-                    capabilityKey={capabilityKey}
-                    className={inputClass}
-                    register={register}
-                    registerKey={param.key}
-                  />
-                ) : (
-                  <input
-                    id={fieldId}
-                    type="text"
-                    inputMode={param.type === 'number' ? 'numeric' : undefined}
-                    className={inputClass}
-                    placeholder={param.placeholder}
-                    aria-invalid={errorText ? true : undefined}
-                    {...register(param.key)}
-                  />
-                )}
-              </>
-            )}
-            {errorText ? (
-              <p className="text-sm text-danger" role="alert">
-                {errorText}
-              </p>
-            ) : null}
+      {primary.map(renderField)}
+      {advanced.length > 0 ? (
+        <div className="flex flex-col gap-4 rounded-md border border-border p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-ink">Advanced options</span>
+            <button
+              type="button"
+              className="text-sm font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              onClick={() => setShowAdvanced((value) => !value)}
+            >
+              {showAdvanced ? 'Hide' : `Show (${advanced.length})`}
+            </button>
           </div>
-        );
-      })}
+          {showAdvanced ? advanced.map(renderField) : null}
+        </div>
+      ) : null}
     </>
   );
 }

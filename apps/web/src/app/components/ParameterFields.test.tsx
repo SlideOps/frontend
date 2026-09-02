@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { vi, describe, expect, it, beforeEach } from 'vitest';
 import type { AvailableVersions, CapabilityParameter } from '@slideops/api-client';
 import { useForm } from 'react-hook-form';
@@ -109,5 +110,53 @@ describe('ParameterFields, a version parameter', () => {
 
     await screen.findByRole('option', { name: /no other version found on this Node/ });
     expect(screen.getByLabelText(/^Version/).tagName).toBe('SELECT');
+  });
+});
+
+function requiredParam(): CapabilityParameter {
+  return {
+    key: 'name',
+    label: 'Name',
+    type: 'string',
+    required: true,
+    help: 'A name for this instance.',
+  };
+}
+
+function optionalParam(): CapabilityParameter {
+  return {
+    key: 'max_memory',
+    label: 'Max memory',
+    type: 'string',
+    required: false,
+    help: 'Redis eviction threshold.',
+  };
+}
+
+describe('ParameterFields, Basic vs Advanced', () => {
+  it('always shows required parameters and the version field, with optional parameters collapsed', async () => {
+    renderInApp(
+      <Harness parameters={[requiredParam(), versionParam(), optionalParam()]} nodeId="node-1" capabilityKey="install-redis" />,
+    );
+
+    expect(screen.getByLabelText(/^Name/)).toBeInTheDocument();
+    await screen.findByLabelText(/^Version/);
+    expect(screen.queryByLabelText(/^Max memory/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show (1)' })).toBeInTheDocument();
+  });
+
+  it('reveals optional parameters once Advanced options is opened', async () => {
+    renderInApp(<Harness parameters={[requiredParam(), optionalParam()]} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Show (1)' }));
+
+    expect(screen.getByLabelText(/^Max memory/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
+  });
+
+  it('renders no Advanced options disclosure when every parameter is required', () => {
+    renderInApp(<Harness parameters={[requiredParam()]} />);
+
+    expect(screen.queryByRole('button', { name: /Show|Hide/ })).not.toBeInTheDocument();
   });
 });

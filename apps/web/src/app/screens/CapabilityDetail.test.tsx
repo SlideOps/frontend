@@ -158,3 +158,75 @@ describe('CapabilityDetail: installed version', () => {
     expect(screen.queryByText(/version/)).not.toBeInTheDocument();
   });
 });
+
+/*
+ * "Run it again" is how an Operator changes something about a Capability
+ * that already ran: a different version to pin, or an option like pgvector
+ * that did not exist the first time. Undiscoverable unless the panel says so
+ * outright, so this proves it does, and only for the Capabilities it
+ * actually applies to.
+ */
+describe('CapabilityDetail: re-run guidance for an already-done Capability', () => {
+  it('names the currently installed version when this Capability has one', async () => {
+    getCapability.mockResolvedValue(
+      capability({
+        parameters: [{ key: 'version', label: 'Version', type: 'version', required: false, help: '' }],
+      }),
+    );
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({ 'install-postgresql': done({ version: '16' }) });
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1');
+
+    expect(await screen.findByText(/Currently installed: 16/)).toBeInTheDocument();
+    expect(screen.getByText(/Pin a different version/)).toBeInTheDocument();
+  });
+
+  it('points at enable_pgvector by name when this Capability has it', async () => {
+    getCapability.mockResolvedValue(
+      capability({
+        key: 'manage-postgresql',
+        name: 'Create PostgreSQL database and user',
+        parameters: [
+          { key: 'database', label: 'Database name', type: 'string', required: true, help: '' },
+          {
+            key: 'enable_pgvector',
+            label: 'Enable pgvector',
+            type: 'boolean',
+            required: false,
+            help: '',
+          },
+        ],
+      }),
+    );
+    listNodes.mockResolvedValue([node()]);
+    // states is keyed by the URL's capability key (install-postgresql, per
+    // show()'s fixed route), regardless of what the mocked Capability object
+    // itself claims as its own key.
+    getCapabilityStates.mockResolvedValue({ 'install-postgresql': done() });
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1');
+
+    expect(
+      await screen.findByText(/Turn on Enable pgvector to add it to an existing database/),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no re-run guidance for a Capability that has never run here', async () => {
+    getCapability.mockResolvedValue(
+      capability({
+        parameters: [{ key: 'version', label: 'Version', type: 'version', required: false, help: '' }],
+      }),
+    );
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({});
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1');
+
+    await screen.findByLabelText('Run on Node');
+    expect(screen.queryByText(/Already done/)).not.toBeInTheDocument();
+  });
+});

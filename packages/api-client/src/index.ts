@@ -256,6 +256,10 @@ export {
   updateServiceCICD,
   rotateDeployHookToken,
   listServiceDeployEvents,
+  connectCapability,
+  getServiceConnections,
+  getCapabilityConnections,
+  preflightDeploy,
   type Service,
   type ServiceSource,
   type ServicePort,
@@ -282,6 +286,10 @@ export {
   type ServiceCapabilityStatus,
   type CapabilitySelectionInput,
   type DeployCapabilitiesInput,
+  type ConnectCapabilityInput,
+  type ServiceConnection,
+  type PreflightCheck,
+  type PreflightStatus,
 } from './services';
 export {
   getReport,

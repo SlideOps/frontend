@@ -55,7 +55,9 @@ import { ServiceLogView } from '../components/ServiceLogView';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
+import { EnvDiffPanel } from '../components/EnvDiffPanel';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
+import { ServiceConnectionsPanel } from '../components/ServiceConnectionsPanel';
 import { ServiceCICDPanel } from '../components/ServiceCICDPanel';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -834,6 +836,10 @@ export function ServiceDetail() {
             <>
               {isCapabilityService ? null : (
                 <ServiceConfiguration service={service} onChanged={reload} />
+              )}
+              {isCapabilityService ? null : <ServiceConnectionsPanel serviceId={service.id} />}
+              {isCapabilityService ? null : (
+                <EnvDiffPanel service={service} projectId={service.project_id} />
               )}
               <ServiceCredentialsPanel
                 nodeId={service.node_id}

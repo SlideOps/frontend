@@ -10,6 +10,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ProjectCapabilities } from '../components/ProjectCapabilities';
 import { ProjectGitHub } from '../components/ProjectGitHub';
+import { ProjectHealthSummary } from '../components/ProjectHealthSummary';
 import { ProjectRouting } from '../components/ProjectRouting';
 import { ProjectServers } from '../components/ProjectServers';
 import { ProjectServices } from '../components/ProjectServices';
@@ -106,9 +107,12 @@ export function ProjectDetail() {
           ) : null}
 
           {activeTab === 'overview' ? (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <ProjectServers projectId={id} />
-              <ProjectGitHub />
+            <div className="flex flex-col gap-6">
+              <ProjectHealthSummary projectId={id} />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ProjectServers projectId={id} />
+                <ProjectGitHub />
+              </div>
             </div>
           ) : null}
 

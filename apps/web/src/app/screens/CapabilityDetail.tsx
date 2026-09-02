@@ -201,7 +201,7 @@ function CapabilityHere({
       </div>
       <Text variant="body-sm" tone="secondary">
         {capabilityName} is already done on this server. Its details and any credentials it created
-        are below; you can run it again from the panel on the right if you need to.
+        are below; run it again from the panel on the right if you need to change something.
       </Text>
       {operation ? (
         <CredentialsCard operation={operation} host={host} dockerBridgeAddress={dockerBridgeAddress} />
@@ -812,6 +812,8 @@ export function CapabilityDetail() {
                     nodes={nodes}
                     initialNodeId={preselectedNode}
                     initialProjectId={preselectedProject}
+                    alreadyDone={Boolean(done) && !isDetected(done)}
+                    currentVersion={done?.version}
                   />
                 )}
               </Card>

@@ -1,10 +1,13 @@
 import {
   ApiError,
+  connectCapability,
   controlCapability,
   createOperation,
+  getCapabilityConnections,
   listNodes,
   listOperations,
   listProjects,
+  listServices,
   revealNodeCredential,
   revealOperationSecret,
   type CapabilityControlAction,
@@ -12,9 +15,11 @@ import {
   type NodeCredential,
   type Operation,
   type Project,
+  type Service,
+  type ServiceConnection,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { KeyRound, Server } from '@slideops/icons';
+import { KeyRound, Server, Waypoints } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -331,10 +336,12 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
 
 function CredentialSection({
   context,
+  services,
   onDownload,
   downloading,
 }: {
   context: CredentialContext;
+  services: Service[];
   onDownload: () => void;
   downloading: boolean;
 }) {
@@ -367,7 +374,126 @@ function CredentialSection({
         dockerBridgeAddress={context.dockerBridgeAddress ?? undefined}
       />
       <CapabilityActionsRow context={context} />
+      <ConnectSection context={context} services={services} />
     </section>
+  );
+}
+
+/**
+ * Wire this Capability's credentials straight into a Service's environment,
+ * one click -- the "Connect" side of the Connect feature. Also shows "Used
+ * by", the reverse direction: every Service already connected to this exact
+ * Capability instance, which doubles as the plain "what talks to what" list
+ * the Operator asked for, not a diagram.
+ *
+ * Only offered for the five database engines (the same ones
+ * CapabilityActionsRow controls), and only a software Service in the same
+ * Project can be a target: a Capability Service has no environment of its
+ * own to receive a connection, and a Service in a different Project is not
+ * offered since nothing here should wire across Project boundaries silently.
+ */
+function ConnectSection({ context, services }: { context: CredentialContext; services: Service[] }) {
+  const family = engineFamilyOf(context.operation.capability_key);
+  const nodeId = context.operation.node_id;
+  const installKey = family ? `install-${family}` : '';
+
+  const connections = useAsyncData<ServiceConnection[]>(
+    (signal) => (family ? getCapabilityConnections(nodeId, installKey, signal) : Promise.resolve([])),
+    [nodeId, installKey, family],
+  );
+
+  const [selected, setSelected] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!family) {
+    return null;
+  }
+
+  const eligible = services.filter(
+    (service) =>
+      service.deployment_type === 'software' &&
+      service.project_id === context.projectId &&
+      service.node_id === nodeId,
+  );
+
+  const connectedNames = new Set(
+    connections.state.status === 'ready'
+      ? connections.state.data.map((connection) => connection.service_id)
+      : [],
+  );
+  const usedBy = eligible.filter((service) => connectedNames.has(service.id));
+
+  async function connect() {
+    if (!selected) {
+      return;
+    }
+    setConnecting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await connectCapability(selected, {
+        node_id: nodeId,
+        capability_key: installKey,
+        operation_id: context.operation.id,
+      });
+      const name = eligible.find((service) => service.id === selected)?.name ?? 'the Service';
+      setMessage(`Connected to ${name}. Redeploying to apply it.`);
+      setSelected('');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Could not connect this.');
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <div className="flex items-center gap-1.5">
+        <Waypoints width={14} height={14} className="text-ink-muted" aria-hidden />
+        <Text variant="caption" tone="secondary">
+          {usedBy.length > 0
+            ? `Used by: ${usedBy.map((service) => service.name).join(', ')}`
+            : 'Not connected to any Service yet'}
+        </Text>
+      </div>
+      {eligible.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className={selectClass}
+            value={selected}
+            onChange={(event) => setSelected(event.target.value)}
+            aria-label="Connect to a Service"
+          >
+            <option value="">Choose a Service&hellip;</option>
+            {eligible.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!selected || connecting}
+            onClick={() => void connect()}
+          >
+            {connecting ? 'Connecting' : 'Connect'}
+          </Button>
+        </div>
+      ) : null}
+      {message ? (
+        <p role="status" className="text-xs text-ink-muted">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -488,9 +614,17 @@ const selectClass =
 export function Credentials() {
   const { state } = useAsyncData(
     (signal) =>
-      Promise.all([listOperations({}, signal), listNodes(signal), listProjects(signal)]).then(
-        ([operations, nodes, projects]) => ({ operations, nodes, projects }),
-      ),
+      Promise.all([
+        listOperations({}, signal),
+        listNodes(signal),
+        listProjects(signal),
+        listServices(signal),
+      ]).then(([operations, nodes, projects, services]) => ({
+        operations,
+        nodes,
+        projects,
+        services,
+      })),
     [],
   );
 
@@ -502,7 +636,12 @@ export function Credentials() {
   const data =
     state.status === 'ready'
       ? state.data
-      : { operations: [] as Operation[], nodes: [] as Node[], projects: [] as Project[] };
+      : {
+          operations: [] as Operation[],
+          nodes: [] as Node[],
+          projects: [] as Project[],
+          services: [] as Service[],
+        };
 
   const contexts = useMemo<CredentialContext[]>(() => {
     const nodeById = new Map(data.nodes.map((node) => [node.id, node] as const));
@@ -790,6 +929,7 @@ export function Credentials() {
                         <CredentialSection
                           key={context.operation.id}
                           context={context}
+                          services={data.services}
                           onDownload={() => void downloadOne(context)}
                           downloading={downloading === context.operation.id}
                         />

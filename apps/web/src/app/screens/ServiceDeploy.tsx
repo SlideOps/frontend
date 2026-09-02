@@ -7,13 +7,26 @@ import {
   listGitHubRepos,
   listNodes,
   listProjects,
+  preflightDeploy,
   type GitHubRepo,
   type GitHubStatus,
   type Node,
+  type PreflightCheck,
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Container, Database, GitBranch, Lock, Search } from '@slideops/icons';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Boxes,
+  CheckCircle2,
+  Container,
+  Database,
+  GitBranch,
+  Lock,
+  Search,
+  XCircle,
+} from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
@@ -96,6 +109,10 @@ const inputClass =
 function DeployForm({ data, initialProjectId }: { data: DeployData; initialProjectId?: string }) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
+  // Basic by default: the recommended CPU/memory/process values already
+  // pre-filled below are what most applications need, so most Operators
+  // never have to think about resource limits at all unless they choose to.
+  const [showAdvancedResources, setShowAdvancedResources] = useState(false);
   const [repoSearch, setRepoSearch] = useState('');
   const filteredRepos = useMemo(() => filterGitHubRepos(data.repos, repoSearch), [data.repos, repoSearch]);
 
@@ -113,6 +130,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<ServiceFormValues>({
     resolver,
@@ -433,35 +451,58 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           {...register('command')}
         />
 
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field
-            label="vCPU limit"
-            type="number"
-            step="0.1"
-            inputMode="decimal"
-            placeholder="0.5"
-            error={errors.cpu_limit?.message}
-            labelAdornment={<Guidance for="service.cpu" />}
-            {...register('cpu_limit')}
-          />
-          <Field
-            label="Memory (MB)"
-            type="number"
-            inputMode="numeric"
-            placeholder="256"
-            error={errors.memory_mb?.message}
-            labelAdornment={<Guidance for="service.memory" />}
-            {...register('memory_mb')}
-          />
-          <Field
-            label="Process limit"
-            type="number"
-            inputMode="numeric"
-            placeholder="Optional"
-            error={errors.pids_limit?.message}
-            labelAdornment={<Guidance for="service.pids" />}
-            {...register('pids_limit')}
-          />
+        <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <Text variant="body-sm" className="font-medium text-ink">
+                Recommended configuration
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                0.5 vCPU · 256 MB memory · no process limit set (SlideOps applies a safe
+                default). Good for most applications; change it if you know you need more.
+              </Text>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvancedResources((value) => !value)}
+            >
+              {showAdvancedResources ? 'Use recommended' : 'Advanced'}
+            </Button>
+          </div>
+          {showAdvancedResources ? (
+            <div className="grid gap-5 sm:grid-cols-3">
+              <Field
+                label="vCPU limit"
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="0.5"
+                error={errors.cpu_limit?.message}
+                labelAdornment={<Guidance for="service.cpu" />}
+                {...register('cpu_limit')}
+              />
+              <Field
+                label="Memory (MB)"
+                type="number"
+                inputMode="numeric"
+                placeholder="256"
+                error={errors.memory_mb?.message}
+                labelAdornment={<Guidance for="service.memory" />}
+                {...register('memory_mb')}
+              />
+              <Field
+                label="Process limit"
+                type="number"
+                inputMode="numeric"
+                placeholder="Optional"
+                error={errors.pids_limit?.message}
+                labelAdornment={<Guidance for="service.pids" />}
+                {...register('pids_limit')}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -548,6 +589,8 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           </div>
         ) : null}
 
+        <PreflightPanel getValues={getValues} />
+
         <div className="flex items-center gap-3">
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? 'Deploying' : 'Deploy Service'}
@@ -559,6 +602,91 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
       </form>
     </Card>
   );
+}
+
+/**
+ * Check before deploying: connects to the chosen Node read only and reports
+ * what a real deploy would run into -- an unreachable Node, a missing
+ * runtime tool, a port already taken, or resources tighter than requested.
+ * Advisory only: nothing here blocks Deploy Service above it.
+ */
+function PreflightPanel({ getValues }: { getValues: () => ServiceFormValues }) {
+  const [state, setState] = useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'ready'; checks: PreflightCheck[] }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+
+  async function run() {
+    setState({ status: 'loading' });
+    try {
+      const checks = await preflightDeploy(toDeployInput(getValues()));
+      setState({ status: 'ready', checks });
+    } catch (cause) {
+      setState({
+        status: 'error',
+        message: cause instanceof ApiError ? cause.message : 'The preflight check could not run.',
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <Text variant="body-sm" className="font-medium text-ink">
+            Preflight check
+          </Text>
+          <Text variant="body-sm" tone="secondary">
+            Connects to the Node and checks for problems before you deploy. Nothing here changes
+            the server, and nothing here blocks Deploy Service.
+          </Text>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => void run()}
+          disabled={state.status === 'loading'}
+        >
+          {state.status === 'loading' ? 'Checking' : 'Run preflight'}
+        </Button>
+      </div>
+      {state.status === 'error' ? (
+        <p role="alert" className="text-sm text-danger">
+          {state.message}
+        </p>
+      ) : null}
+      {state.status === 'ready' ? (
+        <ul className="flex flex-col divide-y divide-border">
+          {state.checks.map((check) => (
+            <li key={check.name} className="flex items-start gap-2 py-2">
+              <PreflightStatusIcon status={check.status} />
+              <div className="min-w-0">
+                <Text variant="body-sm" className="font-medium text-ink">
+                  {check.name}
+                </Text>
+                <Text variant="body-sm" tone="secondary">
+                  {check.message}
+                </Text>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function PreflightStatusIcon({ status }: { status: PreflightCheck['status'] }) {
+  if (status === 'pass') {
+    return <CheckCircle2 width={16} height={16} className="mt-0.5 shrink-0 text-success" aria-hidden />;
+  }
+  if (status === 'fail') {
+    return <XCircle width={16} height={16} className="mt-0.5 shrink-0 text-danger" aria-hidden />;
+  }
+  return <AlertTriangle width={16} height={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />;
 }
 
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */

@@ -1,9 +1,9 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { renderInApp } from '../../test/render';
-import type { Node, Operation } from '@slideops/api-client';
+import type { Node, Operation, Service } from '@slideops/api-client';
 
 /*
  * Re-running the same Capability on the same Node for the same database
@@ -24,9 +24,12 @@ import type { Node, Operation } from '@slideops/api-client';
 const listOperations = vi.fn();
 const listNodes = vi.fn();
 const listProjects = vi.fn();
+const listServices = vi.fn();
 const revealNodeCredential = vi.fn();
 const controlCapability = vi.fn();
 const createOperation = vi.fn();
+const connectCapability = vi.fn();
+const getCapabilityConnections = vi.fn();
 const navigateMock = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
@@ -34,9 +37,12 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listOperations: (...a: unknown[]) => listOperations(...a),
   listNodes: (...a: unknown[]) => listNodes(...a),
   listProjects: (...a: unknown[]) => listProjects(...a),
+  listServices: (...a: unknown[]) => listServices(...a),
   revealNodeCredential: (...a: unknown[]) => revealNodeCredential(...a),
   controlCapability: (...a: unknown[]) => controlCapability(...a),
   createOperation: (...a: unknown[]) => createOperation(...a),
+  connectCapability: (...a: unknown[]) => connectCapability(...a),
+  getCapabilityConnections: (...a: unknown[]) => getCapabilityConnections(...a),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -85,9 +91,28 @@ function show() {
   );
 }
 
+function service(over: Partial<Service> = {}): Service {
+  return {
+    id: 'svc-1',
+    name: 'api',
+    project_id: 'proj-1',
+    node_id: 'n-1',
+    deployment_type: 'software',
+    runtime: 'container',
+    source: { type: 'image', image: 'nginx:latest' },
+    cpu_limit: 0.5,
+    memory_mb: 256,
+    status: 'running',
+    ...over,
+  } as Service;
+}
+
 beforeEach(() => {
+  listServices.mockReset().mockResolvedValue([]);
   controlCapability.mockReset().mockResolvedValue(undefined);
   createOperation.mockReset().mockResolvedValue({ id: 'remove-op-1' });
+  connectCapability.mockReset().mockResolvedValue({});
+  getCapabilityConnections.mockReset().mockResolvedValue([]);
   navigateMock.mockReset();
 });
 
@@ -316,5 +341,85 @@ describe('Credentials: capability actions', () => {
         expect.objectContaining({ parameters: { drop_data: true } }),
       ),
     );
+  });
+});
+
+/*
+ * Connect: wire a database Capability's credentials straight into a
+ * Service's environment. Only a software Service in the same Project as the
+ * credential is offered as a target, and "Used by" reflects whatever the
+ * backend already reports connected, both read the same way "what talks to
+ * what" would be scanned by an Operator.
+ */
+describe('Credentials: connect', () => {
+  it('offers only software Services in the same Project as a connect target', async () => {
+    listOperations.mockResolvedValue([op({ node_id: 'n-1' })]);
+    listNodes.mockResolvedValue([node({ id: 'n-1', project_id: 'proj-1' })]);
+    listProjects.mockResolvedValue([{ id: 'proj-1', name: 'Storefront' }]);
+    listServices.mockResolvedValue([
+      service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' }),
+      service({ id: 'svc-other-project', name: 'other-app', project_id: 'proj-2', node_id: 'n-1' }),
+      service({
+        id: 'svc-capability',
+        name: 'infra',
+        project_id: 'proj-1',
+        node_id: 'n-1',
+        deployment_type: 'capability',
+      }),
+    ]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    const picker = await screen.findByLabelText('Connect to a Service');
+    expect(within(picker).getByRole('option', { name: 'api' })).toBeInTheDocument();
+    expect(within(picker).queryByRole('option', { name: 'other-app' })).not.toBeInTheDocument();
+    expect(within(picker).queryByRole('option', { name: 'infra' })).not.toBeInTheDocument();
+  });
+
+  it('connects the credential to the chosen Service', async () => {
+    listOperations.mockResolvedValue([op({ node_id: 'n-1' })]);
+    listNodes.mockResolvedValue([node({ id: 'n-1', project_id: 'proj-1' })]);
+    listProjects.mockResolvedValue([{ id: 'proj-1', name: 'Storefront' }]);
+    listServices.mockResolvedValue([service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' })]);
+
+    show();
+    await screen.findByText('Manage postgresql');
+
+    const picker = await screen.findByLabelText('Connect to a Service');
+    await userEvent.selectOptions(picker, 'svc-same');
+    await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    await waitFor(() =>
+      expect(connectCapability).toHaveBeenCalledWith('svc-same', {
+        node_id: 'n-1',
+        capability_key: 'install-postgresql',
+        operation_id: 'op-1',
+      }),
+    );
+    expect(await screen.findByText(/Connected to api/)).toBeInTheDocument();
+  });
+
+  it('shows what a Capability is already connected to', async () => {
+    listOperations.mockResolvedValue([op({ node_id: 'n-1' })]);
+    listNodes.mockResolvedValue([node({ id: 'n-1', project_id: 'proj-1' })]);
+    listProjects.mockResolvedValue([{ id: 'proj-1', name: 'Storefront' }]);
+    listServices.mockResolvedValue([service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' })]);
+    getCapabilityConnections.mockResolvedValue([
+      {
+        id: 'conn-1',
+        service_id: 'svc-same',
+        source_node_id: 'n-1',
+        source_capability_key: 'install-postgresql',
+        source_operation_id: 'op-1',
+        env_prefix: 'DATABASE',
+        created_at: '2026-08-01T00:00:00Z',
+      },
+    ]);
+
+    show();
+
+    expect(await screen.findByText('Used by: api')).toBeInTheDocument();
+    expect(getCapabilityConnections).toHaveBeenCalledWith('n-1', 'install-postgresql', expect.anything());
   });
 });

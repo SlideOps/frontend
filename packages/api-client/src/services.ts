@@ -742,3 +742,89 @@ export function getServiceActivity(
     { signal },
   ).then((r) => unwrap<ServiceActivity[]>(r, 'activity'));
 }
+
+/**
+ * The Capability instance to connect: a specific completed Operation, not
+ * "the Capability" in the abstract -- the same Operation its own credential
+ * card already points at, so Connect always wires in the exact credential
+ * shown. `env_prefix` is optional; leaving it out picks a sensible default
+ * from the Capability's own family (DATABASE for Postgres/MySQL/MariaDB/
+ * MongoDB, REDIS for Redis).
+ */
+export interface ConnectCapabilityInput {
+  node_id: string;
+  capability_key: string;
+  operation_id: string;
+  env_prefix?: string;
+}
+
+/**
+ * Wire a Capability's connection details into a Service's environment --
+ * host, port, database, username, its password when it has one, and a ready
+ * to use URL -- keeping every variable already there, and redeploy so it
+ * applies immediately. One call, not a config edit followed by a separate
+ * redeploy.
+ */
+export function connectCapability(serviceId: string, input: ConnectCapabilityInput): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connect`, {
+    method: 'POST',
+    body: input,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** One recorded Connect action. */
+export interface ServiceConnection {
+  id: string;
+  service_id: string;
+  source_node_id: string;
+  source_capability_key: string;
+  source_operation_id: string;
+  env_prefix: string;
+  created_at: string;
+}
+
+/** What a Service is connected to. */
+export function getServiceConnections(serviceId: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, { signal }).then((r) =>
+    unwrap<ServiceConnection[]>(r, 'connections'),
+  );
+}
+
+/**
+ * What's using a Capability: every Service connected to it on this Node.
+ * This doubles as the plain "what talks to what" list -- not a diagram,
+ * just names.
+ */
+export function getCapabilityConnections(
+  nodeId: string,
+  capabilityKey: string,
+  signal?: AbortSignal,
+): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/connections`,
+    { signal },
+  ).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
+}
+
+/** How a single Preflight check came out. */
+export type PreflightStatus = 'pass' | 'warn' | 'fail';
+
+/** One thing Preflight looked at. */
+export interface PreflightCheck {
+  name: string;
+  status: PreflightStatus;
+  message: string;
+}
+
+/**
+ * Check a deploy before running it: the Node answers, the chosen runtime's
+ * own tool is present, every manually chosen port is actually free, and a
+ * rough read of whether the Node currently has the CPU and memory
+ * requested. Read only -- nothing about the Node changes, and nothing here
+ * blocks an actual deploy; every check is advisory.
+ */
+export function preflightDeploy(input: DeployServiceInput): Promise<PreflightCheck[]> {
+  return apiRequest<unknown>('/services/preflight', { method: 'POST', body: input }).then((r) =>
+    unwrap<PreflightCheck[]>(r, 'checks'),
+  );
+}
