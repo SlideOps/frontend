@@ -194,13 +194,16 @@ function ParameterField({
 /**
  * Render the controls for a Capability's parameters from its metadata.
  *
- * Required parameters and the version field (choosing a version is the point
- * of Basic vs Advanced elsewhere in the product, so it never hides) always
- * show. Every other optional parameter -- Redis's max memory or eviction
- * policy, pgvector, and the like -- sits behind an "Advanced options"
- * disclosure, collapsed by default, so a first-time Operator sees only what
- * they must decide. Nothing here changes what an unopened Advanced field
- * submits as: every default stays exactly what it is today.
+ * Required parameters, the version field (choosing a version is the point of
+ * Basic vs Advanced elsewhere in the product, so it never hides), and any
+ * parameter the Capability itself marks `notable` (pgvector on Create
+ * PostgreSQL database and user, the first of these -- a widely asked-for
+ * option that hiding by default made effectively invisible) always show.
+ * Every other optional parameter -- Redis's max memory or eviction policy,
+ * and the like -- sits behind an "Advanced options" disclosure, collapsed by
+ * default, so a first-time Operator sees only what they must decide. Nothing
+ * here changes what an unopened Advanced field submits as: every default
+ * stays exactly what it is today.
  */
 export function ParameterFields({
   idPrefix,
@@ -211,8 +214,12 @@ export function ParameterFields({
   capabilityKey,
 }: ParameterFieldsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const primary = parameters.filter((param) => param.required || param.type === 'version');
-  const advanced = parameters.filter((param) => !param.required && param.type !== 'version');
+  const primary = parameters.filter(
+    (param) => param.required || param.type === 'version' || param.notable,
+  );
+  const advanced = parameters.filter(
+    (param) => !param.required && param.type !== 'version' && !param.notable,
+  );
 
   const renderField = (param: CapabilityParameter) => {
     const fieldId = `${idPrefix}-${param.key}`;

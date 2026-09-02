@@ -125,6 +125,11 @@ export interface CapabilityParameter {
   required: boolean;
   help: string;
   placeholder?: string;
+  /** An optional parameter that must never collapse behind an "Advanced
+   *  options" disclosure the way an ordinary optional parameter does, since it
+   *  is itself a reason an Operator opens the form -- pgvector being the
+   *  first. Absent or false for every ordinary optional parameter. */
+  notable?: boolean;
 }
 
 /**

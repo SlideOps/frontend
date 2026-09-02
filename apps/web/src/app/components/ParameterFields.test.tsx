@@ -133,6 +133,17 @@ function optionalParam(): CapabilityParameter {
   };
 }
 
+function notableParam(): CapabilityParameter {
+  return {
+    key: 'enable_pgvector',
+    label: 'Enable pgvector',
+    type: 'boolean',
+    required: false,
+    notable: true,
+    help: 'Install the pgvector extension and enable it on this database.',
+  };
+}
+
 describe('ParameterFields, Basic vs Advanced', () => {
   it('always shows required parameters and the version field, with optional parameters collapsed', async () => {
     renderInApp(
@@ -158,5 +169,16 @@ describe('ParameterFields, Basic vs Advanced', () => {
     renderInApp(<Harness parameters={[requiredParam()]} />);
 
     expect(screen.queryByRole('button', { name: /Show|Hide/ })).not.toBeInTheDocument();
+  });
+
+  it('shows a notable optional parameter like pgvector up front, never collapsed', () => {
+    renderInApp(<Harness parameters={[requiredParam(), notableParam(), optionalParam()]} />);
+
+    // Not hidden behind the toggle: visible immediately, with no click needed.
+    expect(screen.getByLabelText(/^Enable pgvector/)).toBeInTheDocument();
+    // An ordinary optional parameter alongside it still collapses as before,
+    // so marking one parameter notable does not silently open every other one.
+    expect(screen.queryByLabelText(/^Max memory/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show (1)' })).toBeInTheDocument();
   });
 });

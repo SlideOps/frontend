@@ -134,6 +134,47 @@ describe('CapabilityDetail: Service scoped database credentials', () => {
   });
 });
 
+/*
+ * The bridge to manage-postgresql (where a database, its account, and options
+ * like pgvector actually live) used to disappear entirely once manage-postgresql
+ * had already run once on this Node -- which is exactly the moment an Operator
+ * with an existing database most wants a way back in, to turn pgvector on. It
+ * must stay, just reworded to invite reviewing or changing what already exists
+ * rather than implying there is nothing left to do.
+ */
+describe('CapabilityDetail: the manage step stays reachable once it has already run', () => {
+  it('still offers a way into manage-postgresql, worded as review rather than setup', async () => {
+    getCapability.mockResolvedValue(capability());
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({
+      'install-postgresql': done(),
+      'manage-postgresql': done({ last_operation_id: 'manage-op-1' }),
+    });
+    listOperations.mockResolvedValue([]);
+
+    // No ?service= here: this is the plain Node/Project-scoped page, the one
+    // the Operator lands on from Credentials' own "Manage" button.
+    show('?node=node-1&project=proj-1');
+
+    expect(await screen.findByText('Manage PostgreSQL')).toBeInTheDocument();
+    expect(screen.getByText(/turning on the pgvector extension/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage database and account' })).toBeInTheDocument();
+    expect(screen.queryByText('One more step for a credential')).not.toBeInTheDocument();
+  });
+
+  it('still offers the plain setup nudge when the manage step has never run', async () => {
+    getCapability.mockResolvedValue(capability());
+    listNodes.mockResolvedValue([node()]);
+    getCapabilityStates.mockResolvedValue({ 'install-postgresql': done() });
+    listOperations.mockResolvedValue([]);
+
+    show('?node=node-1&project=proj-1');
+
+    expect(await screen.findByText('One more step for a credential')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create database and account' })).toBeInTheDocument();
+  });
+});
+
 describe('CapabilityDetail: installed version', () => {
   it('shows the version the completing Operation actually ran with', async () => {
     getCapability.mockResolvedValue(capability());

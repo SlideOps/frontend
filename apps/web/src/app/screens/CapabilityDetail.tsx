@@ -217,22 +217,33 @@ function manageStepHref(manageKey: string, nodeId: string, projectId?: string, s
   }`;
 }
 
-/** The calm callout pointing at the manage step, shown when there is nothing yet to show a credential for. */
+/**
+ * The calm callout pointing at the next-step Capability. It never disappears
+ * once that step has already run once -- a manage or configure Capability can
+ * always be opened again to change a setting on it, such as turning on
+ * pgvector, so hiding this the moment there is nothing left to set up for the
+ * first time would leave an Operator with an existing database and no direct
+ * way back in from this page.
+ */
 function OneMoreStepForACredential({
+  title = 'One more step for a credential',
   databaseName,
   manageHref,
   description,
+  actionLabel = 'Create database and account',
 }: {
+  title?: string;
   databaseName: string;
   manageHref: string;
   description: string;
+  actionLabel?: string;
 }) {
   const navigate = useNavigate();
   return (
     <Card className="flex flex-col gap-4 border-brand">
       <div className="flex items-center gap-2">
         <Database width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">One more step for a credential</Text>
+        <Text variant="h4">{title}</Text>
       </div>
       <Text variant="body-sm" tone="secondary">
         {databaseName} {description}
@@ -240,7 +251,7 @@ function OneMoreStepForACredential({
       <div>
         <Button size="sm" onClick={() => navigate(manageHref)}>
           <KeyRound width={15} height={15} aria-hidden />
-          Create database and account
+          {actionLabel}
         </Button>
       </div>
     </Card>
@@ -377,18 +388,25 @@ function ServiceDatabaseCredentials({
 
 /**
  * The next step after a database server is installed. Installing a database
- * starts the server but creates no application database, account, or password, so
- * an Operator has no credential and no obvious way forward. This calm callout
- * points at the manage Capability that creates that database, account, and
- * password. It shows only when this install is done on the server in context and
- * its manage step is not yet done there; once the manage step is done, the
- * credentials appear on their own and this steps aside. It renders nothing when
- * the Capability is not a database install, so a non-database page is untouched.
+ * starts the server but creates no application database, account, or password
+ * (or, for Redis, no set password or tuning), so an Operator has no credential
+ * yet and no obvious way forward. This calm callout points at the Capability
+ * that gets them there. It renders nothing when the Capability is not a
+ * database install, so a non-database page is untouched, and nothing until the
+ * install itself is done on the server in context.
  *
- * When the Operator arrived from a Service, this instead shows the credential (or
- * the nudge) scoped to that one Service, since the platform-wide manage state
- * cannot say which Service, of possibly several sharing this server, is the one
- * being looked at.
+ * Once that next step has itself already run, this does not disappear the way
+ * it used to: a manage or configure Capability is never really "finished" the
+ * way an install is, since a setting on it, a password, an extension like
+ * pgvector, a tuning value, can always be changed later. So it switches to a
+ * review-and-change framing and stays, which is what keeps this page a real
+ * way back in rather than a dead end once a database already exists.
+ *
+ * When the Operator arrived from a per-database engine's own Service, this
+ * instead shows the credential (or the nudge) scoped to that one Service,
+ * since the platform-wide manage state cannot say which Service, of possibly
+ * several sharing this server, is the one being looked at. Redis has no
+ * per-app database to scope to, so it always uses the plain callout instead.
  */
 function CreateDatabaseCredentials({
   capabilityKey,
@@ -416,7 +434,7 @@ function CreateDatabaseCredentials({
     return null;
   }
 
-  if (serviceId) {
+  if (serviceId && step.perDatabase) {
     return (
       <ServiceDatabaseCredentials
         capabilityKey={capabilityKey}
@@ -430,15 +448,13 @@ function CreateDatabaseCredentials({
   }
 
   const manageDone = Boolean(states[step.manageKey]);
-  if (manageDone) {
-    return null;
-  }
-
   return (
     <OneMoreStepForACredential
+      title={manageDone ? `Manage ${step.name}` : undefined}
       databaseName={step.name}
-      manageHref={manageStepHref(step.manageKey, nodeId, projectId)}
-      description="is installed and running. Create a database and account to get connection credentials, including a password, that you can use in your app."
+      manageHref={manageStepHref(step.manageKey, nodeId, projectId, serviceId)}
+      description={manageDone ? step.reviewDescription : step.setupDescription}
+      actionLabel={manageDone ? step.reviewActionLabel : step.actionLabel}
     />
   );
 }
