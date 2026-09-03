@@ -9,9 +9,15 @@ import type { GuidanceRegistry } from '@slideops/tooltips';
 export const guidance: GuidanceRegistry = {
   'dashboard.workspace': {
     label: 'Workspace',
-    summary: 'Your Workspace gathers your Projects, Nodes, and recent Operations in one place.',
+    summary: 'A Workspace gathers its own Projects, Nodes, and recent Operations in one place.',
     detail:
-      'A Workspace is the home for your work. From here you reach every Project you own, the Nodes inside them, and the Operations you have run recently. Nothing here belongs to anyone else.',
+      'This Workspace is one self contained scope: every Project and Node here belongs to it, not to your account as a whole. You can create as many Workspaces as you need, one Personal one you always have plus any others for different teams or clients, and switch between them from the workspace switcher.',
+  },
+  'workspaces.hub': {
+    label: 'Workspaces',
+    summary: 'Every Workspace you can act in, and creating a new one.',
+    detail:
+      'A Workspace starts empty: no Node or Project until you add one. Create as many as you need, for different teams, clients, or purposes, and invite people into only the ones they should see. Deleting one is refused while it still owns a Node or a Project, and your Personal Workspace can never be deleted.',
   },
   'dashboard.nodes': {
     label: 'Nodes',
@@ -126,6 +132,44 @@ export const guidance: GuidanceRegistry = {
     label: 'Project',
     summary: 'Optionally place this Node in a Project to keep related Nodes together.',
   },
+  'node.tags': {
+    label: 'Tags',
+    summary: 'Free-form labels for search and grouping, such as production or eu-west.',
+    detail:
+      'Tags are yours to define. The Nodes list can search by them and group by the first one on each Node, so a naming scheme like environment first (production, staging) makes the list easiest to scan.',
+  },
+  'node.credentialSource': {
+    label: 'Credential',
+    summary: 'Paste a new credential, or pick a key already saved in your library.',
+    detail:
+      'A saved key is imported once and reused across Nodes without pasting it again. Pasting a private key here also offers to save it to the library at the same time, so the next Node can pick it instead of pasting it too.',
+  },
+  'sshKeys.overview': {
+    label: 'SSH Keys',
+    summary: 'A library of keys saved once and reused across Nodes, instead of pasting one each time.',
+    detail:
+      'Removing a key from this library only removes its name here. The sealed key material a Node already uses is untouched and the Node keeps connecting exactly as before.',
+  },
+  'sshKeys.import': {
+    label: 'Save a key',
+    summary: 'The key is sealed the moment it arrives and is never shown again.',
+  },
+  'snippets.overview': {
+    label: 'Snippets',
+    summary: 'Commands saved once and picked from any open terminal, instead of retyped.',
+    detail:
+      'A snippet has no relationship to any particular Node or Service, so the same saved command works from any terminal you open. Picking one types it into the active tab; it is never run for you.',
+  },
+  'snippets.save': {
+    label: 'Save a command',
+    summary: 'Typed into the terminal exactly as written. It is never run for you.',
+  },
+  'terminal.overview': {
+    label: 'Terminal',
+    summary: 'Open a shell on any server or Service without visiting its own page first.',
+    detail:
+      'Each tab is its own independent SSH session, exactly like opening a shell from a Node or Service page directly -- this is a faster way to reach the same connection, not a different one. Closing a tab ends that session; the others keep running.',
+  },
   'node.authKind': {
     label: 'How to sign in',
     summary: 'Choose a private key or a password for the SSH connection. A key is stronger.',
@@ -234,6 +278,13 @@ export const guidance: GuidanceRegistry = {
     summary:
       'The new password or private key. It is stored encrypted the moment it arrives and never shown again.',
   },
+  'server.transfer': {
+    label: 'Transfer ownership',
+    summary:
+      'Hand this node, and everything on it, to a different Operator account entirely. Nothing moves until they accept.',
+    detail:
+      'This offers the node, its project if it has one to itself, every service on it, installed plugins, history, and its credential, to another Operator account by email, whether or not that account is in this workspace. Nothing changes until the receiving Operator accepts, and they can decline instead. A node whose project is also assigned to another node, or that has an operation still running, cannot be offered until that is resolved.',
+  },
   'server.users': {
     label: 'Server accounts',
     summary:
@@ -283,6 +334,12 @@ export const guidance: GuidanceRegistry = {
   'capability.category': {
     label: 'Category',
     summary: 'The area of work a Capability belongs to, such as security or networking.',
+  },
+  'capability.security-posture': {
+    label: 'Security posture',
+    summary: 'The four security Capabilities together, so you can see what is set up and what is not at a glance.',
+    detail:
+      'Fail2ban, automatic security updates, key-only SSH, and a server audit each answer a different part of "is this server secure." Rather than checking each Capability page one at a time, this shows all four together and links straight to whichever one needs attention.',
   },
   'capability.outcome': {
     label: 'Outcome',
@@ -574,6 +631,13 @@ export const guidance: GuidanceRegistry = {
     detail:
       'When GitHub is connected, the repositories you can reach are listed here. Choosing one fills the repository URL and defaults the branch to that repository default branch. You can still edit both afterward.',
   },
+  'service.build': {
+    label: 'Subdirectory',
+    summary:
+      'Only needed for a monorepo: the path, inside the repository, of the one module to build and deploy. Leave it empty to build the repository root.',
+    detail:
+      'The repository is cloned in full either way. This narrows the Docker build context down to one subdirectory, so a monorepo with several applications in one repository deploys just the one you name here, such as apps/api or services/worker, instead of the whole thing. It is a path, not a command.',
+  },
   'service.command': {
     label: 'Command',
     summary:
@@ -730,5 +794,15 @@ export const guidance: GuidanceRegistry = {
       'Pause or resume executions platform wide. Every action is confirmed and fully audited.',
     detail:
       'Emergency controls are first-class, audited actions. Pausing all executions, or suspending a single Operator execution, always asks for confirmation and is written to the immutable audit trail.',
+  },
+  'team.roles': {
+    label: 'Team roles',
+    summary: 'Admin and Member act fully; Viewer is read only. Only Owner and Admin manage the team.',
+    detail:
+      'Admin has full operational access and can also invite, re-role, and remove teammates. Member has the same full operational access but cannot manage who is on the team. Viewer can see everything in this workspace but cannot change anything: every write control is hidden for them, and the backend refuses one anyway if it is ever reached. Owner is the workspace itself and is never invited.',
+  },
+  'team.role': {
+    label: 'Role',
+    summary: 'What the person you invite can do once they accept.',
   },
 };

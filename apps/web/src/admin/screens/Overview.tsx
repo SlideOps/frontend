@@ -1,12 +1,11 @@
 import { getAnalytics, getOverview } from '@slideops/api-client';
-import { Card, Text, type ChartPalette } from '@slideops/design-system';
+import { Card, StatTile, Text, type ChartPalette } from '@slideops/design-system';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useCallback } from 'react';
 import { AdminShell } from '../components/AdminShell';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { LazyChart } from '../components/LazyChart';
-import { StatTile } from '../components/StatTile';
 import { useAsyncData } from '../hooks/useAsyncData';
 import {
   capabilityUsageOption,
@@ -52,36 +51,42 @@ export function Overview() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatTile
+              bordered
               label="Operators"
               value={overview.state.data.operators_total}
-              guidanceKey="overview.operators"
+              adornment={<Guidance for="overview.operators" />}
             />
             <StatTile
+              bordered
               label="Nodes"
               value={overview.state.data.nodes_total}
-              guidanceKey="overview.nodes"
+              adornment={<Guidance for="overview.nodes" />}
             />
             <StatTile
+              bordered
               label="Operations"
               value={overview.state.data.operations_total}
-              guidanceKey="overview.operations"
+              adornment={<Guidance for="overview.operations" />}
             />
             <StatTile
+              bordered
               label="Active now"
               value={overview.state.data.active_operations}
-              guidanceKey="overview.active"
+              adornment={<Guidance for="overview.active" />}
               tone={overview.state.data.active_operations > 0 ? 'warning' : 'primary'}
             />
             <StatTile
+              bordered
               label="Failures, 24h"
               value={overview.state.data.failures_last_24h}
-              guidanceKey="overview.failures"
+              adornment={<Guidance for="overview.failures" />}
               tone={overview.state.data.failures_last_24h > 0 ? 'danger' : 'primary'}
             />
             <StatTile
+              bordered
               label="Suspended Operators"
               value={overview.state.data.operators_suspended}
-              guidanceKey="overview.suspended"
+              adornment={<Guidance for="overview.suspended" />}
               tone={overview.state.data.operators_suspended > 0 ? 'danger' : 'primary'}
             />
           </div>

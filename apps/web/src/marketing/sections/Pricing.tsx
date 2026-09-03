@@ -28,9 +28,10 @@ const tiers: Tier[] = [
     blurb: 'See the whole flow on one server.',
     cta: 'Start free',
     features: [
+      '1 Workspace',
       '1 server',
       '1 Project',
-      '1 seat',
+      '1 seat per Workspace',
       'Core security on every server',
       'The full marketplace',
       '7 days of history',
@@ -45,9 +46,10 @@ const tiers: Tier[] = [
     cta: 'Get started',
     includes: 'Everything in Free, plus',
     features: [
+      'Up to 3 Workspaces',
       '3 servers',
       '5 Projects',
-      '2 seats',
+      '2 seats per Workspace',
       'Automations and scheduling',
       '30 days of history',
       'Email support',
@@ -62,9 +64,10 @@ const tiers: Tier[] = [
     cta: 'Get started',
     includes: 'Everything in Starter, plus',
     features: [
+      'Up to 10 Workspaces',
       '15 servers',
       '30 Projects',
-      '5 seats',
+      '5 seats per Workspace',
       'Advanced monitoring and reports',
       '1 year of history',
       'Audit trail',
@@ -78,6 +81,7 @@ const tiers: Tier[] = [
     cta: 'Talk to us',
     includes: 'Everything in Pro, plus',
     features: [
+      'Unlimited Workspaces',
       'Unlimited servers and Projects',
       'Unlimited seats',
       'Single sign-on',
@@ -120,7 +124,7 @@ export function Pricing() {
           <Text variant="body" tone="secondary" className="mt-5">
             Every Capability runs on your servers, never on ours, so we never cap the CPU, memory,
             or disk you already own. You use all of it. Your plan sets only what SlideOps provides:
-            the servers you connect, the Projects you run, your team seats, and your support.
+            the servers you connect, the Projects you run, the seats on your team, and your support.
           </Text>
         </div>
 

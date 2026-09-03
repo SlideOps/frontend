@@ -69,7 +69,12 @@ beforeEach(() => {
     totals: { active: 0, canceled: 0, expired: 0, expiring_within_30_days: 0 },
   });
   api.listPromoCodes.mockReset().mockResolvedValue([]);
-  api.getEmergencyState.mockReset().mockResolvedValue({ controls: [] });
+  api.getEmergencyState.mockReset().mockResolvedValue({
+    controls: [],
+    any_engaged: false,
+    executions_paused: false,
+    free_season: { name: 'free-season', title: 'Free season', description: '', engaged: false },
+  });
   api.getEmergencyStatus.mockReset().mockResolvedValue({ executions_paused: false });
 });
 

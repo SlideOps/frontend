@@ -5,8 +5,9 @@ import {
   type Plugin,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ArrowRight, Boxes, Lock, ShieldCheck } from '@slideops/icons';
+import { ArrowLeft, ArrowRight, Boxes, capabilityIcon, Lock, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
+import { DetailLayout } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -82,21 +83,23 @@ export function PluginDetail() {
             const { plugin, capabilities } = result.state.data;
             const isCore = Boolean(plugin.is_core);
             const byKey = new Map(capabilities.map((c) => [c.key, c]));
+            const PluginIcon = plugin.provides?.[0]
+              ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+              : Boxes;
 
             return (
               <>
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Boxes width={22} height={22} aria-hidden />
+                      <PluginIcon width={22} height={22} aria-hidden />
                     </span>
-                    <div className="min-w-0">
-                      <Text variant="h1">{plugin.name}</Text>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <Text variant="caption" tone="secondary">
-                          {plugin.category} · v{plugin.version} · {plugin.author}
-                        </Text>
+                    <div className="min-w-0 pt-0.5">
+                      <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-ink-muted">
+                        <span>Plugin</span><span aria-hidden>·</span><span>{plugin.category}</span>
                       </div>
+                      <Text variant="h1">{plugin.name}</Text>
+                      <Text variant="body-sm" tone="secondary" className="mt-1">v{plugin.version} · by {plugin.author}</Text>
                     </div>
                   </div>
                   {isCore ? (
@@ -107,8 +110,8 @@ export function PluginDetail() {
                   ) : null}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-                  <div className="flex flex-col gap-6">
+                <DetailLayout
+                  main={
                     <Card className="flex flex-col gap-5">
                       <Section title="What it does" guidanceKey="marketplace.manifest">
                         <Text variant="body" tone="secondary">
@@ -117,7 +120,7 @@ export function PluginDetail() {
                       </Section>
 
                       {plugin.provides && plugin.provides.length > 0 ? (
-                        <Section title="Capabilities it adds" guidanceKey="marketplace.provides">
+                        <div id="plugin-capabilities" className="scroll-mt-24"><Section title="Capabilities it adds" guidanceKey="marketplace.provides">
                           <div className="flex flex-col gap-2">
                             {plugin.provides.map((key) => {
                               const capability = byKey.get(key);
@@ -138,11 +141,11 @@ export function PluginDetail() {
                               );
                             })}
                           </div>
-                        </Section>
+                        </Section></div>
                       ) : null}
 
                       {plugin.permissions && plugin.permissions.length > 0 ? (
-                        <Section title="Permissions" guidanceKey="marketplace.permissions">
+                        <div id="plugin-permissions" className="scroll-mt-24"><Section title="Permissions" guidanceKey="marketplace.permissions">
                           <ul className="flex flex-col gap-2">
                             {plugin.permissions.map((permission) => (
                               <li key={permission} className="flex items-start gap-2">
@@ -158,12 +161,12 @@ export function PluginDetail() {
                               </li>
                             ))}
                           </ul>
-                        </Section>
+                        </Section></div>
                       ) : null}
                     </Card>
-                  </div>
-
-                  <Card className="h-fit flex-col gap-4">
+                  }
+                  rail={
+                    <Card className="h-fit flex-col gap-4">
                     <div className="mb-2 flex items-center gap-2">
                       <Boxes width={18} height={18} className="text-brand" aria-hidden />
                       <Text variant="h4">{isCore ? 'Built in' : 'Install this Plugin'}</Text>
@@ -204,7 +207,8 @@ export function PluginDetail() {
                       </div>
                     )}
                   </Card>
-                </div>
+                  }
+                />
               </>
             );
           })()

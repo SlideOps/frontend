@@ -7,11 +7,12 @@ import {
   updatePlugin,
   type Plugin,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Check, ShieldCheck } from '@slideops/icons';
+import { Button, Card, Section, Text } from '@slideops/design-system';
+import { ArrowRight, Boxes, capabilityIcon, Check, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNote, Loading } from './Feedback';
@@ -45,6 +46,7 @@ function StackCard({
   onToggle,
   onUninstall,
   onOpen,
+  openLabel,
 }: {
   plugin: StackPlugin;
   busy: boolean;
@@ -52,12 +54,20 @@ function StackCard({
   onToggle: () => void;
   onUninstall: () => void;
   onOpen: () => void;
+  /** "Manage" when onOpen goes straight to this Capability's own management
+   * page (only possible once we know which Node), "Details" when it only goes
+   * to the read-only Marketplace catalog entry. */
+  openLabel: 'Manage' | 'Details';
 }) {
+  const canWrite = useCanWrite();
+  const Icon = plugin.provides?.[0]
+    ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+    : Boxes;
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <Boxes width={18} height={18} aria-hidden />
+          <Icon width={18} height={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <Text variant="h4">{plugin.name}</Text>
@@ -104,7 +114,7 @@ function StackCard({
           <Text variant="caption" tone="secondary">
             The Core security bundle is on every server and cannot be removed.
           </Text>
-        ) : plugin.installed ? (
+        ) : !canWrite ? null : plugin.installed ? (
           <>
             <Button variant="secondary" size="sm" onClick={onToggle} disabled={busy}>
               {plugin.enabled ? 'Disable' : 'Enable'}
@@ -123,7 +133,7 @@ function StackCard({
           onClick={onOpen}
           className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
-          Details
+          {openLabel}
           <ArrowRight width={15} height={15} aria-hidden />
         </button>
       </div>
@@ -135,8 +145,35 @@ function StackCard({
  * The Project stack: the per-Project Marketplace. Installing, enabling, and
  * uninstalling act on this Project, so it carries only the Plugins it needs.
  * This is the real install-per-project surface the global Marketplace points to.
+ *
+ * Split into what is actually there and what is not, rather than one mixed
+ * grid: an Operator looking at a Node or Service wants "what do I have" first,
+ * and "what could I add" as a clearly separate, secondary question, not the
+ * two interleaved.
+ *
+ * nodeId is optional and only meaningful when this is mounted somewhere that
+ * already has one Node in view (a Service's own page, not the Project page
+ * itself, which has none). When it is present, an installed Capability's own
+ * card opens straight into that Capability's management page for this Node,
+ * which is where its real visual manager (Sites, Queues, the Database
+ * Explorer, and so on) actually lives; without one there is nowhere to send
+ * that link, so it falls back to the read-only Marketplace catalog entry.
+ *
+ * serviceId is optional too, carried the same way. When mounted from a
+ * Service's own page it is that Service's id, and it rides along in the
+ * Manage link's query string so the management page it opens can narrow a
+ * database engine's Browse tab and credentials down to what this one Service
+ * actually uses, instead of everything on the whole Node.
  */
-export function ProjectStack({ projectId }: { projectId: string }) {
+export function ProjectStack({
+  projectId,
+  nodeId,
+  serviceId,
+}: {
+  projectId: string;
+  nodeId?: string;
+  serviceId?: string;
+}) {
   const navigate = useNavigate();
   const { state, reload } = useAsyncData((signal) => loadStack(projectId, signal), [projectId]);
 
@@ -198,39 +235,88 @@ export function ProjectStack({ projectId }: { projectId: string }) {
     }
   };
 
-  return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Boxes width={20} height={20} className="text-brand" aria-hidden />
-        <Text variant="h3">Stack</Text>
-        <Guidance for="project.stack" />
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        The Plugins installed into this Project. Install only what this Project needs; each one
-        unlocks its Capabilities here and its Services can use them. The Core security bundle is on
-        every server and shows as built in.
-      </Text>
+  // openFor decides where a card's Manage/Details button goes, and which
+  // label it wears, for one Plugin.
+  function openFor(plugin: StackPlugin): { onOpen: () => void; label: 'Manage' | 'Details' } {
+    const installed = plugin.is_core || plugin.installed;
+    if (installed && nodeId && plugin.provides && plugin.provides.length > 0) {
+      const query = `?node=${nodeId}&project=${projectId}${serviceId ? `&service=${serviceId}` : ''}`;
+      return { onOpen: () => navigate(`/app/capabilities/${plugin.provides[0]}${query}`), label: 'Manage' };
+    }
+    return { onOpen: () => navigate(`/app/marketplace/${plugin.id}`), label: 'Details' };
+  }
 
+  const installed = state.status === 'ready' ? state.data.filter((p) => p.is_core || p.installed) : [];
+  const available = state.status === 'ready' ? state.data.filter((p) => !p.is_core && !p.installed) : [];
+
+  return (
+    <Section
+      title="Stack"
+      description="What this Project actually has installed, and what else is in the Marketplace and could be added. Install only what this Project needs; each one unlocks its Capabilities here and its Services can use them."
+      adornment={<Guidance for="project.stack" />}
+    >
       {state.status === 'loading' ? <Loading label="Loading the Project stack" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {actionError ? (
-        <p role="alert" className="mb-4 text-sm text-danger">
+        <p role="alert" className="text-sm text-danger">
           {actionError}
         </p>
       ) : null}
       {state.status === 'ready' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {state.data.map((plugin) => (
-            <StackCard
-              key={plugin.id}
-              plugin={plugin}
-              busy={busyId === plugin.id}
-              onInstall={() => runInstall(plugin)}
-              onToggle={() => runToggle(plugin)}
-              onUninstall={() => setPendingUninstall(plugin)}
-              onOpen={() => navigate(`/app/marketplace/${plugin.id}`)}
-            />
-          ))}
+        <div className="flex flex-col gap-6">
+          <div>
+            <Text variant="caption" tone="secondary" className="mb-3 block">
+              Installed
+            </Text>
+            {installed.length === 0 ? (
+              <Text variant="body-sm" tone="secondary">
+                Nothing is installed yet.
+              </Text>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {installed.map((plugin) => {
+                  const open = openFor(plugin);
+                  return (
+                    <StackCard
+                      key={plugin.id}
+                      plugin={plugin}
+                      busy={busyId === plugin.id}
+                      onInstall={() => runInstall(plugin)}
+                      onToggle={() => runToggle(plugin)}
+                      onUninstall={() => setPendingUninstall(plugin)}
+                      onOpen={open.onOpen}
+                      openLabel={open.label}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {available.length > 0 ? (
+            <div>
+              <Text variant="caption" tone="secondary" className="mb-3 block">
+                Available to add
+              </Text>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {available.map((plugin) => {
+                  const open = openFor(plugin);
+                  return (
+                    <StackCard
+                      key={plugin.id}
+                      plugin={plugin}
+                      busy={busyId === plugin.id}
+                      onInstall={() => runInstall(plugin)}
+                      onToggle={() => runToggle(plugin)}
+                      onUninstall={() => setPendingUninstall(plugin)}
+                      onOpen={open.onOpen}
+                      openLabel={open.label}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -249,6 +335,6 @@ export function ProjectStack({ projectId }: { projectId: string }) {
         onConfirm={runUninstall}
         onCancel={() => setPendingUninstall(null)}
       />
-    </section>
+    </Section>
   );
 }

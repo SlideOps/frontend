@@ -4,6 +4,7 @@ import { ArrowRight, Check, CheckCircle2, RefreshCw, ShieldCheck } from '@slideo
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /** A yes/no/unknown reading of an sshd directive from the last quick check. */
@@ -163,6 +164,7 @@ export function SecureServer({
   onRotate: () => void;
 }) {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const readiness = useAsyncData((signal) => getReadiness(nodeId, signal), [nodeId]);
 
   // Every measure the report knows about, satisfied or not, keyed by Capability.
@@ -210,15 +212,17 @@ export function SecureServer({
               : undefined
           }
           action={
-            <Button size="sm" variant="secondary" onClick={onDiscover} disabled={discovering}>
-              <RefreshCw
-                width={15}
-                height={15}
-                className={discovering ? 'animate-spin' : undefined}
-                aria-hidden
-              />
-              {discovering ? 'Reading the server' : 'Run the quick check'}
-            </Button>
+            canWrite ? (
+              <Button size="sm" variant="secondary" onClick={onDiscover} disabled={discovering}>
+                <RefreshCw
+                  width={15}
+                  height={15}
+                  className={discovering ? 'animate-spin' : undefined}
+                  aria-hidden
+                />
+                {discovering ? 'Reading the server' : 'Run the quick check'}
+              </Button>
+            ) : undefined
           }
         >
           Read the server over SSH first so the steps that follow are planned from what is really

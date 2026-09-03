@@ -25,6 +25,13 @@ export type ServiceRuntime = 'container' | 'systemd' | 'compose';
 export type ServiceStatus = 'deploying' | 'running' | 'stopped' | 'failed' | 'removed';
 
 /**
+ * software is an application an Operator deploys and runs; capability is
+ * infrastructure a Project depends on (a database, a cache), deployed
+ * through deployCapabilities rather than deployService.
+ */
+export type ServiceDeploymentType = 'software' | 'capability';
+
+/**
  * Where a Service's workload comes from. An image source runs a prebuilt image;
  * a repository source clones the repository and builds it first. `command` is
  * the entrypoint for a systemd unit or an override for a container.
@@ -33,9 +40,12 @@ export interface ServiceSource {
   /**
    * `adopted` marks a workload that was already running when SlideOps found it,
    * so there is no image or repository to rebuild it from; the image, where the
-   * runtime reports one, is kept for display only.
+   * runtime reports one, is kept for display only. `capability` marks a
+   * Capability Service: there is nothing here to build either, for the
+   * opposite reason -- what is running is several independently tracked
+   * Capabilities, not one workload this shape could describe.
    */
-  type: 'image' | 'repository' | 'adopted';
+  type: 'image' | 'repository' | 'adopted' | 'capability';
   image?: string;
   repository_url?: string;
   /** The branch to clone and pull for a repository source. Defaults to main. */
@@ -75,6 +85,8 @@ export interface Service {
   name: string;
   project_id: string;
   node_id: string;
+  /** software or capability. */
+  deployment_type: ServiceDeploymentType;
   runtime: ServiceRuntime;
   source: ServiceSource;
   cpu_limit: number;
@@ -130,6 +142,52 @@ export interface Service {
   public_urls?: string[];
   created_at: string;
   updated_at?: string;
+  /** This Service's automatic deployment configuration. Off by default. */
+  cicd: ServiceCICD;
+  /**
+   * What a Capability Service tracks: which engines compose it, and how
+   * each is doing. Undefined for a software Service, which tracks none.
+   */
+  capabilities?: ServiceCapability[];
+}
+
+/** How one Capability a Capability Service tracks is doing. */
+export type ServiceCapabilityStatus = 'running' | 'done' | 'failed';
+
+/** One Capability tracked as part of a Capability Service. */
+export interface ServiceCapability {
+  capability_key: string;
+  operation_id: string;
+  status: ServiceCapabilityStatus;
+  created_at: string;
+}
+
+/** Where a BuildModeExternal Service's running image actually comes from. */
+export type ServiceBuildMode = 'slideops' | 'external';
+
+/**
+ * A Service's automatic deployment settings, as read back. Never carries a
+ * secret plaintext: `*_configured` says whether one is stored, not what it is.
+ */
+export interface ServiceCICD {
+  auto_deploy: boolean;
+  build_mode: ServiceBuildMode;
+  /**
+   * Whether a GitHub push webhook was successfully registered. False with
+   * auto_deploy true means the polling fallback is what is actually running
+   * it; the CI/CD tab explains why.
+   */
+  webhook_configured: boolean;
+  /**
+   * Whether a deploy hook token has been rotated at least once. The token
+   * itself is only ever returned once, at the moment it is rotated.
+   */
+  deploy_hook_configured: boolean;
+  registry_url?: string;
+  registry_username?: string;
+  registry_configured: boolean;
+  /** The image the most recent deploy hook call or artifact upload deployed. */
+  last_external_image?: string;
 }
 
 /**
@@ -235,6 +293,66 @@ export function deployService(input: DeployServiceInput): Promise<Service> {
   );
 }
 
+/** One Capability to install as part of a Capability Service. */
+export interface CapabilitySelectionInput {
+  capability_key: string;
+  parameters?: Record<string, unknown>;
+}
+
+/** The fields required to deploy a Capability Service. */
+export interface DeployCapabilitiesInput {
+  name: string;
+  project_id?: string;
+  node_id: string;
+  capabilities: CapabilitySelectionInput[];
+}
+
+/**
+ * Deploy a Capability Service: several infrastructure Capabilities put in
+ * place together as one named Service a Project depends on, instead of one
+ * unrelated Service per engine.
+ *
+ * Each Capability still runs as its own real Operation -- planned, approved,
+ * executed, verified, recorded in History -- exactly as starting it on its
+ * own would. They do not depend on each other, so one failing does not stop
+ * the rest: the Service ends up running with whichever succeeded, and
+ * `last_error` names whichever did not.
+ *
+ * Returns immediately with the Service at `deploying`. Watch it complete with
+ * getService or the realtime stream.
+ */
+export function deployCapabilities(input: DeployCapabilitiesInput): Promise<Service> {
+  return apiRequest<unknown>('/services/capabilities', { method: 'POST', body: input }).then((r) =>
+    unwrap<Service>(r, 'service'),
+  );
+}
+
+/**
+ * Add one more Capability to an existing Capability Service, run the same
+ * way the initial deploy ran each one. Refused for a software Service, and
+ * refused for a Capability the Service already tracks -- reconfiguring an
+ * existing one is that Capability's own Configure action, not this one.
+ */
+export function addServiceCapability(
+  serviceId: string,
+  selection: CapabilitySelectionInput,
+): Promise<Service> {
+  return apiRequest<unknown>(`/services/${serviceId}/capabilities`, {
+    method: 'POST',
+    body: selection,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** What a Capability Service currently tracks. */
+export function listServiceCapabilities(
+  serviceId: string,
+  signal?: AbortSignal,
+): Promise<ServiceCapability[]> {
+  return apiRequest<unknown>(`/services/${serviceId}/capabilities`, { signal }).then((r) =>
+    unwrap<ServiceCapability[]>(r, 'capabilities'),
+  );
+}
+
 /** Start a stopped Service's workload. */
 export function startService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}/start`, { method: 'POST' });
@@ -250,9 +368,23 @@ export function restartService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}/restart`, { method: 'POST' });
 }
 
-/** Stop and remove a Service's workload, freeing its allocation. */
+/** Stop and remove a Service's workload, freeing its allocation. The Service
+ * stays on record, so it can still be seen and never be redeployed. */
 export function removeService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * Permanently delete a Service: its record, its activity trail, and any
+ * secret it holds for an environment variable, all gone for good. Unlike
+ * removeService, there is no coming back from this.
+ *
+ * Refused with confirmation_mismatch unless confirm is exactly
+ * `"delete " + the Service's own name`, read back from what the Operator
+ * typed rather than a checkbox, since this cannot be undone.
+ */
+export function purgeService(id: string, confirm: string): Promise<void> {
+  return apiRequest<void>(`/services/${id}/purge`, { method: 'DELETE', body: { confirm } });
 }
 
 /**
@@ -325,6 +457,87 @@ export function checkServiceUpdate(id: string, signal?: AbortSignal): Promise<Se
   return apiRequest<unknown>(`/services/${id}/update-check`, { signal }).then((r) =>
     unwrap<ServiceUpdate>(r, 'update'),
   );
+}
+
+/**
+ * What the CI/CD tab's settings form edits together.
+ *
+ * `registry_password` follows the same convention a secret env value does:
+ * omit it to leave a stored credential untouched, since a sealed value cannot
+ * be read back into the form to show unchanged; send an empty string to
+ * clear it; send anything else to replace it.
+ */
+export interface UpdateServiceCICDInput {
+  auto_deploy: boolean;
+  build_mode: ServiceBuildMode;
+  registry_url: string;
+  registry_username: string;
+  registry_password?: string;
+}
+
+/**
+ * Update a Service's automatic deployment settings. Turning auto-deploy on in
+ * slideops mode for a repository this platform can reach on GitHub tries to
+ * register a push webhook; if that fails, auto-deploy is still turned on,
+ * backed by the polling fallback, and why is on `listServiceDeployEvents`.
+ */
+export function updateServiceCICD(id: string, input: UpdateServiceCICDInput): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/cicd`, {
+    method: 'PUT',
+    body: input,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** A newly rotated deploy hook token, and the Service it belongs to. */
+export interface DeployHookToken {
+  service: Service;
+  /** The plaintext bearer token, shown exactly once. It cannot be read back
+   *  after this call; rotate again to replace it. */
+  token: string;
+}
+
+/**
+ * Rotate a Service's deploy hook token, replacing any existing one. Put the
+ * returned token wherever an external CI's deploy hook or artifact upload
+ * call authenticates from; it is never shown again after this call returns.
+ */
+export function rotateDeployHookToken(id: string): Promise<DeployHookToken> {
+  return apiRequest<DeployHookToken>(`/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`, {
+    method: 'POST',
+  });
+}
+
+/** What caused a deploy attempt to run, for the CI/CD activity trail. */
+export type DeployEventTrigger = 'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
+
+/** What happened once that trigger fired. */
+export type DeployEventOutcome = 'redeploy_started' | 'skipped' | 'error';
+
+/** One entry in a Service's CI/CD activity trail. */
+export interface DeployEvent {
+  id: string;
+  trigger: DeployEventTrigger;
+  commit_sha?: string;
+  image?: string;
+  outcome: DeployEventOutcome;
+  detail?: string;
+  created_at: string;
+}
+
+/**
+ * A Service's CI/CD activity trail, newest first: what triggered a deploy
+ * attempt and what happened. This is what explains a skipped or failed
+ * automatic deploy once a webhook, not a click, is what starts one.
+ */
+export function listServiceDeployEvents(
+  id: string,
+  limit?: number,
+  signal?: AbortSignal,
+): Promise<DeployEvent[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/cicd/deploy-events`, {
+    query: { limit },
+    signal,
+  }).then((r) => unwrap<DeployEvent[]>(r, 'events'));
 }
 
 /**
@@ -528,4 +741,90 @@ export function getServiceActivity(
     `/services/${encodeURIComponent(id)}/activity?limit=${encodeURIComponent(String(limit))}`,
     { signal },
   ).then((r) => unwrap<ServiceActivity[]>(r, 'activity'));
+}
+
+/**
+ * The Capability instance to connect: a specific completed Operation, not
+ * "the Capability" in the abstract -- the same Operation its own credential
+ * card already points at, so Connect always wires in the exact credential
+ * shown. `env_prefix` is optional; leaving it out picks a sensible default
+ * from the Capability's own family (DATABASE for Postgres/MySQL/MariaDB/
+ * MongoDB, REDIS for Redis).
+ */
+export interface ConnectCapabilityInput {
+  node_id: string;
+  capability_key: string;
+  operation_id: string;
+  env_prefix?: string;
+}
+
+/**
+ * Wire a Capability's connection details into a Service's environment --
+ * host, port, database, username, its password when it has one, and a ready
+ * to use URL -- keeping every variable already there, and redeploy so it
+ * applies immediately. One call, not a config edit followed by a separate
+ * redeploy.
+ */
+export function connectCapability(serviceId: string, input: ConnectCapabilityInput): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connect`, {
+    method: 'POST',
+    body: input,
+  }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/** One recorded Connect action. */
+export interface ServiceConnection {
+  id: string;
+  service_id: string;
+  source_node_id: string;
+  source_capability_key: string;
+  source_operation_id: string;
+  env_prefix: string;
+  created_at: string;
+}
+
+/** What a Service is connected to. */
+export function getServiceConnections(serviceId: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, { signal }).then((r) =>
+    unwrap<ServiceConnection[]>(r, 'connections'),
+  );
+}
+
+/**
+ * What's using a Capability: every Service connected to it on this Node.
+ * This doubles as the plain "what talks to what" list -- not a diagram,
+ * just names.
+ */
+export function getCapabilityConnections(
+  nodeId: string,
+  capabilityKey: string,
+  signal?: AbortSignal,
+): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/connections`,
+    { signal },
+  ).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
+}
+
+/** How a single Preflight check came out. */
+export type PreflightStatus = 'pass' | 'warn' | 'fail';
+
+/** One thing Preflight looked at. */
+export interface PreflightCheck {
+  name: string;
+  status: PreflightStatus;
+  message: string;
+}
+
+/**
+ * Check a deploy before running it: the Node answers, the chosen runtime's
+ * own tool is present, every manually chosen port is actually free, and a
+ * rough read of whether the Node currently has the CPU and memory
+ * requested. Read only -- nothing about the Node changes, and nothing here
+ * blocks an actual deploy; every check is advisory.
+ */
+export function preflightDeploy(input: DeployServiceInput): Promise<PreflightCheck[]> {
+  return apiRequest<unknown>('/services/preflight', { method: 'POST', body: input }).then((r) =>
+    unwrap<PreflightCheck[]>(r, 'checks'),
+  );
 }

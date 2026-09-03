@@ -25,6 +25,7 @@ import { StepTimeline } from '../components/StepTimeline';
 import { VerificationView } from '../components/VerificationView';
 import { OperatorShell } from '../components/OperatorShell';
 import { useOperationsStore } from '../store/operations';
+import { useCanWrite } from '../../store/workspace';
 
 const PRE_EXECUTION: OperationStatus[] = [
   'created',
@@ -70,6 +71,7 @@ function StreamIndicator({ status }: { status: StreamStatus }) {
 export function OperationDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
 
   const events = useOperationsStore((state) => state.events[id] ?? EMPTY_EVENTS);
   const ingest = useOperationsStore((state) => state.ingest);
@@ -80,6 +82,9 @@ export function OperationDetail() {
   // connection. It never blocks the page: if it cannot be fetched, the card
   // simply shows no host.
   const [nodeHost, setNodeHost] = useState<string | undefined>(undefined);
+  const [nodeDockerBridgeAddress, setNodeDockerBridgeAddress] = useState<string | undefined>(
+    undefined,
+  );
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -140,6 +145,7 @@ export function OperationDetail() {
       .then((node) => {
         if (active) {
           setNodeHost(node.address);
+          setNodeDockerBridgeAddress(node.docker_bridge_address);
         }
       })
       .catch(() => {
@@ -206,6 +212,12 @@ export function OperationDetail() {
   const isRunning = RUNNING.includes(status);
   const hasExecution =
     isRunning || status === 'completed' || status === 'failed' || status === 'cancelled';
+  // A rollback only genuinely ran when the engine's own rollback step marked
+  // its event this way. An Operation that failed before ever executing, or
+  // one caught by restart recovery (whose process died before any rollback
+  // could run), never gets one, so this must not be assumed from "failed"
+  // alone: that would claim an undo that never happened.
+  const rolledBack = events.some((e) => e.data?.rollback === true);
 
   return (
     <OperatorShell active="operations">
@@ -249,7 +261,7 @@ export function OperationDetail() {
           <XCircle width={18} height={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
           <div>
             <Text variant="body-sm" className="font-medium">
-              The Operation failed and was rolled back
+              {rolledBack ? 'The Operation failed and was rolled back' : 'The Operation failed'}
             </Text>
             <Text variant="body-sm" tone="secondary" className="mt-0.5">
               {operation.error}
@@ -292,24 +304,30 @@ export function OperationDetail() {
               </div>
               <PlanReview plan={operation.plan} />
               <Card>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    size="lg"
-                    onClick={approve}
-                    disabled={approving || status !== 'awaiting_approval'}
-                  >
-                    {approving ? 'Approving' : 'Approve and run'}
-                  </Button>
-                  <Guidance for="operation.approve" />
-                  <Button variant="ghost" size="lg" onClick={cancel} disabled={cancelling}>
-                    {cancelling ? 'Cancelling' : 'Cancel'}
-                  </Button>
-                  {status !== 'awaiting_approval' ? (
-                    <Text variant="body-sm" tone="secondary">
-                      Preparing the plan. Approval opens when it is ready.
-                    </Text>
-                  ) : null}
-                </div>
+                {canWrite ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      size="lg"
+                      onClick={approve}
+                      disabled={approving || status !== 'awaiting_approval'}
+                    >
+                      {approving ? 'Approving' : 'Approve and run'}
+                    </Button>
+                    <Guidance for="operation.approve" />
+                    <Button variant="ghost" size="lg" onClick={cancel} disabled={cancelling}>
+                      {cancelling ? 'Cancelling' : 'Cancel'}
+                    </Button>
+                    {status !== 'awaiting_approval' ? (
+                      <Text variant="body-sm" tone="secondary">
+                        Preparing the plan. Approval opens when it is ready.
+                      </Text>
+                    ) : null}
+                  </div>
+                ) : (
+                  <Text variant="body-sm" tone="secondary">
+                    Approving or cancelling needs a role above Viewer in this workspace.
+                  </Text>
+                )}
                 {actionError ? (
                   <p role="alert" className="mt-3 text-sm text-danger">
                     {actionError}
@@ -346,7 +364,7 @@ export function OperationDetail() {
               flush
               adornment={<Guidance for="operation.terminal" />}
               action={
-                isRunning ? (
+                isRunning && canWrite ? (
                   <Button variant="danger" size="sm" onClick={cancel} disabled={cancelling}>
                     {cancelling ? 'Cancelling' : 'Cancel'}
                   </Button>
@@ -374,7 +392,11 @@ export function OperationDetail() {
             ) : null}
 
             {status === 'completed' ? (
-              <CredentialsCard operation={operation} host={nodeHost} />
+              <CredentialsCard
+                operation={operation}
+                host={nodeHost}
+                dockerBridgeAddress={nodeDockerBridgeAddress}
+              />
             ) : null}
           </div>
         </div>

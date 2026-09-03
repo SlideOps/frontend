@@ -1,9 +1,10 @@
 import { Button, Text } from '@slideops/design-system';
 import {
+  Activity,
   ArrowRight,
   Check,
-  Cpu,
-  FolderKanban,
+  Container,
+  Database,
   GitBranch,
   Server,
   ShieldCheck,
@@ -12,318 +13,107 @@ import {
 import { Link } from 'react-router-dom';
 import { signUpUrl } from '../content/site';
 
-const assurances = [
-  'Your servers stay yours',
-  'Approval before any change',
-  'Verified after every execution',
+const deploymentModes = [
+  { icon: GitBranch, label: 'Repository', detail: 'Deploy from Git with a repeatable plan.' },
+  { icon: Container, label: 'Container', detail: 'Adopt running Docker workloads with context.' },
+  { icon: Database, label: 'Capability', detail: 'Install and manage databases as first-class services.' },
 ];
 
-const families = ['Ubuntu', 'Debian', 'Fedora', 'Arch', 'Alpine', 'openSUSE'];
+const assurances = ['Your servers stay yours', 'Approval before changes', 'Verified after execution'];
 
-/** The hero. A large fox mark sits behind the colored ground like a mark behind
- *  frosted glass, blinking, and it settles in first; the content then rises in,
- *  one block after another, replaying on every load. Every color is a token (the
- *  fox uses the palette variables), so the whole scene flips with the theme, and
- *  the global reduced-motion guard stills all of it. */
 export function Hero() {
   return (
-    <section id="top" className="relative isolate overflow-hidden">
-      {/* Colored ground, the glass wall */}
-      <div
-        aria-hidden
-        className="so-drift pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-subtle via-app to-app opacity-80"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-40 top-1/3 z-0 h-96 w-96 rounded-pill bg-brand/10 blur-3xl"
-      />
-
-      {/* The fox behind the glass */}
-      <FoxBackdrop />
-
-      <div className="relative z-10 mx-auto grid max-w-6xl gap-14 px-6 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-32">
-        <div className="max-w-2xl">
-          <span
-            className="so-rise inline-flex items-center gap-2 rounded-pill border border-border bg-surface/80 px-3.5 py-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted backdrop-blur"
-            style={{ animationDelay: '340ms' }}
-          >
-            <ShieldCheck width={14} height={14} className="text-brand" aria-hidden />
-            Infrastructure Operations, in plain language
-          </span>
-
-          <h1
-            className="so-rise mt-6 text-balance font-display text-[2.05rem] font-semibold leading-[1.06] tracking-tight text-ink sm:text-4xl md:text-5xl lg:text-[3.25rem]"
-            style={{ animationDelay: '460ms' }}
-          >
-            Run your own servers with the{' '}
-            <span className="bg-gradient-to-r from-brand via-accent to-brand bg-clip-text text-transparent">
-              confidence
-            </span>{' '}
-            of a whole platform team.
+    <>
+      <section id="top" className="relative overflow-hidden border-b border-border">
+        <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_bottom,black,transparent_74%)]" />
+        <div className="relative mx-auto max-w-6xl px-6 pb-16 pt-20 text-center md:pb-24 md:pt-28">
+          <div className="so-rise mx-auto inline-flex items-center gap-2 rounded-pill border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink-muted shadow-sm">
+            <ShieldCheck width={14} height={14} className="text-success" aria-hidden />
+            Infrastructure operations, in plain language
+          </div>
+          <h1 className="so-rise-2 mx-auto mt-7 max-w-4xl text-balance font-display text-5xl font-semibold leading-[0.98] tracking-tight text-ink md:text-7xl">
+            Operate your own infrastructure with confidence.
           </h1>
-
-          <Text
-            variant="body"
-            tone="secondary"
-            className="so-rise mt-5 max-w-md text-base"
-            style={{ animationDelay: '600ms' }}
-          >
-            Connect your Linux servers over SSH and operate them from one calm command center.
-            SlideOps drives the tools you already run, and never owns your infrastructure. You do.
+          <Text variant="body" tone="secondary" className="so-rise-3 mx-auto mt-6 max-w-2xl text-base md:text-lg">
+            SlideOps turns SSH, Docker, systemd, databases, and security into one observable control plane. You stay in charge of the servers. Every meaningful change is planned, approved, verified, and recorded.
           </Text>
-
-          <div
-            className="so-rise mt-8 flex flex-wrap items-center gap-3"
-            style={{ animationDelay: '740ms' }}
-          >
+          <div className="so-rise-3 mt-8 flex flex-wrap justify-center gap-3">
             <Link to={signUpUrl}>
               <Button size="lg" className="group">
-                Get started
-                <ArrowRight
-                  width={18}
-                  height={18}
-                  aria-hidden
-                  className="transition-transform duration-fast ease-standard group-hover:translate-x-0.5"
-                />
+                Connect a server
+                <ArrowRight width={17} height={17} className="transition-transform group-hover:translate-x-0.5" aria-hidden />
               </Button>
             </Link>
-            <a href="#how">
-              <Button size="lg" variant="secondary">
-                See how it works
-              </Button>
-            </a>
+            <Link to="/docs"><Button size="lg" variant="secondary">Read the docs</Button></Link>
           </div>
-
-          <ul
-            className="so-rise mt-8 flex flex-wrap items-center gap-x-5 gap-y-2.5"
-            style={{ animationDelay: '860ms' }}
-          >
-            {assurances.map((line, index) => (
-              <li key={line} className="flex items-center gap-2">
-                {index > 0 ? (
-                  <span aria-hidden className="hidden h-3.5 w-px bg-border sm:block" />
-                ) : null}
-                <ShieldCheck width={16} height={16} className="text-accent" aria-hidden />
-                <Text as="span" variant="body-sm" tone="secondary">
-                  {line}
-                </Text>
+          <ul className="so-rise-3 mx-auto mt-8 flex max-w-2xl flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-ink-muted">
+            {assurances.map((assurance) => (
+              <li key={assurance} className="inline-flex items-center gap-1.5">
+                <Check width={13} height={13} className="text-success" aria-hidden />
+                {assurance}
               </li>
             ))}
           </ul>
-
-          <div className="so-rise mt-8" style={{ animationDelay: '960ms' }}>
-            <Text as="span" variant="caption" tone="secondary">
-              Works across the major Linux families
-            </Text>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {families.map((family) => (
-                <li
-                  key={family}
-                  className="rounded-pill border border-border bg-surface/70 px-3 py-1 text-xs font-medium text-ink-muted"
-                >
-                  {family}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ProductPreview />
         </div>
-
-        <div className="so-rise" style={{ animationDelay: '640ms' }}>
-          <HeroVisual />
+      </section>
+      <section className="border-b border-border bg-subtle/40">
+        <div className="mx-auto grid max-w-6xl gap-px px-6 py-12 md:grid-cols-3 md:py-16">
+          {deploymentModes.map(({ icon: Icon, label, detail }) => (
+            <div key={label} className="border-border px-4 py-4 md:border-l md:first:border-l-0 md:px-8">
+              <Icon width={19} height={19} className="text-ink-muted" aria-hidden />
+              <Text variant="h4" className="mt-4">{label}</Text>
+              <Text variant="body-sm" tone="secondary" className="mt-1 max-w-xs">{detail}</Text>
+            </div>
+          ))}
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
-/** The geometric fox mark, large, bleeding off the top-right, behind the glass.
- *  Its fills are the palette variables so it stays on-brand in both themes, and
- *  its eyes blink. Purely decorative. */
-function FoxBackdrop() {
+function ProductPreview() {
   return (
-    <div
-      aria-hidden
-      className="so-fox pointer-events-none absolute left-1/2 top-1/2 z-0 w-[86%] max-w-[1040px] -translate-x-1/2 -translate-y-1/2"
-    >
-      <svg viewBox="9 9 82 82" className="so-fade-in h-auto w-full">
-        <polygon
-          points="50,31 41,31 16,15 28,45 21,51 35,73 50,86"
-          style={{ fill: 'var(--so-marsala)' }}
-        />
-        <polygon
-          points="50,31 59,31 84,15 72,45 79,51 65,73 50,86"
-          style={{ fill: 'var(--so-cognac)' }}
-        />
-        <polygon points="37,53 50,59 63,53 50,84" style={{ fill: 'var(--so-peach)' }} />
-        <g className="so-fox-eye">
-          <polygon points="28,45 42,48 34,55" style={{ fill: 'var(--so-neutral-50)' }} />
-          <polygon points="33,48 39,50 35,53" style={{ fill: 'var(--so-ink)' }} />
-        </g>
-        <g className="so-fox-eye">
-          <polygon points="72,45 58,48 66,55" style={{ fill: 'var(--so-neutral-50)' }} />
-          <polygon points="67,48 61,50 65,53" style={{ fill: 'var(--so-ink)' }} />
-        </g>
-        <polygon points="46,64 54,64 50,70" style={{ fill: 'var(--so-ink)' }} />
-      </svg>
-    </div>
-  );
-}
-
-/** A layered, gently floating product scene: a running Operation on a secured
- *  server, framed by a Project chip and a live metrics chip. All tokens. */
-function HeroVisual() {
-  return (
-    <div className="relative mx-auto w-full max-w-md lg:mr-0 lg:max-w-none">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-6 -z-10 rounded-pill bg-gradient-to-br from-brand/15 via-highlight/10 to-highlight/25 blur-3xl"
-      />
-
-      <div className="so-float-slow relative">
-        {/* Depth: an offset card edge behind, hinting at more servers */}
-        <div
-          aria-hidden
-          className="absolute -right-3 -top-3 h-full w-full rounded-2xl border border-border bg-raised/60"
-        />
-
-        {/* Gradient hairline frame around the main card */}
-        <div className="relative rounded-2xl bg-gradient-to-br from-brand/25 via-border to-highlight/30 p-px shadow-lg">
-          <div className="rounded-2xl bg-surface p-5">
-            {/* Server posture header */}
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-raised px-4 py-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-subtle text-brand">
-                <Server width={20} height={20} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <Text as="span" variant="body-sm" className="block font-semibold">
-                  edge-01
-                </Text>
-                <Text as="span" variant="caption" tone="secondary">
-                  Secured, no root, non-root sudo
-                </Text>
-              </div>
-              <span className="ml-auto inline-flex items-center gap-1.5 rounded-pill border border-border bg-app px-2.5 py-1 text-xs font-medium text-success">
-                <span aria-hidden className="relative flex h-1.5 w-1.5">
-                  <span className="so-pulse-soft absolute inline-flex h-full w-full rounded-pill bg-success" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-pill bg-success" />
-                </span>
-                Hardened
-              </span>
+    <div className="so-rise relative mx-auto mt-16 max-w-5xl text-left md:mt-20">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 text-xs text-ink-muted md:px-5">
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-success" /> edge-01</div>
+          <span>Node overview</span>
+          <span className="hidden md:inline">Updated just now</span>
+        </div>
+        <div className="grid md:grid-cols-[13rem_1fr]">
+          <aside className="hidden border-r border-border p-3 md:block">
+            <div className="mb-5 flex items-center gap-2 px-2 text-sm font-semibold"><Server width={15} height={15} aria-hidden /> SlideOps</div>
+            {['Overview', 'Services', 'Capabilities', 'History', 'Settings'].map((item, index) => (
+              <div key={item} className={`rounded-md px-2.5 py-2 text-xs ${index === 0 ? 'bg-subtle font-medium text-ink' : 'text-ink-muted'}`}>{item}</div>
+            ))}
+          </aside>
+          <div className="min-w-0 p-5 md:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div><Text variant="caption" tone="secondary">Server</Text><Text variant="h2" className="mt-1">edge-01</Text><Text variant="body-sm" tone="secondary" className="mt-1">Ubuntu 24.04 · 4 vCPU · 8 GB</Text></div>
+              <span className="inline-flex items-center gap-1.5 rounded-pill border border-border px-2.5 py-1 text-xs text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" /> Ready</span>
             </div>
-
-            {/* Live operation panel */}
-            <div className="mt-4 rounded-xl border border-border bg-app p-4">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">
-                  <Terminal width={15} height={15} className="text-accent" aria-hidden />
-                  <Text as="span" variant="caption" tone="secondary">
-                    Operation, executing
-                  </Text>
-                </span>
-                <Text as="span" variant="caption" tone="secondary">
-                  7 of 9
-                </Text>
-              </div>
-
-              <ul className="mt-3 flex flex-col gap-2 font-mono text-xs text-ink-muted">
-                <li className="flex items-center gap-2">
-                  <Check width={14} height={14} className="text-success" aria-hidden />
-                  install container runtime
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check width={14} height={14} className="text-success" aria-hidden />
-                  pull main from github
-                </li>
-                <li className="flex items-center gap-2 text-ink">
-                  <span aria-hidden className="text-accent">
-                    &gt;
-                  </span>
-                  start service, 2 vCPU, 4 GB
-                  <span aria-hidden className="so-blink -ml-1 inline-block h-3.5 w-1.5 bg-accent" />
-                </li>
-              </ul>
-
-              {/* Progress track */}
-              <div className="mt-4 h-1.5 overflow-hidden rounded-pill bg-border">
-                <div className="h-full w-[76%] rounded-pill bg-gradient-to-r from-brand to-accent" />
-              </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <span className="inline-flex items-center rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-brand-fg">
-                  Approve
-                </span>
-                <span className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-ink-muted">
-                  Review plan
-                </span>
-              </div>
+            <div className="mt-7 grid gap-3 sm:grid-cols-3">
+              <Metric label="Services" value="06" detail="2 running now" />
+              <Metric label="Posture" value="92%" detail="1 recommendation" />
+              <Metric label="CPU usage" value="34%" detail="last 15 minutes" />
             </div>
-
-            {/* Verification result */}
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-border bg-raised px-4 py-3">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-subtle text-success">
-                <Check width={16} height={16} aria-hidden />
-              </span>
-              <Text as="span" variant="body-sm">
-                Verified and recorded. Rollback ready if a check fails.
-              </Text>
+            <div className="mt-6 border-y border-border">
+              <div className="flex items-center justify-between border-b border-border py-3"><span className="flex items-center gap-2 text-sm font-medium"><Activity width={15} height={15} aria-hidden /> Recent activity</span><span className="text-xs text-ink-muted">View history</span></div>
+              <ActivityRow icon={Terminal} title="Deploy API service" meta="Verified · 2 minutes ago" />
+              <ActivityRow icon={ShieldCheck} title="SSH hardening" meta="Completed · today" />
             </div>
           </div>
-        </div>
-
-        {/* Floating Project chip */}
-        <div className="so-float so-float-delay absolute -left-6 -top-6 hidden items-center gap-2.5 rounded-xl border border-border bg-surface px-3.5 py-2.5 shadow-md sm:flex">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-subtle text-brand">
-            <FolderKanban width={16} height={16} aria-hidden />
-          </span>
-          <div>
-            <Text as="span" variant="body-sm" className="block font-semibold leading-tight">
-              storefront
-            </Text>
-            <span className="mt-1 flex items-center gap-1.5">
-              <GitBranch width={11} height={11} className="text-accent" aria-hidden />
-              <Text as="span" variant="caption" tone="secondary">
-                pull deploy
-              </Text>
-            </span>
-          </div>
-        </div>
-
-        {/* Floating metrics chip */}
-        <div className="so-float absolute -bottom-6 -right-5 hidden w-44 flex-col gap-2 rounded-xl border border-border bg-surface px-4 py-3 shadow-md sm:flex">
-          <span className="flex items-center gap-2">
-            <Cpu width={14} height={14} className="text-accent" aria-hidden />
-            <Text as="span" variant="caption" tone="secondary">
-              Live usage, on their server
-            </Text>
-          </span>
-          <span>
-            <span className="flex items-center justify-between">
-              <Text as="span" variant="caption" tone="secondary">
-                CPU
-              </Text>
-              <Text as="span" variant="caption" tone="secondary">
-                34%
-              </Text>
-            </span>
-            <span className="mt-1 block h-1.5 overflow-hidden rounded-pill bg-border">
-              <span className="block h-full w-[34%] rounded-pill bg-brand" />
-            </span>
-          </span>
-          <span>
-            <span className="flex items-center justify-between">
-              <Text as="span" variant="caption" tone="secondary">
-                Memory
-              </Text>
-              <Text as="span" variant="caption" tone="secondary">
-                2.6 GB
-              </Text>
-            </span>
-            <span className="mt-1 block h-1.5 overflow-hidden rounded-pill bg-border">
-              <span className="block h-full w-[52%] rounded-pill bg-accent" />
-            </span>
-          </span>
         </div>
       </div>
     </div>
   );
+}
+
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="border border-border bg-app px-3 py-3"><Text variant="caption" tone="secondary">{label}</Text><Text variant="h3" className="mt-2 tabular-nums">{value}</Text><Text variant="caption" tone="secondary" className="mt-1">{detail}</Text></div>;
+}
+
+function ActivityRow({ icon: Icon, title, meta }: { icon: typeof Activity; title: string; meta: string }) {
+  return <div className="flex items-center gap-3 border-b border-border py-3 last:border-b-0"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-subtle text-ink-muted"><Icon width={14} height={14} aria-hidden /></span><span className="min-w-0 flex-1"><Text variant="body-sm" className="font-medium">{title}</Text><Text variant="caption" tone="secondary" className="mt-0.5">{meta}</Text></span><Check width={15} height={15} className="text-success" aria-hidden /></div>;
 }

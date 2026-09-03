@@ -1,44 +1,56 @@
 import {
   Activity,
   Boxes,
+  Building2,
   Clock,
   Container,
   CreditCard,
   FileText,
+  Fingerprint,
   FolderKanban,
   KeyRound,
   LayoutDashboard,
   Layers,
+  ListChecks,
   Package,
   Search,
   Server,
   Shield,
   ShieldCheck,
+  Terminal as TerminalIcon,
+  Users,
   X,
 } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
+import { useWorkspaceStore } from '../../store/workspace';
 import { NotificationsBell } from '../notifications/NotificationsBell';
 import { CommandPalette } from './CommandPalette';
 import { InstallApp } from './InstallApp';
 import { LogoutButton } from './LogoutButton';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export type ActiveKey =
   | 'home'
+  | 'workspaces'
   | 'nodes'
   | 'projects'
   | 'services'
+  | 'terminal'
   | 'capabilities'
   | 'marketplace'
   | 'automations'
+  | 'sshKeys'
+  | 'snippets'
   | 'operations'
   | 'credentials'
   | 'reports'
   | 'billing'
   | 'security'
-  | 'extensions';
+  | 'extensions'
+  | 'team';
 
 /** A visible affordance that opens the command palette, with its shortcut shown. */
 function SearchTrigger({ onOpen }: { onOpen: () => void }) {
@@ -100,7 +112,15 @@ function ShellNotice() {
 export function OperatorShell({ active, children }: { active: ActiveKey; children: ReactNode }) {
   const navigate = useNavigate();
   const operator = useAuthStore((state) => state.operator);
+  const refreshWorkspaces = useWorkspaceStore((state) => state.refresh);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Read once per app visit which workspaces this Operator can act in, so the
+  // switcher and every Viewer-role gate throughout the app have an answer
+  // before anything else on the page needs it.
+  useEffect(() => {
+    void refreshWorkspaces();
+  }, [refreshWorkspaces]);
 
   const nav: NavItem[] = [
     {
@@ -109,6 +129,22 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: LayoutDashboard,
       active: active === 'home',
       onSelect: () => navigate('/app'),
+    },
+    {
+      key: 'workspaces',
+      group: 'Workspace',
+      label: 'All Workspaces',
+      icon: Building2,
+      active: active === 'workspaces',
+      onSelect: () => navigate('/app/workspaces'),
+    },
+    {
+      key: 'team',
+      group: 'Workspace',
+      label: 'Team',
+      icon: Users,
+      active: active === 'team',
+      onSelect: () => navigate('/app/team'),
     },
     {
       key: 'nodes',
@@ -135,6 +171,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       onSelect: () => navigate('/app/services'),
     },
     {
+      key: 'terminal',
+      group: 'Your infrastructure',
+      label: 'Terminal',
+      icon: TerminalIcon,
+      active: active === 'terminal',
+      onSelect: () => navigate('/app/terminal'),
+    },
+    {
       key: 'capabilities',
       group: 'Set things up',
       label: 'Capabilities',
@@ -157,6 +201,22 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Clock,
       active: active === 'automations',
       onSelect: () => navigate('/app/automations'),
+    },
+    {
+      key: 'sshKeys',
+      group: 'Set things up',
+      label: 'SSH Keys',
+      icon: Fingerprint,
+      active: active === 'sshKeys',
+      onSelect: () => navigate('/app/ssh-keys'),
+    },
+    {
+      key: 'snippets',
+      group: 'Set things up',
+      label: 'Snippets',
+      icon: ListChecks,
+      active: active === 'snippets',
+      onSelect: () => navigate('/app/snippets'),
     },
     {
       key: 'operations',
@@ -227,6 +287,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
         surface="Operator"
         actions={
           <>
+            <WorkspaceSwitcher />
             <InstallApp />
             <SearchTrigger onOpen={() => setPaletteOpen(true)} />
             <NotificationsBell />

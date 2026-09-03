@@ -71,12 +71,23 @@ export function completedAgo(iso: string, now: Date = new Date()): string {
   return 'just now';
 }
 
-/** The hint shown beside a re-run action, for example "Already done just now". */
-export function completedHint(capabilityKey: string, iso: string, now: Date = new Date()): string {
+/**
+ * The hint shown beside a re-run action, for example "Already installed
+ * (version 16) 3 minutes ago". The version is omitted when the completing
+ * Operation recorded none, which is the case for a Capability with no version
+ * selection and for one installed before version selection existed.
+ */
+export function completedHint(
+  capabilityKey: string,
+  iso: string,
+  version?: string,
+  now: Date = new Date(),
+): string {
   const label = completionLabel(capabilityKey).toLowerCase();
   const ago = completedAgo(iso, now);
   const verb = label === 'done' ? 'done' : label;
-  return ago ? `Already ${verb} ${ago}` : `Already ${verb}`;
+  const versionPart = version ? ` (version ${version})` : '';
+  return ago ? `Already ${verb}${versionPart} ${ago}` : `Already ${verb}${versionPart}`;
 }
 
 /**

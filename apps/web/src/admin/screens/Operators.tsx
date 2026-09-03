@@ -153,7 +153,17 @@ export function Operators() {
                   interactive
                   onClick={() => navigate(`/admin/operators/${operator.id}`)}
                 >
-                  <TD className="font-medium">{operator.email}</TD>
+                  <TD className="font-medium">
+                    {operator.email}
+                    {operator.free_season ? (
+                      <span
+                        title="This Operator has a granted free season: every tier quota and feature gate lifted, with no payment required."
+                        className="ml-2 inline-flex items-center gap-1 rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-warning"
+                      >
+                        Free season
+                      </span>
+                    ) : null}
+                  </TD>
                   <TD>
                     <RoleBadge role={operator.role} />
                   </TD>

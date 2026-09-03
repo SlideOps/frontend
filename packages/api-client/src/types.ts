@@ -61,6 +61,10 @@ export interface Node {
   port: number;
   ssh_username: string;
   auth_kind: NodeAuthKind;
+  /** Which saved SSH key this Node's credential came from, for display only.
+   *  Null when the credential was pasted directly rather than drawn from the
+   *  library. */
+  ssh_key_id: string | null;
   project_id: string | null;
   os: string | null;
   distro: string | null;
@@ -69,6 +73,17 @@ export interface Node {
   tags: string[];
   last_discovered_at: string | null;
   created_at: string;
+  /**
+   * Where a container on this Node reaches a database or cache installed
+   * directly on the host — never `address` above, which a correctly
+   * configured firewall keeps such a service unreachable from on purpose.
+   * From the Node's most recent Discovery; empty until one has run, or on a
+   * Node without Docker. Never assume Docker's textbook 172.17.0.1 default
+   * in its place — a Node already running other containers commonly has
+   * this reconfigured, and that default is exactly the wrong address there.
+   */
+  docker_bridge_address?: string;
+  docker_bridge_subnet?: string;
 }
 
 /** The risk a Capability or a plan step carries. */
@@ -81,7 +96,22 @@ export type RiskLevel = 'low' | 'medium' | 'high';
  * public key. Types stay open ended so a new one never breaks rendering.
  */
 export type CapabilityParameterType =
-  'string' | 'text' | 'number' | 'boolean' | 'domain' | 'path' | 'public_key';
+  | 'string'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'domain'
+  | 'path'
+  | 'public_key'
+  | 'password'
+  /**
+   * A choice among the versions a Node's own package sources actually offer
+   * right now for this Capability, fetched live from
+   * getAvailableVersions rather than typed freely. Left unset, the
+   * Capability installs whatever the distribution's default package
+   * resolves to, exactly as it always has.
+   */
+  | 'version';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the
@@ -95,6 +125,11 @@ export interface CapabilityParameter {
   required: boolean;
   help: string;
   placeholder?: string;
+  /** An optional parameter that must never collapse behind an "Advanced
+   *  options" disclosure the way an ordinary optional parameter does, since it
+   *  is itself a reason an Operator opens the form -- pgvector being the
+   *  first. Absent or false for every ordinary optional parameter. */
+  notable?: boolean;
 }
 
 /**

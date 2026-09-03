@@ -146,7 +146,7 @@ export function Extensions() {
             SlideOps version, permissions, and what it provides.
           </Text>
           <a
-            href="https://slideops.com/docs/sdk"
+            href="https://useslideops.com/docs/sdk"
             className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Read the SDK documentation

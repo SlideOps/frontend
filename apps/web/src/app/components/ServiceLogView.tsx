@@ -258,7 +258,12 @@ export function ServiceLogView({ id }: { id: string }) {
         onScroll={handleScroll}
         role="log"
         aria-label="Live Service output"
-        className="max-h-80 w-full min-w-0 max-w-full overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
+        // resize-y gives this its own drag handle in the bottom-right corner, the
+        // same native control a textarea offers, so an Operator can pull it open
+        // for more context and pull it back down again. min-h keeps it from being
+        // dragged down to nothing; there is deliberately no max-h, since the
+        // whole point is letting it grow past its default.
+        className="h-80 min-h-32 w-full min-w-0 max-w-full resize-y overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
       >
         {entries.length > 0 ? (
           entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} />)

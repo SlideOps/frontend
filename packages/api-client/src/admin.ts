@@ -40,6 +40,9 @@ export interface AdminOperator {
   node_count: number;
   operation_count: number;
   last_active: string | null;
+  /** Whether this Operator carries a per-account free season: every tier quota
+   *  and feature gate lifted for them alone, with no payment required. */
+  free_season: boolean;
 }
 
 /** One cross-tenant Operation, enriched with the Operator email where cheap. */
@@ -269,6 +272,13 @@ export interface EmergencyState {
   any_engaged: boolean;
   /** The executions control under its original name, for older clients. */
   executions_paused: boolean;
+  /**
+   * The platform-wide free season: whether it is engaged, and its title and
+   * description. Kept apart from `controls` because its effect is the opposite
+   * of theirs: it opens access up rather than holding it back, is off by
+   * default, and is never touched by lockdown or release-all.
+   */
+  free_season: EmergencyControl;
 }
 
 /** Read every emergency control and its current state. */
@@ -283,6 +293,21 @@ export function setEmergencyControl(name: string, engaged: boolean): Promise<Eme
     `/admin/emergency/controls/${encodeURIComponent(name)}/${action}`,
     { method: 'POST' },
   );
+}
+
+/**
+ * Engage or release the platform-wide free season: lifts every tier quota and
+ * feature gate for every Operator, with no payment required, as if every
+ * account carried the richest tier. Admins are unaffected; they are unlimited
+ * by role regardless. Off by default, and a dedicated pair of routes rather
+ * than `setEmergencyControl`, since its effect is the opposite of every other
+ * control.
+ */
+export function setFreeSeason(engaged: boolean): Promise<EmergencyState> {
+  const action = engaged ? 'engage' : 'release';
+  return apiRequest<EmergencyState>(`/admin/emergency/free-season/${action}`, {
+    method: 'POST',
+  });
 }
 
 /**
@@ -353,7 +378,72 @@ export interface AdminPayment {
   status: 'pending' | 'success' | 'failed';
   promo_code?: string;
   term_months: number;
+  /** How much of this payment's base amount the automatic first-time annual
+   *  discount took off; absent or zero when it did not apply. */
+  annual_discount_minor?: number;
+  /** The provider's own transaction reference. Empty when there is nothing to
+   *  verify this payment against: one recorded before this was captured, or a
+   *  free tier grant that never reached a provider at all. */
+  provider_ref?: string;
+  /** Set only when an admin's manual recovery ran this payment through the
+   *  normal activation path, rather than a webhook confirming it on its own. */
+  recovered_at?: string;
+  recovery_reason?: string;
+  /** When the receipt was last sent, absent if never. */
+  receipt_sent_at?: string;
   created_at: string;
+}
+
+/** What SlideOps has on record for a payment, against what the provider itself
+ *  reports right now. Read only: asking for one changes nothing. */
+export interface PaymentReconciliation {
+  reference: string;
+  local_status: string;
+  provider_status: string;
+  match: boolean;
+}
+
+/**
+ * Ask the payment provider directly what it knows about a payment, and show it
+ * next to what SlideOps has on record. Changes nothing.
+ */
+export function verifyPayment(
+  reference: string,
+  signal?: AbortSignal,
+): Promise<PaymentReconciliation> {
+  return apiRequest<{ reconciliation?: PaymentReconciliation } & Partial<PaymentReconciliation>>(
+    `/admin/payments/${encodeURIComponent(reference)}/verify`,
+    { signal },
+  ).then((r) => r.reconciliation ?? (r as PaymentReconciliation));
+}
+
+/**
+ * Run a payment the provider confirms succeeded, but that SlideOps never
+ * correctly recorded, through the exact same activation path a real webhook
+ * would have used: the tier is granted, the subscription activated, any promo
+ * redeemed, and the receipt sent. The provider is asked to confirm the
+ * transaction fresh, right before activating; an admin's word alone is never
+ * enough.
+ *
+ * Safe to call twice: a payment already successful comes back unchanged.
+ */
+export function recoverPayment(reference: string, reason: string): Promise<AdminPayment> {
+  return apiRequest<{ payment?: AdminPayment } & Partial<AdminPayment>>(
+    `/admin/payments/${encodeURIComponent(reference)}/recover`,
+    { method: 'POST', body: { reason } },
+  ).then((r) => r.payment ?? (r as AdminPayment));
+}
+
+/**
+ * Resend the receipt for an already-successful payment. Only ever resends the
+ * email: no tier is granted again, no promo is redeemed again, no subscription
+ * state changes.
+ */
+export function resendPaymentReceipt(reference: string): Promise<AdminPayment> {
+  return apiRequest<{ payment?: AdminPayment } & Partial<AdminPayment>>(
+    `/admin/payments/${encodeURIComponent(reference)}/resend-receipt`,
+    { method: 'POST' },
+  ).then((r) => r.payment ?? (r as AdminPayment));
 }
 
 /** A subscriber with their payment history. */

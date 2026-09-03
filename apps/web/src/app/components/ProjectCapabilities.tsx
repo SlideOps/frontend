@@ -7,8 +7,8 @@ import {
   type CapabilityState,
   type Node,
 } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, History, Layers, RotateCcw, Server } from '@slideops/icons';
+import { Button, Section, Text } from '@slideops/design-system';
+import { ArrowRight, History, RotateCcw, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { useState } from 'react';
@@ -122,7 +122,7 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
     return (
       <div className="flex flex-col gap-2">
         <Text variant="caption" tone="secondary">
-          {completedHint(capability.key, state.last_completed_at ?? '')}
+          {completedHint(capability.key, state.last_completed_at ?? '', state.version)}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => navigate(`/app/operations/${state.last_operation_id}`)}>
@@ -152,18 +152,11 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
   };
 
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Layers width={20} height={20} className="text-brand" aria-hidden />
-        <Text variant="h3">Capabilities available here</Text>
-        <Guidance for="project.capabilities" />
-      </div>
-      <Text variant="body-sm" tone="secondary" className="mb-4 max-w-2xl">
-        The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start
-        an Operation on one of this Project's servers; a Plugin Capability runs with this Project's
-        context.
-      </Text>
-
+    <Section
+      title="Capabilities available here"
+      description="The Core security Capabilities plus the ones this Project's installed Plugins unlock. Start an Operation on one of this Project's servers; a Plugin Capability runs with this Project's context."
+      adornment={<Guidance for="project.capabilities" />}
+    >
       {state.status === 'loading' ? (
         <Loading label="Loading the Capabilities for this Project" />
       ) : null}
@@ -177,7 +170,7 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
           />
         ) : (
           <>
-            <div className="mb-4 flex max-w-md flex-wrap items-center gap-3">
+            <div className="flex max-w-md flex-wrap items-center gap-3">
               <label htmlFor="capability-server" className="text-sm font-medium text-ink">
                 Run on server
               </label>
@@ -216,6 +209,6 @@ export function ProjectCapabilities({ projectId }: { projectId: string }) {
           </>
         )
       ) : null}
-    </section>
+    </Section>
   );
 }

@@ -67,8 +67,20 @@ describe('the words for an outcome already in place', () => {
   });
 
   it('still reads a recorded completion as work SlideOps did', () => {
-    expect(completedHint('install-postgresql', '2026-07-26T11:00:00Z', NOW)).toBe(
+    expect(completedHint('install-postgresql', '2026-07-26T11:00:00Z', undefined, NOW)).toBe(
       'Already installed 1 hour ago',
+    );
+  });
+
+  it('names the version the completing Operation actually ran with', () => {
+    expect(completedHint('install-postgresql', '2026-07-26T11:00:00Z', '16', NOW)).toBe(
+      'Already installed (version 16) 1 hour ago',
+    );
+  });
+
+  it('omits the version for a Capability with none recorded, existing installs included', () => {
+    expect(completedHint('install-postgresql', '2026-07-26T11:00:00Z', undefined, NOW)).not.toContain(
+      'version',
     );
   });
 });

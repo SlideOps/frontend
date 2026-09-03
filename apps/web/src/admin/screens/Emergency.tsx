@@ -5,11 +5,12 @@ import {
   getEmergencyState,
   revokeAllSessions,
   setEmergencyControl,
+  setFreeSeason,
   type EmergencyControl,
   type EmergencyState,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { AlertTriangle, Lock, LogOut, ShieldCheck } from '@slideops/icons';
+import { AlertTriangle, Lock, LogOut, ShieldCheck, Unlock } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { AdminShell } from '../components/AdminShell';
@@ -32,6 +33,7 @@ import { useAsyncData } from '../hooks/useAsyncData';
 
 type Pending =
   | { kind: 'control'; control: EmergencyControl }
+  | { kind: 'free-season'; engaged: boolean }
   | { kind: 'lockdown' }
   | { kind: 'release-all' }
   | { kind: 'revoke-sessions' };
@@ -116,6 +118,13 @@ export function Emergency() {
           control.engaged ? `${control.title} is running again.` : `${control.title} is now held.`,
         );
       }
+      case 'free-season':
+        return run(
+          () => setFreeSeason(!pending.engaged),
+          pending.engaged
+            ? 'Free season has ended. Every account is back on its own tier.'
+            : 'Free season has started. Every Operator has full access with no payment required.',
+        );
       case 'lockdown':
         return run(emergencyLockdown, 'Every control is engaged. The platform is locked down.');
       case 'release-all':
@@ -146,6 +155,22 @@ export function Emergency() {
               title: `Hold ${pending.control.title.toLowerCase()}?`,
               description: `This takes effect immediately, for every tenant. ${pending.control.description} This is written to the audit trail.`,
               label: 'Hold it',
+              danger: true,
+            };
+      case 'free-season':
+        return pending.engaged
+          ? {
+              title: 'End the free season?',
+              description:
+                'Every account returns to its own tier immediately: quotas and feature gates apply again. Anyone who exceeded their tier while it was open keeps what they built and simply cannot add more. This is written to the audit trail.',
+              label: 'End free season',
+              danger: false,
+            }
+          : {
+              title: 'Start a free season for everyone?',
+              description:
+                'Lifts every tier quota and feature gate for every Operator, immediately, with no payment required, as if every account carried the richest tier. Admins are unaffected. This is written to the audit trail.',
+              label: 'Start free season',
               danger: true,
             };
       case 'lockdown':
@@ -215,6 +240,40 @@ export function Emergency() {
               </Text>
             </Card>
           ) : null}
+
+          <Card className={board.free_season.engaged ? 'border-warning' : undefined}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <Unlock width={16} height={16} className="text-brand" aria-hidden />
+                  <Text variant="h4">{board.free_season.title}</Text>
+                  {board.free_season.engaged ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-warning">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-ink-muted">
+                      Off
+                    </span>
+                  )}
+                </div>
+                <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+                  {board.free_season.description}
+                </Text>
+                <Text variant="caption" tone="secondary" className="mt-2 block">
+                  You can also grant this to one Operator at a time from their profile, independent
+                  of this platform-wide switch.
+                </Text>
+              </div>
+              <Button
+                variant={board.free_season.engaged ? 'primary' : 'danger'}
+                disabled={busy}
+                onClick={() => setPending({ kind: 'free-season', engaged: board.free_season.engaged })}
+              >
+                {board.free_season.engaged ? 'End free season' : 'Start free season'}
+              </Button>
+            </div>
+          </Card>
 
           <div className="flex flex-col gap-3">
             {board.controls.map((control) => (

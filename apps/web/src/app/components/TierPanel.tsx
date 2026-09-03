@@ -1,6 +1,6 @@
 import { getTier, type TierInfo, type TierName } from '@slideops/api-client';
 import { Card, Text } from '@slideops/design-system';
-import { Check, Gauge, Minus } from '@slideops/icons';
+import { Check, Gauge, Minus, Unlock } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { ErrorNote, Loading } from './Feedback';
 import { Meter } from './Meter';
@@ -67,15 +67,17 @@ function TierQuotas({ tier }: { tier: TierInfo }) {
     nodes: 0,
     projects: 0,
     seats: 0,
+    workspaces: 0,
     history_days: 0,
     automations: false,
     advanced_monitoring: false,
     audit_trail: false,
   };
-  const usage = tier.usage ?? { nodes: 0, projects: 0 };
+  const usage = tier.usage ?? { nodes: 0, projects: 0, workspaces: 0 };
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Quota label="Workspaces" used={usage.workspaces} limit={limits.workspaces} />
         <Quota label="Servers" used={usage.nodes} limit={limits.nodes} />
         <Quota label="Projects" used={usage.projects} limit={limits.projects} />
         <div className="rounded-lg border border-border bg-app px-3 py-2.5">
@@ -130,6 +132,15 @@ export function TierPanel() {
             history it keeps, and the features it includes. Your servers' own resources are always
             yours to use in full.
           </Text>
+          {state.data.free_season ? (
+            <div className="flex items-start gap-2 rounded-lg border border-warning bg-app px-3 py-2.5">
+              <Unlock width={15} height={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+              <Text as="span" variant="body-sm">
+                You are in a free season: every limit below is lifted and nothing is charged while it
+                lasts.
+              </Text>
+            </div>
+          ) : null}
           <TierQuotas tier={state.data} />
         </div>
       ) : null}

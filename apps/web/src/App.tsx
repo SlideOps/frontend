@@ -1,5 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { InvitationAccept } from './auth/InvitationAccept';
+import { NodeTransferAccept } from './auth/NodeTransferAccept';
 import { Login } from './auth/Login';
 import { MfaVerify } from './auth/MfaVerify';
 import { Register } from './auth/Register';
@@ -30,12 +32,21 @@ import { useAuthStore } from './store/auth';
 const Workspace = lazy(() =>
   import('./app/screens/Workspace').then((m) => ({ default: m.Workspace })),
 );
+const WorkspaceHub = lazy(() =>
+  import('./app/screens/WorkspaceHub').then((m) => ({ default: m.WorkspaceHub })),
+);
 const Nodes = lazy(() => import('./app/screens/Nodes').then((m) => ({ default: m.Nodes })));
 const NodeRegister = lazy(() =>
   import('./app/screens/NodeRegister').then((m) => ({ default: m.NodeRegister })),
 );
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
+);
+const SSHKeys = lazy(() =>
+  import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
+);
+const Snippets = lazy(() =>
+  import('./app/screens/Snippets').then((m) => ({ default: m.Snippets })),
 );
 const Projects = lazy(() =>
   import('./app/screens/Projects').then((m) => ({ default: m.Projects })),
@@ -45,6 +56,9 @@ const ProjectDetail = lazy(() =>
 );
 const Services = lazy(() =>
   import('./app/screens/Services').then((m) => ({ default: m.Services })),
+);
+const Terminal = lazy(() =>
+  import('./app/screens/Terminal').then((m) => ({ default: m.Terminal })),
 );
 const ServiceDeploy = lazy(() =>
   import('./app/screens/ServiceDeploy').then((m) => ({ default: m.ServiceDeploy })),
@@ -94,6 +108,7 @@ const Security = lazy(() =>
   import('./app/screens/Security').then((m) => ({ default: m.Security })),
 );
 const Billing = lazy(() => import('./app/screens/Billing').then((m) => ({ default: m.Billing })));
+const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -162,12 +177,17 @@ export function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/mfa" element={<MfaVerify />} />
+        <Route path="/invitations/:token" element={<InvitationAccept />} />
+        <Route path="/node-transfers/:token" element={<NodeTransferAccept />} />
 
         {/* Operator area: any signed-in account. */}
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Workspace />} />
+          <Route path="workspaces" element={<WorkspaceHub />} />
           <Route path="nodes" element={<Nodes />} />
           <Route path="nodes/new" element={<NodeRegister />} />
+          <Route path="ssh-keys" element={<SSHKeys />} />
+          <Route path="snippets" element={<Snippets />} />
           <Route path="nodes/:id" element={<NodeDetail />} />
           <Route path="projects" element={<Projects />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
@@ -175,6 +195,7 @@ export function App() {
           <Route path="services/new" element={<ServiceDeploy />} />
           <Route path="services/import" element={<ServiceImport />} />
           <Route path="services/:id" element={<ServiceDetail />} />
+          <Route path="terminal" element={<Terminal />} />
           <Route path="capabilities" element={<Capabilities />} />
           <Route path="capabilities/matrix" element={<CapabilityMatrix />} />
           <Route path="capabilities/:key" element={<CapabilityDetail />} />
@@ -190,6 +211,7 @@ export function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="billing" element={<Billing />} />
           <Route path="security" element={<Security />} />
+          <Route path="team" element={<Team />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}

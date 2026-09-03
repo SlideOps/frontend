@@ -61,7 +61,7 @@ export function Capabilities() {
         </div>
       </Card>
 
-      <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">
+      <div className="mb-8 flex max-w-xl items-center gap-2 rounded-md border border-border bg-surface px-3 shadow-sm">
         <Search width={18} height={18} className="text-ink-muted" aria-hidden />
         <input
           type="search"
@@ -84,16 +84,16 @@ export function Capabilities() {
             description="Try a different outcome, or clear the search to see everything available."
           />
         ) : (
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-8">
             {groupByCategory(catalog.state.data).map(([category, capabilities]) => (
               <section key={category}>
-                <div className="mb-4 flex items-center gap-2">
+                <div className="mb-3 flex items-center justify-between gap-2 border-b border-border pb-3">
                   <Text variant="h3">{category}</Text>
                   <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink-muted">
                     {capabilities.length}
                   </span>
                 </div>
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid border-y border-border bg-surface lg:grid-cols-2 lg:gap-x-8">
                   {capabilities.map((capability) => (
                     <CapabilityCard
                       key={capability.key}

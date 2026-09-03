@@ -8,13 +8,14 @@ import {
   type Schedule,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, Clock, Server } from '@slideops/icons';
+import { ArrowLeft, Clock, Lock, Server } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState } from '@slideops/ui';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ParameterFields } from '../components/ParameterFields';
@@ -43,10 +44,12 @@ interface NewData {
  */
 function ParameterSection({
   capability,
+  nodeId,
   submitting,
   onValid,
 }: {
   capability: Capability;
+  nodeId: string;
   submitting: boolean;
   onValid: (parameters: Record<string, unknown>) => void;
 }) {
@@ -75,6 +78,8 @@ function ParameterSection({
             parameters={parameters}
             register={register}
             errors={errors}
+            nodeId={nodeId || undefined}
+            capabilityKey={capability.key}
           />
         </div>
       ) : (
@@ -94,6 +99,7 @@ function ParameterSection({
 /** Create an Automation: choose a Node and a Capability, add inputs, set a schedule. */
 export function AutomationNew() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   const { state } = useAsyncData<NewData>(async (signal) => {
     const [nodes, capabilities] = await Promise.all([
@@ -146,6 +152,27 @@ export function AutomationNew() {
       setSubmitting(false);
     }
   };
+
+  if (!canWrite) {
+    return (
+      <OperatorShell active="automations">
+        <button
+          type="button"
+          onClick={() => navigate('/app/automations')}
+          className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <ArrowLeft width={16} height={16} aria-hidden />
+          All Automations
+        </button>
+        <EmptyState
+          icon={Lock}
+          title="This needs a role above Viewer"
+          description="A Viewer can see this workspace's Automations but cannot create one. Ask an Owner or an Admin to invite you at a role that can, or switch to a workspace where you are."
+          action={<Button onClick={() => navigate('/app/automations')}>Back to Automations</Button>}
+        />
+      </OperatorShell>
+    );
+  }
 
   return (
     <OperatorShell active="automations">
@@ -224,6 +251,7 @@ export function AutomationNew() {
                 <ParameterSection
                   key={capability.key}
                   capability={capability}
+                  nodeId={nodeId}
                   submitting={submitting}
                   onValid={create}
                 />

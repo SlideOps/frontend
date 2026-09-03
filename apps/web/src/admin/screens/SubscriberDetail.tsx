@@ -1,9 +1,19 @@
-import { getSubscriber } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, CreditCard } from '@slideops/icons';
+import {
+  ApiError,
+  getSubscriber,
+  recoverPayment,
+  resendPaymentReceipt,
+  verifyPayment,
+  type AdminPayment,
+  type PaymentReconciliation,
+} from '@slideops/api-client';
+import { Button, Card, Field, Text } from '@slideops/design-system';
+import { ArrowLeft, CreditCard, Mail, RefreshCw, Search } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminShell } from '../components/AdminShell';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -15,6 +25,12 @@ import { formatAmount, standingOf } from '../subscribers';
  * Failed and pending attempts are shown alongside successful ones. A history of
  * only what worked cannot answer the question this page exists for, which is
  * usually why somebody is not on the tier they believe they paid for.
+ *
+ * A payment that never recorded correctly is recovered here rather than by
+ * editing a row: recovery asks the provider to confirm the transaction fresh,
+ * then runs it through the same activation path a real webhook would have,
+ * so the tier, subscription, and receipt all move together. Every recovery
+ * and resend is written to the audit trail.
  */
 
 const paymentTone: Record<string, string> = {
@@ -44,7 +60,74 @@ function when(value?: string): string {
 export function SubscriberDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { state } = useAsyncData((signal) => getSubscriber(id, signal), [id]);
+  const { state, reload } = useAsyncData((signal) => getSubscriber(id, signal), [id]);
+
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  const [verifyingRef, setVerifyingRef] = useState<string | null>(null);
+  const [reconciliation, setReconciliation] = useState<PaymentReconciliation | null>(null);
+
+  const [recovering, setRecovering] = useState<AdminPayment | null>(null);
+  const [recoverReason, setRecoverReason] = useState('');
+
+  const [resending, setResending] = useState<AdminPayment | null>(null);
+
+  const runVerify = async (payment: AdminPayment) => {
+    setActionError(null);
+    setActionMessage(null);
+    setReconciliation(null);
+    setVerifyingRef(payment.reference);
+    try {
+      const report = await verifyPayment(payment.reference);
+      setReconciliation(report);
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'Could not verify that payment. Try again.',
+      );
+    } finally {
+      setVerifyingRef(null);
+    }
+  };
+
+  const runRecover = async () => {
+    if (!recovering) {
+      return;
+    }
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await recoverPayment(recovering.reference, recoverReason);
+      setActionMessage(`Payment ${recovering.reference} recovered. The subscription is active.`);
+      setRecovering(null);
+      setRecoverReason('');
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That recovery did not go through. Try again.',
+      );
+      setRecovering(null);
+    }
+  };
+
+  const runResend = async () => {
+    if (!resending) {
+      return;
+    }
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await resendPaymentReceipt(resending.reference);
+      setActionMessage(`Receipt for ${resending.reference} sent again.`);
+      setResending(null);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'The receipt was not sent. Try again.',
+      );
+      setResending(null);
+    }
+  };
 
   return (
     <AdminShell active="subscribers">
@@ -61,6 +144,32 @@ export function SubscriberDetail() {
 
       {state.status === 'loading' ? <Loading label="Loading the subscriber" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
+
+      {actionError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {actionError}
+        </p>
+      ) : null}
+      {actionMessage ? (
+        <p role="status" className="mb-4 text-sm text-success">
+          {actionMessage}
+        </p>
+      ) : null}
+      {reconciliation ? (
+        <Card className="mb-4">
+          <Text variant="body-sm" className="font-medium">
+            Payment {reconciliation.reference}
+          </Text>
+          <Text variant="body-sm" tone="secondary" className="mt-1">
+            SlideOps has this at <strong className="text-ink">{reconciliation.local_status}</strong>
+            . The provider reports{' '}
+            <strong className="text-ink">{reconciliation.provider_status}</strong>.{' '}
+            {reconciliation.match
+              ? 'These agree, nothing to recover.'
+              : 'These disagree — Recover below to correct it.'}
+          </Text>
+        </Card>
+      ) : null}
 
       {state.status === 'ready' ? (
         <>
@@ -98,7 +207,9 @@ export function SubscriberDetail() {
                 <TH className="text-right">Amount</TH>
                 <TH>Term</TH>
                 <TH>Promo</TH>
+                <TH>Annual discount</TH>
                 <TH>Provider reference</TH>
+                <TH className="text-right">Recovery</TH>
               </THead>
               <TBody>
                 {state.data.payment_history.map((payment) => (
@@ -108,6 +219,11 @@ export function SubscriberDetail() {
                       <span className={`font-medium ${paymentTone[payment.status] ?? ''}`}>
                         {payment.status}
                       </span>
+                      {payment.recovered_at ? (
+                        <Text variant="caption" tone="secondary" className="block">
+                          Recovered {when(payment.recovered_at)}
+                        </Text>
+                      ) : null}
                     </TD>
                     <TD className="capitalize">{payment.tier}</TD>
                     <TD className="text-right tabular-nums">
@@ -117,7 +233,46 @@ export function SubscriberDetail() {
                       {payment.term_months} {payment.term_months === 1 ? 'month' : 'months'}
                     </TD>
                     <TD className="text-ink-muted">{payment.promo_code || ''}</TD>
+                    <TD className="text-ink-muted">
+                      {payment.annual_discount_minor
+                        ? `-${formatAmount(payment.annual_discount_minor, payment.currency)}`
+                        : ''}
+                    </TD>
                     <TD className="font-mono text-xs text-ink-muted">{payment.reference}</TD>
+                    <TD className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        {payment.provider_ref ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => runVerify(payment)}
+                            disabled={verifyingRef === payment.reference}
+                          >
+                            <Search width={14} height={14} aria-hidden />
+                            {verifyingRef === payment.reference ? 'Checking' : 'Verify'}
+                          </Button>
+                        ) : null}
+                        {payment.status !== 'success' && payment.provider_ref ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setRecoverReason('');
+                              setRecovering(payment);
+                            }}
+                          >
+                            <RefreshCw width={14} height={14} aria-hidden />
+                            Recover
+                          </Button>
+                        ) : null}
+                        {payment.status === 'success' ? (
+                          <Button variant="ghost" size="sm" onClick={() => setResending(payment)}>
+                            <Mail width={14} height={14} aria-hidden />
+                            Resend receipt
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TD>
                   </TR>
                 ))}
               </TBody>
@@ -125,6 +280,52 @@ export function SubscriberDetail() {
           )}
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={recovering !== null}
+        title="Recover this payment?"
+        description={
+          <div className="flex flex-col gap-3">
+            <p>
+              The provider is asked to confirm{' '}
+              <strong className="text-ink">{recovering?.reference}</strong> fresh, right now. Only
+              if it agrees the payment succeeded does this grant the tier, activate the
+              subscription, redeem any promo, and send the receipt — the same path a real webhook
+              takes. This is written to the audit trail.
+            </p>
+            <Field
+              label="Reason"
+              hint="Why this is being recovered by hand. Required."
+              value={recoverReason}
+              onChange={(event) => setRecoverReason(event.target.value)}
+              placeholder="Provider confirmed successful transaction, webhook never arrived"
+            />
+          </div>
+        }
+        confirmLabel="Recover payment"
+        confirmVariant="primary"
+        onConfirm={runRecover}
+        onCancel={() => {
+          setRecovering(null);
+          setRecoverReason('');
+        }}
+      />
+
+      <ConfirmDialog
+        open={resending !== null}
+        title="Resend this receipt?"
+        description={
+          <>
+            Sends the receipt for <strong className="text-ink">{resending?.reference}</strong>{' '}
+            again. This only resends the email: no tier is granted again, no promo is redeemed
+            again, no subscription state changes. This is written to the audit trail.
+          </>
+        }
+        confirmLabel="Resend receipt"
+        confirmVariant="primary"
+        onConfirm={runResend}
+        onCancel={() => setResending(null)}
+      />
     </AdminShell>
   );
 }

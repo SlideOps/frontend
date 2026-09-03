@@ -8,11 +8,12 @@ import {
   type Operation,
   type Project,
 } from '@slideops/api-client';
-import { Button, Text } from '@slideops/design-system';
-import { ArrowRight, CheckCircle2, Layers, Plus, Server, XCircle } from '@slideops/icons';
+import { Button, StatTile, Text } from '@slideops/design-system';
+import { ArrowRight, capabilityIcon, CheckCircle2, Plus, Server, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useNavigate } from 'react-router-dom';
+import { activeWorkspace, useWorkspaceStore } from '../../store/workspace';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
@@ -35,38 +36,6 @@ async function loadWorkspace(signal: AbortSignal): Promise<WorkspaceData> {
     listCapabilities({}, signal),
   ]);
   return { projects, nodes, operations, capabilities };
-}
-
-/*
- * One figure in the headline strip.
- *
- * These were four bordered, shadowed cards in a grid, which gave four numbers the
- * visual weight of four documents and pushed everything else below the fold. They
- * are one strip now, divided by hairlines: the numbers are still the first thing
- * read, and they take a quarter of the height.
- */
-function Stat({
-  label,
-  value,
-  guidanceKey,
-}: {
-  label: string;
-  value: number;
-  guidanceKey: string;
-}) {
-  return (
-    <div className="flex-1 px-5 py-4 first:pl-0">
-      <div className="flex items-center gap-1.5">
-        <Text variant="caption" tone="secondary">
-          {label}
-        </Text>
-        <Guidance for={guidanceKey} size={14} />
-      </div>
-      <Text variant="h2" className="mt-1 block tabular-nums">
-        {String(value)}
-      </Text>
-    </div>
-  );
 }
 
 function HealthCard({ operations }: { operations: Operation[] }) {
@@ -105,11 +74,13 @@ function HealthCard({ operations }: { operations: Operation[] }) {
 export function Workspace() {
   const navigate = useNavigate();
   const { state } = useAsyncData((signal) => loadWorkspace(signal), []);
+  const workspaces = useWorkspaceStore((store) => store.workspaces);
+  const active = activeWorkspace(workspaces);
 
   return (
     <OperatorShell active="home">
       <PageHeader
-        title="Workspace"
+        title={active?.name ?? 'Workspace'}
         description="Your Projects, Nodes, and recent Operations at a glance."
         guidanceKey="dashboard.workspace"
         actions={
@@ -127,16 +98,21 @@ export function Workspace() {
           {/* One strip, divided by hairlines, rather than four framed boxes for
               four numbers. */}
           <div className="flex flex-col divide-y divide-border border-b border-border sm:flex-row sm:divide-x sm:divide-y-0">
-            <Stat
+            <StatTile
+              className="first:pl-0"
               label="Projects"
               value={state.data.projects.length}
-              guidanceKey="dashboard.projects"
+              adornment={<Guidance for="dashboard.projects" size={14} />}
             />
-            <Stat label="Nodes" value={state.data.nodes.length} guidanceKey="dashboard.nodes" />
-            <Stat
+            <StatTile
+              label="Nodes"
+              value={state.data.nodes.length}
+              adornment={<Guidance for="dashboard.nodes" size={14} />}
+            />
+            <StatTile
               label="Operations"
               value={state.data.operations.length}
-              guidanceKey="dashboard.operations"
+              adornment={<Guidance for="dashboard.operations" size={14} />}
             />
             <HealthCard operations={state.data.operations} />
           </div>
@@ -168,6 +144,7 @@ export function Workspace() {
                     <NodeRow
                       key={node.id}
                       node={node}
+                      boxed
                       onOpen={() => navigate(`/app/nodes/${node.id}`)}
                     />
                   ))}
@@ -219,10 +196,12 @@ export function Workspace() {
               {/* Rows, like every other list of Capabilities, so the same thing
                   looks the same wherever it appears. */}
               <div className="flex flex-col divide-y divide-border border-y border-border">
-                {state.data.capabilities.slice(0, 2).map((capability) => (
+                {state.data.capabilities.slice(0, 2).map((capability) => {
+                  const Icon = capabilityIcon(capability);
+                  return (
                   <div key={capability.key} className="flex items-start gap-3 py-3.5">
                     <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                      <Layers width={15} height={15} aria-hidden />
+                      <Icon width={15} height={15} aria-hidden />
                     </span>
                     <div className="min-w-0 flex-1">
                       <Text variant="body-sm" className="font-medium">
@@ -246,7 +225,8 @@ export function Workspace() {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ) : null}

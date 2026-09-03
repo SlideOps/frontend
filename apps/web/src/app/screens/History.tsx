@@ -3,20 +3,27 @@ import {
   clearOperations,
   deleteOperation,
   listOperations,
+  listOperationsPage,
   type Operation,
   type OperationStatus,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
 import { Activity, ChevronRight, Trash2 } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Refreshing } from '../components/Refreshing';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+/** How many Operations History loads at a time. A long-lived account's whole
+ *  run history loading, or reloading on every filter change, in one request
+ *  is exactly what this bounds. */
+const PAGE_SIZE = 50;
 
 /**
  * Whether an Operation has finished and so may be deleted. One still planning,
@@ -36,15 +43,16 @@ function OperationRow({
   onOpen: () => void;
   onDelete: () => void;
 }) {
+  const canWrite = useCanWrite();
   const when = operation.created_at ? new Date(operation.created_at).toLocaleString() : '';
   return (
-    <div className="flex w-full items-center gap-2 rounded-md border border-border bg-surface pr-2 transition-colors duration-fast ease-standard hover:bg-subtle">
+    <div className="group flex w-full items-center gap-2 border-b border-border bg-surface pr-2 transition-colors duration-fast ease-standard first:border-t hover:bg-subtle">
       <button
         type="button"
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-ink-muted transition-colors group-hover:text-ink">
           <Activity width={18} height={18} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
@@ -66,7 +74,7 @@ function OperationRow({
         <StatusBadge status={operation.status} />
         <ChevronRight width={18} height={18} className="shrink-0 text-ink-muted" aria-hidden />
       </button>
-      {isFinished(operation.status) ? (
+      {isFinished(operation.status) && canWrite ? (
         <button
           type="button"
           aria-label={`Delete this ${operation.status} Operation from your History`}
@@ -101,13 +109,90 @@ const FILTER_TABS: { key: HistoryFilter; label: string; status?: OperationStatus
  */
 export function History() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const activeTab = FILTER_TABS.find((tab) => tab.key === filter) ?? { key: 'all', label: 'All' };
-  // The load is keyed on the filter so switching it refetches the right slice.
-  const { state, reload, refreshing } = useAsyncData(
-    (signal) => listOperations(activeTab.status ? { status: activeTab.status } : {}, signal),
-    [filter],
+
+  // One page at a time, newest first: a long-lived account's whole run
+  // history loading in one request, on every filter change, is exactly what
+  // this replaces. Keyed on the filter, so switching tabs starts a fresh
+  // first page rather than appending onto a different slice.
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [listError, setListError] = useState<ApiError | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const isRefresh = refreshKey > 0;
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setListError(null);
+    listOperationsPage(
+      { status: activeTab.status, limit: PAGE_SIZE },
+      controller.signal,
+    )
+      .then((page) => {
+        if (!controller.signal.aborted) {
+          setOperations(page.operations);
+          setHasMore(page.hasMore);
+        }
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setListError(
+            caught instanceof ApiError ? caught : new ApiError(0, 'unknown_error', 'This did not load.'),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, refreshKey]);
+
+  const reload = () => setRefreshKey((key) => key + 1);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const page = await listOperationsPage({
+        status: activeTab.status,
+        limit: PAGE_SIZE,
+        offset: operations.length,
+      });
+      setOperations((current) => [...current, ...page.operations]);
+      setHasMore(page.hasMore);
+    } catch (caught) {
+      setListError(
+        caught instanceof ApiError ? caught : new ApiError(0, 'unknown_error', 'That page did not load.'),
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // The one count that must stay accurate regardless of which page or filter
+  // is on screen: how many Operations are waiting on the Operator right now.
+  // Reading it off whatever page happens to be loaded would undercount the
+  // moment History is paginated, so it is its own small, unbounded, always
+  // current query.
+  const requiredResult = useAsyncData(
+    (signal) => listOperations({ status: 'awaiting_approval' }, signal),
+    [refreshKey],
   );
+  const requiredCount =
+    requiredResult.state.status === 'ready' ? requiredResult.state.data.length : undefined;
 
   // Tidying History. Deleting a record never touches infrastructure: whatever an
   // Operation did to a server stays done, and only the record of it goes.
@@ -171,13 +256,6 @@ export function History() {
     }
   };
 
-  const requiredCount =
-    state.status === 'ready'
-      ? filter === 'required'
-        ? state.data.length
-        : state.data.filter((operation) => operation.status === 'awaiting_approval').length
-      : undefined;
-
   const tabBase =
     'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
@@ -190,9 +268,7 @@ export function History() {
         actions={
           <>
             <Refreshing show={refreshing} />
-            {canClear &&
-            state.status === 'ready' &&
-            state.data.some((op) => isFinished(op.status)) ? (
+            {canWrite && canClear && !loading && operations.some((op) => isFinished(op.status)) ? (
               <Button variant="secondary" disabled={busy} onClick={() => setClearing(true)}>
                 <Trash2 width={16} height={16} aria-hidden />
                 {clearableStatus ? `Clear ${activeTab.label.toLowerCase()}` : 'Clear finished'}
@@ -240,10 +316,10 @@ export function History() {
         ))}
       </div>
 
-      {state.status === 'loading' ? <Loading label="Loading your Operations" /> : null}
-      {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
-      {state.status === 'ready' ? (
-        state.data.length === 0 ? (
+      {loading ? <Loading label="Loading your Operations" /> : null}
+      {listError ? <ErrorNote error={listError} /> : null}
+      {!loading && !listError ? (
+        operations.length === 0 ? (
           filter === 'required' ? (
             <EmptyState
               icon={Activity}
@@ -264,16 +340,25 @@ export function History() {
             />
           )
         ) : (
-          <div className="flex flex-col gap-2">
-            {state.data.map((operation) => (
-              <OperationRow
-                key={operation.id}
-                operation={operation}
-                onOpen={() => navigate(`/app/operations/${operation.id}`)}
-                onDelete={() => setPendingDelete(operation)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="overflow-hidden border-y border-border bg-surface">
+              {operations.map((operation) => (
+                <OperationRow
+                  key={operation.id}
+                  operation={operation}
+                  onOpen={() => navigate(`/app/operations/${operation.id}`)}
+                  onDelete={() => setPendingDelete(operation)}
+                />
+              ))}
+            </div>
+            {hasMore ? (
+              <div className="flex justify-center py-4">
+                <Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()}>
+                  {loadingMore ? 'Loading' : 'Load more'}
+                </Button>
+              </div>
+            ) : null}
+          </>
         )
       ) : null}
 

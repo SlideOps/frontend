@@ -52,7 +52,7 @@ function ThemeToggle() {
   );
 }
 
-function NavButton({ item, dense }: { item: NavItem; dense: boolean }) {
+function NavButton({ item }: { item: NavItem }) {
   const Icon = item.icon;
   return (
     <button
@@ -60,13 +60,12 @@ function NavButton({ item, dense }: { item: NavItem; dense: boolean }) {
       onClick={item.onSelect}
       aria-current={item.active ? 'page' : undefined}
       className={cn(
-        'group flex items-center gap-3 rounded-md font-medium transition-colors duration-fast ease-standard',
+        'group flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-        dense ? 'px-3 py-2 text-sm' : 'px-3 py-2.5',
         item.active ? 'bg-subtle text-brand' : 'text-ink-muted hover:bg-subtle hover:text-ink',
       )}
     >
-      <Icon width={20} height={20} aria-hidden />
+      <Icon width={17} height={17} aria-hidden />
       <span>{item.label}</span>
     </button>
   );
@@ -81,14 +80,17 @@ function NavButton({ item, dense }: { item: NavItem; dense: boolean }) {
 export function AppShell({ nav, surface, children, actions, dense = false }: AppShellProps) {
   return (
     <div className="flex min-h-dvh bg-app text-ink">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-4 md:flex">
-        <div className="flex items-center gap-2 px-2 pb-6">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-2.5 py-3 md:flex">
+        <div className="flex items-center gap-2 px-2 pb-4">
           <Logo size={26} />
           <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
             {surface}
           </span>
         </div>
-        <nav className="flex flex-1 flex-col gap-1" aria-label={`${surface} navigation`}>
+        <nav
+          className="flex flex-1 flex-col gap-0.5 overflow-y-auto"
+          aria-label={`${surface} navigation`}
+        >
           {nav.map((item, index) => {
             // A heading appears the first time a group is seen. Comparing against
             // the previous entry keeps the grouping in the caller's ordering rather
@@ -97,11 +99,11 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
             return (
               <Fragment key={item.key}>
                 {heading ? (
-                  <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  <div className="px-3 pb-1 pt-3 text-[11px] font-medium text-ink-muted first:pt-1">
                     {heading}
                   </div>
                 ) : null}
-                <NavButton item={item} dense={dense} />
+                <NavButton item={item} />
               </Fragment>
             );
           })}
@@ -125,7 +127,10 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
         <main
           className={cn('min-w-0 flex-1', dense ? 'p-4 md:p-6' : 'p-4 md:p-8', 'pb-24 md:pb-8')}
         >
-          {children}
+          {/* Content is capped and centered so a page reads at the width it was
+              designed for, rather than a list or a two-column detail layout
+              stretching to whatever a wide monitor happens to be. */}
+          <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
         </main>
       </div>
 

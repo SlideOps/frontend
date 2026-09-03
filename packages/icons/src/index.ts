@@ -4,6 +4,7 @@ export {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  ArrowRightLeft,
   ArrowUpRight,
   Maximize2,
   Minimize2,
@@ -24,6 +25,8 @@ export {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
   Circle,
   CircleDot,
   CircleHelp,
@@ -33,10 +36,14 @@ export {
   Cpu,
   CreditCard,
   Database,
+  Table,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
   FolderKanban,
+  Fingerprint,
+  Folder,
   Gauge,
   GitBranch,
   Globe,
@@ -52,12 +59,14 @@ export {
   Loader2,
   Lock,
   LogOut,
+  Mail,
   MemoryStick,
   Menu,
   Minus,
   Moon,
   Network,
   Package,
+  Pencil,
   Play,
   Plus,
   Printer,
@@ -66,6 +75,7 @@ export {
   ScanSearch,
   Search,
   Server,
+  Tags,
   Settings,
   Shield,
   ShieldCheck,
@@ -78,6 +88,7 @@ export {
   ToggleLeft,
   ToggleRight,
   Trash2,
+  UserPlus,
   Users,
   Waypoints,
   Wifi,
@@ -90,3 +101,8 @@ export {
 // SlideOps custom marks.
 export { Mark, type MarkProps } from './Mark';
 export { Logo, type LogoProps } from './Logo';
+
+// Real technology brand marks (simple-icons, CC0-1.0), plus the
+// key/category lookup that picks one for a Capability.
+export * from './brands';
+export { capabilityIcon, serviceIcon, type CapabilityIconInput } from './capability-icons';
