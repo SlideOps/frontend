@@ -45,6 +45,7 @@ export {
   FolderKanban,
   Fingerprint,
   Folder,
+  Gift,
   Gauge,
   GitBranch,
   Globe,

@@ -2,12 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './errors';
 import {
   getOverview,
+  grantEntitlement,
   listAdminOperations,
   listAdminTiers,
+  listEntitlementGrants,
   pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
   resumeSubscriber,
+  revokeEntitlement,
   suspendOperator,
   updateAdminTier,
   verifyPayment,
@@ -192,6 +195,70 @@ describe('admin requests', () => {
     expect(init?.method).toBe('POST');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/subscribers/op-1/resume');
     expect(sub.tier).toBe('pro');
+  });
+
+  it('lists entitlement grants for an Operator and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        grants: [
+          {
+            id: 'grant-1',
+            operator_id: 'op-1',
+            granted_by_operator_id: 'admin-1',
+            reason: 'support compensation',
+            bonus_nodes: 2,
+            bonus_projects: 0,
+            bonus_seats: 0,
+            granted_at: '2026-09-01T00:00:00Z',
+            active: true,
+          },
+        ],
+      }),
+    );
+
+    const grants = await listEntitlementGrants('op-1');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/entitlements');
+    expect(grants).toHaveLength(1);
+    expect(grants[0]?.bonus_nodes).toBe(2);
+  });
+
+  it('posts a grant with its reason, bonus, and expiry', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        grant: { id: 'grant-1', reason: 'compensation', bonus_nodes: 3, active: true },
+      }),
+    );
+
+    const grant = await grantEntitlement('op-1', {
+      reason: 'compensation',
+      bonusNodes: 3,
+      expiresAt: new Date('2026-10-01T00:00:00.000Z'),
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/operators/op-1/entitlements');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      reason: 'compensation',
+      bonus_nodes: 3,
+      bonus_projects: 0,
+      bonus_seats: 0,
+      expires_at: '2026-10-01T00:00:00.000Z',
+    });
+    expect(grant.bonus_nodes).toBe(3);
+  });
+
+  it('posts a revoke to the grant-scoped path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+
+    await revokeEntitlement('op-1', 'grant-1');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/operators/op-1/entitlements/grant-1/revoke',
+    );
   });
 
   it('lists tiers over the admin path with cookies and unwraps the array', async () => {

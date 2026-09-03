@@ -544,3 +544,72 @@ export function resumeSubscriber(operatorId: string): Promise<AdminSubscriptionA
     { method: 'POST' },
   ).then((r) => r.subscription ?? (r as AdminSubscriptionAction));
 }
+
+/*
+ * Entitlement grants: an Admin override on top of an Operator's tier (extra
+ * Nodes, Projects, or Seats), for support compensation or anything else that
+ * does not fit a promo campaign. Summed into the same effective quota every
+ * enforcement point already reads on the backend, so this is not a second,
+ * unenforced entitlement system.
+ */
+
+/** One entitlement grant, as the Admin surface reads it. */
+export interface EntitlementGrant {
+  id: string;
+  operator_id: string;
+  granted_by_operator_id: string;
+  reason: string;
+  bonus_nodes: number;
+  bonus_projects: number;
+  bonus_seats: number;
+  granted_at: string;
+  /** Absent when the grant lasts until an Admin revokes it by hand. */
+  expires_at?: string;
+  /** Present only once an Admin has revoked this grant. */
+  revoked_at?: string;
+  /** Computed: not revoked, and not past its own expiry. */
+  active: boolean;
+}
+
+/** Every grant ever issued to an Operator, newest first, active or not. */
+export function listEntitlementGrants(
+  operatorId: string,
+  signal?: AbortSignal,
+): Promise<EntitlementGrant[]> {
+  return apiRequest<{ grants?: EntitlementGrant[] } | EntitlementGrant[]>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/entitlements`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.grants ?? [])));
+}
+
+/**
+ * Grant extra Nodes, Projects, or Seats on top of an Operator's tier. A
+ * reason is required; the grant lasts until the optional expiry, or until an
+ * Admin revokes it by hand.
+ */
+export function grantEntitlement(
+  operatorId: string,
+  input: { reason: string; bonusNodes?: number; bonusProjects?: number; bonusSeats?: number; expiresAt?: Date },
+): Promise<EntitlementGrant> {
+  return apiRequest<{ grant?: EntitlementGrant } & Partial<EntitlementGrant>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/entitlements`,
+    {
+      method: 'POST',
+      body: {
+        reason: input.reason,
+        bonus_nodes: input.bonusNodes ?? 0,
+        bonus_projects: input.bonusProjects ?? 0,
+        bonus_seats: input.bonusSeats ?? 0,
+        expires_at: input.expiresAt ? input.expiresAt.toISOString() : undefined,
+      },
+    },
+  ).then((r) => r.grant ?? (r as EntitlementGrant));
+}
+
+/** Revoke a grant before its own expiry, or before it would otherwise last indefinitely. */
+export function revokeEntitlement(operatorId: string, grantId: string): Promise<void> {
+  return apiRequest<void>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/entitlements/${encodeURIComponent(grantId)}/revoke`,
+    { method: 'POST' },
+  );
+}
