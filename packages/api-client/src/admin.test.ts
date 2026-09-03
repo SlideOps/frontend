@@ -14,9 +14,11 @@ import {
   listEntitlementGrants,
   listFeatureFlags,
   listWebhookDeliveries,
+  lookupLoginRateLimit,
   pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
+  resetLoginRateLimit,
   resumeSubscriber,
   revokeEntitlement,
   setFeatureFlagEnabled,
@@ -560,5 +562,31 @@ describe('admin requests', () => {
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/webhook-deliveries');
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('limit=');
+  });
+
+  it('looks up a login rate limit by email and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        entries: [{ subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 }],
+      }),
+    );
+
+    const entries = await lookupLoginRateLimit('op@slideops.com');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/rate-limits/login?email=op%40slideops.com');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.attempts).toBe(3);
+  });
+
+  it('posts a reset with the email and returns how many were cleared', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { cleared: 2 }));
+
+    const cleared = await resetLoginRateLimit('op@slideops.com');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/rate-limits/login/reset');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'op@slideops.com' });
+    expect(cleared).toBe(2);
   });
 });

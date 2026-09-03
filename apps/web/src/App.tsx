@@ -156,6 +156,9 @@ const FeatureFlags = lazy(() =>
 const WebhookDeliveries = lazy(() =>
   import('./admin/screens/WebhookDeliveries').then((m) => ({ default: m.WebhookDeliveries })),
 );
+const RateLimits = lazy(() =>
+  import('./admin/screens/RateLimits').then((m) => ({ default: m.RateLimits })),
+);
 
 export function App() {
   const loadSession = useAuthStore((state) => state.loadSession);
@@ -241,6 +244,7 @@ export function App() {
           <Route path="emergency" element={<Emergency />} />
           <Route path="feature-flags" element={<FeatureFlags />} />
           <Route path="webhooks" element={<WebhookDeliveries />} />
+          <Route path="rate-limits" element={<RateLimits />} />
         </Route>
 
         {/* Anything else returns to the marketing home. */}
