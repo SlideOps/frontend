@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './errors';
 import {
+  addSupportNote,
   createFeatureFlag,
+  deleteSupportNote,
+  listSupportNotes,
   deleteFeatureFlag,
   emergencyEngageIncident,
   emergencyEngageMaintenance,
@@ -612,5 +615,59 @@ describe('admin requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/email-deliveries?limit=100');
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0]?.outcome).toBe('sent');
+  });
+
+  it('lists support notes for an operator and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        notes: [
+          {
+            id: 'note-1',
+            operator_id: 'op-1',
+            author_operator_id: 'admin-1',
+            body: 'called about a billing dispute',
+            created_at: '2026-09-03T00:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    const notes = await listSupportNotes('op-1');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/support-notes');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.body).toBe('called about a billing dispute');
+  });
+
+  it('posts a new support note with its body', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        note: {
+          id: 'note-1',
+          operator_id: 'op-1',
+          author_operator_id: 'admin-1',
+          body: 'a note',
+          created_at: '2026-09-03T00:00:00Z',
+        },
+      }),
+    );
+
+    const note = await addSupportNote('op-1', 'a note');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/operators/op-1/support-notes');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ body: 'a note' });
+    expect(note.body).toBe('a note');
+  });
+
+  it('deletes a support note over the note-scoped path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+
+    await deleteSupportNote('op-1', 'note-1');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('DELETE');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/support-notes/note-1');
   });
 });

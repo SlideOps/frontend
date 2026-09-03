@@ -790,3 +790,41 @@ export function listEmailDeliveries(limit?: number, signal?: AbortSignal): Promi
     { signal },
   ).then((r) => (Array.isArray(r) ? r : (r.deliveries ?? [])));
 }
+
+/*
+ * Support notes: free-text context an Admin writes on an Operator's record,
+ * visible only to Admins, never surfaced to the Operator.
+ */
+
+/** One Admin-written note on an Operator's record. */
+export interface SupportNote {
+  id: string;
+  operator_id: string;
+  author_operator_id: string;
+  body: string;
+  created_at: string;
+}
+
+/** Every support note on an Operator's record, newest first. */
+export function listSupportNotes(operatorId: string, signal?: AbortSignal): Promise<SupportNote[]> {
+  return apiRequest<{ notes?: SupportNote[] } | SupportNote[]>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/support-notes`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.notes ?? [])));
+}
+
+/** Writes a new note on an Operator's record. */
+export function addSupportNote(operatorId: string, body: string): Promise<SupportNote> {
+  return apiRequest<{ note?: SupportNote } & Partial<SupportNote>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/support-notes`,
+    { method: 'POST', body: { body } },
+  ).then((r) => r.note ?? (r as SupportNote));
+}
+
+/** Removes a note nobody meant to write. */
+export function deleteSupportNote(operatorId: string, noteId: string): Promise<void> {
+  return apiRequest<void>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/support-notes/${encodeURIComponent(noteId)}`,
+    { method: 'DELETE' },
+  );
+}
