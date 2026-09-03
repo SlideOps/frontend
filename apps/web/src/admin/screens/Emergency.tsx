@@ -1,7 +1,9 @@
 import {
   ApiError,
+  emergencyEngageMaintenance,
   emergencyLockdown,
   emergencyReleaseAll,
+  emergencyReleaseMaintenance,
   getEmergencyState,
   revokeAllSessions,
   setEmergencyControl,
@@ -10,7 +12,7 @@ import {
   type EmergencyState,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { AlertTriangle, Lock, LogOut, ShieldCheck, Unlock } from '@slideops/icons';
+import { AlertTriangle, Construction, Lock, LogOut, ShieldCheck, Unlock } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { AdminShell } from '../components/AdminShell';
@@ -36,7 +38,13 @@ type Pending =
   | { kind: 'free-season'; engaged: boolean }
   | { kind: 'lockdown' }
   | { kind: 'release-all' }
+  | { kind: 'maintenance'; engaged: boolean }
   | { kind: 'revoke-sessions' };
+
+/** Maintenance mode is its own dedicated bundle, not one more entry in the
+ *  generic per-control list: toggling it there would flip only the marker,
+ *  not the registrations/deploys/checkout bundle it actually engages. */
+const MAINTENANCE_CONTROL_NAME = 'maintenance';
 
 /** One switch, its explanation, and the action to flip it. */
 function ControlCard({
@@ -86,6 +94,8 @@ export function Emergency() {
   const [note, setNote] = useState<string | null>(null);
 
   const board: EmergencyState | null = state.status === 'ready' ? state.data : null;
+  const maintenanceControl = board?.controls.find((c) => c.name === MAINTENANCE_CONTROL_NAME);
+  const otherControls = board?.controls.filter((c) => c.name !== MAINTENANCE_CONTROL_NAME) ?? [];
 
   const run = async (work: () => Promise<unknown>, success: string) => {
     setBusy(true);
@@ -131,6 +141,13 @@ export function Emergency() {
         return run(
           emergencyReleaseAll,
           'Every control is released. The platform is running normally.',
+        );
+      case 'maintenance':
+        return run(
+          pending.engaged ? emergencyReleaseMaintenance : emergencyEngageMaintenance,
+          pending.engaged
+            ? 'Maintenance mode is off. Registrations, deploys, and checkout are open again.'
+            : 'Maintenance mode is on. The public app shows a maintenance page.',
         );
       case 'revoke-sessions':
         return run(async () => {
@@ -189,6 +206,22 @@ export function Emergency() {
           label: 'Release everything',
           danger: false,
         };
+      case 'maintenance':
+        return pending.engaged
+          ? {
+              title: 'End maintenance mode?',
+              description:
+                'Releases registrations, deploys, and checkout along with the maintenance page. Existing running Services and sessions were never affected. This is written to the audit trail.',
+              label: 'End maintenance',
+              danger: false,
+            }
+          : {
+              title: 'Start maintenance mode?',
+              description:
+                'The public app shows a maintenance page, and new registrations, new deploys, and new checkouts are held alongside it. Existing running Services, existing sessions, and the Admin control plane are unaffected -- you can still turn this back off. This is written to the audit trail.',
+              label: 'Start maintenance',
+              danger: true,
+            };
       case 'revoke-sessions':
         return {
           title: 'Sign every Operator out?',
@@ -275,8 +308,40 @@ export function Emergency() {
             </div>
           </Card>
 
+          {maintenanceControl ? (
+            <Card className={maintenanceControl.engaged ? 'border-warning' : undefined}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Construction width={16} height={16} className="text-brand" aria-hidden />
+                    <Text variant="h4">{maintenanceControl.title}</Text>
+                    {maintenanceControl.engaged ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-warning">
+                        On
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-ink-muted">
+                        Off
+                      </span>
+                    )}
+                  </div>
+                  <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+                    {maintenanceControl.description}
+                  </Text>
+                </div>
+                <Button
+                  variant={maintenanceControl.engaged ? 'primary' : 'danger'}
+                  disabled={busy}
+                  onClick={() => setPending({ kind: 'maintenance', engaged: maintenanceControl.engaged })}
+                >
+                  {maintenanceControl.engaged ? 'End maintenance' : 'Start maintenance'}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
           <div className="flex flex-col gap-3">
-            {board.controls.map((control) => (
+            {otherControls.map((control) => (
               <ControlCard
                 key={control.name}
                 control={control}
