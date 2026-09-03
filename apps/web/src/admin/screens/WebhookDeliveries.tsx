@@ -94,7 +94,7 @@ export function WebhookDeliveries() {
                 <TR key={delivery.id}>
                   <TD className="text-ink-muted">{when(delivery.received_at)}</TD>
                   <TD className="font-medium">{providerLabel[delivery.provider] ?? delivery.provider}</TD>
-                  <TD className="font-mono text-xs text-ink-muted">{delivery.reference || '—'}</TD>
+                  <TD className="font-mono text-xs text-ink-muted">{delivery.reference || 'Not set'}</TD>
                   <TD>
                     <OutcomeCell outcome={delivery.outcome} />
                   </TD>
