@@ -381,7 +381,69 @@ export interface AdminPayment {
   /** How much of this payment's base amount the automatic first-time annual
    *  discount took off; absent or zero when it did not apply. */
   annual_discount_minor?: number;
+  /** The provider's own transaction reference. Empty when there is nothing to
+   *  verify this payment against: one recorded before this was captured, or a
+   *  free tier grant that never reached a provider at all. */
+  provider_ref?: string;
+  /** Set only when an admin's manual recovery ran this payment through the
+   *  normal activation path, rather than a webhook confirming it on its own. */
+  recovered_at?: string;
+  recovery_reason?: string;
+  /** When the receipt was last sent, absent if never. */
+  receipt_sent_at?: string;
   created_at: string;
+}
+
+/** What SlideOps has on record for a payment, against what the provider itself
+ *  reports right now. Read only: asking for one changes nothing. */
+export interface PaymentReconciliation {
+  reference: string;
+  local_status: string;
+  provider_status: string;
+  match: boolean;
+}
+
+/**
+ * Ask the payment provider directly what it knows about a payment, and show it
+ * next to what SlideOps has on record. Changes nothing.
+ */
+export function verifyPayment(
+  reference: string,
+  signal?: AbortSignal,
+): Promise<PaymentReconciliation> {
+  return apiRequest<{ reconciliation?: PaymentReconciliation } & Partial<PaymentReconciliation>>(
+    `/admin/payments/${encodeURIComponent(reference)}/verify`,
+    { signal },
+  ).then((r) => r.reconciliation ?? (r as PaymentReconciliation));
+}
+
+/**
+ * Run a payment the provider confirms succeeded, but that SlideOps never
+ * correctly recorded, through the exact same activation path a real webhook
+ * would have used: the tier is granted, the subscription activated, any promo
+ * redeemed, and the receipt sent. The provider is asked to confirm the
+ * transaction fresh, right before activating; an admin's word alone is never
+ * enough.
+ *
+ * Safe to call twice: a payment already successful comes back unchanged.
+ */
+export function recoverPayment(reference: string, reason: string): Promise<AdminPayment> {
+  return apiRequest<{ payment?: AdminPayment } & Partial<AdminPayment>>(
+    `/admin/payments/${encodeURIComponent(reference)}/recover`,
+    { method: 'POST', body: { reason } },
+  ).then((r) => r.payment ?? (r as AdminPayment));
+}
+
+/**
+ * Resend the receipt for an already-successful payment. Only ever resends the
+ * email: no tier is granted again, no promo is redeemed again, no subscription
+ * state changes.
+ */
+export function resendPaymentReceipt(reference: string): Promise<AdminPayment> {
+  return apiRequest<{ payment?: AdminPayment } & Partial<AdminPayment>>(
+    `/admin/payments/${encodeURIComponent(reference)}/resend-receipt`,
+    { method: 'POST' },
+  ).then((r) => r.payment ?? (r as AdminPayment));
 }
 
 /** A subscriber with their payment history. */
