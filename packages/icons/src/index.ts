@@ -12,6 +12,7 @@ export {
   BellRing,
   BookOpen,
   Boxes,
+  Pause,
   Upload,
   Unlock,
   MessageSquare,
