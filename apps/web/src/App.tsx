@@ -150,6 +150,9 @@ const SubscriberDetail = lazy(() =>
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
+const FeatureFlags = lazy(() =>
+  import('./admin/screens/FeatureFlags').then((m) => ({ default: m.FeatureFlags })),
+);
 
 export function App() {
   const loadSession = useAuthStore((state) => state.loadSession);
@@ -233,6 +236,7 @@ export function App() {
           <Route path="subscribers" element={<Subscribers />} />
           <Route path="subscribers/:id" element={<SubscriberDetail />} />
           <Route path="emergency" element={<Emergency />} />
+          <Route path="feature-flags" element={<FeatureFlags />} />
         </Route>
 
         {/* Anything else returns to the marketing home. */}

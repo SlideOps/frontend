@@ -45,6 +45,7 @@ export {
   FileText,
   FolderKanban,
   Fingerprint,
+  Flag,
   Folder,
   Gift,
   Gauge,
