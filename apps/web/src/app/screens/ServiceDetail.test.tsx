@@ -199,6 +199,10 @@ describe('ServiceDetail', () => {
     vi.unstubAllGlobals();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   // The claim that keeps coming back: there is no log console on the Service.
   it('shows the logs section, open, live, with the workload output in it', async () => {
     show();
