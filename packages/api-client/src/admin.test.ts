@@ -13,6 +13,7 @@ import {
   listAdminTiers,
   listEntitlementGrants,
   listFeatureFlags,
+  listWebhookDeliveries,
   pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
@@ -528,5 +529,36 @@ describe('admin requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/feature-flags/new-billing-flow');
+  });
+
+  it('lists webhook deliveries with a limit and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        deliveries: [
+          {
+            id: 'wd-1',
+            provider: 'paystack',
+            reference: 'so_a',
+            outcome: 'accepted_success',
+            received_at: '2026-09-03T00:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    const deliveries = await listWebhookDeliveries(100);
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/webhook-deliveries?limit=100');
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.outcome).toBe('accepted_success');
+  });
+
+  it('lists webhook deliveries with no limit when none is given', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { deliveries: [] }));
+
+    await listWebhookDeliveries();
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/webhook-deliveries');
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('limit=');
   });
 });
