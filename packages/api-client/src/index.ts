@@ -158,6 +158,8 @@ export {
   emergencyReleaseAll,
   emergencyEngageMaintenance,
   emergencyReleaseMaintenance,
+  emergencyEngageIncident,
+  emergencyReleaseIncident,
   revokeAllSessions,
   verifyPayment,
   recoverPayment,

@@ -1,8 +1,10 @@
 import {
   ApiError,
+  emergencyEngageIncident,
   emergencyEngageMaintenance,
   emergencyLockdown,
   emergencyReleaseAll,
+  emergencyReleaseIncident,
   emergencyReleaseMaintenance,
   getEmergencyState,
   revokeAllSessions,
@@ -12,7 +14,15 @@ import {
   type EmergencyState,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { AlertTriangle, Construction, Lock, LogOut, ShieldCheck, Unlock } from '@slideops/icons';
+import {
+  AlertTriangle,
+  Construction,
+  Lock,
+  LogOut,
+  ShieldAlert,
+  ShieldCheck,
+  Unlock,
+} from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { AdminShell } from '../components/AdminShell';
@@ -39,12 +49,16 @@ type Pending =
   | { kind: 'lockdown' }
   | { kind: 'release-all' }
   | { kind: 'maintenance'; engaged: boolean }
+  | { kind: 'incident'; engaged: boolean }
   | { kind: 'revoke-sessions' };
 
-/** Maintenance mode is its own dedicated bundle, not one more entry in the
- *  generic per-control list: toggling it there would flip only the marker,
- *  not the registrations/deploys/checkout bundle it actually engages. */
+/** Maintenance mode and Incident mode are each their own dedicated bundle,
+ *  not one more entry in the generic per-control list: toggling either there
+ *  would flip only its own marker, not the other controls it actually
+ *  engages. */
 const MAINTENANCE_CONTROL_NAME = 'maintenance';
+const INCIDENT_CONTROL_NAME = 'incident';
+const BUNDLE_CONTROL_NAMES = new Set([MAINTENANCE_CONTROL_NAME, INCIDENT_CONTROL_NAME]);
 
 /** One switch, its explanation, and the action to flip it. */
 function ControlCard({
@@ -95,7 +109,8 @@ export function Emergency() {
 
   const board: EmergencyState | null = state.status === 'ready' ? state.data : null;
   const maintenanceControl = board?.controls.find((c) => c.name === MAINTENANCE_CONTROL_NAME);
-  const otherControls = board?.controls.filter((c) => c.name !== MAINTENANCE_CONTROL_NAME) ?? [];
+  const incidentControl = board?.controls.find((c) => c.name === INCIDENT_CONTROL_NAME);
+  const otherControls = board?.controls.filter((c) => !BUNDLE_CONTROL_NAMES.has(c.name)) ?? [];
 
   const run = async (work: () => Promise<unknown>, success: string) => {
     setBusy(true);
@@ -148,6 +163,13 @@ export function Emergency() {
           pending.engaged
             ? 'Maintenance mode is off. Registrations, deploys, and checkout are open again.'
             : 'Maintenance mode is on. The public app shows a maintenance page.',
+        );
+      case 'incident':
+        return run(
+          pending.engaged ? emergencyReleaseIncident : emergencyEngageIncident,
+          pending.engaged
+            ? 'Incident mode is off. Operations, deploys, registrations, checkout, and GitHub connections are open again.'
+            : 'Incident mode is on. New Operations, deploys, registrations, checkout, and GitHub connections are held.',
         );
       case 'revoke-sessions':
         return run(async () => {
@@ -220,6 +242,22 @@ export function Emergency() {
               description:
                 'The public app shows a maintenance page, and new registrations, new deploys, and new checkouts are held alongside it. Existing running Services, existing sessions, and the Admin control plane are unaffected -- you can still turn this back off. This is written to the audit trail.',
               label: 'Start maintenance',
+              danger: true,
+            };
+      case 'incident':
+        return pending.engaged
+          ? {
+              title: 'End incident mode?',
+              description:
+                'Releases new Operations, deploys, registrations, checkout, and GitHub connections. Existing running Services and sessions were never affected. This is written to the audit trail.',
+              label: 'End incident mode',
+              danger: false,
+            }
+          : {
+              title: 'Start incident mode?',
+              description:
+                'Holds new Operations of every kind (including a new Capability install, which starts as an Operation), new deploys, new registrations, new checkouts, and new GitHub connections. Sign in, existing sessions, and scheduled Automations are deliberately left alone, and nothing is shown to the public. This is written to the audit trail.',
+              label: 'Start incident mode',
               danger: true,
             };
       case 'revoke-sessions':
@@ -335,6 +373,38 @@ export function Emergency() {
                   onClick={() => setPending({ kind: 'maintenance', engaged: maintenanceControl.engaged })}
                 >
                   {maintenanceControl.engaged ? 'End maintenance' : 'Start maintenance'}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
+          {incidentControl ? (
+            <Card className={incidentControl.engaged ? 'border-danger' : undefined}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert width={16} height={16} className="text-brand" aria-hidden />
+                    <Text variant="h4">{incidentControl.title}</Text>
+                    {incidentControl.engaged ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-danger">
+                        On
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill bg-subtle px-2.5 py-0.5 text-xs font-medium text-ink-muted">
+                        Off
+                      </span>
+                    )}
+                  </div>
+                  <Text variant="body-sm" tone="secondary" className="mt-2 max-w-2xl">
+                    {incidentControl.description}
+                  </Text>
+                </div>
+                <Button
+                  variant={incidentControl.engaged ? 'primary' : 'danger'}
+                  disabled={busy}
+                  onClick={() => setPending({ kind: 'incident', engaged: incidentControl.engaged })}
+                >
+                  {incidentControl.engaged ? 'End incident mode' : 'Start incident mode'}
                 </Button>
               </div>
             </Card>
