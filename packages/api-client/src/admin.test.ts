@@ -11,6 +11,7 @@ import {
   grantEntitlement,
   listAdminOperations,
   listAdminTiers,
+  listEmailDeliveries,
   listEntitlementGrants,
   listFeatureFlags,
   listWebhookDeliveries,
@@ -588,5 +589,28 @@ describe('admin requests', () => {
     expect(init?.method).toBe('POST');
     expect(JSON.parse(String(init?.body))).toEqual({ email: 'op@slideops.com' });
     expect(cleared).toBe(2);
+  });
+
+  it('lists email deliveries with a limit and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        deliveries: [
+          {
+            id: 'ed-1',
+            to: 'op@slideops.com',
+            subject: 'Payment successful',
+            provider: 'emailjs',
+            outcome: 'sent',
+            sent_at: '2026-09-03T00:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    const deliveries = await listEmailDeliveries(100);
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/email-deliveries?limit=100');
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.outcome).toBe('sent');
   });
 });
