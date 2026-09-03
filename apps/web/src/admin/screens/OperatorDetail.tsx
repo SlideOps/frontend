@@ -5,14 +5,18 @@ import {
   setOperatorRole,
   adminSetTier,
   adminSetFreeSeason,
+  listEntitlementGrants,
+  grantEntitlement,
+  revokeEntitlement,
   ApiError,
   type TierName,
+  type EntitlementGrant,
 } from '@slideops/api-client';
-import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowLeft, ShieldCheck, Unlock, Users } from '@slideops/icons';
+import { Button, Card, Field, Text } from '@slideops/design-system';
+import { ArrowLeft, Gift, ShieldCheck, Unlock, Users, X } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminShell } from '../components/AdminShell';
 import { OperatorStatusBadge, StatusBadge } from '../components/Badges';
@@ -53,6 +57,30 @@ export function OperatorDetail() {
   const [pendingTier, setPendingTier] = useState<TierName | null>(null);
   const [freeSeasonConfirming, setFreeSeasonConfirming] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [grants, setGrants] = useState<EntitlementGrant[]>([]);
+  const [grantsError, setGrantsError] = useState<ApiError | null>(null);
+  const [granting, setGranting] = useState(false);
+  const [grantReason, setGrantReason] = useState('');
+  const [grantNodes, setGrantNodes] = useState('0');
+  const [grantProjects, setGrantProjects] = useState('0');
+  const [grantSeats, setGrantSeats] = useState('0');
+  const [grantExpiresAt, setGrantExpiresAt] = useState('');
+  const [revoking, setRevoking] = useState<EntitlementGrant | null>(null);
+
+  const loadGrants = () => {
+    if (!id) {
+      return;
+    }
+    listEntitlementGrants(id)
+      .then((g) => {
+        setGrants(g);
+        setGrantsError(null);
+      })
+      .catch((error) => setGrantsError(error instanceof ApiError ? error : null));
+  };
+
+  useEffect(loadGrants, [id]);
 
   const operator = state.status === 'ready' ? state.data : null;
   const isSuspended = operator?.status === 'suspended';
@@ -132,6 +160,55 @@ export function OperatorDetail() {
     }
   };
 
+  const resetGrantForm = () => {
+    setGrantReason('');
+    setGrantNodes('0');
+    setGrantProjects('0');
+    setGrantSeats('0');
+    setGrantExpiresAt('');
+  };
+
+  const runGrant = async () => {
+    if (!operator) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await grantEntitlement(operator.id, {
+        reason: grantReason,
+        bonusNodes: Number(grantNodes) || 0,
+        bonusProjects: Number(grantProjects) || 0,
+        bonusSeats: Number(grantSeats) || 0,
+        expiresAt: grantExpiresAt ? new Date(grantExpiresAt) : undefined,
+      });
+      setGranting(false);
+      resetGrantForm();
+      loadGrants();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That grant did not go through. Try again.',
+      );
+      setGranting(false);
+    }
+  };
+
+  const runRevoke = async () => {
+    if (!operator || !revoking) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await revokeEntitlement(operator.id, revoking.id);
+      setRevoking(null);
+      loadGrants();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'That revoke did not go through. Try again.',
+      );
+      setRevoking(null);
+    }
+  };
+
   return (
     <AdminShell active="operators">
       <Button
@@ -188,6 +265,10 @@ export function OperatorDetail() {
                 </Button>
                 <Button variant="secondary" onClick={() => setRoleConfirming(true)}>
                   {isAdmin ? 'Revoke admin' : 'Make admin'}
+                </Button>
+                <Button variant="secondary" onClick={() => setGranting(true)}>
+                  <Gift width={16} height={16} aria-hidden />
+                  Grant entitlement
                 </Button>
                 <Button
                   variant={isSuspended ? 'primary' : 'danger'}
@@ -279,6 +360,74 @@ export function OperatorDetail() {
               )}
             </div>
           </div>
+
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <Text variant="h4">Entitlement grants</Text>
+              <Text variant="caption" tone="secondary">
+                Extra Nodes, Projects, or Seats on top of this Operator's tier, summed into their
+                effective quota. Every grant here needs a reason and is written to the audit trail.
+              </Text>
+            </div>
+            {grantsError ? <ErrorNote error={grantsError} /> : null}
+            {grants.length === 0 ? (
+              <Card>
+                <Text variant="body-sm" tone="secondary">
+                  No entitlement grants for this Operator.
+                </Text>
+              </Card>
+            ) : (
+              <Table label="Entitlement grants">
+                <THead>
+                  <TH>Reason</TH>
+                  <TH className="text-right">Nodes</TH>
+                  <TH className="text-right">Projects</TH>
+                  <TH className="text-right">Seats</TH>
+                  <TH>Granted</TH>
+                  <TH>Status</TH>
+                  <TH className="text-right">Action</TH>
+                </THead>
+                <TBody>
+                  {grants.map((grant) => (
+                    <TR key={grant.id}>
+                      <TD className="max-w-xs">{grant.reason}</TD>
+                      <TD className="text-right tabular-nums">
+                        {grant.bonus_nodes ? `+${grant.bonus_nodes}` : ''}
+                      </TD>
+                      <TD className="text-right tabular-nums">
+                        {grant.bonus_projects ? `+${grant.bonus_projects}` : ''}
+                      </TD>
+                      <TD className="text-right tabular-nums">
+                        {grant.bonus_seats ? `+${grant.bonus_seats}` : ''}
+                      </TD>
+                      <TD className="text-ink-muted">
+                        {new Date(grant.granted_at).toLocaleDateString()}
+                      </TD>
+                      <TD>
+                        {grant.active ? (
+                          <span className="text-success">
+                            Active{grant.expires_at ? ` until ${new Date(grant.expires_at).toLocaleDateString()}` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-ink-muted">
+                            {grant.revoked_at ? 'Revoked' : 'Expired'}
+                          </span>
+                        )}
+                      </TD>
+                      <TD className="text-right">
+                        {grant.active ? (
+                          <Button variant="ghost" size="sm" onClick={() => setRevoking(grant)}>
+                            <X width={14} height={14} aria-hidden />
+                            Revoke
+                          </Button>
+                        ) : null}
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            )}
+          </div>
         </>
       ) : null}
 
@@ -336,6 +485,80 @@ export function OperatorDetail() {
         confirmVariant={isAdmin ? 'danger' : 'primary'}
         onConfirm={runRoleAction}
         onCancel={() => setRoleConfirming(false)}
+      />
+
+      <ConfirmDialog
+        open={granting}
+        title="Grant an entitlement?"
+        description={
+          <div className="flex flex-col gap-3">
+            <p>
+              Adds the bonus below on top of this Operator's tier, the same way an active promo
+              code's value-add does. Existing infrastructure is unaffected either way. This is
+              written to the audit trail.
+            </p>
+            <Field
+              label="Reason"
+              hint="Why this is being granted. Required."
+              value={grantReason}
+              onChange={(event) => setGrantReason(event.target.value)}
+              placeholder="Support compensation for the outage on Sep 2"
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <Field
+                label="Extra Nodes"
+                type="number"
+                min={0}
+                value={grantNodes}
+                onChange={(event) => setGrantNodes(event.target.value)}
+              />
+              <Field
+                label="Extra Projects"
+                type="number"
+                min={0}
+                value={grantProjects}
+                onChange={(event) => setGrantProjects(event.target.value)}
+              />
+              <Field
+                label="Extra Seats"
+                type="number"
+                min={0}
+                value={grantSeats}
+                onChange={(event) => setGrantSeats(event.target.value)}
+              />
+            </div>
+            <Field
+              label="Expires on"
+              hint="Optional. Leave blank to last until an Admin revokes it by hand."
+              type="date"
+              value={grantExpiresAt}
+              onChange={(event) => setGrantExpiresAt(event.target.value)}
+            />
+          </div>
+        }
+        confirmLabel="Grant entitlement"
+        confirmVariant="primary"
+        onConfirm={runGrant}
+        onCancel={() => {
+          setGranting(false);
+          resetGrantForm();
+        }}
+      />
+
+      <ConfirmDialog
+        open={revoking !== null}
+        title="Revoke this entitlement grant?"
+        description={
+          <>
+            Ends <strong className="text-ink">{revoking?.reason}</strong> now, before its own
+            expiry. This Operator's effective quota drops by the bonus it granted immediately.
+            This is written to the audit trail.
+          </>
+        }
+        confirmLabel="Revoke grant"
+        confirmVariant="danger"
+        onConfirm={runRevoke}
+        onCancel={() => setRevoking(null)}
       />
     </AdminShell>
   );
