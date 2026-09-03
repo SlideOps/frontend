@@ -1,6 +1,7 @@
 import {
   Activity,
   CreditCard,
+  Flag,
   Gauge,
   Layers,
   LayoutDashboard,
@@ -25,7 +26,8 @@ export type ActiveKey =
   | 'promo-codes'
   | 'tiers'
   | 'subscribers'
-  | 'emergency';
+  | 'emergency'
+  | 'feature-flags';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -98,6 +100,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: ShieldCheck,
       active: active === 'emergency',
       onSelect: () => navigate('/admin/emergency'),
+    },
+    {
+      key: 'feature-flags',
+      label: 'Feature flags',
+      icon: Flag,
+      active: active === 'feature-flags',
+      onSelect: () => navigate('/admin/feature-flags'),
     },
     {
       key: 'app',

@@ -643,3 +643,65 @@ export function revokeEntitlement(operatorId: string, grantId: string): Promise<
     { method: 'POST' },
   );
 }
+
+/*
+ * Feature flags: a deliberate rollout or an internal/admin-only gate an Admin
+ * creates and toggles at runtime, distinct from the emergency switchboard.
+ */
+
+/** One centralized feature flag. */
+export interface FeatureFlag {
+  key: string;
+  title: string;
+  description?: string;
+  enabled: boolean;
+  created_by_operator_id?: string;
+  created_at: string;
+  updated_by_operator_id?: string;
+  updated_at: string;
+}
+
+/** Every feature flag, ordered by key. */
+export function listFeatureFlags(signal?: AbortSignal): Promise<FeatureFlag[]> {
+  return apiRequest<{ flags?: FeatureFlag[] } | FeatureFlag[]>('/admin/feature-flags', {
+    signal,
+  }).then((r) => (Array.isArray(r) ? r : (r.flags ?? [])));
+}
+
+/**
+ * Create a new flag, off by default unless enabled is set. The key may only
+ * use lowercase letters, digits, and hyphens, since it is never renamed once
+ * real code depends on it.
+ */
+export function createFeatureFlag(input: {
+  key: string;
+  title: string;
+  description?: string;
+  enabled?: boolean;
+}): Promise<FeatureFlag> {
+  return apiRequest<{ flag?: FeatureFlag } & Partial<FeatureFlag>>('/admin/feature-flags', {
+    method: 'POST',
+    body: {
+      key: input.key,
+      title: input.title,
+      description: input.description ?? '',
+      enabled: input.enabled ?? false,
+    },
+  }).then((r) => r.flag ?? (r as FeatureFlag));
+}
+
+/** Turn a flag on or off, immediately. */
+export function setFeatureFlagEnabled(key: string, enabled: boolean): Promise<FeatureFlag> {
+  return apiRequest<{ flag?: FeatureFlag } & Partial<FeatureFlag>>(
+    `/admin/feature-flags/${encodeURIComponent(key)}/enabled`,
+    { method: 'POST', body: { enabled } },
+  ).then((r) => r.flag ?? (r as FeatureFlag));
+}
+
+/**
+ * Delete a flag entirely. A flag carries no user-facing or billing
+ * consequence of its own, so deleting one nobody reads anymore is safe.
+ */
+export function deleteFeatureFlag(key: string): Promise<void> {
+  return apiRequest<void>(`/admin/feature-flags/${encodeURIComponent(key)}`, { method: 'DELETE' });
+}

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './errors';
 import {
+  createFeatureFlag,
+  deleteFeatureFlag,
   emergencyEngageIncident,
   emergencyEngageMaintenance,
   emergencyReleaseIncident,
@@ -10,11 +12,13 @@ import {
   listAdminOperations,
   listAdminTiers,
   listEntitlementGrants,
+  listFeatureFlags,
   pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
   resumeSubscriber,
   revokeEntitlement,
+  setFeatureFlagEnabled,
   suspendOperator,
   updateAdminTier,
   verifyPayment,
@@ -437,5 +441,92 @@ describe('admin requests', () => {
         purchasable: true,
       }),
     ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('lists feature flags and unwraps the array', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        flags: [
+          {
+            key: 'new-billing-flow',
+            title: 'New billing flow',
+            description: '',
+            enabled: false,
+            created_at: '2026-09-01T00:00:00Z',
+            updated_at: '2026-09-01T00:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    const flags = await listFeatureFlags();
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/feature-flags');
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.key).toBe('new-billing-flow');
+  });
+
+  it('posts a new feature flag with its key, title, and description', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        flag: {
+          key: 'new-billing-flow',
+          title: 'New billing flow',
+          description: 'Gates the new checkout path',
+          enabled: false,
+          created_at: '2026-09-01T00:00:00Z',
+          updated_at: '2026-09-01T00:00:00Z',
+        },
+      }),
+    );
+
+    const flag = await createFeatureFlag({
+      key: 'new-billing-flow',
+      title: 'New billing flow',
+      description: 'Gates the new checkout path',
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/feature-flags');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      key: 'new-billing-flow',
+      title: 'New billing flow',
+      description: 'Gates the new checkout path',
+      enabled: false,
+    });
+    expect(flag.key).toBe('new-billing-flow');
+  });
+
+  it('posts a toggle to the flag-scoped enabled path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        flag: {
+          key: 'new-billing-flow',
+          title: 'New billing flow',
+          enabled: true,
+          created_at: '2026-09-01T00:00:00Z',
+          updated_at: '2026-09-01T00:00:00Z',
+        },
+      }),
+    );
+
+    const flag = await setFeatureFlagEnabled('new-billing-flow', true);
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/feature-flags/new-billing-flow/enabled');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ enabled: true });
+    expect(flag.enabled).toBe(true);
+  });
+
+  it('deletes a feature flag over the key-scoped path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+
+    await deleteFeatureFlag('new-billing-flow');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('DELETE');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/feature-flags/new-billing-flow');
   });
 });
