@@ -339,6 +339,21 @@ export function emergencyReleaseMaintenance(): Promise<EmergencyState> {
 }
 
 /**
+ * Turn on incident mode: holds new Operations of every kind (including a new
+ * Capability install), new deploys, new registrations, new checkouts, and new
+ * GitHub connections. Sign in, existing sessions, and scheduled Automations
+ * are left alone, and nothing is shown to the public.
+ */
+export function emergencyEngageIncident(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/incident/engage', { method: 'POST' });
+}
+
+/** Turn incident mode off, releasing every control it engaged. */
+export function emergencyReleaseIncident(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/incident/release', { method: 'POST' });
+}
+
+/**
  * End every open session on the platform, so a captured token stops working now
  * rather than at the end of its life.
  *
