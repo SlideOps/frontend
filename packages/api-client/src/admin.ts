@@ -764,3 +764,29 @@ export function resetLoginRateLimit(email: string): Promise<number> {
     body: { email },
   }).then((r) => r.cleared ?? 0);
 }
+
+/*
+ * Email deliveries: the sending-side mirror of the webhook delivery log,
+ * every attempted transactional email SlideOps sends (a receipt, a seat
+ * invitation, anything else), whether it succeeded or failed.
+ */
+
+/** One recorded transactional email send attempt. */
+export interface EmailDelivery {
+  id: string;
+  to: string;
+  subject?: string;
+  provider: string;
+  outcome: string;
+  detail?: string;
+  sent_at: string;
+}
+
+/** The most recent email deliveries, newest first. */
+export function listEmailDeliveries(limit?: number, signal?: AbortSignal): Promise<EmailDelivery[]> {
+  const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
+  return apiRequest<{ deliveries?: EmailDelivery[] } | EmailDelivery[]>(
+    `/admin/email-deliveries${query}`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.deliveries ?? [])));
+}

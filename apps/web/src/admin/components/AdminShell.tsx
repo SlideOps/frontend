@@ -6,6 +6,7 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  Mail,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -31,7 +32,8 @@ export type ActiveKey =
   | 'emergency'
   | 'feature-flags'
   | 'webhooks'
-  | 'rate-limits';
+  | 'rate-limits'
+  | 'email-deliveries';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -125,6 +127,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: ShieldAlert,
       active: active === 'rate-limits',
       onSelect: () => navigate('/admin/rate-limits'),
+    },
+    {
+      key: 'email-deliveries',
+      label: 'Email deliveries',
+      icon: Mail,
+      active: active === 'email-deliveries',
+      onSelect: () => navigate('/admin/email-deliveries'),
     },
     {
       key: 'app',
