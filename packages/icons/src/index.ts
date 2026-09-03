@@ -81,6 +81,7 @@ export {
   Tags,
   Settings,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Square,
