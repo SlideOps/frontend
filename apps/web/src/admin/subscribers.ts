@@ -93,6 +93,16 @@ export function standingOf(
     return { label: 'Active', tone: 'good', detail: 'Paid and current.' };
   }
 
+  if (subscriber.status === 'paused') {
+    return {
+      label: 'Paused',
+      tone: 'warning',
+      detail: subscriber.pause_reason
+        ? `Held by an Admin: ${subscriber.pause_reason}. Resuming restores ${subscriber.paused_previous_tier || 'the prior tier'} exactly.`
+        : `Held by an Admin. Resuming restores ${subscriber.paused_previous_tier || 'the prior tier'} exactly.`,
+    };
+  }
+
   const onFree = subscriber.account_tier === 'free';
   return {
     label: subscriber.status === 'canceled' ? 'Cancelled' : 'Lapsed',

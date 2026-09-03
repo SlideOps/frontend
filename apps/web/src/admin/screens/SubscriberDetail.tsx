@@ -1,14 +1,16 @@
 import {
   ApiError,
   getSubscriber,
+  pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
+  resumeSubscriber,
   verifyPayment,
   type AdminPayment,
   type PaymentReconciliation,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { ArrowLeft, CreditCard, Mail, RefreshCw, Search } from '@slideops/icons';
+import { ArrowLeft, CreditCard, Mail, Pause, Play, RefreshCw, Search } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -73,6 +75,11 @@ export function SubscriberDetail() {
 
   const [resending, setResending] = useState<AdminPayment | null>(null);
 
+  const [pausing, setPausing] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
+  const [pauseResumeAt, setPauseResumeAt] = useState('');
+  const [resuming, setResuming] = useState(false);
+
   const runVerify = async (payment: AdminPayment) => {
     setActionError(null);
     setActionMessage(null);
@@ -129,16 +136,78 @@ export function SubscriberDetail() {
     }
   };
 
+  const runPause = async () => {
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await pauseSubscriber(id, pauseReason, pauseResumeAt ? new Date(pauseResumeAt) : undefined);
+      setActionMessage('Subscription paused. The Account has moved to Free until it is resumed.');
+      setPausing(false);
+      setPauseReason('');
+      setPauseResumeAt('');
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'The pause did not go through. Try again.',
+      );
+      setPausing(false);
+    }
+  };
+
+  const runResume = async () => {
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const sub = await resumeSubscriber(id);
+      setActionMessage(`Subscription resumed. The Account is back on ${sub.tier}.`);
+      setResuming(false);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'The resume did not go through. Try again.',
+      );
+      setResuming(false);
+    }
+  };
+
+  const subscriptionStatus = state.status === 'ready' ? state.data.status : undefined;
+  const isPaused = subscriptionStatus === 'paused';
+  // Pause only makes sense while there is a live subscription to hold; a
+  // lapsed or cancelled one has nothing left to pause.
+  const canPause = subscriptionStatus === 'active';
+
   return (
     <AdminShell active="subscribers">
       <PageHeader
         title={state.status === 'ready' ? state.data.email : 'Subscriber'}
         description="What this account is subscribed to, and every payment attempt behind it. Each payment carries the provider's own reference, so a disputed charge can be found in the provider's dashboard."
         actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate('/admin/subscribers')}>
-            <ArrowLeft width={15} height={15} aria-hidden />
-            All subscribers
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {isPaused ? (
+              <Button variant="primary" size="sm" onClick={() => setResuming(true)}>
+                <Play width={15} height={15} aria-hidden />
+                Resume subscription
+              </Button>
+            ) : null}
+            {canPause ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setPauseReason('');
+                  setPauseResumeAt('');
+                  setPausing(true);
+                }}
+              >
+                <Pause width={15} height={15} aria-hidden />
+                Pause subscription
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/subscribers')}>
+              <ArrowLeft width={15} height={15} aria-hidden />
+              All subscribers
+            </Button>
+          </div>
         }
       />
 
@@ -189,6 +258,15 @@ export function SubscriberDetail() {
                 label="Taken in total"
                 value={formatAmount(state.data.paid_minor, state.data.currency)}
               />
+              {isPaused ? (
+                <>
+                  <Fact label="Paused reason" value={state.data.pause_reason ?? ''} />
+                  <Fact
+                    label="Resumes"
+                    value={state.data.resume_at ? when(state.data.resume_at) : 'Manually'}
+                  />
+                </>
+              ) : null}
             </div>
           </Card>
 
@@ -325,6 +403,62 @@ export function SubscriberDetail() {
         confirmVariant="primary"
         onConfirm={runResend}
         onCancel={() => setResending(null)}
+      />
+
+      <ConfirmDialog
+        open={pausing}
+        title="Pause this subscription?"
+        description={
+          <div className="flex flex-col gap-3">
+            <p>
+              The Account moves to Free immediately, the same way a cancel would, but the current
+              tier is recorded so resuming restores it exactly. Existing Nodes, Projects, and
+              Services keep running unaffected — this only holds billing and entitlements. This is
+              written to the audit trail.
+            </p>
+            <Field
+              label="Reason"
+              hint="Why this subscription is being paused. Required."
+              value={pauseReason}
+              onChange={(event) => setPauseReason(event.target.value)}
+              placeholder="Payment dispute under investigation"
+            />
+            <Field
+              label="Resume on"
+              hint="Optional. Leave blank to resume only when an Admin does it by hand."
+              type="date"
+              value={pauseResumeAt}
+              onChange={(event) => setPauseResumeAt(event.target.value)}
+            />
+          </div>
+        }
+        confirmLabel="Pause subscription"
+        confirmVariant="danger"
+        onConfirm={runPause}
+        onCancel={() => {
+          setPausing(false);
+          setPauseReason('');
+          setPauseResumeAt('');
+        }}
+      />
+
+      <ConfirmDialog
+        open={resuming}
+        title="Resume this subscription?"
+        description={
+          <>
+            Restores{' '}
+            <strong className="text-ink">
+              {state.status === 'ready' ? (state.data.paused_previous_tier ?? 'the prior tier') : ''}
+            </strong>
+            , the tier this subscription was on before it was paused, through the same path a real
+            subscribe already uses. This is written to the audit trail.
+          </>
+        }
+        confirmLabel="Resume subscription"
+        confirmVariant="primary"
+        onConfirm={runResume}
+        onCancel={() => setResuming(false)}
       />
     </AdminShell>
   );

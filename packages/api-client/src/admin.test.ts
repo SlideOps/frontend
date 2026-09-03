@@ -4,8 +4,10 @@ import {
   getOverview,
   listAdminOperations,
   listAdminTiers,
+  pauseSubscriber,
   recoverPayment,
   resendPaymentReceipt,
+  resumeSubscriber,
   suspendOperator,
   updateAdminTier,
   verifyPayment,
@@ -143,6 +145,53 @@ describe('admin requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       '/admin/payments/pay_1/resend-receipt',
     );
+  });
+
+  it('posts a pause with its reason and unwraps the returned subscription', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        subscription: { tier: 'free', status: 'paused', paused_previous_tier: 'pro' },
+      }),
+    );
+
+    const sub = await pauseSubscriber('op-1', 'payment dispute');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/subscribers/op-1/pause');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      reason: 'payment dispute',
+      resume_at: undefined,
+    });
+    expect(sub.status).toBe('paused');
+    expect(sub.paused_previous_tier).toBe('pro');
+  });
+
+  it('sends resume_at as an ISO timestamp when given', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { subscription: { tier: 'free', status: 'paused' } }));
+
+    await pauseSubscriber('op-1', 'temporary hold', new Date('2026-10-01T00:00:00.000Z'));
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(init?.body))).toEqual({
+      reason: 'temporary hold',
+      resume_at: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('posts a resume and unwraps the restored subscription', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { subscription: { tier: 'pro', status: 'active' } }));
+
+    const sub = await resumeSubscriber('op-1');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/subscribers/op-1/resume');
+    expect(sub.tier).toBe('pro');
   });
 
   it('lists tiers over the admin path with cookies and unwraps the array', async () => {

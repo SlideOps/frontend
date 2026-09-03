@@ -364,6 +364,14 @@ export interface AdminSubscriber {
   paid_minor: number;
   currency?: string;
   last_paid_at?: string;
+  /** The tier this subscription was on immediately before an Admin paused it,
+   *  set only while `status` is `'paused'`. Resuming restores exactly this. */
+  paused_previous_tier?: string;
+  /** Why an Admin paused this subscription, set only while paused. */
+  pause_reason?: string;
+  /** When the pause is expected to lift on its own, set only while paused and
+   *  only when one was given. */
+  resume_at?: string;
 }
 
 /** One payment attempt, successful or not. */
@@ -497,4 +505,42 @@ export function getSubscriber(id: string, signal?: AbortSignal): Promise<AdminSu
     `/admin/subscribers/${encodeURIComponent(id)}`,
     { signal },
   ).then((r) => r.subscriber ?? (r as AdminSubscriberDetail));
+}
+
+/** A subscription as returned by a pause or resume action. */
+export interface AdminSubscriptionAction {
+  tier: string;
+  status: string;
+  paused_previous_tier?: string;
+  pause_reason?: string;
+  resume_at?: string;
+}
+
+/**
+ * Hold a subscriber's benefits without canceling them: the Account moves to
+ * Free immediately, through the same tier-set path a real subscribe or cancel
+ * already uses, and the tier it was paused from is recorded so a resume
+ * restores exactly that. A reason is required so the action is always
+ * auditable; resumeAt is optional and, when given, the pause lifts itself.
+ *
+ * Safe to call twice: a subscription already paused comes back unchanged
+ * rather than paused again, which would overwrite the real previous tier.
+ */
+export function pauseSubscriber(
+  operatorId: string,
+  reason: string,
+  resumeAt?: Date,
+): Promise<AdminSubscriptionAction> {
+  return apiRequest<{ subscription?: AdminSubscriptionAction } & Partial<AdminSubscriptionAction>>(
+    `/admin/subscribers/${encodeURIComponent(operatorId)}/pause`,
+    { method: 'POST', body: { reason, resume_at: resumeAt ? resumeAt.toISOString() : undefined } },
+  ).then((r) => r.subscription ?? (r as AdminSubscriptionAction));
+}
+
+/** Lift a pause: restores the tier recorded when the subscription was paused. */
+export function resumeSubscriber(operatorId: string): Promise<AdminSubscriptionAction> {
+  return apiRequest<{ subscription?: AdminSubscriptionAction } & Partial<AdminSubscriptionAction>>(
+    `/admin/subscribers/${encodeURIComponent(operatorId)}/resume`,
+    { method: 'POST' },
+  ).then((r) => r.subscription ?? (r as AdminSubscriptionAction));
 }

@@ -88,6 +88,31 @@ describe('standingOf', () => {
     );
     expect(standing.detail).toMatch(/Admin granted tier/i);
   });
+
+  // A pause is an Admin hold, not an organic lapse or a fault, and must read
+  // differently from both -- warning, not bad, and never blamed on the Operator.
+  it('reads a paused subscription as an Admin hold, not a lapse', () => {
+    const standing = standingOf(
+      subscriber({
+        status: 'paused',
+        account_tier: 'free',
+        subscription_tier: 'pro',
+        pause_reason: 'payment dispute',
+        paused_previous_tier: 'pro',
+      }),
+      now,
+    );
+    expect(standing.label).toBe('Paused');
+    expect(standing.tone).toBe('warning');
+    expect(standing.detail).toMatch(/payment dispute/i);
+    expect(standing.detail).toMatch(/pro/i);
+  });
+
+  it('still explains a pause with no reason on record', () => {
+    const standing = standingOf(subscriber({ status: 'paused', account_tier: 'free' }), now);
+    expect(standing.label).toBe('Paused');
+    expect(standing.detail).not.toBe('');
+  });
 });
 
 describe('tierMismatch', () => {
