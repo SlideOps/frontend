@@ -47,6 +47,35 @@ describe('marketplace requests', () => {
     expect(url).not.toContain('project_id');
   });
 
+  it('reads the Capability keys a Plugin provides from the backend field, capabilities', async () => {
+    // The backend's own wire shape (pluginManifestView in the Go transport
+    // layer) names this field capabilities, not provides. Every screen in
+    // this app reads plugin.provides; casting the raw response straight to
+    // the typed shape left it undefined always, which is why an installed
+    // Capability's card could never route anywhere but the read-only
+    // Marketplace catalog entry, whatever an Operator clicked.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        plugins: [
+          {
+            manifest: {
+              id: 'postgresql',
+              name: 'PostgreSQL',
+              category: 'Databases',
+              capabilities: ['install-postgresql'],
+            },
+            core: false,
+            installed: true,
+          },
+        ],
+      }),
+    );
+
+    const plugins = await listMarketplacePlugins('pr_1');
+
+    expect(plugins[0]?.provides).toEqual(['install-postgresql']);
+  });
+
   it('reflects a Project in the catalog with project_id', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
@@ -119,6 +148,26 @@ describe('marketplace requests', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse(200, { plugins: [] }));
     const after = await listInstalledPlugins('pr_1');
     expect(after.map((p) => p.plugin_id)).not.toContain('postgresql');
+  });
+
+  it('maps the embedded manifest on an installed Plugin the same way', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        plugins: [
+          {
+            id: 'ip_1',
+            plugin_id: 'postgresql',
+            enabled: true,
+            installed_at: '2026-07-24T00:00:00Z',
+            manifest: { id: 'postgresql', name: 'PostgreSQL', capabilities: ['install-postgresql'] },
+          },
+        ],
+      }),
+    );
+
+    const installed = await listInstalledPlugins('pr_1');
+
+    expect(installed[0]?.manifest?.provides).toEqual(['install-postgresql']);
   });
 
   it('surfaces a typed error when Core cannot be uninstalled', async () => {

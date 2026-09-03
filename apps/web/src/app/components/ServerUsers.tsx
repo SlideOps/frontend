@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -48,6 +49,7 @@ function AccessBadge({ level }: { level: ServerUser['access_level'] }) {
  */
 export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => listNodeUsers(nodeId, signal), [nodeId]);
 
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
@@ -158,7 +160,7 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
                   />
                 </button>
                 <AccessBadge level={user.access_level} />
-                {user.connection || user.system ? (
+                {user.connection || user.system || !canWrite ? (
                   <span className="w-9" aria-hidden />
                 ) : (
                   <Button
@@ -187,6 +189,11 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
           </Text>
           <Guidance for="server.users.create" />
         </div>
+        {!canWrite ? (
+          <Text variant="body-sm" tone="secondary">
+            Creating or updating an account needs a role above Viewer in this workspace.
+          </Text>
+        ) : (
         <form className="flex flex-col gap-4" onSubmit={startManage} noValidate>
           <Field
             label="Username"
@@ -250,6 +257,7 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
             </Text>
           </div>
         </form>
+        )}
       </div>
 
       <ConfirmDialog

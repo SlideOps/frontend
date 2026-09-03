@@ -2,18 +2,21 @@ import {
   ApiError,
   cancelSubscription,
   getSubscription,
+  quoteCheckout,
   startCheckout,
   validatePromo,
+  type PayCurrency,
   type PaymentProvider,
   type PromoPreview,
   type PurchasableTier,
+  type Quote,
   type Subscription,
   type SubscriptionStatus,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
 import { Check, CreditCard, Globe, Sparkles, TicketPercent } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -97,6 +100,54 @@ const PROVIDERS: ProviderDescriptor[] = [
     icon: Globe,
   },
 ];
+
+interface CurrencyDescriptor {
+  currency: PayCurrency;
+  name: string;
+  helper: string;
+}
+
+interface TermOption {
+  months: number;
+  label: string;
+}
+
+/** How many months a checkout pays for at once: the ordinary monthly charge, or
+ *  a full year and above paid straight through in one charge. The exact total
+ *  is always the monthly price multiplied by the months chosen, confirmed by
+ *  the quote below before committing; a first-time year-or-longer choice also
+ *  earns the automatic annual discount, shown on that same quote. */
+const TERM_OPTIONS: TermOption[] = [
+  { months: 1, label: 'Monthly' },
+  { months: 12, label: '1 year' },
+  { months: 24, label: '2 years' },
+  { months: 36, label: '3 years' },
+];
+
+// Dollar acceptance through Paystack is limited on our live account right now,
+// so its checkout runs through our normal Naira conversion instead; the plan
+// price stays in dollars regardless. Flip this back once dollar charges are
+// confirmed working end to end again on that gateway.
+const paystackUSDDisabled = true;
+
+/** The currencies a gateway can actually charge right now. A gateway with more
+ *  than one lets the Operator choose; one with exactly one charges it without
+ *  asking, since there is nothing to choose between. */
+function currenciesFor(provider: PaymentProvider): CurrencyDescriptor[] {
+  if (provider === 'paystack') {
+    const naira: CurrencyDescriptor = {
+      currency: 'NGN',
+      name: 'Naira',
+      helper: 'Converted from the dollar price at the live exchange rate when you check out.',
+    };
+    if (paystackUSDDisabled) {
+      return [naira];
+    }
+    return [{ currency: 'USD', name: 'US Dollar', helper: 'The plan price shown above.' }, naira];
+  }
+  // Flutterwave is the international gateway: dollars, at the plan's own price.
+  return [{ currency: 'USD', name: 'US Dollar', helper: 'The plan price shown above.' }];
+}
 
 const statusLabel: Record<SubscriptionStatus, string> = {
   active: 'Active',
@@ -297,6 +348,67 @@ function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
   );
 }
 
+/** The itemized price panel: the plan subtotal, the automatic annual discount
+ *  when it applies, the platform fee, the total, and the exchange rate when
+ *  converted to Naira. Shown before the Operator commits to pay, so the fee,
+ *  any conversion, and any savings are never a surprise at checkout. */
+function PriceQuotePanel({ quote }: { quote: Quote }) {
+  const discount = quote.annual_discount_minor ?? 0;
+  const listPrice = quote.base_amount_minor + discount;
+  return (
+    <div className="rounded-lg border border-border bg-subtle p-4">
+      {quote.annual_discount_applied && discount > 0 ? (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-success/40 bg-surface px-3 py-2">
+          <Sparkles width={15} height={15} className="mt-0.5 shrink-0 text-success" aria-hidden />
+          <div>
+            <Text variant="body-sm" className="font-medium text-success">
+              You saved {formatMoney(discount, quote.currency)}
+            </Text>
+            <Text variant="caption" tone="secondary" className="mt-0.5 block">
+              Your first-time discount for paying a full year or more straight through checkout.
+              This applies once, the first time; after this it is not offered again.
+            </Text>
+          </div>
+        </div>
+      ) : null}
+      <div className="flex items-center justify-between gap-2">
+        <Text as="span" variant="body-sm" tone="secondary">
+          Subtotal{quote.term_months > 1 ? ` (${quote.term_months} months)` : ''}
+        </Text>
+        <Text as="span" variant="body-sm">
+          {quote.annual_discount_applied && discount > 0 ? (
+            <span className="mr-1.5 text-ink-muted line-through">
+              {formatMoney(listPrice, quote.currency)}
+            </span>
+          ) : null}
+          {formatMoney(quote.base_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <Text as="span" variant="body-sm" tone="secondary">
+          {quote.fee_label ?? 'Fee'} (10%)
+        </Text>
+        <Text as="span" variant="body-sm">
+          {formatMoney(quote.fee_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <Text as="span" variant="body-sm" className="font-medium">
+          Total charged today
+        </Text>
+        <Text as="span" variant="h4">
+          {formatMoney(quote.total_amount_minor, quote.currency)}
+        </Text>
+      </div>
+      {quote.fx_rate ? (
+        <Text variant="caption" tone="secondary" className="mt-2 block">
+          Converted at the live rate: 1 USD = {quote.fx_rate.toLocaleString()} NGN.
+        </Text>
+      ) : null}
+    </div>
+  );
+}
+
 /** The Operator billing screen: current plan, the plans, and the upgrade flow. */
 export function Billing() {
   const operator = useAuthStore((state) => state.operator);
@@ -307,7 +419,10 @@ export function Billing() {
   const returnStatus = searchParams.get('status');
 
   const [selectedTier, setSelectedTier] = useState<PurchasableTier>('pro');
+  const [termMonths, setTermMonths] = useState<number>(1);
   const [provider, setProvider] = useState<PaymentProvider>('paystack');
+  const [currency, setCurrency] = useState<PayCurrency>(currenciesFor('paystack')[0]!.currency);
+  const availableCurrencies = currenciesFor(provider);
   const [promoCode, setPromoCode] = useState('');
   const [preview, setPreview] = useState<PromoPreview | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -316,6 +431,8 @@ export function Billing() {
   const [upgrading, setUpgrading] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [grantNotice, setGrantNotice] = useState<string | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const data = state.status === 'ready' ? state.data : null;
   const configured = data?.configured ?? false;
@@ -326,6 +443,34 @@ export function Billing() {
     setPreview(null);
     setPromoError(null);
   };
+
+  // The itemized total (subtotal, platform fee, and grand total) is priced fresh
+  // whenever the plan or pay currency changes, so the Operator always sees the
+  // exact amount before committing, including a live Naira conversion.
+  useEffect(() => {
+    if (!configured || admin) {
+      return;
+    }
+    let cancelled = false;
+    setQuoteError(null);
+    quoteCheckout({ tier: selectedTier, currency, term_months: termMonths })
+      .then((result) => {
+        if (!cancelled) {
+          setQuote(result);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setQuote(null);
+          setQuoteError(
+            error instanceof ApiError ? error.message : 'The price could not be loaded.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, admin, selectedTier, currency, termMonths]);
 
   const dismissReturnNotice = () => {
     const next = new URLSearchParams(searchParams);
@@ -342,7 +487,7 @@ export function Billing() {
     setValidating(true);
     setPromoError(null);
     try {
-      const result = await validatePromo({ code, tier: selectedTier });
+      const result = await validatePromo({ code, tier: selectedTier, term_months: termMonths });
       setPreview(result);
     } catch (error) {
       setPreview(null);
@@ -363,7 +508,9 @@ export function Billing() {
       const result = await startCheckout({
         tier: selectedTier,
         provider,
+        currency,
         promo_code: code || undefined,
+        term_months: termMonths,
       });
       if (result.granted || !result.checkout_url) {
         // A free tier-grant promo activated the tier with no payment; there is no
@@ -515,6 +662,50 @@ export function Billing() {
               </Text>
 
               <fieldset className="mt-5">
+                <legend className="text-sm font-medium text-ink">Billing cycle</legend>
+                <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                  {TERM_OPTIONS.map((option) => {
+                    const active = termMonths === option.months;
+                    return (
+                      <label
+                        key={option.months}
+                        className={cn(
+                          'flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors duration-fast ease-standard',
+                          'focus-within:ring-2 focus-within:ring-focus',
+                          active ? 'border-brand bg-brand-subtle' : 'border-border hover:bg-subtle',
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="billing-cycle"
+                          value={option.months}
+                          checked={active}
+                          onChange={() => {
+                            setTermMonths(option.months);
+                            clearPreview();
+                          }}
+                          className="sr-only"
+                        />
+                        <Text as="span" variant="body-sm" className="font-medium">
+                          {option.label}
+                        </Text>
+                        {option.months >= 12 ? (
+                          <Text as="span" variant="caption" tone="secondary">
+                            {option.months} months at once
+                          </Text>
+                        ) : null}
+                      </label>
+                    );
+                  })}
+                </div>
+                <Text variant="caption" tone="secondary" className="mt-2 block">
+                  Pay for more than one month at once: the price is simply the monthly price times
+                  the months you choose. The first time you pay for a full year or more straight
+                  through checkout, you get a one-time 2% discount, shown below.
+                </Text>
+              </fieldset>
+
+              <fieldset className="mt-5">
                 <legend className="text-sm font-medium text-ink">Payment provider</legend>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {PROVIDERS.map((entry) => {
@@ -534,7 +725,13 @@ export function Billing() {
                           name="payment-provider"
                           value={entry.provider}
                           checked={active}
-                          onChange={() => setProvider(entry.provider)}
+                          onChange={() => {
+                            setProvider(entry.provider);
+                            // The currency choice belongs to the gateway: switching
+                            // gateways always lands on that gateway's own default.
+                            setCurrency(currenciesFor(entry.provider)[0]!.currency);
+                            clearPreview();
+                          }}
                           className="sr-only"
                         />
                         <Icon
@@ -564,6 +761,67 @@ export function Billing() {
                   })}
                 </div>
               </fieldset>
+
+              {availableCurrencies.length > 1 ? (
+                <fieldset className="mt-5">
+                  <legend className="text-sm font-medium text-ink">Currency</legend>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {availableCurrencies.map((entry) => {
+                      const active = currency === entry.currency;
+                      return (
+                        <label
+                          key={entry.currency}
+                          className={cn(
+                            'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors duration-fast ease-standard',
+                            'focus-within:ring-2 focus-within:ring-focus',
+                            active ? 'border-brand bg-brand-subtle' : 'border-border hover:bg-subtle',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="pay-currency"
+                            value={entry.currency}
+                            checked={active}
+                            onChange={() => {
+                              setCurrency(entry.currency);
+                              clearPreview();
+                            }}
+                            className="sr-only"
+                          />
+                          <span>
+                            <Text as="span" variant="body-sm" className="block font-medium">
+                              {entry.name}
+                            </Text>
+                            <Text
+                              as="span"
+                              variant="body-sm"
+                              tone="secondary"
+                              className="mt-0.5 block"
+                            >
+                              {entry.helper}
+                            </Text>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : (
+                <Text variant="caption" tone="secondary" className="mt-5 block">
+                  {PROVIDERS.find((p) => p.provider === provider)?.name} charges in{' '}
+                  {availableCurrencies[0]!.name}. {availableCurrencies[0]!.helper}
+                </Text>
+              )}
+
+              <div className="mt-5">
+                {quote ? (
+                  <PriceQuotePanel quote={quote} />
+                ) : quoteError ? (
+                  <p role="alert" className="text-sm text-danger">
+                    {quoteError}
+                  </p>
+                ) : null}
+              </div>
 
               <div className="mt-5">
                 <label htmlFor="promo-code" className="text-sm font-medium text-ink">
@@ -605,6 +863,12 @@ export function Billing() {
               {preview ? (
                 <div className="mt-4">
                   <PromoPreviewPanel preview={preview} />
+                  {!preview.free_grant ? (
+                    <Text variant="caption" tone="secondary" className="mt-2 block">
+                      The {quote?.fee_label ?? 'fee'} above still applies on top of this discounted
+                      amount.
+                    </Text>
+                  ) : null}
                 </div>
               ) : null}
 

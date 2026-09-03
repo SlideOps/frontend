@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -31,9 +32,9 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: () => void 
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="group flex w-full items-center gap-4 border-b border-border px-3 py-4 text-left transition-colors duration-fast ease-standard first:border-t hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-ink-muted transition-colors group-hover:text-ink">
         <FolderKanban width={18} height={18} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
@@ -166,6 +167,7 @@ function CreateProjectForm({
 /** The Projects list: the second level of the model, each Project a stack on one or more servers. */
 export function Projects() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [creating, setCreating] = useState(false);
   const { state, reload } = useAsyncData((signal) => listProjects(signal), []);
 
@@ -181,10 +183,12 @@ export function Projects() {
         description="A Project groups a stack on one or more of your servers. Assign the servers it runs on, install the Plugins it needs, connect a repository, and deploy its Services."
         guidanceKey="dashboard.projects"
         actions={
-          <Button onClick={() => setCreating((open) => !open)}>
-            <Plus width={16} height={16} aria-hidden />
-            Create a Project
-          </Button>
+          canWrite ? (
+            <Button onClick={() => setCreating((open) => !open)}>
+              <Plus width={16} height={16} aria-hidden />
+              Create a Project
+            </Button>
+          ) : undefined
         }
       />
 
@@ -200,10 +204,10 @@ export function Projects() {
             icon={FolderKanban}
             title="No Projects yet"
             description="A Project groups a stack on one or more of your servers. Create one, assign the servers it runs on, and install only the Plugins it needs."
-            action={<Button onClick={() => setCreating(true)}>Create your first Project</Button>}
+            action={canWrite ? <Button onClick={() => setCreating(true)}>Create your first Project</Button> : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="overflow-hidden border-y border-border bg-surface">
             {state.data.map((project) => (
               <ProjectRow
                 key={project.id}

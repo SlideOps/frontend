@@ -7,6 +7,7 @@ import {
 import { Button, Section, Text } from '@slideops/design-system';
 import { AlertTriangle, RefreshCw, Settings } from '@slideops/icons';
 import { useState } from 'react';
+import { useCanWrite } from '../../store/workspace';
 import { RevealValue } from './RevealValue';
 import { parseEnv, SECRET_PREFIX } from '../service-schema';
 
@@ -93,6 +94,7 @@ export function ServiceConfiguration({
   service: Service;
   onChanged: () => void;
 }) {
+  const canWrite = useCanWrite();
   const [command, setCommand] = useState(service.source.command ?? '');
   const [envText, setEnvText] = useState(() => envToText(service));
   // Values are masked by default. An environment is where the database password
@@ -153,9 +155,6 @@ export function ServiceConfiguration({
       adornment={<Settings width={16} height={16} className="text-brand" aria-hidden />}
       description="Change what this Service runs and the variables it runs with. Saving records the change; because a container bakes these in when it is created, a redeploy is what applies it."
       collapsible
-      // Folded by default. It is the longest thing on the page, and the one edit
-      // it exists for is rare next to the reasons somebody opens a Service.
-      defaultOpen={false}
       summary={`${Object.keys(service.env ?? {}).length} variables`}
     >
       <div className="flex flex-col gap-2">
@@ -185,14 +184,16 @@ export function ServiceConfiguration({
           <Text variant="body-sm" className="font-medium">
             Environment
           </Text>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto"
-            onClick={() => setEditing((was) => !was)}
-          >
-            {editing ? 'Done editing' : 'Edit'}
-          </Button>
+          {canWrite ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setEditing((was) => !was)}
+            >
+              {editing ? 'Done editing' : 'Edit'}
+            </Button>
+          ) : null}
         </div>
 
         {editing ? (
@@ -235,10 +236,12 @@ export function ServiceConfiguration({
             Saved, but not yet running. The container still has the previous command and environment
             until you redeploy.
           </Text>
-          <Button size="sm" onClick={applyNow} disabled={redeploying}>
-            <RefreshCw width={15} height={15} aria-hidden />
-            {redeploying ? 'Redeploying' : 'Redeploy to apply'}
-          </Button>
+          {canWrite ? (
+            <Button size="sm" onClick={applyNow} disabled={redeploying}>
+              <RefreshCw width={15} height={15} aria-hidden />
+              {redeploying ? 'Redeploying' : 'Redeploy to apply'}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -249,11 +252,13 @@ export function ServiceConfiguration({
         </Text>
       ) : null}
 
-      <div>
-        <Button onClick={save} disabled={saving}>
-          {saving ? 'Saving' : 'Save changes'}
-        </Button>
-      </div>
+      {canWrite ? (
+        <div>
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Saving' : 'Save changes'}
+          </Button>
+        </div>
+      ) : null}
     </Section>
   );
 }

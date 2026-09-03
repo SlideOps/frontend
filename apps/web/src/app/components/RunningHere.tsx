@@ -6,7 +6,7 @@ import {
   type Workload,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { Boxes, Check } from '@slideops/icons';
+import { Boxes, Check, Server, serviceIcon } from '@slideops/icons';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -38,8 +38,12 @@ function WorkloadRow({
   busy: boolean;
   onAdopt: (workload: Workload) => void;
 }) {
+  const Icon = workload.runtime === 'container' ? serviceIcon(workload.image) : Server;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border py-2.5 last:border-b-0">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+        <Icon width={16} height={16} aria-hidden />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Text variant="body-sm" className="font-medium">

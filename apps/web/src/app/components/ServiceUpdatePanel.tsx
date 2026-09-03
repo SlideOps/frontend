@@ -8,6 +8,7 @@ import {
 import { Button, Card, Text, cn } from '@slideops/design-system';
 import { CheckCircle2, GitBranch, Info, Rocket, ScanSearch } from '@slideops/icons';
 import { useState } from 'react';
+import { useCanWrite } from '../../store/workspace';
 import { ErrorNote, Loading } from './Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -56,6 +57,7 @@ interface UpdateResultProps {
 
 /** Render the outcome of an update check: available, up to date, or a reason. */
 function UpdateResult({ update, deploying, onDeployLatest }: UpdateResultProps) {
+  const canWrite = useCanWrite();
   if (update.update_available) {
     return (
       <div className="flex flex-col gap-3">
@@ -67,10 +69,16 @@ function UpdateResult({ update, deploying, onDeployLatest }: UpdateResultProps) 
           The <span className="font-mono">{update.branch}</span> branch has moved ahead to{' '}
           <span className="font-mono text-ink">{shortSha(update.latest_commit)}</span>.
         </Text>
-        <Button onClick={onDeployLatest} disabled={deploying}>
-          <Rocket width={15} height={15} aria-hidden />
-          {deploying ? 'Deploying' : 'Deploy latest'}
-        </Button>
+        {canWrite ? (
+          <Button onClick={onDeployLatest} disabled={deploying}>
+            <Rocket width={15} height={15} aria-hidden />
+            {deploying ? 'Deploying' : 'Deploy latest'}
+          </Button>
+        ) : (
+          <Text variant="body-sm" tone="secondary">
+            Deploying the latest commit needs a role above Viewer in this workspace.
+          </Text>
+        )}
       </div>
     );
   }

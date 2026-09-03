@@ -30,7 +30,14 @@ export interface OperationFilter {
   status?: OperationStatus;
 }
 
-/** List the Operator's Operations, newest first. This is History. */
+/**
+ * List the Operator's Operations, newest first, every match, unpaginated.
+ * This is what Credentials, Reports, and every "already done" badge across
+ * the Capability catalog read: each of those already narrows by its own
+ * node_id or status and needs every one of its own matches, not a page of
+ * them. History's own page is the one place that wants a bounded page; use
+ * listOperationsPage there instead.
+ */
 export function listOperations(
   filter: OperationFilter = {},
   signal?: AbortSignal,
@@ -39,6 +46,39 @@ export function listOperations(
     query: { node_id: filter.node_id, status: filter.status },
     signal,
   }).then((r) => r.operations);
+}
+
+export interface OperationPageFilter extends OperationFilter {
+  /** How many to return, newest first, capped at 200 server side. */
+  limit: number;
+  /** How many to skip past the newest, for the next page. Defaults to 0. */
+  offset?: number;
+}
+
+export interface OperationPage {
+  operations: Operation[];
+  /** Whether a next page exists past this one. */
+  hasMore: boolean;
+}
+
+/**
+ * List one page of the Operator's Operations, newest first. This is what
+ * History's own page reads, so a long-lived account's full run history does
+ * not have to load, or re-load on every filter change, in one request.
+ */
+export function listOperationsPage(
+  filter: OperationPageFilter,
+  signal?: AbortSignal,
+): Promise<OperationPage> {
+  return apiRequest<{ operations: Operation[]; has_more: boolean }>('/operations', {
+    query: {
+      node_id: filter.node_id,
+      status: filter.status,
+      limit: filter.limit,
+      offset: filter.offset,
+    },
+    signal,
+  }).then((r) => ({ operations: r.operations, hasMore: r.has_more }));
 }
 
 /** Read the full Operation record, including its plan, events, and verification. */

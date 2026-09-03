@@ -25,13 +25,13 @@ export function SiteHeader() {
         </Link>
         <nav
           aria-label="Sections"
-          className="hidden items-center gap-1 rounded-pill border border-border bg-surface/60 px-1.5 py-1 lg:flex"
+          className="hidden items-center gap-5 lg:flex"
         >
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-pill px-3.5 py-1.5 text-sm font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="rounded-md px-1 py-1.5 text-sm font-medium text-ink-muted transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Text as="span" variant="body-sm">
                 {link.label}

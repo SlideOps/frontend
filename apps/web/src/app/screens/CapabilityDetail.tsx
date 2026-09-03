@@ -1,9 +1,12 @@
 import {
+  ApiError,
   getCapability,
   getCapabilityStates,
   getNode,
   getOperation,
   listNodes,
+  listOperations,
+  runCapabilityAction,
   type Capability,
   type CapabilityState,
   type Node,
@@ -13,10 +16,10 @@ import { Button, Card, Text } from '@slideops/design-system';
 import {
   ArrowLeft,
   ArrowRight,
+  capabilityIcon,
   Database,
   History,
   KeyRound,
-  Layers,
   ListChecks,
   Play,
   ScanSearch,
@@ -24,7 +27,7 @@ import {
   ShieldCheck,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { EmptyState } from '@slideops/ui';
+import { DetailLayout, EmptyState } from '@slideops/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -34,14 +37,32 @@ import {
   detectedLabel,
   isDetected,
 } from '../capability-completion';
+import { useCanWrite } from '../../store/workspace';
 import { databaseManageStep } from '../database-credentials';
 import { CompletionBadge, DetectedBadge, PluginSourceBadge, RiskBadge } from '../components/Badges';
 import { CredentialsCard } from '../components/CredentialsCard';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { CapabilityManagement } from '../components/CapabilityManagement';
+import {
+  DatabaseExplorer,
+  DATABASE_EXPLORER_ACTION_KEYS,
+  isExplorableDatabase,
+} from '../components/DatabaseExplorer';
+import { ContainerManager } from '../components/ContainerManager';
+import { WebSitesManager, isWebSitesCapability } from '../components/WebSitesManager';
+import { MessagingManager, isMessagingCapability } from '../components/MessagingManager';
+import { StorageExplorer, isStorageCapability } from '../components/StorageExplorer';
+import { SearchIndexManager, isSearchIndexCapability } from '../components/SearchIndexManager';
+import { RuntimeManager, isRuntimeCapability } from '../components/RuntimeManager';
+import { NetworkingManager, isNetworkingCapability } from '../components/NetworkingManager';
+import { SecurityPosturePanel } from '../components/SecurityPosturePanel';
+import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
 import { StartOperation } from '../components/StartOperation';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+/** The four security Capabilities SecurityPosturePanel shows together. */
+const SECURITY_CHECKLIST_KEYS = ['install-fail2ban', 'enable-auto-updates', 'enforce-key-only-ssh', 'server-audit'];
 
 function Section({
   title,
@@ -131,8 +152,13 @@ function CapabilityHere({
   // comes from the already-loaded Nodes when present, and is fetched only as a
   // fallback. It never blocks the card: an unresolved host just omits the host.
   const nodeId = operation?.node_id;
-  const knownHost = nodeId ? nodes.find((node) => node.id === nodeId)?.address : undefined;
+  const knownNode = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
+  const knownHost = knownNode?.address;
+  const knownDockerBridgeAddress = knownNode?.docker_bridge_address;
   const [fetchedHost, setFetchedHost] = useState<string | undefined>(undefined);
+  const [fetchedDockerBridgeAddress, setFetchedDockerBridgeAddress] = useState<
+    string | undefined
+  >(undefined);
   useEffect(() => {
     if (!nodeId || knownHost) {
       return;
@@ -142,6 +168,7 @@ function CapabilityHere({
       .then((node) => {
         if (active) {
           setFetchedHost(node.address);
+          setFetchedDockerBridgeAddress(node.docker_bridge_address);
         }
       })
       .catch(() => {
@@ -152,6 +179,7 @@ function CapabilityHere({
     };
   }, [nodeId, knownHost]);
   const host = knownHost ?? fetchedHost;
+  const dockerBridgeAddress = knownDockerBridgeAddress ?? fetchedDockerBridgeAddress;
 
   return (
     <Card className="flex flex-col gap-4 border-success">
@@ -159,7 +187,7 @@ function CapabilityHere({
         <div className="flex items-center gap-2">
           <CompletionBadge label={completionLabel(capabilityKey)} />
           <Text variant="body-sm" tone="secondary">
-            {completedHint(capabilityKey, done.last_completed_at ?? '')}
+            {completedHint(capabilityKey, done.last_completed_at ?? '', done.version)}
           </Text>
         </div>
         <Button
@@ -173,66 +201,261 @@ function CapabilityHere({
       </div>
       <Text variant="body-sm" tone="secondary">
         {capabilityName} is already done on this server. Its details and any credentials it created
-        are below; you can run it again from the panel on the right if you need to.
+        are below; run it again from the panel on the right if you need to change something.
       </Text>
-      {operation ? <CredentialsCard operation={operation} host={host} /> : null}
+      {operation ? (
+        <CredentialsCard operation={operation} host={host} dockerBridgeAddress={dockerBridgeAddress} />
+      ) : null}
+    </Card>
+  );
+}
+
+/** The Manage link to the Capability that creates a database, an account, and a password. */
+function manageStepHref(manageKey: string, nodeId: string, projectId?: string, serviceId?: string): string {
+  return `/app/capabilities/${manageKey}?node=${nodeId}${projectId ? `&project=${projectId}` : ''}${
+    serviceId ? `&service=${serviceId}` : ''
+  }`;
+}
+
+/**
+ * The calm callout pointing at the next-step Capability. It never disappears
+ * once that step has already run once -- a manage or configure Capability can
+ * always be opened again to change a setting on it, such as turning on
+ * pgvector, so hiding this the moment there is nothing left to set up for the
+ * first time would leave an Operator with an existing database and no direct
+ * way back in from this page.
+ */
+function OneMoreStepForACredential({
+  title = 'One more step for a credential',
+  databaseName,
+  manageHref,
+  description,
+  actionLabel = 'Create database and account',
+}: {
+  title?: string;
+  databaseName: string;
+  manageHref: string;
+  description: string;
+  actionLabel?: string;
+}) {
+  const navigate = useNavigate();
+  return (
+    <Card className="flex flex-col gap-4 border-brand">
+      <div className="flex items-center gap-2">
+        <Database width={18} height={18} className="text-brand" aria-hidden />
+        <Text variant="h4">{title}</Text>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        {databaseName} {description}
+      </Text>
+      <div>
+        <Button size="sm" onClick={() => navigate(manageHref)}>
+          <KeyRound width={15} height={15} aria-hidden />
+          {actionLabel}
+        </Button>
+      </div>
     </Card>
   );
 }
 
 /**
+ * The newest completed manage Operation that created the named database on this
+ * Node, or null when nothing recorded ever created one by that name. A database
+ * found by name but never created through SlideOps (set up by hand, or by
+ * something else) has no Operation behind it and so no secret to reveal.
+ */
+function newestOperationFor(operations: Operation[], manageKey: string, database: string): Operation | null {
+  let newest: Operation | null = null;
+  for (const operation of operations) {
+    if (operation.capability_key !== manageKey || operation.parameters?.database !== database) {
+      continue;
+    }
+    const at = operation.completed_at ?? operation.created_at ?? '';
+    const newestAt = newest ? (newest.completed_at ?? newest.created_at ?? '') : '';
+    if (!newest || at.localeCompare(newestAt) > 0) {
+      newest = operation;
+    }
+  }
+  return newest;
+}
+
+/**
+ * The credential for the one database (or few) this Service actually points at,
+ * on a database server that usually carries one per application. Reading Browse's
+ * own scoped list-databases Action, rather than a separate notion of "what this
+ * Service uses", means this always agrees with what Browse shows: the same
+ * database server can host several Services, so a Service page must show only
+ * the database it uses, not the manage step's platform-wide done state, which
+ * says nothing about which Service asked.
+ */
+function ServiceDatabaseCredentials({
+  capabilityKey,
+  nodeId,
+  serviceId,
+  projectId,
+  host,
+  dockerBridgeAddress,
+}: {
+  capabilityKey: string;
+  nodeId: string;
+  serviceId: string;
+  projectId?: string;
+  host?: string;
+  dockerBridgeAddress?: string;
+}) {
+  const step = databaseManageStep(capabilityKey);
+  const [databases, setDatabases] = useState<string[] | null>(null);
+  const [operations, setOperations] = useState<Operation[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!step) {
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      runCapabilityAction(capabilityKey, 'list-databases', { node_id: nodeId, service_id: serviceId }),
+      listOperations({ node_id: nodeId, status: 'completed' }, controller.signal),
+    ])
+      .then(([table, ops]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setDatabases(table.rows.map((row) => row[0]).filter((name): name is string => Boolean(name)));
+        setOperations(ops);
+      })
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(caught instanceof ApiError ? caught : new ApiError(0, 'unknown_error', 'This did not load.'));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [capabilityKey, nodeId, serviceId, step]);
+
+  if (!step) {
+    return null;
+  }
+  if (loading) {
+    return <Loading label="Loading this Service's database credentials" />;
+  }
+  if (error) {
+    return <ErrorNote error={error} />;
+  }
+
+  const manageHref = manageStepHref(step.manageKey, nodeId, projectId, serviceId);
+
+  if (!databases || databases.length === 0) {
+    return (
+      <OneMoreStepForACredential
+        databaseName={step.name}
+        manageHref={manageHref}
+        description="is installed and running, but this Service does not point at a database here yet. Create one, then add its connection details to this Service's environment to get a credential."
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {databases.map((name) => {
+        const operation = newestOperationFor(operations ?? [], step.manageKey, name);
+        return operation ? (
+          <CredentialsCard
+            key={name}
+            operation={operation}
+            host={host}
+            dockerBridgeAddress={dockerBridgeAddress}
+          />
+        ) : (
+          <Card key={name} className="flex flex-col gap-2 border-warning">
+            <Text variant="body-sm" tone="secondary">
+              This Service uses a database called &ldquo;{name}&rdquo;, but SlideOps has no recorded
+              credential for it. It was likely created outside SlideOps.
+            </Text>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * The next step after a database server is installed. Installing a database
- * starts the server but creates no application database, account, or password, so
- * an Operator has no credential and no obvious way forward. This calm callout
- * points at the manage Capability that creates that database, account, and
- * password. It shows only when this install is done on the server in context and
- * its manage step is not yet done there; once the manage step is done, the
- * credentials appear on their own and this steps aside. It renders nothing when
- * the Capability is not a database install, so a non-database page is untouched.
+ * starts the server but creates no application database, account, or password
+ * (or, for Redis, no set password or tuning), so an Operator has no credential
+ * yet and no obvious way forward. This calm callout points at the Capability
+ * that gets them there. It renders nothing when the Capability is not a
+ * database install, so a non-database page is untouched, and nothing until the
+ * install itself is done on the server in context.
+ *
+ * Once that next step has itself already run, this does not disappear the way
+ * it used to: a manage or configure Capability is never really "finished" the
+ * way an install is, since a setting on it, a password, an extension like
+ * pgvector, a tuning value, can always be changed later. So it switches to a
+ * review-and-change framing and stays, which is what keeps this page a real
+ * way back in rather than a dead end once a database already exists.
+ *
+ * When the Operator arrived from a per-database engine's own Service, this
+ * instead shows the credential (or the nudge) scoped to that one Service,
+ * since the platform-wide manage state cannot say which Service, of possibly
+ * several sharing this server, is the one being looked at. Redis has no
+ * per-app database to scope to, so it always uses the plain callout instead.
  */
 function CreateDatabaseCredentials({
   capabilityKey,
   states,
   nodeId,
   projectId,
+  serviceId,
+  host,
+  dockerBridgeAddress,
 }: {
   capabilityKey: string;
   states: Record<string, CapabilityState>;
   nodeId: string;
   projectId?: string;
+  serviceId?: string;
+  host?: string;
+  dockerBridgeAddress?: string;
 }) {
-  const navigate = useNavigate();
   const step = databaseManageStep(capabilityKey);
   if (!step) {
     return null;
   }
   const installDone = Boolean(states[capabilityKey]);
-  const manageDone = Boolean(states[step.manageKey]);
-  if (!installDone || manageDone) {
+  if (!installDone) {
     return null;
   }
 
-  const manageHref = `/app/capabilities/${step.manageKey}?node=${nodeId}${
-    projectId ? `&project=${projectId}` : ''
-  }`;
+  if (serviceId && step.perDatabase) {
+    return (
+      <ServiceDatabaseCredentials
+        capabilityKey={capabilityKey}
+        nodeId={nodeId}
+        serviceId={serviceId}
+        projectId={projectId}
+        host={host}
+        dockerBridgeAddress={dockerBridgeAddress}
+      />
+    );
+  }
 
+  const manageDone = Boolean(states[step.manageKey]);
   return (
-    <Card className="flex flex-col gap-4 border-brand">
-      <div className="flex items-center gap-2">
-        <Database width={18} height={18} className="text-brand" aria-hidden />
-        <Text variant="h4">One more step for a credential</Text>
-      </div>
-      <Text variant="body-sm" tone="secondary">
-        {step.name} is installed and running. Create a database and account to get connection
-        credentials, including a password, that you can use in your app.
-      </Text>
-      <div>
-        <Button size="sm" onClick={() => navigate(manageHref)}>
-          <KeyRound width={15} height={15} aria-hidden />
-          Create database and account
-        </Button>
-      </div>
-    </Card>
+    <OneMoreStepForACredential
+      title={manageDone ? `Manage ${step.name}` : undefined}
+      databaseName={step.name}
+      manageHref={manageStepHref(step.manageKey, nodeId, projectId, serviceId)}
+      description={manageDone ? step.reviewDescription : step.setupDescription}
+      actionLabel={manageDone ? step.reviewActionLabel : step.actionLabel}
+    />
   );
 }
 
@@ -247,11 +470,17 @@ function CreateDatabaseCredentials({
 export function CapabilityDetail() {
   const { key = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   const preselectedNode = searchParams.get('node') ?? undefined;
   // A Plugin Capability started from a Project carries ?project=; a Core
   // Capability carries none, so this stays undefined and no project_id is sent.
   const preselectedProject = searchParams.get('project') ?? undefined;
+  // Present only when the Operator arrived from a Service's own Stack tab. It
+  // narrows a database engine's Browse tab and credentials to what that one
+  // Service actually uses; every other manager already ignores an unrecognized
+  // Service scope on the backend, so passing it along here is always safe.
+  const preselectedService = searchParams.get('service') ?? undefined;
 
   const capabilityResult = useAsyncData<Capability>((signal) => getCapability(key, signal), [key]);
   const nodesResult = useAsyncData<Node[]>((signal) => listNodes(signal), []);
@@ -295,7 +524,10 @@ export function CapabilityDetail() {
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-                <Layers width={22} height={22} aria-hidden />
+                {(() => {
+                  const Icon = capabilityIcon(capabilityResult.state.data);
+                  return <Icon width={22} height={22} aria-hidden />;
+                })()}
               </span>
               <div className="min-w-0">
                 <Text variant="h1">{capabilityResult.state.data.name}</Text>
@@ -306,6 +538,9 @@ export function CapabilityDetail() {
                   <Guidance for="capability.category" size={14} />
                   <PluginSourceBadge capability={capabilityResult.state.data} />
                 </div>
+                <Text variant="body-sm" tone="secondary" className="mt-1 max-w-2xl">
+                  {capabilityResult.state.data.description}
+                </Text>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -321,166 +556,285 @@ export function CapabilityDetail() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-            <div className="flex min-w-0 flex-col gap-6">
-              {done && isDetected(done) ? (
-                <CapabilityAlreadyPresent
-                  capabilityName={capabilityResult.state.data.name}
-                  capabilityKey={key}
-                  state={done}
-                />
-              ) : null}
-              {done && !isDetected(done) ? (
-                <CapabilityHere
-                  capabilityName={capabilityResult.state.data.name}
-                  capabilityKey={key}
-                  done={done}
-                  nodes={nodes}
-                />
-              ) : null}
-              {preselectedNode ? (
-                <CreateDatabaseCredentials
-                  capabilityKey={key}
-                  states={states}
-                  nodeId={preselectedNode ?? ''}
-                  projectId={preselectedProject}
-                />
-              ) : null}
-              {capabilityResult.state.data.requirements &&
-              capabilityResult.state.data.requirements.length > 0 ? (
-                <Card className="flex flex-col gap-4 border-warning">
-                  <div className="flex items-center gap-2">
-                    <ListChecks width={18} height={18} className="text-warning" aria-hidden />
-                    <Text variant="h4">Before you start</Text>
-                  </div>
-                  <Text variant="body-sm" tone="secondary">
-                    Set these up first so this Capability works the way you expect.
-                  </Text>
-                  <div className="flex flex-col gap-3">
-                    {capabilityResult.state.data.requirements.map((requirement) => (
-                      <div
-                        key={requirement.kind}
-                        className="rounded-md border border-border bg-subtle p-4"
-                      >
-                        <Text variant="body-sm" className="font-medium text-ink">
-                          {requirement.title}
-                        </Text>
-                        <Text variant="body-sm" tone="secondary" className="mt-1">
-                          {requirement.description}
-                        </Text>
-                        <Text variant="body-sm" tone="secondary" className="mt-2">
-                          <span className="font-medium text-ink">How: </span>
-                          {requirement.how_to}
-                        </Text>
-                        {requirement.setup_capability_key || requirement.setup_path ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(
-                                requirement.setup_capability_key
-                                  ? `/app/capabilities/${requirement.setup_capability_key}`
-                                  : (requirement.setup_path ?? '/app'),
-                              )
-                            }
-                            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                          >
-                            Set this up
-                            <ArrowRight width={15} height={15} aria-hidden />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              ) : null}
-
-              {/* No frame around the document. These are parts of one page, and
-                  a border around them said they were separate things. */}
-              <div className="flex flex-col divide-y divide-border">
-                <Section title="Outcome" guidanceKey="capability.outcome">
-                  <Text variant="body" tone="secondary">
-                    {capabilityResult.state.data.description}
-                  </Text>
-                </Section>
-
-                {capabilityResult.state.data.intent ? (
-                  <Section title="Intent" guidanceKey="capability.intent">
-                    <Text variant="body-sm" tone="secondary">
-                      {capabilityResult.state.data.intent}
-                    </Text>
-                  </Section>
+          <DetailLayout
+            main={
+              <>
+                {done && isDetected(done) ? (
+                  <CapabilityAlreadyPresent
+                    capabilityName={capabilityResult.state.data.name}
+                    capabilityKey={key}
+                    state={done}
+                  />
                 ) : null}
-
-                {capabilityResult.state.data.supported_platforms &&
-                capabilityResult.state.data.supported_platforms.length > 0 ? (
-                  <Section title="Supported platforms" guidanceKey="capability.platforms">
-                    <div className="flex flex-wrap gap-2">
-                      {capabilityResult.state.data.supported_platforms.map((platform) => (
-                        <span
-                          key={platform}
-                          className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-subtle px-3 py-1 text-xs font-medium text-ink"
+                {done && !isDetected(done) ? (
+                  <CapabilityHere
+                    capabilityName={capabilityResult.state.data.name}
+                    capabilityKey={key}
+                    done={done}
+                    nodes={nodes}
+                  />
+                ) : null}
+                {preselectedNode ? (
+                  <CreateDatabaseCredentials
+                    capabilityKey={key}
+                    states={states}
+                    nodeId={preselectedNode ?? ''}
+                    projectId={preselectedProject}
+                    serviceId={preselectedService}
+                    host={nodes.find((node) => node.id === preselectedNode)?.address}
+                    dockerBridgeAddress={
+                      nodes.find((node) => node.id === preselectedNode)?.docker_bridge_address
+                    }
+                  />
+                ) : null}
+                {capabilityResult.state.data.requirements &&
+                capabilityResult.state.data.requirements.length > 0 ? (
+                  <Card className="flex flex-col gap-4 border-warning">
+                    <div className="flex items-center gap-2">
+                      <ListChecks width={18} height={18} className="text-warning" aria-hidden />
+                      <Text variant="h4">Before you start</Text>
+                    </div>
+                    <Text variant="body-sm" tone="secondary">
+                      Set these up first so this Capability works the way you expect.
+                    </Text>
+                    <div className="flex flex-col gap-3">
+                      {capabilityResult.state.data.requirements.map((requirement) => (
+                        <div
+                          key={requirement.kind}
+                          className="rounded-md border border-border bg-subtle p-4"
                         >
-                          <Server width={13} height={13} aria-hidden />
-                          {platform}
-                        </span>
+                          <Text variant="body-sm" className="font-medium text-ink">
+                            {requirement.title}
+                          </Text>
+                          <Text variant="body-sm" tone="secondary" className="mt-1">
+                            {requirement.description}
+                          </Text>
+                          <Text variant="body-sm" tone="secondary" className="mt-2">
+                            <span className="font-medium text-ink">How: </span>
+                            {requirement.how_to}
+                          </Text>
+                          {requirement.setup_capability_key || requirement.setup_path ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(
+                                  requirement.setup_capability_key
+                                    ? `/app/capabilities/${requirement.setup_capability_key}`
+                                    : (requirement.setup_path ?? '/app'),
+                                )
+                              }
+                              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                            >
+                              Set this up
+                              <ArrowRight width={15} height={15} aria-hidden />
+                            </button>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
-                  </Section>
+                  </Card>
                 ) : null}
 
-                {/* Only once it is installed here. Before that there is nothing
-                    to manage, and the page stays the description it always was. */}
-                <CapabilityManagement
-                  capabilityKey={key}
-                  nodeId={preselectedNode ?? ''}
-                  projectId={preselectedProject}
-                  installed={Boolean(done)}
-                />
+                {/* No frame around the document. These are parts of one page, and
+                  a border around them said they were separate things. */}
+                <div
+                  id="capability-overview"
+                  className="scroll-mt-24 flex flex-col divide-y divide-border"
+                >
+                  <Section title="Outcome" guidanceKey="capability.outcome">
+                    <Text variant="body" tone="secondary">
+                      {capabilityResult.state.data.description}
+                    </Text>
+                  </Section>
 
-                {capabilityResult.state.data.verification_strategy ? (
-                  <Section title="How verification proves it" guidanceKey="capability.verification">
-                    <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
-                      <ShieldCheck
-                        width={18}
-                        height={18}
-                        className="mt-0.5 shrink-0 text-brand"
-                        aria-hidden
-                      />
+                  {capabilityResult.state.data.intent ? (
+                    <Section title="Intent" guidanceKey="capability.intent">
                       <Text variant="body-sm" tone="secondary">
-                        {capabilityResult.state.data.verification_strategy}
+                        {capabilityResult.state.data.intent}
                       </Text>
-                    </div>
-                  </Section>
-                ) : null}
-              </div>
-            </div>
+                    </Section>
+                  ) : null}
 
-            <Card className="h-fit">
-              <div className="mb-4 flex items-center gap-2">
-                <Play width={18} height={18} className="text-brand" aria-hidden />
-                <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
-                <Guidance for="capability.start" />
-              </div>
-              {nodesResult.state.status === 'loading' ? (
-                <Loading label="Loading your Nodes" />
-              ) : nodesResult.state.status === 'error' ? (
-                <ErrorNote error={nodesResult.state.error} />
-              ) : nodes.length === 0 ? (
-                <EmptyState
-                  icon={Server}
-                  title="Connect a Node first"
-                  description="A Capability runs on a Node. Connect one, then come back to start this Operation."
-                />
-              ) : (
-                <StartOperation
-                  capability={capabilityResult.state.data}
-                  nodes={nodes}
-                  initialNodeId={preselectedNode}
-                  initialProjectId={preselectedProject}
-                />
-              )}
-            </Card>
-          </div>
+                  {capabilityResult.state.data.supported_platforms &&
+                  capabilityResult.state.data.supported_platforms.length > 0 ? (
+                    <Section title="Supported platforms" guidanceKey="capability.platforms">
+                      <div className="flex flex-wrap gap-2">
+                        {capabilityResult.state.data.supported_platforms.map((platform) => (
+                          <span
+                            key={platform}
+                            className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-subtle px-3 py-1 text-xs font-medium text-ink"
+                          >
+                            <Server width={13} height={13} aria-hidden />
+                            {platform}
+                          </span>
+                        ))}
+                      </div>
+                    </Section>
+                  ) : null}
+
+                  {/* Only once it is installed here, and only for a database
+                    engine DatabaseExplorer knows how to draw. Before that
+                    there is nothing to browse yet. */}
+                  {done && preselectedNode && isExplorableDatabase(key) ? (
+                    <Section title="Browse">
+                      <Text variant="body-sm" tone="secondary" className="mb-3 block">
+                        What is actually inside, a page at a time, searchable. Nothing here changes
+                        anything.
+                      </Text>
+                      <DatabaseExplorer
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {/* The container runtime's own page is where "what is
+                    actually running here" should be visible, not only on a
+                    separate cross-server import screen. */}
+                  {done && preselectedNode && key === 'enable-containers' ? (
+                    <Section title="Containers">
+                      <ContainerManager nodeId={preselectedNode} projectId={preselectedProject} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isWebSitesCapability(key) ? (
+                    <Section title="Sites">
+                      <WebSitesManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isMessagingCapability(key) ? (
+                    <Section title={key === 'install-nats' ? 'Streams' : 'Queues'}>
+                      <MessagingManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isStorageCapability(key) ? (
+                    <Section title="Buckets">
+                      <StorageExplorer capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isSearchIndexCapability(key) ? (
+                    <Section title="Indexes">
+                      <SearchIndexManager
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isRuntimeCapability(key) ? (
+                    <Section title="Running now">
+                      <RuntimeManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && isNetworkingCapability(key) ? (
+                    <Section title="Peers">
+                      <NetworkingManager
+                        capabilityKey={key}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {/* Shown on any of the four security Capability pages, so
+                    an Operator looking at one sees the whole posture rather
+                    than only this one item. */}
+                  {preselectedNode && SECURITY_CHECKLIST_KEYS.includes(key) ? (
+                    <Section title="Security posture" guidanceKey="capability.security-posture">
+                      <SecurityPosturePanel
+                        states={states}
+                        nodeId={preselectedNode}
+                        projectId={preselectedProject}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {/* The existing Node health panel, wired here instead of
+                    living only as its own separate dashboard area. */}
+                  {preselectedNode && key === 'enable-monitoring' ? (
+                    <Section title="Health">
+                      <NodeHealth nodeId={preselectedNode} />
+                    </Section>
+                  ) : null}
+
+                  {/* Only once it is installed here. Before that there is nothing
+                    to manage, and the page stays the description it always was. */}
+                  <div id="capability-management" className="scroll-mt-24">
+                    <CapabilityManagement
+                      capabilityKey={key}
+                      nodeId={preselectedNode ?? ''}
+                      projectId={preselectedProject}
+                      serviceId={preselectedService}
+                      installed={Boolean(done)}
+                      hideActionKeys={
+                        isExplorableDatabase(key) ? DATABASE_EXPLORER_ACTION_KEYS : undefined
+                      }
+                    />
+                  </div>
+
+                  {capabilityResult.state.data.verification_strategy ? (
+                    <div id="capability-verification" className="scroll-mt-24">
+                      <Section
+                        title="How verification proves it"
+                        guidanceKey="capability.verification"
+                      >
+                        <div className="flex items-start gap-3 rounded-md border border-border bg-subtle p-4">
+                          <ShieldCheck
+                            width={18}
+                            height={18}
+                            className="mt-0.5 shrink-0 text-brand"
+                            aria-hidden
+                          />
+                          <Text variant="body-sm" tone="secondary">
+                            {capabilityResult.state.data.verification_strategy}
+                          </Text>
+                        </div>
+                      </Section>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            }
+            rail={
+              <Card className="h-fit">
+                <div className="mb-4 flex items-center gap-2">
+                  <Play width={18} height={18} className="text-brand" aria-hidden />
+                  <Text variant="h4">{done ? 'Run again' : 'Start an Operation'}</Text>
+                  <Guidance for="capability.start" />
+                </div>
+                {!canWrite ? (
+                  <Text variant="body-sm" tone="secondary">
+                    Starting an Operation needs a role above Viewer in this workspace.
+                  </Text>
+                ) : nodesResult.state.status === 'loading' ? (
+                  <Loading label="Loading your Nodes" />
+                ) : nodesResult.state.status === 'error' ? (
+                  <ErrorNote error={nodesResult.state.error} />
+                ) : nodes.length === 0 ? (
+                  <EmptyState
+                    icon={Server}
+                    title="Connect a Node first"
+                    description="A Capability runs on a Node. Connect one, then come back to start this Operation."
+                  />
+                ) : (
+                  <StartOperation
+                    capability={capabilityResult.state.data}
+                    nodes={nodes}
+                    initialNodeId={preselectedNode}
+                    initialProjectId={preselectedProject}
+                    alreadyDone={Boolean(done) && !isDetected(done)}
+                    currentVersion={done?.version}
+                  />
+                )}
+              </Card>
+            }
+          />
         </>
       ) : null}
     </OperatorShell>

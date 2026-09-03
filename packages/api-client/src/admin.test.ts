@@ -4,8 +4,11 @@ import {
   getOverview,
   listAdminOperations,
   listAdminTiers,
+  recoverPayment,
+  resendPaymentReceipt,
   suspendOperator,
   updateAdminTier,
+  verifyPayment,
 } from './admin';
 
 /** Build a Response-like stub for the mocked fetch. */
@@ -87,6 +90,59 @@ describe('admin requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/admin/operators/op_3/suspend');
+  });
+
+  it('reads a payment reconciliation report and unwraps the envelope', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        reconciliation: {
+          reference: 'pay_1',
+          local_status: 'failed',
+          provider_status: 'success',
+          match: false,
+        },
+      }),
+    );
+
+    const report = await verifyPayment('pay_1');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/payments/pay_1/verify');
+    expect(report).toEqual({
+      reference: 'pay_1',
+      local_status: 'failed',
+      provider_status: 'success',
+      match: false,
+    });
+  });
+
+  it('posts a recovery with its reason and unwraps the returned payment', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        payment: { reference: 'pay_1', status: 'success', recovered_at: '2026-09-03T00:00:00Z' },
+      }),
+    );
+
+    const payment = await recoverPayment('pay_1', 'Provider confirmed success');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/payments/pay_1/recover');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ reason: 'Provider confirmed success' });
+    expect(payment.status).toBe('success');
+  });
+
+  it('posts a receipt resend and unwraps the returned payment', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { payment: { reference: 'pay_1', status: 'success' } }),
+    );
+
+    await resendPaymentReceipt('pay_1');
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/payments/pay_1/resend-receipt',
+    );
   });
 
   it('lists tiers over the admin path with cookies and unwraps the array', async () => {

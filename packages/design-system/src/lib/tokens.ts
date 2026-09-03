@@ -30,17 +30,17 @@ export function readCssVar(name: string, el?: Element | null): string {
  * so a chart still resolves a sensible color when no document is available.
  */
 const TOKEN_FALLBACK: Record<string, string> = {
-  '--color-brand': '#743930',
-  '--color-accent': '#996350',
-  '--color-highlight': '#e5bea0',
-  '--color-text-primary': '#2b1c17',
-  '--color-text-secondary': '#6b544b',
+  '--color-brand': '#171717',
+  '--color-accent': '#525252',
+  '--color-highlight': '#f5f5f5',
+  '--color-text-primary': '#0a0a0a',
+  '--color-text-secondary': '#737373',
   '--color-text-on-brand': '#ffffff',
-  '--color-border': '#e7dad4',
-  '--color-success': '#5b8c6e',
-  '--color-warning': '#c98a3c',
-  '--color-danger': '#c8402f',
-  '--color-info': '#3d7a8c',
+  '--color-border': '#e5e5e5',
+  '--color-success': '#2f9e5b',
+  '--color-warning': '#c98a2e',
+  '--color-danger': '#e5484d',
+  '--color-info': '#0070f3',
 };
 
 /** Resolve one design token to a concrete color, falling back to its documented value. */

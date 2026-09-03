@@ -20,6 +20,13 @@ const getServiceActivity = vi.fn();
 const getServiceMetrics = vi.fn();
 const listCapabilityActions = vi.fn();
 const checkServiceUpdate = vi.fn();
+const purgeService = vi.fn();
+const listMarketplacePlugins = vi.fn();
+const listInstalledPlugins = vi.fn();
+const getCapabilityStates = vi.fn();
+const getOperation = vi.fn();
+const listCapabilities = vi.fn();
+const addServiceCapability = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -30,6 +37,13 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   getServiceMetrics: (...a: unknown[]) => getServiceMetrics(...a),
   listCapabilityActions: (...a: unknown[]) => listCapabilityActions(...a),
   checkServiceUpdate: (...a: unknown[]) => checkServiceUpdate(...a),
+  purgeService: (...a: unknown[]) => purgeService(...a),
+  listMarketplacePlugins: (...a: unknown[]) => listMarketplacePlugins(...a),
+  listInstalledPlugins: (...a: unknown[]) => listInstalledPlugins(...a),
+  getCapabilityStates: (...a: unknown[]) => getCapabilityStates(...a),
+  getOperation: (...a: unknown[]) => getOperation(...a),
+  listCapabilities: (...a: unknown[]) => listCapabilities(...a),
+  addServiceCapability: (...a: unknown[]) => addServiceCapability(...a),
 }));
 
 const { ServiceDetail } = await import('./ServiceDetail');
@@ -135,6 +149,54 @@ describe('ServiceDetail', () => {
       },
     ]);
     checkServiceUpdate.mockReset().mockResolvedValue({ behind: false });
+    purgeService.mockReset().mockResolvedValue(undefined);
+    listMarketplacePlugins.mockReset().mockResolvedValue([
+      {
+        id: 'postgresql',
+        name: 'PostgreSQL',
+        version: '1.0.0',
+        author: 'SlideOps',
+        category: 'database',
+        description: 'A PostgreSQL server.',
+        provides: ['install-postgresql'],
+        config: [],
+        permissions: [],
+        installed: true,
+      },
+    ]);
+    listInstalledPlugins.mockReset().mockResolvedValue([
+      { id: 'inst-1', plugin_id: 'postgresql', enabled: true, installed_at: '2026-01-01' },
+    ]);
+    getCapabilityStates.mockReset().mockResolvedValue({
+      'install-postgresql': {
+        status: 'done',
+        source: 'slideops',
+        last_operation_id: 'op-1',
+        last_completed_at: '2026-01-01T00:00:00Z',
+      },
+    });
+    getOperation.mockReset().mockResolvedValue({
+      id: 'op-1',
+      node_id: 'n-1',
+      capability_key: 'install-postgresql',
+      status: 'completed',
+      plan: null,
+      verification: null,
+      error: null,
+      parameters: {},
+      created_at: '2026-01-01T00:00:00Z',
+      approved_at: null,
+      started_at: null,
+      completed_at: '2026-01-01T00:00:00Z',
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   afterEach(() => {
@@ -145,10 +207,8 @@ describe('ServiceDetail', () => {
   it('shows the logs section, open, live, with the workload output in it', async () => {
     show();
 
-    expect(await screen.findByRole('button', { name: /^Logs and activity/ })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
+
     await screen.findByRole('log');
     FakeSocket.last!.openIt();
     FakeSocket.last!.message({ type: 'history', data: 'listening on :8000\nready' });
@@ -161,6 +221,7 @@ describe('ServiceDetail', () => {
   it('shows the activity trail beside the output', async () => {
     show();
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
     await userEvent.click(await screen.findByRole('tab', { name: 'Activity' }));
 
     expect(await screen.findByText('Deployed, and the Service is running.')).toBeInTheDocument();
@@ -168,55 +229,198 @@ describe('ServiceDetail', () => {
   });
 
   /*
-   * Every section the Operator asked to be able to fold. Each is checked by its
-   * disclosure button, which is what actually makes it foldable: a heading that
-   * merely looks like one is the failure being guarded against.
+   * The sections that remain foldable now that each lives on its own tab
+   * rather than competing with everything else on one long page. Each is
+   * checked by its disclosure button, which is what actually makes it
+   * foldable: a heading that merely looks like one is the failure being
+   * guarded against.
    */
   it.each([
-    ['Logs and activity', true],
-    ['Command and environment', false],
-    ['Manage', true],
-    ['Shell', false],
-    ['Live usage', true],
-  ])('lets the Operator fold %s', async (title, startsOpen) => {
+    ['Live usage', 'Overview' as const],
+    ['Manage', 'Browse' as const],
+    ['Command and environment', 'Settings' as const],
+  ])('lets the Operator fold %s', async (title, tab) => {
     show();
+
+    if (tab !== 'Overview') {
+      await userEvent.click(await screen.findByRole('tab', { name: tab }));
+    }
 
     // Anchored, because a guidance tooltip beside a heading is also a button
-    // with aria-expanded and its name mentions the same section.
+    // with aria-expanded and its name mentions the same section. Every one of
+    // these starts open on its own tab now: an Operator who navigated here
+    // asked for exactly this, so nothing should greet them collapsed.
     const toggle = await screen.findByRole('button', { name: new RegExp('^' + title) });
-    expect(toggle).toHaveAttribute('aria-expanded', String(startsOpen));
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', String(!startsOpen)));
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'false'));
 
     await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', String(startsOpen)));
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-expanded', 'true'));
   });
 
-  // Folding the logs away must actually stop showing them, not merely hide them,
-  // or the polling and the open connections behind a section carry on.
-  it('takes the output away when the logs are folded', async () => {
+  // Browse used to be hard coded to install-postgresql regardless of what
+  // this Service's Project actually has installed. It now asks what is
+  // really there and draws whichever real visual manager applies.
+  it('shows the real visual manager for whatever is actually installed on Browse', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Browse' }));
+
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(listMarketplacePlugins).toHaveBeenCalledWith(service.project_id, expect.anything());
+    expect(getCapabilityStates).toHaveBeenCalledWith(service.node_id, service.project_id, expect.anything());
+  });
+
+  it('shows nothing to browse when the Project has nothing with a visual manager installed', async () => {
+    listMarketplacePlugins.mockResolvedValue([]);
+    getCapabilityStates.mockResolvedValue({});
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Browse' }));
+
+    expect(await screen.findByText('Nothing to browse yet')).toBeInTheDocument();
+  });
+
+  // Settings used to show only the Service's own env and resource
+  // configuration, with no way to find a database password or a master key
+  // without already knowing which Capability page it lived on.
+  it('shows an installed app’s credentials on Settings', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }));
+
+    expect(await screen.findByText('Installed apps')).toBeInTheDocument();
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(getOperation).toHaveBeenCalledWith('op-1', expect.anything());
+  });
+
+  // Leaving the Logs tab must actually stop the log view, not merely hide it,
+  // or the open websocket behind it carries on regardless of what is on screen.
+  it('takes the output away when the Logs tab is left', async () => {
     show();
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Logs' }));
     expect(await screen.findByRole('log')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Logs and activity/ }));
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Overview' }));
     await waitFor(() => expect(screen.queryByRole('log')).not.toBeInTheDocument());
   });
 
-  // It used to sit at the very bottom, under the whole environment editor, which
-  // is a large part of why it read as missing.
-  it('puts the logs above the configuration editor', async () => {
-    const { container } = show();
-    await screen.findByRole('log');
+  // Logs sits ahead of Settings in the tab order, so the section an Operator
+  // most often comes looking for when something is wrong is not the one they
+  // have to dig past everything else, including their own config editor, to
+  // reach.
+  it('puts the Logs tab ahead of Settings', async () => {
+    show();
 
-    const headings = Array.from(container.querySelectorAll('section')).map(
-      (s) => s.textContent?.slice(0, 40) ?? '',
-    );
-    const logs = headings.findIndex((h) => h.includes('Logs and activity'));
-    const config = headings.findIndex((h) => h.includes('Command and environment'));
+    const tabs = (await screen.findAllByRole('tab')).map((tab) => tab.textContent);
+    const logs = tabs.findIndex((label) => label === 'Logs');
+    const settings = tabs.findIndex((label) => label === 'Settings');
 
     expect(logs).toBeGreaterThanOrEqual(0);
-    expect(config).toBeGreaterThanOrEqual(0);
-    expect(logs).toBeLessThan(config);
+    expect(settings).toBeGreaterThanOrEqual(0);
+    expect(logs).toBeLessThan(settings);
+  });
+
+  it('has a Stack tab showing what is installed on this Service, not everything', async () => {
+    show();
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByRole('tab', { name: /Stack/ }));
+
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(listMarketplacePlugins).toHaveBeenCalledWith(service.project_id, expect.anything());
+  });
+
+  // Purging is the strong, irreversible delete: it must never fire on a
+  // mistyped or incomplete confirmation, only on the exact phrase.
+  it('deletes the Service forever only once the exact name is typed', async () => {
+    show();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete this Service forever' }),
+    );
+    const confirmButton = await screen.findByRole('button', { name: 'Delete forever' });
+    expect(confirmButton).toBeDisabled();
+
+    const input = screen.getByLabelText(/Type "delete prudent-journal-backend" to confirm/);
+    await userEvent.type(input, 'delete something-else');
+    expect(confirmButton).toBeDisabled();
+
+    await userEvent.clear(input);
+    await userEvent.type(input, 'delete prudent-journal-backend');
+    expect(confirmButton).toBeEnabled();
+
+    await userEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend'),
+    );
+  });
+});
+
+const capabilityService = {
+  ...service,
+  deployment_type: 'capability',
+  runtime: '',
+  source: { type: 'capability' },
+  capabilities: [
+    { capability_key: 'install-postgresql', operation_id: 'op-1', status: 'done', created_at: '2026-07-30T10:00:00Z' },
+    { capability_key: 'install-redis', operation_id: 'op-2', status: 'running', created_at: '2026-07-30T10:01:00Z' },
+  ],
+};
+
+const catalog = [
+  { key: 'install-postgresql', name: 'PostgreSQL', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+  { key: 'install-redis', name: 'Redis', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+  { key: 'install-mongodb', name: 'MongoDB', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+];
+
+describe('ServiceDetail: a Capability Service', () => {
+  beforeEach(() => {
+    FakeSocket.last = null;
+    vi.stubGlobal('WebSocket', FakeSocket as unknown as typeof WebSocket);
+    getService.mockReset().mockResolvedValue(capabilityService);
+    getProject.mockReset().mockResolvedValue({ id: 'p-1', name: 'Kenpoly' });
+    getNode.mockReset().mockResolvedValue({ id: 'n-1', name: 'contabo vps' });
+    getServiceActivity.mockReset().mockResolvedValue([]);
+    listCapabilityActions.mockReset().mockResolvedValue([]);
+    listMarketplacePlugins.mockReset().mockResolvedValue([]);
+    listInstalledPlugins.mockReset().mockResolvedValue([]);
+    getCapabilityStates.mockReset().mockResolvedValue({});
+    listCapabilities.mockReset().mockResolvedValue(catalog);
+    addServiceCapability.mockReset().mockResolvedValue({ ...capabilityService });
+  });
+
+  it('shows the tracked capabilities and their status, not resource/build panels', async () => {
+    show();
+    expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
+    expect(screen.getByText('Redis')).toBeInTheDocument();
+    // Nothing software-shaped: no CPU/memory summary rows, no CI/CD tab.
+    expect(screen.queryByText('CPU limit')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /CI\/CD/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Shell/ })).not.toBeInTheDocument();
+  });
+
+  it('offers no Start, Stop, or Redeploy actions', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redeploy' })).not.toBeInTheDocument();
+  });
+
+  it('adds another capability without disturbing what is already tracked', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+    await userEvent.click(await screen.findByRole('button', { name: /Add Capability/ }));
+
+    // Only the untracked engine is offered.
+    const select = await screen.findByLabelText('Capability');
+    expect(select).toHaveValue('install-mongodb');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(addServiceCapability).toHaveBeenCalledWith('svc-1', expect.objectContaining({ capability_key: 'install-mongodb' })),
+    );
   });
 });

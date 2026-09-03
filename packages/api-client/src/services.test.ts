@@ -5,6 +5,7 @@ import {
   getServiceLogs,
   getServiceMetrics,
   listServices,
+  purgeService,
   redeployService,
   removeService,
   startService,
@@ -134,6 +135,31 @@ describe('services requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1');
+  });
+
+  it('purges a Service with a DELETE and the typed confirmation', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+    await purgeService('sv_1', 'delete web');
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('DELETE');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/purge');
+    expect(JSON.parse(String(init?.body))).toEqual({ confirm: 'delete web' });
+  });
+
+  it('reports the exact confirmation the backend refused', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(400, {
+        error: {
+          code: 'confirmation_mismatch',
+          message: 'type "delete web" exactly to permanently delete this service',
+        },
+      }),
+    );
+    await expect(purgeService('sv_1', 'wrong')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 400,
+      code: 'confirmation_mismatch',
+    });
   });
 
   it('reads live metrics, accepting a bare shape', async () => {

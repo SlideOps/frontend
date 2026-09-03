@@ -1,19 +1,30 @@
 import { ApiError, getProject, removeProject } from '@slideops/api-client';
 import { Button } from '@slideops/design-system';
-import { ArrowLeft, Trash2 } from '@slideops/icons';
-import { PageHeader } from '@slideops/ui';
+import { ArrowLeft, Boxes, Globe, Layers, Server, Sparkles, Trash2 } from '@slideops/icons';
+import { PageHeader, TabNav, type TabNavTab } from '@slideops/ui';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ProjectCapabilities } from '../components/ProjectCapabilities';
 import { ProjectGitHub } from '../components/ProjectGitHub';
+import { ProjectHealthSummary } from '../components/ProjectHealthSummary';
 import { ProjectRouting } from '../components/ProjectRouting';
 import { ProjectServers } from '../components/ProjectServers';
 import { ProjectServices } from '../components/ProjectServices';
 import { ProjectStack } from '../components/ProjectStack';
 import { useAsyncData } from '../hooks/useAsyncData';
+
+const PROJECT_TABS: TabNavTab[] = [
+  { key: 'overview', label: 'Overview', icon: Server },
+  { key: 'domains', label: 'Domains', icon: Globe },
+  { key: 'stack', label: 'Stack', icon: Boxes },
+  { key: 'capabilities', label: 'Capabilities', icon: Sparkles },
+  { key: 'services', label: 'Services', icon: Layers },
+];
+const DEFAULT_PROJECT_TAB = 'overview';
 
 /**
  * The Project view: the second level of the two-level model. A Project gathers
@@ -24,7 +35,26 @@ import { useAsyncData } from '../hooks/useAsyncData';
 export function ProjectDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => getProject(id, signal), [id]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = PROJECT_TABS.some((tab) => tab.key === searchParams.get('tab'))
+    ? (searchParams.get('tab') as string)
+    : DEFAULT_PROJECT_TAB;
+  const setActiveTab = (key: string) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (key === DEFAULT_PROJECT_TAB) {
+          next.delete('tab');
+        } else {
+          next.set('tab', key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -59,11 +89,14 @@ export function ProjectDetail() {
               state.data.description || 'A Project groups a stack on one or more of your servers.'
             }
             guidanceKey="project.overview"
+            tabs={<TabNav tabs={PROJECT_TABS} active={activeTab} onSelect={setActiveTab} />}
             actions={
-              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                <Trash2 width={16} height={16} aria-hidden />
-                Delete Project
-              </Button>
+              canWrite ? (
+                <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 width={16} height={16} aria-hidden />
+                  Delete Project
+                </Button>
+              ) : undefined
             }
           />
 
@@ -73,16 +106,25 @@ export function ProjectDetail() {
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-10">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <ProjectServers projectId={id} />
-              <ProjectGitHub />
+          {activeTab === 'overview' ? (
+            <div className="flex flex-col gap-6">
+              <ProjectHealthSummary projectId={id} />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ProjectServers projectId={id} />
+                <ProjectGitHub />
+              </div>
             </div>
+          ) : null}
+
+          {activeTab === 'domains' ? (
             <ProjectRouting projectId={id} domain={state.data.domain} />
-            <ProjectStack projectId={id} />
-            <ProjectCapabilities projectId={id} />
-            <ProjectServices projectId={id} />
-          </div>
+          ) : null}
+
+          {activeTab === 'stack' ? <ProjectStack projectId={id} /> : null}
+
+          {activeTab === 'capabilities' ? <ProjectCapabilities projectId={id} /> : null}
+
+          {activeTab === 'services' ? <ProjectServices projectId={id} /> : null}
         </>
       ) : null}
 

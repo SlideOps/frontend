@@ -9,10 +9,12 @@ import {
   type CapabilityAction,
   type StagedUpload,
 } from '@slideops/api-client';
-import { Button, Section, Text } from '@slideops/design-system';
-import { Download, RefreshCw, Upload } from '@slideops/icons';
+import { Button, Field, Section, Text } from '@slideops/design-system';
+import { Download, RefreshCw } from '@slideops/icons';
+import { FileDrop } from '@slideops/ui';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { ErrorNote, Loading } from './Feedback';
 
@@ -92,6 +94,7 @@ function ActionRow({
   result?: ActionTable;
   onResult: (key: string, table: ActionTable | undefined) => void;
 }) {
+  const canWrite = useCanWrite();
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,7 +179,7 @@ function ActionRow({
             <Download width={15} height={15} aria-hidden />
             {busy ? 'Preparing' : 'Download'}
           </Button>
-        ) : (
+        ) : canWrite ? (
           <Button size="sm" variant="secondary" disabled={busy} onClick={run}>
             <RefreshCw
               width={15}
@@ -186,7 +189,7 @@ function ActionRow({
             />
             {busy ? 'Reading' : result ? 'Read again' : 'Show'}
           </Button>
-        )}
+        ) : null}
         {missing ? (
           <Text variant="caption" tone="secondary">
             Fill in the fields above first.
@@ -209,8 +212,29 @@ function ActionRow({
   );
 }
 
+// The restore Capability each database engine's install offers, and the file
+// kind its dump takes: text for the SQL engines, MongoDB's own gzipped
+// archive for the one engine whose export is not text.
+const RESTORE_CAPABILITY_KEY: Record<string, string> = {
+  'install-postgresql': 'restore-postgresql',
+  'install-mysql': 'restore-mysql',
+  'install-mariadb': 'restore-mariadb',
+  'install-mongodb': 'restore-mongodb',
+};
+const RESTORE_ACCEPT: Record<string, string> = {
+  'install-postgresql': '.sql,.dump,text/plain,application/octet-stream',
+  'install-mysql': '.sql,.dump,text/plain,application/octet-stream',
+  'install-mariadb': '.sql,.dump,text/plain,application/octet-stream',
+  'install-mongodb': '.gz,.archive,application/gzip,application/octet-stream',
+};
+
+/** Whether this Capability has a restore to offer at all. Redis does not: see its Capability for why. */
+export function isRestorable(capabilityKey: string): boolean {
+  return capabilityKey in RESTORE_CAPABILITY_KEY;
+}
+
 /**
- * Restoring a database from a dump you upload.
+ * Restoring a database from a dump you drop in.
  *
  * Two steps on purpose. The upload puts the file on the server and changes
  * nothing; the restore is an Operation with a plan to read and approve. A file
@@ -223,33 +247,50 @@ function ActionRow({
  * shows up much later.
  */
 function RestoreFromUpload({
+  capabilityKey,
   nodeId,
   projectId,
   database,
 }: {
+  capabilityKey: string;
   nodeId: string;
   projectId?: string;
   database?: string;
 }) {
+  const restoreKey = RESTORE_CAPABILITY_KEY[capabilityKey];
   const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
   const [target, setTarget] = useState(database ?? '');
   const [staged, setStaged] = useState<StagedUpload | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [uploadMessage, setUploadMessage] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const send = async () => {
+  if (!restoreKey) {
+    return null;
+  }
+
+  const handleFiles = async (files: File[]) => {
+    const file = files[0];
     if (!file) {
       return;
     }
-    setBusy(true);
+    setStaged(null);
     setError(null);
+    setUploadStatus('uploading');
+    setUploadMessage(undefined);
     try {
-      setStaged(await uploadToNode(nodeId, file));
+      const result = await uploadToNode(nodeId, file);
+      setStaged(result);
+      setUploadStatus('done');
+      setUploadMessage(
+        `${file.name}, ${result.bytes.toLocaleString()} bytes arrived on the server. Check that against the file you meant to send before restoring it.`,
+      );
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That upload did not complete.');
-    } finally {
-      setBusy(false);
+      const message = caught instanceof ApiError ? caught.message : 'That upload did not complete.';
+      setUploadStatus('error');
+      setUploadMessage(message);
+      setError(message);
     }
   };
 
@@ -263,7 +304,7 @@ function RestoreFromUpload({
       const operation = await createOperation({
         node_id: nodeId,
         project_id: projectId,
-        capability_key: 'restore-postgresql',
+        capability_key: restoreKey,
         parameters: { database: target.trim(), upload_id: staged.id },
       });
       // Straight to the Operation, because nothing has happened yet: it is waiting
@@ -281,53 +322,30 @@ function RestoreFromUpload({
         Restore from a dump
       </Text>
       <Text variant="body-sm" tone="secondary" className="mt-1 block max-w-2xl">
-        Upload a SQL dump, then approve the restore. Uploading changes nothing: the database is
+        Drop a dump in, then approve the restore. Uploading changes nothing: the database is
         untouched until you have read the plan and agreed to it. A copy of what is there now is
         taken first, so it can be put back.
       </Text>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-ink-muted">Dump file</span>
-          <input
-            type="file"
-            accept=".sql,.dump,text/plain,application/octet-stream"
-            aria-label="Dump file"
-            className="text-sm text-ink file:mr-2 file:h-9 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:text-sm file:text-ink"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setStaged(null);
-            }}
-          />
-        </label>
-        <Button size="sm" variant="secondary" disabled={!file || busy} onClick={send}>
-          <Upload width={15} height={15} aria-hidden />
-          {busy && !staged ? 'Uploading' : 'Upload'}
-        </Button>
+      <div className="mt-3 max-w-md">
+        <FileDrop
+          onFiles={(files) => void handleFiles(files)}
+          accept={RESTORE_ACCEPT[capabilityKey]}
+          label="Drop a dump here, or click to browse"
+          status={uploadStatus}
+          statusMessage={uploadMessage}
+        />
       </div>
 
       {staged ? (
         <div className="mt-3 flex flex-wrap items-end gap-2">
-          <Text variant="body-sm" tone="secondary" className="w-full">
-            {staged.bytes.toLocaleString()} bytes arrived on the server. Check that against the file
-            you meant to send before restoring it.
-          </Text>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-ink-muted">Restore into</span>
-            <input
-              className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-ink"
-              aria-label="Restore into"
-              placeholder="app"
-              value={target}
-              onChange={(event) => setTarget(event.target.value)}
-            />
-          </label>
-          <Button
-            size="sm"
-            variant="danger"
-            disabled={busy || !target.trim()}
-            onClick={planRestore}
-          >
+          <Field
+            label="Restore into"
+            placeholder="app"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+          />
+          <Button size="sm" variant="danger" disabled={busy || !target.trim()} onClick={planRestore}>
             Plan the restore
           </Button>
         </div>
@@ -356,6 +374,7 @@ export function CapabilityManagement({
   projectId,
   scopedDatabase,
   installed,
+  hideActionKeys,
 }: {
   capabilityKey: string;
   nodeId: string;
@@ -371,7 +390,14 @@ export function CapabilityManagement({
   serviceId?: string;
   /** Whether this Capability's outcome is already in place on this Node. */
   installed: boolean;
+  /**
+   * Action keys to leave out of the plain list, because something else on the
+   * page already offers them a better way: DatabaseExplorer's Tree and grid
+   * instead of a form for browse-rows, for one.
+   */
+  hideActionKeys?: string[];
 }) {
+  const canWrite = useCanWrite();
   // Not fetched at all until there is something to manage. A hook cannot be
   // called conditionally, so the condition lives in the loader: asking what a
   // Capability offers before it is installed is a request whose answer is thrown
@@ -382,13 +408,17 @@ export function CapabilityManagement({
     [capabilityKey, installed, nodeId],
   );
   const [results, setResults] = useState<Results>({});
+  const shown =
+    actions.state.status === 'ready'
+      ? actions.state.data.filter((action) => !hideActionKeys?.includes(action.key))
+      : [];
 
   // Nothing to manage, or nothing installed to manage yet. Either way this is
   // not the moment to put controls in front of somebody.
   if (!installed || !nodeId) {
     return null;
   }
-  if (actions.state.status === 'ready' && actions.state.data.length === 0) {
+  if (actions.state.status === 'ready' && shown.length === 0) {
     return null;
   }
 
@@ -406,7 +436,7 @@ export function CapabilityManagement({
       {actions.state.status === 'error' ? <ErrorNote error={actions.state.error} /> : null}
       {actions.state.status === 'ready' ? (
         <div className="flex flex-col">
-          {actions.state.data.map((action) => (
+          {shown.map((action) => (
             <ActionRow
               key={action.key}
               capabilityKey={capabilityKey}
@@ -417,8 +447,13 @@ export function CapabilityManagement({
               onResult={(key, table) => setResults((current) => ({ ...current, [key]: table }))}
             />
           ))}
-          {capabilityKey === 'install-postgresql' ? (
-            <RestoreFromUpload nodeId={nodeId} projectId={projectId} database={scopedDatabase} />
+          {isRestorable(capabilityKey) && canWrite ? (
+            <RestoreFromUpload
+              capabilityKey={capabilityKey}
+              nodeId={nodeId}
+              projectId={projectId}
+              database={scopedDatabase}
+            />
           ) : null}
         </div>
       ) : null}

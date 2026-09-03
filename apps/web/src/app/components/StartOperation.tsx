@@ -34,6 +34,8 @@ export function StartOperation({
   nodes,
   initialNodeId,
   initialProjectId,
+  alreadyDone,
+  currentVersion,
 }: {
   capability: Capability;
   nodes: Node[];
@@ -44,6 +46,20 @@ export function StartOperation({
    * undefined and no project_id is sent.
    */
   initialProjectId?: string;
+  /**
+   * Whether this Capability has already run here. Every Capability in the
+   * catalog is written to be safe to re-run -- an install re-pins a chosen
+   * version, a manage step resets a password and can turn on an option like
+   * pgvector it did not the first time -- so this is what lets that be said
+   * out loud instead of leaving "run it again" to be discovered by trying it.
+   */
+  alreadyDone?: boolean;
+  /**
+   * The version the last completed run actually installed, when this
+   * Capability records one and it is known. Shown so choosing a different
+   * one below reads as changing it, not guessing at what is already there.
+   */
+  currentVersion?: string;
 }) {
   const navigate = useNavigate();
   const parameters = useMemo<CapabilityParameter[]>(
@@ -51,6 +67,12 @@ export function StartOperation({
     [capability],
   );
   const schema = useMemo(() => buildParameterSchema(parameters), [parameters]);
+  const hasVersionParam = parameters.some((param) => param.type === 'version');
+  // enable_pgvector is worth naming directly: an Operator re-running Create
+  // PostgreSQL database and user to turn it on for a database that already
+  // exists is exactly the case this note exists to make discoverable, and a
+  // generic "an option" would leave them to find the checkbox by scanning.
+  const pgvectorParam = parameters.find((param) => param.key === 'enable_pgvector');
 
   const [nodeId, setNodeId] = useState<string>(
     initialNodeId && nodes.some((node) => node.id === initialNodeId)
@@ -121,6 +143,20 @@ export function StartOperation({
 
   return (
     <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
+      {alreadyDone ? (
+        <div className="rounded-md border border-border bg-subtle px-3 py-2">
+          <Text variant="body-sm" tone="secondary">
+            Already done. This is safe to re-run: change a value below and run it again to apply
+            it.
+            {hasVersionParam
+              ? ` Pin a different version to change what is installed.${
+                  currentVersion ? ` Currently installed: ${currentVersion}.` : ''
+                }`
+              : ''}
+            {pgvectorParam ? ` Turn on ${pgvectorParam.label} to add it to an existing database.` : ''}
+          </Text>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2">
         <label htmlFor={`node-${capability.key}`} className="text-sm font-medium text-ink">
           Run on Node
@@ -144,6 +180,8 @@ export function StartOperation({
         parameters={parameters}
         register={register}
         errors={errors}
+        nodeId={nodeId}
+        capabilityKey={capability.key}
       />
 
       <div className="flex flex-wrap items-center gap-3">

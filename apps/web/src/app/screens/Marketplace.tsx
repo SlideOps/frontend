@@ -1,6 +1,6 @@
 import { listMarketplacePlugins, type Plugin } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Boxes, Check, Package, Search } from '@slideops/icons';
+import { ArrowRight, Boxes, capabilityIcon, Check, Package, Search } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
 import { useMemo, useState } from 'react';
@@ -35,11 +35,14 @@ function matches(plugin: Plugin, query: string): boolean {
 
 /** One Plugin presented as a card, with its outcome, what it provides, and its install state. */
 function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) {
+  const Icon = plugin.provides?.[0]
+    ? capabilityIcon({ key: plugin.provides[0], category: plugin.category })
+    : Boxes;
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="group flex flex-col gap-4 border-border transition-colors duration-fast ease-standard hover:border-ink-muted hover:bg-subtle/30">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
-          <Boxes width={18} height={18} aria-hidden />
+          <Icon width={18} height={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <Text variant="h4">{plugin.name}</Text>
@@ -64,7 +67,11 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
       </Text>
 
       {plugin.provides && plugin.provides.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
+        <div>
+          <Text variant="caption" tone="secondary" className="mb-2 block">
+            Provides
+          </Text>
+          <div className="flex flex-wrap gap-1.5">
           {plugin.provides.map((key) => (
             <span
               key={key}
@@ -73,6 +80,7 @@ function PluginCard({ plugin, onOpen }: { plugin: Plugin; onOpen: () => void }) 
               {key}
             </span>
           ))}
+          </div>
         </div>
       ) : null}
 
@@ -137,7 +145,7 @@ export function Marketplace() {
         </Button>
       </Card>
 
-      <div className="mb-8 flex max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3">
+      <div className="mb-8 flex max-w-xl items-center gap-2 rounded-md border border-border bg-surface px-3 shadow-sm">
         <Search width={18} height={18} className="text-ink-muted" aria-hidden />
         <input
           type="search"

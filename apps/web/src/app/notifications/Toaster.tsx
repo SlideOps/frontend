@@ -41,9 +41,21 @@ export function Toaster() {
     for (const item of fresh) {
       seen.current.add(item.id);
     }
-    setActive((current) => [...fresh, ...current].slice(0, 3));
+    // An inbox notification the durable backend already has marked read (from a
+    // prior session, or an earlier visit this same one) has already been shown
+    // to the Operator once. It still belongs in the bell's list, but "not yet
+    // seen by this particular page load" is not the same question as "not yet
+    // seen by the Operator", and toasting it again on every fresh login was
+    // exactly that mistake: the same already-read notification popping up
+    // forever, on every browser, since a fresh mount has never personally seen
+    // it before either.
+    const toastWorthy = fresh.filter((item) => !item.read);
+    if (toastWorthy.length === 0) {
+      return;
+    }
+    setActive((current) => [...toastWorthy, ...current].slice(0, 3));
     // A persistent notification waits until acted on, so it gets no dismiss timer.
-    const timers = fresh
+    const timers = toastWorthy
       .filter((item) => !item.persistent)
       .map((item) =>
         setTimeout(() => {
@@ -68,7 +80,8 @@ export function Toaster() {
       {active.map((toast) => {
         const actionRequired = toast.kind === 'action_required';
         const Icon = actionRequired ? AlertTriangle : toneIcon[toast.tone];
-        const target = toast.href ?? `/app/operations/${toast.operationId}`;
+        const target =
+          toast.href ?? (toast.operationId ? `/app/operations/${toast.operationId}` : '/app');
         return (
           <div
             key={toast.id}
@@ -98,7 +111,7 @@ export function Toaster() {
                 }}
                 className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
-                <p className="text-sm font-medium text-ink">{toast.title}</p>
+                <p className="truncate text-sm font-medium text-ink">{toast.title}</p>
                 <p className="mt-0.5 truncate text-sm text-ink-muted">{toast.body}</p>
               </button>
               {toast.href ? (

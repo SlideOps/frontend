@@ -4,7 +4,7 @@ import { Button, Field, Text } from '@slideops/design-system';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
 import { GitHubSignIn } from '../components/GitHubSignIn';
 import { registerSchema, type RegisterValues } from '../auth-schemas';
@@ -13,9 +13,14 @@ import { useAuthStore } from '../store/auth';
 /** Create a new Operator account. On success the Operator is signed in. */
 export function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const status = useAuthStore((state) => state.status);
   const signIn = useAuthStore((state) => state.signIn);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Where to land after signing up. An invitation link sends an anonymous
+  // visitor here first, and expects to come right back to it.
+  const next = (location.state as { next?: string } | null)?.next ?? '/app';
 
   const {
     register,
@@ -24,7 +29,7 @@ export function Register() {
   } = useForm<RegisterValues>({ resolver: zodResolver(registerSchema) });
 
   if (status === 'authenticated') {
-    return <Navigate to="/app" replace />;
+    return <Navigate to={next} replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -35,7 +40,7 @@ export function Register() {
         password: values.password,
       });
       signIn(operator);
-      navigate('/app', { replace: true });
+      navigate(next, { replace: true });
     } catch (error) {
       setFormError(
         error instanceof ApiError ? error.message : 'Sign up did not complete. Try again.',
@@ -50,7 +55,11 @@ export function Register() {
       footer={
         <Text variant="body-sm" tone="secondary">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-accent hover:text-brand">
+          <Link
+            to="/login"
+            state={next === '/app' ? undefined : { next }}
+            className="font-medium text-accent hover:text-brand"
+          >
             Sign in
           </Link>
         </Text>

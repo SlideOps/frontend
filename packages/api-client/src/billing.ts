@@ -19,6 +19,10 @@ export type PurchasableTier = 'starter' | 'pro';
 /** The payment providers. Paystack serves local payments; Flutterwave international. */
 export type PaymentProvider = 'paystack' | 'flutterwave';
 
+/** The currencies a checkout may be paid in. USD is every plan's own price;
+ *  NGN converts it to Naira at the live exchange rate. */
+export type PayCurrency = 'USD' | 'NGN';
+
 /** The lifecycle state of a paid subscription. */
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired';
 
@@ -45,12 +49,14 @@ export interface BillingSubscription {
   subscription: Subscription | null;
 }
 
-/** What a checkout starts with. term_months defaults to one month on the backend. */
+/** What a checkout starts with. term_months defaults to one month on the backend.
+ *  currency defaults to the plan's own currency (USD) when omitted. */
 export interface CheckoutInput {
   tier: PurchasableTier;
   provider: PaymentProvider;
   promo_code?: string;
   term_months?: number;
+  currency?: PayCurrency;
 }
 
 /**
@@ -124,6 +130,48 @@ export interface ValidatePromoInput {
   term_months?: number;
 }
 
+/** What a checkout quote is asked for: a tier and currency, and an optional
+ *  promo code and term. */
+export interface QuoteInput {
+  tier: PurchasableTier;
+  currency?: PayCurrency;
+  promo_code?: string;
+  term_months?: number;
+}
+
+/**
+ * The exact total a checkout would charge right now: the tier price after any
+ * promo discount and currency conversion, the platform fee charged on top of it,
+ * and the total. It changes nothing; it is what the checkout UI shows before the
+ * Operator commits to pay. When free_grant is true the promo code activates a
+ * tier with no charge at all, and the amount fields are zero.
+ *
+ * annual_discount_applied is true when the automatic first-time discount for
+ * paying a full year (12 months) or more straight through checkout applies to
+ * this quote, with annual_discount_minor naming how much it takes off. It is
+ * a one-time deal, granted once per Operator ever, and never combines with a
+ * promo code: a code supplied at the same time is what wins instead, in which
+ * case this stays false.
+ */
+export interface Quote {
+  tier: string;
+  currency?: string;
+  term_months: number;
+  base_amount_minor: number;
+  fee_label?: string;
+  fee_amount_minor: number;
+  total_amount_minor: number;
+  /** The USD to NGN rate used, present only for a Naira quote. */
+  fx_rate?: number;
+  promo_applied: boolean;
+  promo_descriptions: string[];
+  free_grant: boolean;
+  grant_tier?: string;
+  free_days?: number;
+  annual_discount_applied: boolean;
+  annual_discount_minor?: number;
+}
+
 /**
  * An Admin-created promo code and the effects it carries. The code is matched
  * case-insensitively at checkout. starts_at and ends_at bound an optional validity
@@ -168,6 +216,14 @@ export function getSubscription(signal?: AbortSignal): Promise<BillingSubscripti
  */
 export function startCheckout(input: CheckoutInput): Promise<CheckoutResult> {
   return apiRequest<CheckoutResult>('/billing/checkout', { method: 'POST', body: input });
+}
+
+/** Price a checkout before starting it: the total a checkout would charge right
+ *  now, including the platform fee and any Naira conversion. Changes nothing. */
+export function quoteCheckout(input: QuoteInput): Promise<Quote> {
+  return apiRequest<unknown>('/billing/quote', { method: 'POST', body: input }).then((r) =>
+    unwrap<Quote>(r, 'quote'),
+  );
 }
 
 /** Cancel the subscription and return the Operator to the Free tier. */

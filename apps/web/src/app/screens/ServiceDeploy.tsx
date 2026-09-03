@@ -2,25 +2,41 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ApiError,
   deployService,
+  getGitHubRepositoryAccess,
   getGitHubStatus,
   listGitHubRepos,
   listNodes,
   listProjects,
+  preflightDeploy,
   type GitHubRepo,
   type GitHubStatus,
   type Node,
+  type PreflightCheck,
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { Container, GitBranch } from '@slideops/icons';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Boxes,
+  CheckCircle2,
+  Container,
+  Database,
+  GitBranch,
+  Lock,
+  Search,
+  XCircle,
+} from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
-import { PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { EmptyState, PageHeader } from '@slideops/ui';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCanWrite } from '../../store/workspace';
 import { ComposeStackPlan } from '../components/ComposeStackPlan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { filterGitHubRepos } from '../github-repos';
 import {
   buildServiceSchema,
   parseEnv,
@@ -29,24 +45,61 @@ import {
   type ServiceFormValues,
 } from '../service-schema';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { ServiceDeployCapabilities } from './ServiceDeployCapabilities';
 
 interface DeployData {
   projects: Project[];
   nodes: Node[];
   github: GitHubStatus;
+  // What the connected account offers this form to pick from: every
+  // repository the account can reach in "all" mode, or only what has been
+  // added on the Project page's GitHub section in "selected" mode. Configure
+  // that there; this form only ever reads the current configuration.
   repos: GitHubRepo[];
+  // Set when connected but the repository list itself could not be read, so
+  // the picker can say that plainly instead of just not appearing, which
+  // otherwise reads as "nothing is connected" rather than "this failed".
+  reposError: ApiError | null;
 }
 
-async function loadDeployData(signal: AbortSignal): Promise<DeployData> {
-  const [projects, nodes, github] = await Promise.all([
-    listProjects(signal),
-    listNodes(signal),
-    // GitHub is optional here, so a failure or an unconfigured platform must not
-    // block the deploy form; fall back to an unconnected status.
-    getGitHubStatus(signal).catch(() => ({ configured: false, connected: false }) as GitHubStatus),
-  ]);
-  const repos = github.connected ? await listGitHubRepos(signal).catch(() => []) : [];
-  return { projects, nodes, github, repos };
+/**
+ * Loads what the chosen path needs. GitHub is only ever relevant to the
+ * Software path, so it stays unfetched until that path is actually chosen --
+ * the Capabilities path has nothing to do with the GitHub integration and
+ * must never touch it, not even as an unused prefetch.
+ */
+async function loadDeployData(
+  deployType: 'software' | 'capabilities' | null,
+  signal: AbortSignal,
+): Promise<DeployData> {
+  const [projects, nodes] = await Promise.all([listProjects(signal), listNodes(signal)]);
+  if (deployType !== 'software') {
+    return { projects, nodes, github: { configured: false, connected: false }, repos: [], reposError: null };
+  }
+  // GitHub is optional here, so a failure or an unconfigured platform must not
+  // block the deploy form; fall back to an unconnected status.
+  const github = await getGitHubStatus(signal).catch(
+    () => ({ configured: false, connected: false }) as GitHubStatus,
+  );
+  if (!github.connected) {
+    return { projects, nodes, github, repos: [], reposError: null };
+  }
+  try {
+    const access = await getGitHubRepositoryAccess(signal);
+    // "All" mode has nothing meaningful under access.repos (it is never
+    // populated for that mode), so the picker itself needs the live account.
+    const repos = access.mode === 'all' ? await listGitHubRepos(signal) : access.repos;
+    return { projects, nodes, github, repos, reposError: null };
+  } catch (error) {
+    return {
+      projects,
+      nodes,
+      github,
+      repos: [],
+      reposError:
+        error instanceof ApiError ? error : new ApiError(0, 'unknown_error', 'The repositories could not be read.'),
+    };
+  }
 }
 
 const inputClass =
@@ -56,6 +109,12 @@ const inputClass =
 function DeployForm({ data, initialProjectId }: { data: DeployData; initialProjectId?: string }) {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
+  // Basic by default: the recommended CPU/memory/process values already
+  // pre-filled below are what most applications need, so most Operators
+  // never have to think about resource limits at all unless they choose to.
+  const [showAdvancedResources, setShowAdvancedResources] = useState(false);
+  const [repoSearch, setRepoSearch] = useState('');
+  const filteredRepos = useMemo(() => filterGitHubRepos(data.repos, repoSearch), [data.repos, repoSearch]);
 
   // Preselect the Project only when it is one the Operator owns, so a stray
   // param never selects nothing.
@@ -71,6 +130,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<ServiceFormValues>({
     resolver,
@@ -314,14 +374,35 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                   </label>
                   <Guidance for="service.githubRepo" />
                 </div>
+                <label className="relative block">
+                  <Search
+                    width={14}
+                    height={14}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                    aria-hidden
+                  />
+                  <input
+                    type="search"
+                    value={repoSearch}
+                    onChange={(event) => setRepoSearch(event.target.value)}
+                    placeholder="Search repositories..."
+                    aria-label="Search GitHub repositories"
+                    className={`${inputClass} pl-8`}
+                  />
+                </label>
                 <select
                   id="github_repo"
+                  size={Math.min(8, Math.max(3, filteredRepos.length))}
                   className={inputClass}
                   defaultValue=""
                   onChange={(event) => onPickRepo(event.target.value)}
                 >
-                  <option value="">Choose a repository to fill the URL and branch</option>
-                  {data.repos.map((repo) => (
+                  {filteredRepos.length === 0 ? (
+                    <option value="" disabled>
+                      No repository matches &ldquo;{repoSearch}&rdquo;
+                    </option>
+                  ) : null}
+                  {filteredRepos.map((repo) => (
                     <option key={repo.full_name} value={repo.full_name}>
                       {repo.full_name}
                       {repo.private ? ' (private)' : ''}
@@ -331,10 +412,13 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
                 <Text variant="body-sm" tone="secondary" className="flex items-center gap-1.5">
                   <GitBranch width={14} height={14} aria-hidden />
                   Connected as {data.github.login ?? 'your GitHub account'}. Picking a repository
-                  fills the URL and branch below.
+                  fills the URL and branch below. Don&apos;t see one you expect? Configure
+                  repositories on the Project page&apos;s GitHub section &mdash; this only offers
+                  what is currently configured there.
                 </Text>
               </div>
             ) : null}
+            {data.github.connected && data.reposError ? <ErrorNote error={data.reposError} /> : null}
             <Field
               label="Repository URL"
               placeholder="https://github.com/you/app.git"
@@ -350,9 +434,10 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
               {...register('branch')}
             />
             <Field
-              label="Build command (optional)"
-              placeholder="docker build -t app ."
+              label="Subdirectory (optional)"
+              placeholder="apps/api"
               error={errors.build?.message}
+              labelAdornment={<Guidance for="service.build" />}
               {...register('build')}
             />
           </div>
@@ -366,35 +451,58 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           {...register('command')}
         />
 
-        <div className="grid gap-5 sm:grid-cols-3">
-          <Field
-            label="vCPU limit"
-            type="number"
-            step="0.1"
-            inputMode="decimal"
-            placeholder="0.5"
-            error={errors.cpu_limit?.message}
-            labelAdornment={<Guidance for="service.cpu" />}
-            {...register('cpu_limit')}
-          />
-          <Field
-            label="Memory (MB)"
-            type="number"
-            inputMode="numeric"
-            placeholder="256"
-            error={errors.memory_mb?.message}
-            labelAdornment={<Guidance for="service.memory" />}
-            {...register('memory_mb')}
-          />
-          <Field
-            label="Process limit"
-            type="number"
-            inputMode="numeric"
-            placeholder="Optional"
-            error={errors.pids_limit?.message}
-            labelAdornment={<Guidance for="service.pids" />}
-            {...register('pids_limit')}
-          />
+        <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <Text variant="body-sm" className="font-medium text-ink">
+                Recommended configuration
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                0.5 vCPU · 256 MB memory · no process limit set (SlideOps applies a safe
+                default). Good for most applications; change it if you know you need more.
+              </Text>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvancedResources((value) => !value)}
+            >
+              {showAdvancedResources ? 'Use recommended' : 'Advanced'}
+            </Button>
+          </div>
+          {showAdvancedResources ? (
+            <div className="grid gap-5 sm:grid-cols-3">
+              <Field
+                label="vCPU limit"
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="0.5"
+                error={errors.cpu_limit?.message}
+                labelAdornment={<Guidance for="service.cpu" />}
+                {...register('cpu_limit')}
+              />
+              <Field
+                label="Memory (MB)"
+                type="number"
+                inputMode="numeric"
+                placeholder="256"
+                error={errors.memory_mb?.message}
+                labelAdornment={<Guidance for="service.memory" />}
+                {...register('memory_mb')}
+              />
+              <Field
+                label="Process limit"
+                type="number"
+                inputMode="numeric"
+                placeholder="Optional"
+                error={errors.pids_limit?.message}
+                labelAdornment={<Guidance for="service.pids" />}
+                {...register('pids_limit')}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -448,7 +556,7 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           {errors.env ? <p className="text-sm text-danger">{errors.env.message}</p> : null}
         </div>
 
-        {sourceType === 'repository' ? (
+        {sourceType === 'repository' && runtime === 'compose' ? (
           <div className="mt-6">
             <ComposeStackPlan
               nodeID={plannedNode ?? ''}
@@ -481,6 +589,8 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
           </div>
         ) : null}
 
+        <PreflightPanel getValues={getValues} />
+
         <div className="flex items-center gap-3">
           <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting ? 'Deploying' : 'Deploy Service'}
@@ -494,13 +604,161 @@ function DeployForm({ data, initialProjectId }: { data: DeployData; initialProje
   );
 }
 
+/**
+ * Check before deploying: connects to the chosen Node read only and reports
+ * what a real deploy would run into -- an unreachable Node, a missing
+ * runtime tool, a port already taken, or resources tighter than requested.
+ * Advisory only: nothing here blocks Deploy Service above it.
+ */
+function PreflightPanel({ getValues }: { getValues: () => ServiceFormValues }) {
+  const [state, setState] = useState<
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'ready'; checks: PreflightCheck[] }
+    | { status: 'error'; message: string }
+  >({ status: 'idle' });
+
+  async function run() {
+    setState({ status: 'loading' });
+    try {
+      const checks = await preflightDeploy(toDeployInput(getValues()));
+      setState({ status: 'ready', checks });
+    } catch (cause) {
+      setState({
+        status: 'error',
+        message: cause instanceof ApiError ? cause.message : 'The preflight check could not run.',
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <Text variant="body-sm" className="font-medium text-ink">
+            Preflight check
+          </Text>
+          <Text variant="body-sm" tone="secondary">
+            Connects to the Node and checks for problems before you deploy. Nothing here changes
+            the server, and nothing here blocks Deploy Service.
+          </Text>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => void run()}
+          disabled={state.status === 'loading'}
+        >
+          {state.status === 'loading' ? 'Checking' : 'Run preflight'}
+        </Button>
+      </div>
+      {state.status === 'error' ? (
+        <p role="alert" className="text-sm text-danger">
+          {state.message}
+        </p>
+      ) : null}
+      {state.status === 'ready' ? (
+        <ul className="flex flex-col divide-y divide-border">
+          {state.checks.map((check) => (
+            <li key={check.name} className="flex items-start gap-2 py-2">
+              <PreflightStatusIcon status={check.status} />
+              <div className="min-w-0">
+                <Text variant="body-sm" className="font-medium text-ink">
+                  {check.name}
+                </Text>
+                <Text variant="body-sm" tone="secondary">
+                  {check.message}
+                </Text>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function PreflightStatusIcon({ status }: { status: PreflightCheck['status'] }) {
+  if (status === 'pass') {
+    return <CheckCircle2 width={16} height={16} className="mt-0.5 shrink-0 text-success" aria-hidden />;
+  }
+  if (status === 'fail') {
+    return <XCircle width={16} height={16} className="mt-0.5 shrink-0 text-danger" aria-hidden />;
+  }
+  return <AlertTriangle width={16} height={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />;
+}
+
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */
+/**
+ * The choice between a Software deploy (the existing GitHub/image driven
+ * form, unchanged below) and a Capabilities deploy (several infrastructure
+ * Capabilities put in place together as one Service). Shown first so an
+ * Operator picks the shape of what they are deploying before filling in
+ * anything specific to it.
+ */
+function DeployTypeChooser({ onChoose }: { onChoose: (type: 'software' | 'capabilities') => void }) {
+  return (
+    <div className="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+      <Card className="flex flex-col gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-subtle text-brand">
+          <Container width={18} height={18} aria-hidden />
+        </span>
+        <Text variant="h4">Software</Text>
+        <Text variant="body-sm" tone="secondary">
+          Deploy an application, API, frontend, or worker from a repository or an
+          image.
+        </Text>
+        <Button className="self-start" onClick={() => onChoose('software')}>
+          Continue
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      </Card>
+      <Card className="flex flex-col gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-subtle text-brand">
+          <Boxes width={18} height={18} aria-hidden />
+        </span>
+        <Text variant="h4">Capabilities</Text>
+        <Text variant="body-sm" tone="secondary">
+          Add infrastructure your Project depends on -- PostgreSQL, Redis, and more
+          -- deployed together as one Service.
+        </Text>
+        <Button className="self-start" onClick={() => onChoose('capabilities')}>
+          Continue
+          <ArrowRight width={15} height={15} aria-hidden />
+        </Button>
+      </Card>
+    </div>
+  );
+}
+
 export function ServiceDeploy() {
   const navigate = useNavigate();
+  const canWrite = useCanWrite();
   const [searchParams] = useSearchParams();
   // Deploying from inside a Project preselects it here via ?project=.
   const initialProjectId = searchParams.get('project') ?? undefined;
-  const { state } = useAsyncData((signal) => loadDeployData(signal), []);
+  // ?type= lets a link jump straight past the chooser (used by the "Add a
+  // Capability" flow from an existing Capability Service, for example).
+  const initialType = searchParams.get('type');
+  const [deployType, setDeployType] = useState<'software' | 'capabilities' | null>(
+    initialType === 'software' || initialType === 'capabilities' ? initialType : null,
+  );
+  const { state } = useAsyncData((signal) => loadDeployData(deployType, signal), [deployType]);
+
+  if (!canWrite) {
+    return (
+      <OperatorShell active="services">
+        <PageHeader title="Deploy a Service" />
+        <EmptyState
+          icon={Lock}
+          title="This needs a role above Viewer"
+          description="A Viewer can see this workspace's Services but cannot deploy one. Ask an Owner or an Admin to invite you at a role that can, or switch to a workspace where you are."
+          action={<Button onClick={() => navigate('/app/services')}>Back to Services</Button>}
+        />
+      </OperatorShell>
+    );
+  }
 
   return (
     <OperatorShell active="services">
@@ -512,7 +770,10 @@ export function ServiceDeploy() {
 
       {state.status === 'loading' ? <Loading label="Preparing the deploy form" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
-      {state.status === 'ready' ? (
+      {state.status === 'ready' && !deployType ? (
+        <DeployTypeChooser onChoose={setDeployType} />
+      ) : null}
+      {state.status === 'ready' && deployType === 'software' ? (
         state.data.projects.length === 0 || state.data.nodes.length === 0 ? (
           <Card className="max-w-2xl">
             <div className="flex items-start gap-3">
@@ -539,6 +800,35 @@ export function ServiceDeploy() {
           </Card>
         ) : (
           <DeployForm data={state.data} initialProjectId={initialProjectId} />
+        )
+      ) : null}
+      {state.status === 'ready' && deployType === 'capabilities' ? (
+        state.data.nodes.length === 0 ? (
+          <Card className="max-w-2xl">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-subtle text-brand">
+                <Database width={18} height={18} aria-hidden />
+              </span>
+              <div>
+                <Text variant="h4">A Node comes first</Text>
+                <Text variant="body-sm" tone="secondary" className="mt-1">
+                  A Capability Service runs on a Node. Connect one before deploying.
+                </Text>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button onClick={() => navigate('/app/nodes/new')}>Connect a Node</Button>
+                  <Button variant="ghost" onClick={() => navigate('/app/services')}>
+                    Back to Services
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <ServiceDeployCapabilities
+            projects={state.data.projects}
+            nodes={state.data.nodes}
+            initialProjectId={initialProjectId}
+          />
         )
       ) : null}
     </OperatorShell>

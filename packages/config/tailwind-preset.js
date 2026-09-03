@@ -1,11 +1,11 @@
 /**
  * SlideOps Tailwind preset.
  *
- * Encodes the Everlasting Beauty palette and the semantic design tokens.
- * Every color resolves to a CSS variable defined by the design-system token
- * sheet, so light and dark themes are handled purely at the variable level and
- * no app ever hard codes a hex value. Apps extend this preset and only add
- * their own content globs.
+ * Encodes the brand palette and the semantic design tokens. Every color
+ * resolves to a CSS variable defined by the design-system token sheet, so
+ * light and dark themes are handled purely at the variable level and no app
+ * ever hard codes a hex value. Apps extend this preset and only add their
+ * own content globs.
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -39,6 +39,7 @@ const preset = {
         },
         accent: 'var(--color-accent)',
         highlight: 'var(--color-highlight)',
+        overlay: 'var(--color-overlay)',
 
         // Functional status tokens.
         success: 'var(--color-success)',
@@ -81,9 +82,9 @@ const preset = {
         slow: 'var(--so-duration-slow)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },
   },
