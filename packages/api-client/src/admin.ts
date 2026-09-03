@@ -733,3 +733,34 @@ export function listWebhookDeliveries(limit?: number, signal?: AbortSignal): Pro
     { signal },
   ).then((r) => (Array.isArray(r) ? r : (r.deliveries ?? [])));
 }
+
+/*
+ * Login rate limits: the support scenario is an Operator locked out by too
+ * many login attempts. The login limiter keys its counter on email plus the
+ * caller's IP, so a lookup or reset by email alone reaches every IP that has
+ * contributed to it.
+ */
+
+/** One active login attempt counter, one per IP that has attempted it. */
+export interface RateLimitEntry {
+  subject: string;
+  attempts: number;
+  max: number;
+  resets_in_seconds: number;
+}
+
+/** Every active login rate limit counter for the given email. */
+export function lookupLoginRateLimit(email: string, signal?: AbortSignal): Promise<RateLimitEntry[]> {
+  return apiRequest<{ entries?: RateLimitEntry[] } | RateLimitEntry[]>(
+    `/admin/rate-limits/login?email=${encodeURIComponent(email)}`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.entries ?? [])));
+}
+
+/** Clears every active login rate limit counter for the given email. Returns how many were cleared. */
+export function resetLoginRateLimit(email: string): Promise<number> {
+  return apiRequest<{ cleared?: number }>('/admin/rate-limits/login/reset', {
+    method: 'POST',
+    body: { email },
+  }).then((r) => r.cleared ?? 0);
+}
