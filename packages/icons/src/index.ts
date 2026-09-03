@@ -32,6 +32,7 @@ export {
   CircleDot,
   CircleHelp,
   Clock,
+  Construction,
   Container,
   Copy,
   Cpu,

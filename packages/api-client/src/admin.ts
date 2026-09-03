@@ -324,6 +324,21 @@ export function emergencyReleaseAll(): Promise<EmergencyState> {
 }
 
 /**
+ * Turn on planned maintenance: the public app shows a maintenance page, and
+ * new registrations, new deploys, and new checkouts are held alongside it.
+ * Existing running Services, existing sessions, and the Admin control plane
+ * are unaffected.
+ */
+export function emergencyEngageMaintenance(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/maintenance/engage', { method: 'POST' });
+}
+
+/** Turn maintenance mode off, releasing every control it engaged. */
+export function emergencyReleaseMaintenance(): Promise<EmergencyState> {
+  return apiRequest<EmergencyState>('/admin/emergency/maintenance/release', { method: 'POST' });
+}
+
+/**
  * End every open session on the platform, so a captured token stops working now
  * rather than at the end of its life.
  *

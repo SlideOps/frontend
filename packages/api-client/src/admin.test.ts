@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './errors';
 import {
+  emergencyEngageMaintenance,
+  emergencyReleaseMaintenance,
   getOverview,
   grantEntitlement,
   listAdminOperations,
@@ -259,6 +261,30 @@ describe('admin requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       '/admin/operators/op-1/entitlements/grant-1/revoke',
     );
+  });
+
+  it('posts an engage to the maintenance path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
+    );
+
+    await emergencyEngageMaintenance();
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/emergency/maintenance/engage');
+  });
+
+  it('posts a release to the maintenance path', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
+    );
+
+    await emergencyReleaseMaintenance();
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('POST');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/emergency/maintenance/release');
   });
 
   it('lists tiers over the admin path with cookies and unwraps the array', async () => {
