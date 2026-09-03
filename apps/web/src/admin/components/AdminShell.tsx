@@ -6,6 +6,7 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   TicketPercent,
@@ -29,7 +30,8 @@ export type ActiveKey =
   | 'subscribers'
   | 'emergency'
   | 'feature-flags'
-  | 'webhooks';
+  | 'webhooks'
+  | 'rate-limits';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -116,6 +118,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: Waypoints,
       active: active === 'webhooks',
       onSelect: () => navigate('/admin/webhooks'),
+    },
+    {
+      key: 'rate-limits',
+      label: 'Rate limits',
+      icon: ShieldAlert,
+      active: active === 'rate-limits',
+      onSelect: () => navigate('/admin/rate-limits'),
     },
     {
       key: 'app',
