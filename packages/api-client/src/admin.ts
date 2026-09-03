@@ -705,3 +705,31 @@ export function setFeatureFlagEnabled(key: string, enabled: boolean): Promise<Fe
 export function deleteFeatureFlag(key: string): Promise<void> {
   return apiRequest<void>(`/admin/feature-flags/${encodeURIComponent(key)}`, { method: 'DELETE' });
 }
+
+/*
+ * Webhook deliveries: a read-only log of every inbound payment provider
+ * webhook (Paystack, Flutterwave), so an Admin can see whether a provider's
+ * webhook ever arrived, whether its signature checked out, and what it did,
+ * without shelling into server logs. This is what diagnosing a payment stuck
+ * pending -- its webhook never arrived, arrived with a bad signature, or
+ * errored while being applied -- reaches for before Verify/Recover.
+ */
+
+/** One recorded delivery attempt from a payment provider's webhook. */
+export interface WebhookDelivery {
+  id: string;
+  provider: string;
+  reference?: string;
+  outcome: string;
+  detail?: string;
+  received_at: string;
+}
+
+/** The most recent webhook deliveries, newest first. */
+export function listWebhookDeliveries(limit?: number, signal?: AbortSignal): Promise<WebhookDelivery[]> {
+  const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
+  return apiRequest<{ deliveries?: WebhookDelivery[] } | WebhookDelivery[]>(
+    `/admin/webhook-deliveries${query}`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.deliveries ?? [])));
+}

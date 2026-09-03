@@ -10,6 +10,7 @@ import {
   Sparkles,
   TicketPercent,
   Users,
+  Waypoints,
 } from '@slideops/icons';
 import { AppShell, type NavItem } from '@slideops/ui';
 import type { ReactNode } from 'react';
@@ -27,7 +28,8 @@ export type ActiveKey =
   | 'tiers'
   | 'subscribers'
   | 'emergency'
-  | 'feature-flags';
+  | 'feature-flags'
+  | 'webhooks';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -107,6 +109,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: Flag,
       active: active === 'feature-flags',
       onSelect: () => navigate('/admin/feature-flags'),
+    },
+    {
+      key: 'webhooks',
+      label: 'Webhooks',
+      icon: Waypoints,
+      active: active === 'webhooks',
+      onSelect: () => navigate('/admin/webhooks'),
     },
     {
       key: 'app',
