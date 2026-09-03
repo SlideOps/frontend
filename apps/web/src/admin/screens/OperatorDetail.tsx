@@ -8,12 +8,16 @@ import {
   listEntitlementGrants,
   grantEntitlement,
   revokeEntitlement,
+  listSupportNotes,
+  addSupportNote,
+  deleteSupportNote,
   ApiError,
   type TierName,
   type EntitlementGrant,
+  type SupportNote,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { ArrowLeft, Gift, ShieldCheck, Unlock, Users, X } from '@slideops/icons';
+import { ArrowLeft, FileText, Gift, ShieldCheck, Trash2, Unlock, Users, X } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
 import { useEffect, useState } from 'react';
@@ -81,6 +85,63 @@ export function OperatorDetail() {
   };
 
   useEffect(loadGrants, [id]);
+
+  const [notes, setNotes] = useState<SupportNote[]>([]);
+  const [notesError, setNotesError] = useState<ApiError | null>(null);
+  const [newNoteBody, setNewNoteBody] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteActionError, setNoteActionError] = useState<string | null>(null);
+  const [deletingNote, setDeletingNote] = useState<SupportNote | null>(null);
+
+  const loadNotes = () => {
+    if (!id) {
+      return;
+    }
+    listSupportNotes(id)
+      .then((n) => {
+        setNotes(n);
+        setNotesError(null);
+      })
+      .catch((error) => setNotesError(error instanceof ApiError ? error : null));
+  };
+
+  useEffect(loadNotes, [id]);
+
+  const runAddNote = async () => {
+    if (!id || newNoteBody.trim() === '') {
+      return;
+    }
+    setAddingNote(true);
+    setNoteActionError(null);
+    try {
+      await addSupportNote(id, newNoteBody.trim());
+      setNewNoteBody('');
+      loadNotes();
+    } catch (error) {
+      setNoteActionError(
+        error instanceof ApiError ? error.message : 'That note did not save. Try again.',
+      );
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  const runDeleteNote = async () => {
+    if (!id || !deletingNote) {
+      return;
+    }
+    setNoteActionError(null);
+    try {
+      await deleteSupportNote(id, deletingNote.id);
+      setDeletingNote(null);
+      loadNotes();
+    } catch (error) {
+      setNoteActionError(
+        error instanceof ApiError ? error.message : 'That note did not delete. Try again.',
+      );
+      setDeletingNote(null);
+    }
+  };
 
   const operator = state.status === 'ready' ? state.data : null;
   const isSuspended = operator?.status === 'suspended';
@@ -428,6 +489,73 @@ export function OperatorDetail() {
               </Table>
             )}
           </div>
+
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2">
+              <Text variant="h4">Support notes</Text>
+              <Text variant="caption" tone="secondary">
+                Free-text context for support, visible only to Admins and never shown to the
+                Operator.
+              </Text>
+            </div>
+            <Card>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <textarea
+                  value={newNoteBody}
+                  onChange={(event) => setNewNoteBody(event.target.value)}
+                  placeholder="Called about a billing dispute on Sept 1, resolved..."
+                  rows={2}
+                  className="min-h-[2.5rem] w-full flex-1 resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                />
+                <Button
+                  variant="secondary"
+                  onClick={runAddNote}
+                  disabled={addingNote || newNoteBody.trim() === ''}
+                >
+                  <FileText width={15} height={15} aria-hidden />
+                  {addingNote ? 'Adding' : 'Add note'}
+                </Button>
+              </div>
+            </Card>
+            {noteActionError ? (
+              <p role="alert" className="mt-2 text-sm text-danger">
+                {noteActionError}
+              </p>
+            ) : null}
+            {notesError ? <ErrorNote error={notesError} /> : null}
+            {notes.length === 0 ? (
+              <Card className="mt-3">
+                <Text variant="body-sm" tone="secondary">
+                  No support notes for this Operator yet.
+                </Text>
+              </Card>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2">
+                {notes.map((note) => (
+                  <Card key={note.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Text variant="body-sm" className="whitespace-pre-wrap">
+                          {note.body}
+                        </Text>
+                        <Text variant="caption" tone="secondary" className="mt-1 block">
+                          {new Date(note.created_at).toLocaleString()}
+                        </Text>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeletingNote(note)}
+                        aria-label="Delete this note"
+                      >
+                        <Trash2 width={14} height={14} aria-hidden />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       ) : null}
 
@@ -559,6 +687,16 @@ export function OperatorDetail() {
         confirmVariant="danger"
         onConfirm={runRevoke}
         onCancel={() => setRevoking(null)}
+      />
+
+      <ConfirmDialog
+        open={deletingNote !== null}
+        title="Delete this support note?"
+        description="Removes it for good. A note carries no consequence of its own, so this is safe, but it cannot be undone."
+        confirmLabel="Delete note"
+        confirmVariant="danger"
+        onConfirm={runDeleteNote}
+        onCancel={() => setDeletingNote(null)}
       />
     </AdminShell>
   );
