@@ -156,6 +156,8 @@ export {
   setFreeSeason,
   emergencyLockdown,
   emergencyReleaseAll,
+  emergencyEngageMaintenance,
+  emergencyReleaseMaintenance,
   revokeAllSessions,
   verifyPayment,
   recoverPayment,
@@ -204,6 +206,7 @@ export {
 } from './marketplace';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
 export { getSampleApp, type SampleApp } from './sample-app';
+export { getMaintenanceStatus } from './maintenance';
 export {
   getSubscription,
   startCheckout,
