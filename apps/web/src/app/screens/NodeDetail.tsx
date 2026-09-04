@@ -375,7 +375,11 @@ export function NodeDetail() {
                 node={nodeResult.state.data}
                 onRotated={() => nodeResult.reload()}
               />
-              <ServerUsers nodeId={id} node={nodeResult.state.data} />
+              <ServerUsers
+                nodeId={id}
+                node={nodeResult.state.data}
+                onSwitched={() => nodeResult.reload()}
+              />
               <TagsEditor node={nodeResult.state.data} onSaved={() => nodeResult.reload()} />
               <NodeTransferControl node={nodeResult.state.data} />
             </div>

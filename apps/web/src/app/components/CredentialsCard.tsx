@@ -1,6 +1,6 @@
 import { revealOperationSecret, type Operation } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
-import { Check, Copy, Eye, EyeOff, KeyRound } from '@slideops/icons';
+import { Button, Card, Text } from '@slideops/design-system';
+import { Check, Copy, Download, Eye, EyeOff, KeyRound } from '@slideops/icons';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   buildConnectionUrl,
@@ -334,6 +334,134 @@ function EndpointConnection({
 }
 
 /**
+ * A generated private key, shown with its own Copy and Download `.pem`
+ * actions rather than the single masked line every other secret gets: this
+ * is the one secret an Operator is expected to save to a file and use in
+ * another SSH client, not paste into a form, so it needs a real download,
+ * not just a copy.
+ */
+function GeneratedPrivateKeyCard({
+  operation,
+  secretKey,
+  filename,
+}: {
+  operation: Operation;
+  secretKey: string;
+  filename: string;
+}) {
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [loading, setLoading] = useState<null | 'copy' | 'download'>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+    },
+    [],
+  );
+
+  const resolve = useCallback(async (): Promise<string | null> => {
+    if (revealed !== null) {
+      return revealed;
+    }
+    try {
+      const result = await revealOperationSecret(operation.id, secretKey);
+      setRevealed(result.value);
+      return result.value;
+    } catch {
+      setError('Could not reveal the private key. Try again.');
+      return null;
+    }
+  }, [operation.id, secretKey, revealed]);
+
+  const copy = async () => {
+    setLoading('copy');
+    setError(null);
+    const plaintext = await resolve();
+    if (plaintext !== null) {
+      try {
+        await navigator.clipboard?.writeText(plaintext);
+        setCopied(true);
+        if (timer.current) {
+          clearTimeout(timer.current);
+        }
+        timer.current = setTimeout(() => setCopied(false), COPIED_RESET_MS);
+      } catch {
+        setCopied(false);
+      }
+    }
+    setLoading(null);
+  };
+
+  const download = async () => {
+    setLoading('download');
+    setError(null);
+    const plaintext = await resolve();
+    if (plaintext !== null) {
+      const blob = new Blob([plaintext], { type: 'application/x-pem-file' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+    setLoading(null);
+  };
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <KeyRound width={16} height={16} className="text-brand" aria-hidden />
+        <Text variant="body-sm" className="font-medium text-ink">
+          Your private key
+        </Text>
+      </div>
+      <Text variant="body-sm" tone="secondary">
+        Generated for this account and installed on the server. This is the only time it is shown
+        here — save it now. It stays revealable through this Operation's own record if you need it
+        again, but is never shown anywhere else.
+      </Text>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void copy()}
+          disabled={loading !== null}
+        >
+          {copied ? (
+            <Check width={14} height={14} className="text-success" aria-hidden />
+          ) : (
+            <Copy width={14} height={14} aria-hidden />
+          )}
+          {loading === 'copy' ? 'Copying' : copied ? 'Copied' : 'Copy private key'}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void download()}
+          disabled={loading !== null}
+        >
+          <Download width={14} height={14} aria-hidden />
+          {loading === 'download' ? 'Preparing' : `Download ${filename}`}
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * The credentials an Operation created, shown so an Operator can turn them into
  * a working connection: the host and the service port, the connection details as
  * plain copyable rows, each secret behind a reveal control that fetches the
@@ -359,9 +487,13 @@ export function CredentialsCard({
 }) {
   const parameters = operation.parameters ?? {};
 
-  const secretKeys = Object.keys(parameters).filter(
+  const allSecretKeys = Object.keys(parameters).filter(
     (key) => parameters[key] === SECRET_PLACEHOLDER,
   );
+  // A generated private key gets its own dedicated card below, with a real
+  // download rather than the single masked line every other secret gets.
+  const hasPrivateKey = allSecretKeys.includes('private_key');
+  const secretKeys = allSecretKeys.filter((key) => key !== 'private_key');
 
   const endpoint = resolveEndpoint(
     operation.capability_key,
@@ -415,9 +547,11 @@ export function CredentialsCard({
   const connectionSecretKey = secretKeys[0] ?? null;
   const showConnection = endpoint !== null && Boolean(endpoint.host || endpoint.privateHost);
 
-  if (secretKeys.length === 0 && plainRows.length === 0 && !showConnection) {
+  if (secretKeys.length === 0 && plainRows.length === 0 && !showConnection && !hasPrivateKey) {
     return null;
   }
+
+  const username = typeof parameters.username === 'string' ? parameters.username : 'server';
 
   return (
     <Card>
@@ -447,6 +581,13 @@ export function CredentialsCard({
           </CredentialRow>
         ))}
       </dl>
+      {hasPrivateKey ? (
+        <GeneratedPrivateKeyCard
+          operation={operation}
+          secretKey="private_key"
+          filename={`${username}.pem`}
+        />
+      ) : null}
       {showConnection && endpoint ? (
         <EndpointConnection
           operation={operation}

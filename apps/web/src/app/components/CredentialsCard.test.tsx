@@ -13,14 +13,18 @@ import { renderInApp } from '../../test/render';
  * whenever credentials are shown.
  */
 
-const revealOperationSecret = vi.fn(async (..._a: unknown[]) => ({
-  parameter: 'password',
-  value: 's3cr3t',
+const revealOperationSecret = vi.fn(async (_operationId: unknown, parameter: unknown) => ({
+  parameter,
+  value:
+    parameter === 'private_key'
+      ? '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----'
+      : 's3cr3t',
 }));
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  revealOperationSecret: (...a: unknown[]) => revealOperationSecret(...a),
+  revealOperationSecret: (operationId: unknown, parameter: unknown) =>
+    revealOperationSecret(operationId, parameter),
 }));
 
 const { CredentialsCard } = await import('./CredentialsCard');
@@ -121,6 +125,60 @@ describe('CredentialsCard', () => {
     // The container block is rendered first.
     await userEvent.click(buttons[0]!);
 
-    expect(await screen.findByText(/postgresql:\/\/app_user:s3cr3t@10\.0\.0\.1:5432\/app/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/postgresql:\/\/app_user:s3cr3t@10\.0\.0\.1:5432\/app/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a generated private key with its own copy and download actions, not the generic reveal row', async () => {
+    renderInApp(
+      <CredentialsCard
+        operation={postgresOperation({
+          capability_key: 'manage-server-user',
+          parameters: { username: 'deploy', private_key: '[stored securely]' },
+        })}
+        host="169.58.53.167"
+      />,
+    );
+
+    expect(await screen.findByText('Your private key')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Download deploy\.pem/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copy private key/ })).toBeInTheDocument();
+    // Not also rendered as a generic masked row.
+    expect(screen.queryByLabelText('Reveal private key')).not.toBeInTheDocument();
+  });
+
+  it('reveals the private key once on copy, and reuses the cached value on download', async () => {
+    revealOperationSecret.mockClear();
+    // jsdom does not implement the Blob URL APIs the real download uses, and
+    // logs a benign "not implemented: navigation" warning when the anchor's
+    // click() is left to run for real against a fake blob: href.
+    const createObjectURL = vi.fn(() => 'blob:mock');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    renderInApp(
+      <CredentialsCard
+        operation={postgresOperation({
+          capability_key: 'manage-server-user',
+          parameters: { username: 'deploy', private_key: '[stored securely]' },
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /Copy private key/ }));
+    expect(await screen.findByRole('button', { name: /Copied/ })).toBeInTheDocument();
+    expect(revealOperationSecret).toHaveBeenCalledTimes(1);
+    expect(revealOperationSecret).toHaveBeenCalledWith('op-1', 'private_key');
+
+    await userEvent.click(screen.getByRole('button', { name: /Download deploy\.pem/ }));
+    // Cached: no second network call for the same secret.
+    expect(revealOperationSecret).toHaveBeenCalledTimes(1);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 });
