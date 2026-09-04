@@ -11,6 +11,7 @@ import {
   recoverPayment,
   resendPaymentReceipt,
   resumeSubscriber,
+  sendPendingPaymentReminder,
   verifyPayment,
   type AdminPayment,
   type Arrangement,
@@ -45,7 +46,7 @@ import { ErrorNote, Loading } from '../components/Feedback';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import { conditionDescription, conditionLabel, deadlineUrgency, isEditable } from '../arrangements';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { formatAmount, standingOf } from '../subscribers';
+import { formatAmount, paymentStatusLabel, paymentStatusTone, standingOf } from '../subscribers';
 
 /*
  * One subscriber, and every payment attempt behind them.
@@ -60,12 +61,6 @@ import { formatAmount, standingOf } from '../subscribers';
  * so the tier, subscription, and receipt all move together. Every recovery
  * and resend is written to the audit trail.
  */
-
-const paymentTone: Record<string, string> = {
-  success: 'text-success',
-  failed: 'text-danger',
-  pending: 'text-warning',
-};
 
 const selectClass =
   'h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
@@ -119,6 +114,7 @@ export function SubscriberDetail() {
   const [recoverReason, setRecoverReason] = useState('');
 
   const [resending, setResending] = useState<AdminPayment | null>(null);
+  const [sendingReminderRef, setSendingReminderRef] = useState<string | null>(null);
 
   const [pausing, setPausing] = useState(false);
   const [pauseReason, setPauseReason] = useState('');
@@ -178,6 +174,25 @@ export function SubscriberDetail() {
         error instanceof ApiError ? error.message : 'The receipt was not sent. Try again.',
       );
       setResending(null);
+    }
+  };
+
+  const runSendPendingReminder = async (payment: AdminPayment) => {
+    setActionError(null);
+    setActionMessage(null);
+    setSendingReminderRef(payment.reference);
+    try {
+      await sendPendingPaymentReminder(payment.reference);
+      setActionMessage(`Pending Payment email sent for ${payment.reference}.`);
+      reload();
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError
+          ? error.message
+          : 'The Pending Payment email was not sent. Try again.',
+      );
+    } finally {
+      setSendingReminderRef(null);
     }
   };
 
@@ -635,8 +650,10 @@ export function SubscriberDetail() {
                   <TR key={payment.id}>
                     <TD className="text-ink-muted">{when(payment.created_at)}</TD>
                     <TD>
-                      <span className={`font-medium ${paymentTone[payment.status] ?? ''}`}>
-                        {payment.status}
+                      <span
+                        className={`font-medium ${urgencyTextTone[paymentStatusTone[payment.status]]}`}
+                      >
+                        {paymentStatusLabel[payment.status]}
                       </span>
                       {payment.recovered_at ? (
                         <Text variant="caption" tone="secondary" className="block">
@@ -657,9 +674,30 @@ export function SubscriberDetail() {
                         ? `-${formatAmount(payment.annual_discount_minor, payment.currency)}`
                         : ''}
                     </TD>
-                    <TD className="font-mono text-xs text-ink-muted">{payment.reference}</TD>
+                    <TD className="font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/subscribers/${id}/payments/${payment.reference}`)}
+                        className="text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      >
+                        {payment.reference}
+                      </button>
+                    </TD>
                     <TD className="text-right">
                       <div className="flex justify-end gap-1.5">
+                        {payment.status === 'pending' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => runSendPendingReminder(payment)}
+                            disabled={sendingReminderRef === payment.reference}
+                          >
+                            <Mail width={14} height={14} aria-hidden />
+                            {sendingReminderRef === payment.reference
+                              ? 'Sending'
+                              : 'Send Pending Payment Email'}
+                          </Button>
+                        ) : null}
                         {payment.provider_ref ? (
                           <Button
                             variant="ghost"
@@ -681,7 +719,7 @@ export function SubscriberDetail() {
                             }}
                           >
                             <RefreshCw width={14} height={14} aria-hidden />
-                            Recover
+                            Recover Payment
                           </Button>
                         ) : null}
                         {payment.status === 'success' ? (

@@ -31,6 +31,7 @@ export type ActiveKey =
   | 'tiers'
   | 'subscribers'
   | 'arrangements'
+  | 'billing-communications'
   | 'emergency'
   | 'feature-flags'
   | 'webhooks'
@@ -73,6 +74,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: FileText,
       active: active === 'arrangements',
       onSelect: () => navigate('/admin/arrangements'),
+    },
+    {
+      key: 'billing-communications',
+      label: 'Billing Communications',
+      icon: Mail,
+      active: active === 'billing-communications',
+      onSelect: () => navigate('/admin/billing-communications'),
     },
     {
       key: 'operations',

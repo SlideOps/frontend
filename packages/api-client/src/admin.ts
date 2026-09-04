@@ -1,5 +1,5 @@
 import type { PayCurrency, PaymentProvider } from './billing';
-import { apiRequest, unwrap } from './http';
+import { apiBase, apiRequest, unwrap } from './http';
 import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
 
@@ -405,6 +405,17 @@ export interface AdminSubscriber {
   resume_at?: string;
 }
 
+/** One payment attempt, successful or not. Matches the Operator's own
+ *  Transaction status vocabulary exactly -- there is one status system, not
+ *  a separate Admin one. */
+export type AdminPaymentStatus =
+  | 'pending'
+  | 'success'
+  | 'failed'
+  | 'cancelled'
+  | 'refunded'
+  | 'disputed';
+
 /** One payment attempt, successful or not. */
 export interface AdminPayment {
   id: string;
@@ -414,7 +425,7 @@ export interface AdminPayment {
   tier: string;
   amount_minor: number;
   currency: string;
-  status: 'pending' | 'success' | 'failed';
+  status: AdminPaymentStatus;
   promo_code?: string;
   term_months: number;
   /** How much of this payment's base amount the automatic first-time annual
@@ -430,6 +441,13 @@ export interface AdminPayment {
   recovery_reason?: string;
   /** When the receipt was last sent, absent if never. */
   receipt_sent_at?: string;
+  /** When the automatic Pending Payment reminder sweep last sent one,
+   *  absent if never. manual_reminder_sent_at/by is an Admin's own "Send
+   *  Pending Payment Email" click, tracked separately from the automatic
+   *  one -- either may have happened regardless of the other. */
+  pending_reminder_sent_at?: string;
+  manual_reminder_sent_at?: string;
+  manual_reminder_sent_by?: string;
   created_at: string;
 }
 
@@ -483,6 +501,66 @@ export function resendPaymentReceipt(reference: string): Promise<AdminPayment> {
     `/admin/payments/${encodeURIComponent(reference)}/resend-receipt`,
     { method: 'POST' },
   ).then((r) => r.payment ?? (r as AdminPayment));
+}
+
+/**
+ * Send the Pending Payment reminder for one payment, on demand -- exactly
+ * the same email the automatic sweep would send. Only ever sends an email:
+ * no payment, subscription, tier, or entitlement state changes. Refuses
+ * (throwing ApiError with code "not_pending") when the payment is no
+ * longer genuinely pending, checked fresh immediately before sending.
+ */
+/** The URL to view or download any payment's PDF receipt in a new tab --
+ *  admin-scoped, unlike the Operator's own /billing/payments/.../invoice.pdf.
+ *  Cookie-authenticated, same as every other request; not a signed link. */
+export function adminInvoiceURL(reference: string): string {
+  return `${apiBase()}/admin/payments/${encodeURIComponent(reference)}/invoice.pdf`;
+}
+
+export function sendPendingPaymentReminder(reference: string): Promise<AdminPayment> {
+  return apiRequest<{ payment?: AdminPayment } & Partial<AdminPayment>>(
+    `/admin/payments/${encodeURIComponent(reference)}/send-pending-reminder`,
+    { method: 'POST' },
+  ).then((r) => r.payment ?? (r as AdminPayment));
+}
+
+/** The Pending Payment reminder's own settings: whether it runs, and how
+ *  long a payment must sit pending before it fires. Never hardcoded. */
+export interface CommunicationSettings {
+  pending_reminder_enabled: boolean;
+  pending_reminder_delay_minutes: number;
+  updated_by_operator_id?: string;
+  updated_at?: string;
+}
+
+/** Read the current Pending Payment reminder settings. A fresh deployment
+ *  that has never saved one reads the default: enabled, 10 minutes. */
+export function getCommunicationSettings(signal?: AbortSignal): Promise<CommunicationSettings> {
+  return apiRequest<{ settings?: CommunicationSettings } & Partial<CommunicationSettings>>(
+    '/admin/billing/communication-settings',
+    { signal },
+  ).then((r) => r.settings ?? (r as CommunicationSettings));
+}
+
+/**
+ * Save the Pending Payment reminder settings. Takes effect for every
+ * payment that becomes eligible for a reminder from this point on --
+ * nothing already sent is retried or undone.
+ */
+export function setCommunicationSettings(input: {
+  enabled: boolean;
+  delayMinutes: number;
+}): Promise<CommunicationSettings> {
+  return apiRequest<{ settings?: CommunicationSettings } & Partial<CommunicationSettings>>(
+    '/admin/billing/communication-settings',
+    {
+      method: 'PUT',
+      body: {
+        pending_reminder_enabled: input.enabled,
+        pending_reminder_delay_minutes: input.delayMinutes,
+      },
+    },
+  ).then((r) => r.settings ?? (r as CommunicationSettings));
 }
 
 /** A subscriber with their payment history. */
