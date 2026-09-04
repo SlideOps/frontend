@@ -31,15 +31,18 @@ import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import {
+  blockedBy,
   completedHint,
   completionLabel,
   detectedHint,
   detectedLabel,
   isDetected,
+  orderByDependencies,
   RE_RUN_LABEL,
   RUN_ANYWAY_LABEL,
+  type MissingDependency,
 } from '../capability-completion';
-import { CompletionBadge, DetectedBadge } from '../components/Badges';
+import { BlockedBadge, CompletionBadge, DetectedBadge } from '../components/Badges';
 import { CapabilityCard } from '../components/CapabilityCard';
 import { CredentialRotation } from '../components/CredentialRotation';
 import { DiscoveryScan } from '../components/DiscoveryScan';
@@ -127,30 +130,57 @@ export function NodeDetail() {
   );
   const states = statesResult.state.status === 'ready' ? statesResult.state.data : {};
 
+  const capabilitiesByKey = new Map(
+    (capabilitiesResult.state.status === 'ready' ? capabilitiesResult.state.data : []).map((c) => [
+      c.key,
+      c,
+    ]),
+  );
+  const orderedCapabilities =
+    capabilitiesResult.state.status === 'ready'
+      ? orderByDependencies(capabilitiesResult.state.data, states)
+      : [];
+
   const recommendedKeys = new Set<string>(
     discovery?.assessment.recommendations.map((recommendation) => recommendation.capability_key) ??
       [],
   );
 
   // The badge that matches a Capability's state here: a completion SlideOps
-  // recorded, or an outcome found already in place on the server.
-  const capabilityBadge = (key: string, state: CapabilityState | undefined) => {
-    if (!state) {
-      return undefined;
+  // recorded, an outcome found already in place on the server, or -- when
+  // neither and a declared prerequisite has not completed -- blocked. The
+  // same Dependencies the backend's own hard gate would refuse a request
+  // over, so this can never promise a start action the API would then reject.
+  const capabilityBadge = (
+    key: string,
+    state: CapabilityState | undefined,
+    missing: MissingDependency[],
+  ) => {
+    if (state) {
+      return isDetected(state) ? (
+        <DetectedBadge label={detectedLabel(key)} />
+      ) : (
+        <CompletionBadge label={completionLabel(key)} />
+      );
     }
-    return isDetected(state) ? (
-      <DetectedBadge label={detectedLabel(key)} />
-    ) : (
-      <CompletionBadge label={completionLabel(key)} />
-    );
+    if (missing.length > 0) {
+      return <BlockedBadge title={`Requires ${missing.map((m) => m.title).join(', ')} first`} />;
+    }
+    return undefined;
   };
 
   // A Capability SlideOps carried out here links back to its run and offers a
   // quieter Re-run. One found already in place says what was found and offers
   // only the quiet action, since there is no run of ours to look back at. An
   // untouched one keeps the plain start action, with the recommendation note when
-  // the Assessment suggests it.
-  const capabilityFooter = (key: string, state: CapabilityState | undefined) => {
+  // the Assessment suggests it -- unless a declared prerequisite has not
+  // completed, in which case starting it would only be refused, so the action
+  // points at that prerequisite instead.
+  const capabilityFooter = (
+    key: string,
+    state: CapabilityState | undefined,
+    missing: MissingDependency[],
+  ) => {
     const startHref = `/app/capabilities/${key}?node=${id}`;
     if (state && isDetected(state)) {
       return (
@@ -184,6 +214,26 @@ export function NodeDetail() {
             <Button size="sm" variant="ghost" onClick={() => navigate(startHref)}>
               <RotateCcw width={15} height={15} aria-hidden />
               {RE_RUN_LABEL}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    if (missing.length > 0) {
+      const first = missing[0]!;
+      return (
+        <div className="flex flex-col gap-2">
+          <Text variant="caption" tone="secondary">
+            Complete {missing.map((m) => m.title).join(', ')} first.
+          </Text>
+          <div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate(`/app/capabilities/${first.key}?node=${id}`)}
+            >
+              View required step
+              <ArrowRight width={15} height={15} aria-hidden />
             </Button>
           </div>
         </div>
@@ -337,15 +387,18 @@ export function NodeDetail() {
               ) : null}
               {capabilitiesResult.state.status === 'ready' ? (
                 <div className="rounded-md border border-border bg-surface px-3">
-                  {capabilitiesResult.state.data.map((capability) => (
-                    <CapabilityCard
-                      key={capability.key}
-                      capability={capability}
-                      inPlace={Boolean(states[capability.key])}
-                      badge={capabilityBadge(capability.key, states[capability.key])}
-                      footer={capabilityFooter(capability.key, states[capability.key])}
-                    />
-                  ))}
+                  {orderedCapabilities.map((capability) => {
+                    const missing = blockedBy(capability, capabilitiesByKey, states);
+                    return (
+                      <CapabilityCard
+                        key={capability.key}
+                        capability={capability}
+                        inPlace={Boolean(states[capability.key])}
+                        badge={capabilityBadge(capability.key, states[capability.key], missing)}
+                        footer={capabilityFooter(capability.key, states[capability.key], missing)}
+                      />
+                    );
+                  })}
                 </div>
               ) : null}
             </div>

@@ -111,7 +111,11 @@ export type CapabilityParameterType =
    * Capability installs whatever the distribution's default package
    * resolves to, exactly as it always has.
    */
-  | 'version';
+  | 'version'
+  /** A fixed set of values the Operator picks one of, listed on the
+   *  parameter's own options, in display order. Unlike version, these do
+   *  not depend on the Node. */
+  | 'choice';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the
@@ -130,6 +134,9 @@ export interface CapabilityParameter {
    *  is itself a reason an Operator opens the form -- pgvector being the
    *  first. Absent or false for every ordinary optional parameter. */
   notable?: boolean;
+  /** The valid values for a "choice" typed parameter, in display order.
+   *  Absent for every other type. */
+  options?: string[];
 }
 
 /**
@@ -165,6 +172,10 @@ export interface Capability {
   parameters?: CapabilityParameter[];
   /** Configuration prerequisites to set up before this works. Empty when none. */
   requirements?: CapabilityRequirement[];
+  /** The Capability keys this one builds on. Once completed on a Node, the
+   *  backend refuses to plan this Capability until they have. Empty for
+   *  most Capabilities. */
+  dependencies?: string[];
   /**
    * The Plugin this Capability comes from. Core Capabilities carry no Plugin
    * source (or report `core`); a Capability unlocked by an installed Plugin

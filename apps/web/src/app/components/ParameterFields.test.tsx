@@ -67,6 +67,44 @@ function versionParam(): CapabilityParameter {
   };
 }
 
+function choiceParam(overrides: Partial<CapabilityParameter> = {}): CapabilityParameter {
+  return {
+    key: 'auth_method',
+    label: 'Authentication method',
+    type: 'choice',
+    required: false,
+    help: 'Password or private key.',
+    options: ['password', 'private_key'],
+    ...overrides,
+  };
+}
+
+describe('ParameterFields, a choice parameter', () => {
+  it('offers every declared option, in order', async () => {
+    renderInApp(<Harness parameters={[choiceParam({ required: true })]} />);
+
+    const field = await screen.findByLabelText(/^Authentication method/);
+    expect(field.tagName).toBe('SELECT');
+    expect(screen.getByRole('option', { name: 'password' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'private key' })).toBeInTheDocument();
+  });
+
+  it('offers no Not set option when the choice is required', async () => {
+    renderInApp(<Harness parameters={[choiceParam({ required: true })]} />);
+    await screen.findByLabelText(/^Authentication method/);
+    expect(screen.queryByRole('option', { name: 'Not set' })).not.toBeInTheDocument();
+  });
+
+  it('offers a Not set option when the choice is optional', async () => {
+    renderInApp(<Harness parameters={[requiredParam(), choiceParam()]} />);
+    // Optional, so it starts collapsed behind Advanced options, same as any
+    // other optional parameter would.
+    await userEvent.click(screen.getByRole('button', { name: 'Show (1)' }));
+    await screen.findByLabelText(/^Authentication method/);
+    expect(screen.getByRole('option', { name: 'Not set' })).toBeInTheDocument();
+  });
+});
+
 describe('ParameterFields, a version parameter', () => {
   it('offers only the versions read live, with the latest marked', async () => {
     renderInApp(
@@ -81,7 +119,11 @@ describe('ParameterFields, a version parameter', () => {
     expect(screen.getByLabelText(/^Version/).tagName).toBe('SELECT');
     expect(screen.getByRole('option', { name: '16' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '15' })).toBeInTheDocument();
-    expect(getAvailableVersions).toHaveBeenCalledWith('node-1', 'install-postgresql', expect.anything());
+    expect(getAvailableVersions).toHaveBeenCalledWith(
+      'node-1',
+      'install-postgresql',
+      expect.anything(),
+    );
   });
 
   it('falls back to a plain field when no Node has been chosen yet', async () => {
@@ -147,7 +189,11 @@ function notableParam(): CapabilityParameter {
 describe('ParameterFields, Basic vs Advanced', () => {
   it('always shows required parameters and the version field, with optional parameters collapsed', async () => {
     renderInApp(
-      <Harness parameters={[requiredParam(), versionParam(), optionalParam()]} nodeId="node-1" capabilityKey="install-redis" />,
+      <Harness
+        parameters={[requiredParam(), versionParam(), optionalParam()]}
+        nodeId="node-1"
+        capabilityKey="install-redis"
+      />,
     );
 
     expect(screen.getByLabelText(/^Name/)).toBeInTheDocument();

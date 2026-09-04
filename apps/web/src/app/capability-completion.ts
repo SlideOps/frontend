@@ -1,4 +1,4 @@
-import type { CapabilityState } from '@slideops/api-client';
+import type { Capability, CapabilityState } from '@slideops/api-client';
 
 /*
  * The Operator-facing language for a Capability whose outcome is already in
@@ -119,3 +119,78 @@ export function detectedHint(state: CapabilityState, now: Date = new Date()): st
 
 /** The action verb for a Capability already in place that SlideOps did not run. */
 export const RUN_ANYWAY_LABEL = 'Run it anyway';
+
+/*
+ * Dependency ordering and blocking: the same Capability.dependencies the
+ * backend's own hard gate reads before planning an Operation, read here so
+ * the Capabilities tab shows the identical picture -- what is ready, what is
+ * blocked, and why -- rather than a second guess at it. A Capability already
+ * satisfied (done or detected; states carries both under one key) never
+ * blocks anything downstream of it, and never blocks itself.
+ */
+
+/** One unmet prerequisite: its key, and its display name when known. */
+export interface MissingDependency {
+  key: string;
+  title: string;
+}
+
+/** Whether a Capability is blocked, and by which unmet prerequisites. */
+export function blockedBy(
+  capability: Capability,
+  capabilitiesByKey: ReadonlyMap<string, Capability>,
+  states: Record<string, CapabilityState>,
+): MissingDependency[] {
+  return (capability.dependencies ?? [])
+    .filter((dep) => !states[dep])
+    .map((dep) => ({ key: dep, title: capabilitiesByKey.get(dep)?.name ?? dep }));
+}
+
+/**
+ * Order capabilities so a blocked one never appears ahead of its own unmet
+ * prerequisite, without disturbing the catalog's own order otherwise: a
+ * Capability with no Dependencies, or whose Dependencies are all already
+ * satisfied, keeps its original relative position. depthOf walks the same
+ * graph the hard gate would refuse a request over; a satisfied Capability
+ * always contributes depth 0, so ordering only actually moves anything while
+ * something real is genuinely blocked.
+ */
+export function orderByDependencies(
+  capabilities: readonly Capability[],
+  states: Record<string, CapabilityState>,
+): Capability[] {
+  const byKey = new Map(capabilities.map((c) => [c.key, c]));
+  const depthCache = new Map<string, number>();
+
+  const depthOf = (key: string, seen: Set<string>): number => {
+    const cached = depthCache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    if (seen.has(key) || states[key]) {
+      return 0;
+    }
+    const capability = byKey.get(key);
+    if (!capability) {
+      return 0;
+    }
+    seen.add(key);
+    let max = 0;
+    for (const dep of capability.dependencies ?? []) {
+      // A satisfied dependency blocks nothing, so it contributes no depth to
+      // what depends on it -- only an unmet one does, and only then does its
+      // own depth (plus this one step) count.
+      if (states[dep]) {
+        continue;
+      }
+      max = Math.max(max, depthOf(dep, seen) + 1);
+    }
+    depthCache.set(key, max);
+    return max;
+  };
+
+  return capabilities
+    .map((capability, index) => ({ capability, index, depth: depthOf(capability.key, new Set()) }))
+    .sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.index - b.index))
+    .map((entry) => entry.capability);
+}

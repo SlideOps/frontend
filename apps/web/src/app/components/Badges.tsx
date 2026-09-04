@@ -1,6 +1,6 @@
 import { cn } from '@slideops/design-system';
 import type { Capability, OperationStatus, RiskLevel, ServiceStatus } from '@slideops/api-client';
-import { Boxes, CheckCircle2, ScanSearch, ShieldCheck } from '@slideops/icons';
+import { Boxes, CheckCircle2, Lock, ScanSearch, ShieldCheck } from '@slideops/icons';
 
 /*
  * Small status and risk badges. Every color is a semantic design token, so the
@@ -140,6 +140,21 @@ export function DetectedBadge({ label }: { label: string }) {
     >
       <ScanSearch width={12} height={12} aria-hidden />
       {label}
+    </span>
+  );
+}
+
+/**
+ * A badge marking a Capability that cannot be run yet because a Capability it
+ * depends on has not completed on this Node. The same Dependencies the
+ * backend's own hard gate would refuse the request over, so this can never
+ * promise something the API would then reject.
+ */
+export function BlockedBadge({ title }: { title: string }) {
+  return (
+    <span className={cn(badgeBase, toneClass.warning)} title={title}>
+      <Lock width={12} height={12} aria-hidden />
+      Blocked
     </span>
   );
 }
