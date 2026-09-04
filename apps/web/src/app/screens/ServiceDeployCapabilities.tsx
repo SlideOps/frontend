@@ -8,7 +8,7 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { Database, Play } from '@slideops/icons';
+import { capabilityIcon, Play } from '@slideops/icons';
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -21,9 +21,13 @@ import { ParameterFields } from '../components/ParameterFields';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /**
- * The database Capabilities a Capability Service can be built from. Only the
- * engines SlideOps actually has a Provider for -- offering more here would be
- * a selector with nothing real behind it.
+ * The backing-service Capabilities a Capability Service can be built from:
+ * every engine a Project's application would connect to at runtime --
+ * databases, message brokers, cache, search, and object storage -- each with
+ * a full install/configure/verify Provider behind it. Node-level setup
+ * (language runtimes, web servers, orchestration, security hardening) stays
+ * out of this list: those are platform choices for the Node itself, not
+ * something a Project "depends on" the way it depends on its own database.
  */
 export const SUPPORTED_CAPABILITY_KEYS = [
   'install-postgresql',
@@ -31,6 +35,11 @@ export const SUPPORTED_CAPABILITY_KEYS = [
   'install-mysql',
   'install-mariadb',
   'install-mongodb',
+  'install-rabbitmq',
+  'install-nats',
+  'install-memcached',
+  'install-minio',
+  'install-meilisearch',
 ] as const;
 
 const selectClass =
@@ -118,7 +127,9 @@ export function ServiceDeployCapabilities({
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [projectId, setProjectId] = useState(
-    initialProjectId && projects.some((p) => p.id === initialProjectId) ? initialProjectId : '',
+    initialProjectId && projects.some((p) => p.id === initialProjectId)
+      ? initialProjectId
+      : (projects[0]?.id ?? ''),
   );
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? '');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -148,6 +159,13 @@ export function ServiceDeployCapabilities({
       </Text>
     );
   }
+  if (projects.length === 0) {
+    return (
+      <Text variant="body-sm" tone="secondary">
+        Create a Project to deploy a Capability Service.
+      </Text>
+    );
+  }
 
   const selectedCapabilities =
     catalogState.status === 'ready'
@@ -158,6 +176,10 @@ export function ServiceDeployCapabilities({
     event.preventDefault();
     if (!name.trim()) {
       setError('Name your Capability Service.');
+      return;
+    }
+    if (!projectId) {
+      setError('Choose a Project this service belongs to.');
       return;
     }
     if (!nodeId) {
@@ -185,7 +207,7 @@ export function ServiceDeployCapabilities({
       }
       const service = await deployCapabilities({
         name,
-        project_id: projectId || undefined,
+        project_id: projectId,
         node_id: nodeId,
         capabilities: results.map((r) => ({
           capability_key: r.key,
@@ -226,7 +248,6 @@ export function ServiceDeployCapabilities({
               value={projectId}
               onChange={(event) => setProjectId(event.target.value)}
             >
-              <option value="">No project</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
@@ -278,7 +299,10 @@ export function ServiceDeployCapabilities({
                       checked={selected.has(c.key)}
                       onChange={() => toggle(c.key)}
                     />
-                    <Database width={15} height={15} className="shrink-0 text-ink-muted" aria-hidden />
+                    {(() => {
+                      const Icon = capabilityIcon(c);
+                      return <Icon width={15} height={15} className="shrink-0 text-ink-muted" aria-hidden />;
+                    })()}
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">{c.name}</span>
                   </label>
                 </li>

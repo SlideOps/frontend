@@ -302,7 +302,7 @@ export interface CapabilitySelectionInput {
 /** The fields required to deploy a Capability Service. */
 export interface DeployCapabilitiesInput {
   name: string;
-  project_id?: string;
+  project_id: string;
   node_id: string;
   capabilities: CapabilitySelectionInput[];
 }
