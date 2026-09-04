@@ -108,6 +108,12 @@ const Security = lazy(() =>
   import('./app/screens/Security').then((m) => ({ default: m.Security })),
 );
 const Billing = lazy(() => import('./app/screens/Billing').then((m) => ({ default: m.Billing })));
+const Transactions = lazy(() =>
+  import('./app/screens/Transactions').then((m) => ({ default: m.Transactions })),
+);
+const TransactionDetail = lazy(() =>
+  import('./app/screens/TransactionDetail').then((m) => ({ default: m.TransactionDetail })),
+);
 const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
 
 // Admin control plane.
@@ -222,6 +228,8 @@ export function App() {
           <Route path="credentials" element={<Credentials />} />
           <Route path="reports" element={<Reports />} />
           <Route path="billing" element={<Billing />} />
+          <Route path="billing/transactions" element={<Transactions />} />
+          <Route path="billing/transactions/:reference" element={<TransactionDetail />} />
           <Route path="security" element={<Security />} />
           <Route path="team" element={<Team />} />
           {/* The standalone shells sit inside the authenticated area so they are
