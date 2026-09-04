@@ -894,6 +894,47 @@ export function listArrangements(operatorId: string, signal?: AbortSignal): Prom
   ).then((r) => (Array.isArray(r) ? r : (r.arrangements ?? [])));
 }
 
+/** One arrangement on the Admin-wide list, with the Operator it belongs to. */
+export interface ArrangementWithOperator extends Arrangement {
+  operator_email: string;
+}
+
+/** Filters listAllArrangements accepts. An empty filter matches everything. */
+export interface ArrangementListFilter {
+  condition?: ArrangementCondition;
+  status?: ArrangementStatus;
+  limit?: number;
+  offset?: number;
+}
+
+/** One page of the Admin-wide arrangements activity feed. */
+export interface ArrangementPage {
+  arrangements: ArrangementWithOperator[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
+/**
+ * Every payment arrangement across every Operator, newest first: the
+ * Admin-wide activity feed, distinct from listArrangements's one-Operator
+ * scope that the Subscriber detail page uses.
+ */
+export function listAllArrangements(
+  filter: ArrangementListFilter = {},
+  signal?: AbortSignal,
+): Promise<ArrangementPage> {
+  return apiRequest<ArrangementPage>('/admin/arrangements', {
+    query: {
+      condition: filter.condition,
+      status: filter.status,
+      limit: filter.limit,
+      offset: filter.offset,
+    },
+    signal,
+  });
+}
+
 /**
  * Record a payment the customer already made outside SlideOps. Activates
  * the tier immediately under an explicit manual payment source, never a
@@ -931,8 +972,14 @@ export function recordOfflinePayment(
 
 /**
  * Grant a tier immediately, ahead of payment, expected to complete by the
- * deadline. No payment is created or implied: this is access on trust,
- * tracked openly as exactly that, and sends the temporary access email.
+ * deadline. Access is never conditioned on payment -- that is the point --
+ * but a real, correctly priced pending payment for what is owed is also
+ * started through the same checkout pipeline self-serve checkout uses, so
+ * it shows up in the Operator's own Billing -> Transactions and they can
+ * Complete Payment themselves. Sends one email that says both facts: access
+ * is active, and (when provider names a configured provider) what is owed
+ * and a link to pay it. A deployment with no provider configured still
+ * grants access, just with checkout_url coming back empty.
  */
 export function grantTemporaryAccess(
   operatorId: string,
@@ -941,22 +988,28 @@ export function grantTemporaryAccess(
     paymentDeadline?: Date;
     autoExpireOnDeadline?: boolean;
     termMonths?: number;
+    provider?: PaymentProvider;
+    currency?: PayCurrency;
     notes?: string;
   },
-): Promise<Arrangement> {
-  return apiRequest<{ arrangement?: Arrangement } & Partial<Arrangement>>(
-    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/temporary-access`,
-    {
-      method: 'POST',
-      body: {
-        tier: input.tier,
-        payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
-        auto_expire_on_deadline: input.autoExpireOnDeadline ?? false,
-        term_months: input.termMonths ?? 1,
-        notes: input.notes ?? '',
-      },
+): Promise<PaymentRequiredArrangement> {
+  return apiRequest<
+    { arrangement?: Arrangement; checkout_url?: string } & Partial<PaymentRequiredArrangement>
+  >(`/admin/operators/${encodeURIComponent(operatorId)}/arrangements/temporary-access`, {
+    method: 'POST',
+    body: {
+      tier: input.tier,
+      payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
+      auto_expire_on_deadline: input.autoExpireOnDeadline ?? false,
+      term_months: input.termMonths ?? 1,
+      provider: input.provider,
+      currency: input.currency,
+      notes: input.notes ?? '',
     },
-  ).then((r) => r.arrangement ?? (r as Arrangement));
+  }).then((r) => ({
+    arrangement: r.arrangement as Arrangement,
+    checkout_url: r.checkout_url ?? '',
+  }));
 }
 
 /** The result of starting a payment-required arrangement: the arrangement plus the real checkout link. */
