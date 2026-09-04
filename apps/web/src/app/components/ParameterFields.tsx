@@ -160,6 +160,20 @@ function ParameterField({
               aria-invalid={errorText ? true : undefined}
               {...register(param.key)}
             />
+          ) : param.type === 'choice' && param.options && param.options.length > 0 ? (
+            <select
+              id={fieldId}
+              className={inputClass}
+              aria-invalid={errorText ? true : undefined}
+              {...register(param.key)}
+            >
+              {param.required ? null : <option value="">Not set</option>}
+              {param.options.map((option) => (
+                <option key={option} value={option}>
+                  {option.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
           ) : param.type === 'version' && capabilityKey ? (
             <VersionField
               fieldId={fieldId}
