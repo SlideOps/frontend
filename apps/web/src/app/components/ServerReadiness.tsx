@@ -1,6 +1,6 @@
 import { getReadiness, type ReadinessMeasure, type ReadinessSeverity } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { Check, ChevronRight, ShieldCheck } from '@slideops/icons';
+import { Check, ChevronRight, Lock, ShieldCheck } from '@slideops/icons';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -36,30 +36,48 @@ const severityWord: Record<ReadinessSeverity, string> = {
   none: '',
 };
 
-/** One gap, as a row rather than a box. */
+/**
+ * One gap, as a row rather than a box.
+ *
+ * A blocked measure opens its own unmet prerequisite instead of itself: the
+ * same Dependencies the Operation engine's hard gate would refuse this
+ * measure's own request over, so a click here can never land on a form that
+ * only fails.
+ */
 function MissingRow({
   measure,
+  titleFor,
   onOpen,
 }: {
   measure: ReadinessMeasure;
+  titleFor: (key: string) => string;
   onOpen: (key: string) => void;
 }) {
+  const blocked = Boolean(measure.blocked) && (measure.blocked_by?.length ?? 0) > 0;
   return (
     <button
       type="button"
-      onClick={() => onOpen(measure.capability_key)}
+      onClick={() => onOpen(blocked ? measure.blocked_by![0]! : measure.capability_key)}
       className="group flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <span
-        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${severityDot[measure.severity]}`}
-        aria-hidden
-      />
+      {blocked ? (
+        <Lock width={13} height={13} className="mt-1.5 shrink-0 text-ink-muted" aria-hidden />
+      ) : (
+        <span
+          className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${severityDot[measure.severity]}`}
+          aria-hidden
+        />
+      )}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <Text variant="body-sm" className="font-medium">
             {measure.title}
           </Text>
-          <span className="text-xs text-ink-muted">{severityWord[measure.severity]}</span>
+          <span className="text-xs text-ink-muted">
+            {blocked
+              ? `Requires ${measure.blocked_by!.map(titleFor).join(', ')} first`
+              : severityWord[measure.severity]}
+          </span>
         </span>
         <Text variant="caption" tone="secondary" className="mt-0.5 block">
           {measure.why}
@@ -117,6 +135,8 @@ export function ServerReadiness({ nodeId }: { nodeId: string }) {
   const total = satisfied.length + missing.length;
   const inPlace = satisfied.length;
   const percent = total === 0 ? 0 : Math.round((inPlace / total) * 100);
+  const allMeasures = [...satisfied, ...missing];
+  const titleFor = (key: string) => allMeasures.find((m) => m.capability_key === key)?.title ?? key;
 
   return (
     <Section
@@ -158,6 +178,7 @@ export function ServerReadiness({ nodeId }: { nodeId: string }) {
             <MissingRow
               key={measure.capability_key}
               measure={measure}
+              titleFor={titleFor}
               onOpen={(key) => navigate(`/app/capabilities/${key}?node=${nodeId}`)}
             />
           ))}

@@ -151,6 +151,12 @@ export interface ReadinessMeasure {
   severity: ReadinessSeverity;
   /** How it was decided, so the claim can be checked rather than believed. */
   evidence?: string;
+  /** True while this measure has a real, unmet prerequisite -- the same
+   *  Dependencies the backend's own hard gate would refuse a request over.
+   *  Always false once satisfied. */
+  blocked?: boolean;
+  /** The prerequisite Capability keys still missing, when blocked. */
+  blocked_by?: string[];
 }
 
 export interface Readiness {

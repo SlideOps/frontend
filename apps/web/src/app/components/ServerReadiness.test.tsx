@@ -152,4 +152,33 @@ describe('ServerReadiness', () => {
     await waitFor(() => expect(screen.getByText('1 of 2 in place')).toBeInTheDocument());
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
   });
+
+  // A blocked measure would only be refused by the backend's own hard gate if
+  // opened directly: this proves the row says so, names the real prerequisite,
+  // and clicking it lands on that prerequisite instead of the blocked measure.
+  it('names the real unmet prerequisite when a measure is blocked', async () => {
+    getReadiness.mockResolvedValue({
+      discovered: true,
+      summary: 'This server is not ready yet.',
+      essentials_missing: 2,
+      satisfied: [],
+      missing: [
+        measure({
+          capability_key: 'create-app-user',
+          title: 'A non root account to work as',
+          severity: 'high',
+        }),
+        measure({
+          capability_key: 'secure-ssh',
+          title: 'SSH hardened',
+          blocked: true,
+          blocked_by: ['create-app-user'],
+        }),
+      ],
+    });
+    render();
+
+    await waitFor(() => expect(screen.getByText('SSH hardened')).toBeInTheDocument());
+    expect(screen.getByText('Requires A non root account to work as first')).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,11 @@
-import { getReadiness, type DiscoveryResult, type Node } from '@slideops/api-client';
+import {
+  getReadiness,
+  type DiscoveryResult,
+  type Node,
+  type ReadinessMeasure,
+} from '@slideops/api-client';
 import { Button, Card, Text } from '@slideops/design-system';
-import { ArrowRight, Check, CheckCircle2, RefreshCw, ShieldCheck } from '@slideops/icons';
+import { ArrowRight, Check, CheckCircle2, Lock, RefreshCw, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -138,19 +143,33 @@ function Step({
   );
 }
 
+/** Guidance keys that already have real registered content. Any Capability
+ *  without an entry here renders no help bubble, which Guidance already
+ *  handles gracefully. */
+const GUIDANCE_KEY: Record<string, string> = {
+  'create-app-user': 'server.secure.admin',
+  'secure-ssh': 'server.secure.hardenSsh',
+};
+
 /**
- * The guided path to stop operating a server as root.
+ * The guided path through this server's own readiness baseline, in the same
+ * dependency order the Capabilities tab and the Operation engine's hard gate
+ * both use -- one underlying picture, three places it shows up.
  *
- * This used to be a fixed list of four steps that never changed. On a server
- * secured weeks ago it still read "Create a non-root administrator", as though
- * nothing had happened, while the readiness panel directly beneath it said the
- * opposite. Two components on one page disagreeing about the same server teaches
- * an Operator to trust neither.
+ * This used to be a fixed list of four steps that never changed and covered
+ * only the very first three baseline measures. On a server secured weeks ago
+ * it still read "Create a non-root administrator", as though nothing had
+ * happened, while the readiness panel directly beneath it said the opposite.
+ * Two components on one page disagreeing about the same server teaches an
+ * Operator to trust neither, and stopping at three measures left out most of
+ * how servers are actually lost: no firewall, no unattended updates, no
+ * brute force protection.
  *
  * It reads the same readiness the rest of the page trusts, so a step SlideOps
  * carried out and a step the Operator did by hand before SlideOps ever saw the
  * machine both count. Detected counts as much as done: a server hardened by hand
- * is a hardened server.
+ * is a hardened server. A measure the readiness report marks blocked shows why,
+ * with no start action that the backend would only refuse.
  */
 export function SecureServer({
   nodeId,
@@ -167,25 +186,29 @@ export function SecureServer({
   const canWrite = useCanWrite();
   const readiness = useAsyncData((signal) => getReadiness(nodeId, signal), [nodeId]);
 
-  // Every measure the report knows about, satisfied or not, keyed by Capability.
-  const measures =
+  const discovered = readiness.state.status === 'ready' && readiness.state.data.discovered;
+  // Satisfied first (already in baseline order), then missing in the
+  // dependency-and-severity order the backend computed: since the hard gate
+  // refuses any Operation out of order, a satisfied set can only ever be a
+  // prefix of the correct order, so this concatenation is the true pipeline
+  // order for everything, done or not.
+  const measures: ReadinessMeasure[] =
     readiness.state.status === 'ready'
       ? [...readiness.state.data.satisfied, ...readiness.state.data.missing]
       : [];
-  const satisfied = (key: string) => {
-    const measure = measures.find((entry) => entry.capability_key === key);
-    return {
-      done: measure?.state === 'done' || measure?.state === 'detected',
-      evidence: measure?.evidence,
-    };
-  };
+  const titleFor = (key: string) => measures.find((m) => m.capability_key === key)?.title ?? key;
 
-  const discovered = readiness.state.status === 'ready' && readiness.state.data.discovered;
-  const appUser = satisfied('create-app-user');
-  const ssh = satisfied('secure-ssh');
+  const appUserDone = measures.some(
+    (m) => m.capability_key === 'create-app-user' && (m.state === 'done' || m.state === 'detected'),
+  );
+  const sshDone = measures.some(
+    (m) => m.capability_key === 'secure-ssh' && (m.state === 'done' || m.state === 'detected'),
+  );
   // The connection is on the non-root account exactly when SlideOps is not
   // connecting as root, which the Node itself records.
-  const everythingDone = discovered && appUser.done && ssh.done;
+  const everythingDone = discovered && appUserDone && sshDone;
+
+  let stepIndex = 1;
 
   return (
     <Card>
@@ -195,14 +218,16 @@ export function SecureServer({
         <Guidance for="server.secure" />
       </div>
       <Text variant="body-sm" tone="secondary" className="mb-5">
-        {everythingDone
-          ? 'This server is already secured. Everything below is done, kept here so you can see what was applied and run any of it again if you need to.'
-          : 'SlideOps should never operate a server as root once it is connected. Follow these steps in order to create a non-root administrator, harden SSH, then switch to the new account.'}
+        {readiness.state.status === 'ready' &&
+        readiness.state.data.missing.length === 0 &&
+        discovered
+          ? 'This server is already secured according to the currently detected security requirements. Everything below is done, kept here so you can see what was applied and run any of it again if you need to.'
+          : "SlideOps guides you through this server's own setup and security steps in the order they actually depend on each other, so a step is never offered before what it needs."}
       </Text>
 
       <ol className="flex flex-col gap-6">
         <Step
-          index={1}
+          index={stepIndex++}
           guidanceKey="server.secure.discover"
           title="Run the quick check"
           done={discovered}
@@ -228,64 +253,77 @@ export function SecureServer({
           Read the server over SSH first so the steps that follow are planned from what is really
           there. It changes nothing.
         </Step>
-        <Step
-          index={2}
-          guidanceKey="server.secure.admin"
-          title="Create a non-root administrator"
-          done={appUser.done}
-          evidence={appUser.evidence}
-          action={
+
+        {measures.map((measure) => {
+          const done = measure.state === 'done' || measure.state === 'detected';
+          const blocked =
+            !done && Boolean(measure.blocked) && (measure.blocked_by?.length ?? 0) > 0;
+          const startHref = `/app/capabilities/${measure.capability_key}?node=${nodeId}`;
+
+          const action = blocked ? (
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => navigate(`/app/capabilities/create-app-user?node=${nodeId}`)}
+              onClick={() => navigate(`/app/capabilities/${measure.blocked_by![0]}?node=${nodeId}`)}
             >
-              Create the administrator
-              <ArrowRight width={15} height={15} aria-hidden />
+              <Lock width={15} height={15} aria-hidden />
+              Complete {measure.blocked_by!.map(titleFor).join(', ')} first
             </Button>
-          }
-        >
-          Create a dedicated account with full sudo and a public key you hold, so SlideOps never has
-          to sign in as root. This opens an Operation you approve.
-        </Step>
-        <Step
-          index={3}
-          guidanceKey="server.secure.hardenSsh"
-          title="Harden SSH"
-          done={ssh.done}
-          evidence={ssh.evidence}
-          action={
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate(`/app/capabilities/secure-ssh?node=${nodeId}`)}
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => navigate(startHref)}>
+                {measure.title}
+                <ArrowRight width={15} height={15} aria-hidden />
+              </Button>
+              {measure.capability_key === 'create-app-user' ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => navigate(`/app/nodes/${nodeId}?tab=settings`)}
+                >
+                  Or create one with a generated key
+                </Button>
+              ) : null}
+            </div>
+          );
+
+          return (
+            <Step
+              key={measure.capability_key}
+              index={stepIndex++}
+              guidanceKey={
+                GUIDANCE_KEY[measure.capability_key] ?? `server.secure.${measure.capability_key}`
+              }
+              title={measure.title}
+              done={done}
+              evidence={measure.evidence ?? (done ? undefined : measure.why)}
+              action={action}
             >
-              Harden SSH
-              <ArrowRight width={15} height={15} aria-hidden />
-            </Button>
-          }
-        >
-          Turn off direct root sign in, so the only way in is the non-root account you created. Do
-          this only after that account exists and works, so you are never left without a way in.
-        </Step>
-        <Step
-          index={4}
-          guidanceKey="server.secure.rotate"
-          title="Switch to the new account"
-          done={everythingDone}
-          evidence={
-            everythingDone ? 'SlideOps is connected on a non-root account with sudo.' : undefined
-          }
-          action={
-            <Button size="sm" onClick={onRotate}>
-              <CheckCircle2 width={15} height={15} aria-hidden />
-              Switch the connection
-            </Button>
-          }
-        >
-          Point SlideOps at the non-root account. The new credential is verified before the switch,
-          so a wrong one changes nothing and you are never locked out.
-        </Step>
+              {measure.why}
+            </Step>
+          );
+        })}
+
+        {appUserDone && sshDone ? (
+          <Step
+            index={stepIndex++}
+            guidanceKey="server.secure.rotate"
+            title="Switch to the new account"
+            done={everythingDone}
+            evidence={
+              everythingDone ? 'SlideOps is connected on a non-root account with sudo.' : undefined
+            }
+            action={
+              <Button size="sm" onClick={onRotate}>
+                <CheckCircle2 width={15} height={15} aria-hidden />
+                Switch the connection
+              </Button>
+            }
+          >
+            Point SlideOps at the non-root account. The new credential is verified before the
+            switch, so a wrong one changes nothing and you are never locked out.
+          </Step>
+        ) : null}
       </ol>
     </Card>
   );
