@@ -70,6 +70,15 @@ const paymentTone: Record<string, string> = {
 const selectClass =
   'h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
+/** The same billing-cycle choices self-serve checkout offers, so an arrangement made
+ *  here for a year or more upfront activates for that whole term, not just one month. */
+const TERM_MONTH_OPTIONS: { months: number; label: string }[] = [
+  { months: 1, label: 'Monthly (1 month)' },
+  { months: 12, label: '1 year (12 months)' },
+  { months: 24, label: '2 years (24 months)' },
+  { months: 36, label: '3 years (36 months)' },
+];
+
 const urgencyTextTone: Record<'good' | 'warning' | 'bad' | 'neutral', string> = {
   good: 'text-success',
   warning: 'text-warning',
@@ -234,6 +243,7 @@ export function SubscriberDetail() {
   const [offlineCurrency, setOfflineCurrency] = useState('USD');
   const [offlineReference, setOfflineReference] = useState('');
   const [offlinePaidAt, setOfflinePaidAt] = useState('');
+  const [offlineTermMonths, setOfflineTermMonths] = useState(1);
   const [offlineNotes, setOfflineNotes] = useState('');
 
   const resetOfflineForm = () => {
@@ -242,6 +252,7 @@ export function SubscriberDetail() {
     setOfflineCurrency('USD');
     setOfflineReference('');
     setOfflinePaidAt('');
+    setOfflineTermMonths(1);
     setOfflineNotes('');
   };
 
@@ -258,6 +269,7 @@ export function SubscriberDetail() {
         currency: offlineCurrency,
         reference: offlineReference,
         paidAt: offlinePaidAt ? new Date(offlinePaidAt) : undefined,
+        termMonths: offlineTermMonths,
         notes: offlineNotes,
       });
       setActionMessage('Offline payment recorded. The tier is active and a confirmation was sent.');
@@ -277,12 +289,14 @@ export function SubscriberDetail() {
   const [tempTier, setTempTier] = useState<TierName>('starter');
   const [tempDeadline, setTempDeadline] = useState('');
   const [tempAutoExpire, setTempAutoExpire] = useState(false);
+  const [tempTermMonths, setTempTermMonths] = useState(1);
   const [tempNotes, setTempNotes] = useState('');
 
   const resetTempAccessForm = () => {
     setTempTier('starter');
     setTempDeadline('');
     setTempAutoExpire(false);
+    setTempTermMonths(1);
     setTempNotes('');
   };
 
@@ -297,6 +311,7 @@ export function SubscriberDetail() {
         tier: tempTier,
         paymentDeadline: tempDeadline ? new Date(tempDeadline) : undefined,
         autoExpireOnDeadline: tempAutoExpire,
+        termMonths: tempTermMonths,
         notes: tempNotes,
       });
       setActionMessage('Temporary access granted. The tier is active now.');
@@ -317,6 +332,7 @@ export function SubscriberDetail() {
   const [checkoutProvider, setCheckoutProvider] = useState<PaymentProvider>('paystack');
   const [checkoutCurrency, setCheckoutCurrency] = useState<PayCurrency>('USD');
   const [checkoutDeadline, setCheckoutDeadline] = useState('');
+  const [checkoutTermMonths, setCheckoutTermMonths] = useState(1);
   const [checkoutNotes, setCheckoutNotes] = useState('');
 
   const resetCheckoutForm = () => {
@@ -324,6 +340,7 @@ export function SubscriberDetail() {
     setCheckoutProvider('paystack');
     setCheckoutCurrency('USD');
     setCheckoutDeadline('');
+    setCheckoutTermMonths(1);
     setCheckoutNotes('');
   };
 
@@ -340,6 +357,7 @@ export function SubscriberDetail() {
         provider: checkoutProvider,
         currency: checkoutCurrency,
         paymentDeadline: checkoutDeadline ? new Date(checkoutDeadline) : undefined,
+        termMonths: checkoutTermMonths,
         notes: checkoutNotes,
       });
       setActionMessage('Checkout started. The tier activates automatically once they pay.');
@@ -924,6 +942,20 @@ export function SubscriberDetail() {
               value={offlinePaidAt}
               onChange={(event) => setOfflinePaidAt(event.target.value)}
             />
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-ink">Term paid for</span>
+              <select
+                className={selectClass}
+                value={offlineTermMonths}
+                onChange={(event) => setOfflineTermMonths(Number(event.target.value))}
+              >
+                {TERM_MONTH_OPTIONS.map((option) => (
+                  <option key={option.months} value={option.months}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Field
               label="Notes"
               value={offlineNotes}
@@ -979,6 +1011,20 @@ export function SubscriberDetail() {
                 className="h-4 w-4 rounded border-border"
               />
               Automatically expire access if the deadline passes with no payment
+            </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-ink">Term to grant</span>
+              <select
+                className={selectClass}
+                value={tempTermMonths}
+                onChange={(event) => setTempTermMonths(Number(event.target.value))}
+              >
+                {TERM_MONTH_OPTIONS.map((option) => (
+                  <option key={option.months} value={option.months}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <Field
               label="Notes"
@@ -1042,6 +1088,20 @@ export function SubscriberDetail() {
               >
                 <option value="USD">USD</option>
                 <option value="NGN">NGN</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-ink">Billing cycle</span>
+              <select
+                className={selectClass}
+                value={checkoutTermMonths}
+                onChange={(event) => setCheckoutTermMonths(Number(event.target.value))}
+              >
+                {TERM_MONTH_OPTIONS.map((option) => (
+                  <option key={option.months} value={option.months}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <Field

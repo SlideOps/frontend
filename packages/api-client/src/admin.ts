@@ -908,6 +908,7 @@ export function recordOfflinePayment(
     currency: string;
     reference: string;
     paidAt?: Date;
+    termMonths?: number;
     notes?: string;
   },
 ): Promise<Arrangement> {
@@ -921,6 +922,7 @@ export function recordOfflinePayment(
         currency: input.currency,
         reference: input.reference,
         paid_at: input.paidAt ? input.paidAt.toISOString() : undefined,
+        term_months: input.termMonths ?? 1,
         notes: input.notes ?? '',
       },
     },
@@ -938,6 +940,7 @@ export function grantTemporaryAccess(
     tier: TierName;
     paymentDeadline?: Date;
     autoExpireOnDeadline?: boolean;
+    termMonths?: number;
     notes?: string;
   },
 ): Promise<Arrangement> {
@@ -949,6 +952,7 @@ export function grantTemporaryAccess(
         tier: input.tier,
         payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
         auto_expire_on_deadline: input.autoExpireOnDeadline ?? false,
+        term_months: input.termMonths ?? 1,
         notes: input.notes ?? '',
       },
     },
@@ -976,6 +980,7 @@ export function createPaymentRequiredArrangement(
     provider: PaymentProvider;
     currency?: PayCurrency;
     paymentDeadline?: Date;
+    termMonths?: number;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -988,6 +993,7 @@ export function createPaymentRequiredArrangement(
       provider: input.provider,
       currency: input.currency,
       payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
+      term_months: input.termMonths ?? 1,
       notes: input.notes ?? '',
     },
   }).then((r) => ({
