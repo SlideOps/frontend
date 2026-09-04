@@ -251,6 +251,21 @@ export function OperationDetail() {
         >
           View the Node
         </Button>
+        {status === 'failed' ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              navigate(
+                `/app/capabilities/${operation.capability_key}?node=${encodeURIComponent(operation.node_id)}${
+                  operation.project_id ? `&project=${encodeURIComponent(operation.project_id)}` : ''
+                }`,
+              )
+            }
+          >
+            Retry
+          </Button>
+        ) : null}
       </div>
 
       {status === 'failed' && operation.error ? (
