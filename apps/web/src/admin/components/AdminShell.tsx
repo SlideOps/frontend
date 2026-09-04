@@ -1,6 +1,7 @@
 import {
   Activity,
   CreditCard,
+  FileText,
   Flag,
   Gauge,
   Layers,
@@ -29,6 +30,7 @@ export type ActiveKey =
   | 'promo-codes'
   | 'tiers'
   | 'subscribers'
+  | 'arrangements'
   | 'emergency'
   | 'feature-flags'
   | 'webhooks'
@@ -64,6 +66,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       icon: CreditCard,
       active: active === 'subscribers',
       onSelect: () => navigate('/admin/subscribers'),
+    },
+    {
+      key: 'arrangements',
+      label: 'Arrangements',
+      icon: FileText,
+      active: active === 'arrangements',
+      onSelect: () => navigate('/admin/arrangements'),
     },
     {
       key: 'operations',
