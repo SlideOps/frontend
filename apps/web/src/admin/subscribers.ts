@@ -1,4 +1,4 @@
-import type { AdminSubscriber } from '@slideops/api-client';
+import type { AdminPaymentStatus, AdminSubscriber } from '@slideops/api-client';
 
 /*
  * How billing is read and phrased on the Admin surface. Pure, so it is testable
@@ -30,6 +30,28 @@ export function formatAmount(minor: number, currency?: string): string {
     return `${(minor / 100).toFixed(2)} ${currency}`;
   }
 }
+
+/** How one payment's own status reads on the Admin surface -- the exact same
+ *  words the Operator's own Transactions page uses for the same status,
+ *  never a generic "Pending Transaction" or a raw status code. One status
+ *  vocabulary, not two. */
+export const paymentStatusLabel: Record<AdminPaymentStatus, string> = {
+  pending: 'Pending Payment',
+  success: 'Payment Successful',
+  failed: 'Payment Failed',
+  cancelled: 'Payment Cancelled',
+  refunded: 'Payment Refunded',
+  disputed: 'Payment Disputed',
+};
+
+export const paymentStatusTone: Record<AdminPaymentStatus, 'good' | 'warning' | 'bad' | 'neutral'> = {
+  pending: 'warning',
+  success: 'good',
+  failed: 'bad',
+  cancelled: 'neutral',
+  refunded: 'neutral',
+  disputed: 'bad',
+};
 
 /** How a subscriber's standing reads, and how strongly it should be shown. */
 export type SubscriberStanding = {
