@@ -70,6 +70,7 @@ export {
   setNodeTags,
   listNodeUsers,
   revealNodeCredential,
+  switchToServerUser,
   type NodeAuth,
   type CreateNodeInput,
   type SavedDiscovery,
