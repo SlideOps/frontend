@@ -2,11 +2,12 @@ import {
   ApiError,
   createOperation,
   revealNodeCredential,
+  switchToServerUser,
   type Node,
   type ServerUser,
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
-import { Download, KeyRound, Lock, Trash2, Unlock, X } from '@slideops/icons';
+import { ArrowRightLeft, Download, KeyRound, Lock, Trash2, Unlock, X } from '@slideops/icons';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
@@ -39,31 +40,40 @@ function DetailRow({ label, value }: { label: string; value: string }) {
  *
  * The modal showed an account and gave no way to act on it, so disabling one
  * meant knowing which Capability to find and typing the username again. The
- * actions belong where the account is.
+ * actions belong where the account is, together, in this one place: Switch,
+ * Disable or Enable, and Remove always appear side by side for an eligible
+ * account, never independently, so none of them ever reads as having gone
+ * missing relative to the others.
  *
  * Which actions appear depends on the account. The connection account offers
- * none: locking or removing the account SlideOps signs in with would end its own
- * access to the server. A system account other than root offers none either.
- * root can be disabled but never removed, because the account has to exist.
+ * none of Disable/Remove: locking or removing the account SlideOps signs in
+ * with would end its own access to the server (Switch is naturally absent
+ * too, since it is already the connection account). A system account other
+ * than root offers none either. root can be disabled but never removed,
+ * because the account has to exist.
  */
 function AccountActions({
   account,
   node,
   onDone,
+  onSwitched,
 }: {
   account: ServerUser;
   node: Node;
   onDone: () => void;
+  onSwitched?: (updated: Node) => void;
 }) {
   const navigate = useNavigate();
   const canWrite = useCanWrite();
-  const [busy, setBusy] = useState<null | 'disable' | 'enable' | 'remove'>(null);
+  const [busy, setBusy] = useState<null | 'disable' | 'enable' | 'remove' | 'switch'>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const run = async (kind: 'disable' | 'enable' | 'remove', capabilityKey: string) => {
     setBusy(kind);
     setFailure(null);
+    setMessage(null);
     try {
       const operation = await createOperation({
         node_id: node.id,
@@ -82,13 +92,30 @@ function AccountActions({
     }
   };
 
+  const runSwitch = async () => {
+    setBusy('switch');
+    setFailure(null);
+    setMessage(null);
+    try {
+      const updated = await switchToServerUser(node.id, account.username);
+      setMessage(`SlideOps now connects to this server as ${account.username}.`);
+      onSwitched?.(updated);
+    } catch (error) {
+      setFailure(
+        error instanceof ApiError ? error.message : 'Could not switch to that account. Try again.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (account.connection) {
     return (
       <div className="mt-6 border-t border-border pt-4">
         <Text variant="body-sm" tone="secondary">
           This is the account SlideOps connects with. It cannot be disabled or removed from here,
-          because doing so would end SlideOps' own access to this server. Switch the connection to
-          another account first.
+          because doing so would end SlideOps' own access to this server, and it cannot be switched
+          to since it already is the active one.
         </Text>
       </div>
     );
@@ -107,7 +134,7 @@ function AccountActions({
     return (
       <div className="mt-6 border-t border-border pt-4">
         <Text variant="body-sm" tone="secondary">
-          Disabling or removing an account needs a role above Viewer in this workspace.
+          Switching, disabling, or removing an account needs a role above Viewer in this workspace.
         </Text>
       </div>
     );
@@ -125,6 +152,16 @@ function AccountActions({
       </Text>
 
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy !== null}
+          onClick={() => void runSwitch()}
+        >
+          <ArrowRightLeft width={15} height={15} aria-hidden />
+          {busy === 'switch' ? 'Switching' : 'Switch to this account'}
+        </Button>
+
         {account.disabled ? (
           <Button
             size="sm"
@@ -177,6 +214,11 @@ function AccountActions({
           reversible and is usually what you want.
         </Text>
       ) : null}
+      {message ? (
+        <p role="status" className="mt-2 text-sm text-success">
+          {message}
+        </p>
+      ) : null}
       {failure ? (
         <p role="alert" className="mt-2 text-sm text-danger">
           {failure}
@@ -191,11 +233,15 @@ export function ServerAccountModal({
   account,
   node,
   onClose,
+  onSwitched,
 }: {
   open: boolean;
   account: ServerUser | null;
   node: Node;
   onClose: () => void;
+  /** Called after a successful switch, with the Node now reflecting the new
+   *  connection account. */
+  onSwitched?: (updated: Node) => void;
 }) {
   const titleId = useId();
   const canWrite = useCanWrite();
@@ -392,7 +438,7 @@ export function ServerAccountModal({
           )}
         </div>
 
-        <AccountActions account={account} node={node} onDone={onClose} />
+        <AccountActions account={account} node={node} onDone={onClose} onSwitched={onSwitched} />
 
         <div className="mt-6 flex justify-end">
           <Button variant="ghost" onClick={onClose}>
