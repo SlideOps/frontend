@@ -156,6 +156,14 @@ const SubscriberDetail = lazy(() =>
 const Arrangements = lazy(() =>
   import('./admin/screens/Arrangements').then((m) => ({ default: m.Arrangements })),
 );
+const PaymentDetail = lazy(() =>
+  import('./admin/screens/PaymentDetail').then((m) => ({ default: m.PaymentDetail })),
+);
+const BillingCommunications = lazy(() =>
+  import('./admin/screens/BillingCommunications').then((m) => ({
+    default: m.BillingCommunications,
+  })),
+);
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
@@ -255,7 +263,9 @@ export function App() {
           <Route path="tiers" element={<Tiers />} />
           <Route path="subscribers" element={<Subscribers />} />
           <Route path="subscribers/:id" element={<SubscriberDetail />} />
+          <Route path="subscribers/:id/payments/:reference" element={<PaymentDetail />} />
           <Route path="arrangements" element={<Arrangements />} />
+          <Route path="billing-communications" element={<BillingCommunications />} />
           <Route path="emergency" element={<Emergency />} />
           <Route path="feature-flags" element={<FeatureFlags />} />
           <Route path="webhooks" element={<WebhookDeliveries />} />
