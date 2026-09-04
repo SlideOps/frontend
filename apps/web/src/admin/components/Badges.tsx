@@ -1,5 +1,5 @@
 import { cn } from '@slideops/design-system';
-import type { OperationStatus, OperatorStatus } from '@slideops/api-client';
+import type { ArrangementStatus, OperationStatus, OperatorStatus } from '@slideops/api-client';
 
 /*
  * Status badges for the control plane. Every color is a semantic design token,
@@ -64,4 +64,27 @@ const operatorLabel: Record<OperatorStatus, string> = {
 export function OperatorStatusBadge({ status }: { status: OperatorStatus }) {
   const tone = operatorTone[status] ?? 'neutral';
   return <span className={cn(badgeBase, toneClass[tone])}>{operatorLabel[status] ?? status}</span>;
+}
+
+const arrangementTone: Record<ArrangementStatus, Tone> = {
+  awaiting_payment: 'warning',
+  active: 'success',
+  completed: 'success',
+  expired: 'danger',
+  cancelled: 'neutral',
+};
+
+const arrangementLabel: Record<ArrangementStatus, string> = {
+  awaiting_payment: 'Awaiting payment',
+  active: 'Active',
+  completed: 'Completed',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+};
+
+export function ArrangementStatusBadge({ status }: { status: ArrangementStatus }) {
+  const tone = arrangementTone[status] ?? 'neutral';
+  return (
+    <span className={cn(badgeBase, toneClass[tone])}>{arrangementLabel[status] ?? status}</span>
+  );
 }
