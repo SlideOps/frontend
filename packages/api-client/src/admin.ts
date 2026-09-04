@@ -1,3 +1,4 @@
+import type { PayCurrency, PaymentProvider } from './billing';
 import { apiRequest, unwrap } from './http';
 import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
@@ -619,7 +620,13 @@ export function listEntitlementGrants(
  */
 export function grantEntitlement(
   operatorId: string,
-  input: { reason: string; bonusNodes?: number; bonusProjects?: number; bonusSeats?: number; expiresAt?: Date },
+  input: {
+    reason: string;
+    bonusNodes?: number;
+    bonusProjects?: number;
+    bonusSeats?: number;
+    expiresAt?: Date;
+  },
 ): Promise<EntitlementGrant> {
   return apiRequest<{ grant?: EntitlementGrant } & Partial<EntitlementGrant>>(
     `/admin/operators/${encodeURIComponent(operatorId)}/entitlements`,
@@ -726,7 +733,10 @@ export interface WebhookDelivery {
 }
 
 /** The most recent webhook deliveries, newest first. */
-export function listWebhookDeliveries(limit?: number, signal?: AbortSignal): Promise<WebhookDelivery[]> {
+export function listWebhookDeliveries(
+  limit?: number,
+  signal?: AbortSignal,
+): Promise<WebhookDelivery[]> {
   const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
   return apiRequest<{ deliveries?: WebhookDelivery[] } | WebhookDelivery[]>(
     `/admin/webhook-deliveries${query}`,
@@ -750,7 +760,10 @@ export interface RateLimitEntry {
 }
 
 /** Every active login rate limit counter for the given email. */
-export function lookupLoginRateLimit(email: string, signal?: AbortSignal): Promise<RateLimitEntry[]> {
+export function lookupLoginRateLimit(
+  email: string,
+  signal?: AbortSignal,
+): Promise<RateLimitEntry[]> {
   return apiRequest<{ entries?: RateLimitEntry[] } | RateLimitEntry[]>(
     `/admin/rate-limits/login?email=${encodeURIComponent(email)}`,
     { signal },
@@ -783,7 +796,10 @@ export interface EmailDelivery {
 }
 
 /** The most recent email deliveries, newest first. */
-export function listEmailDeliveries(limit?: number, signal?: AbortSignal): Promise<EmailDelivery[]> {
+export function listEmailDeliveries(
+  limit?: number,
+  signal?: AbortSignal,
+): Promise<EmailDelivery[]> {
   const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
   return apiRequest<{ deliveries?: EmailDelivery[] } | EmailDelivery[]>(
     `/admin/email-deliveries${query}`,
@@ -826,5 +842,180 @@ export function deleteSupportNote(operatorId: string, noteId: string): Promise<v
   return apiRequest<void>(
     `/admin/operators/${encodeURIComponent(operatorId)}/support-notes/${encodeURIComponent(noteId)}`,
     { method: 'DELETE' },
+  );
+}
+
+/*
+ * Payment arrangements: the real-world situations self-serve checkout does
+ * not cover -- an offline payment already made, temporary access granted
+ * ahead of payment, or a real checkout started on a customer's behalf.
+ * Every mutation reuses billing's own tier activation, checkout, and email
+ * machinery on the backend rather than a second parallel payment system,
+ * and a payment-required arrangement completes itself automatically,
+ * through the normal payment webhook, once the customer actually pays.
+ */
+
+/** Why this arrangement exists, which decides how it reached its Status. */
+export type ArrangementCondition = 'offline_settled' | 'temporary_access' | 'payment_required';
+
+/** The arrangement's own lifecycle, distinct from the subscription or payment it may involve. */
+export type ArrangementStatus =
+  'awaiting_payment' | 'active' | 'completed' | 'expired' | 'cancelled';
+
+/** One payment arrangement. */
+export interface Arrangement {
+  id: string;
+  operator_id: string;
+  tier: string;
+  amount_minor: number;
+  currency?: string;
+  condition: ArrangementCondition;
+  status: ArrangementStatus;
+  /** When an offline payment was actually made, set only for offline_settled. */
+  paid_at?: string;
+  /** When payment is expected, set for temporary_access and payment_required. */
+  payment_deadline?: string;
+  /** Whether the arrangement expires itself once the deadline passes with no payment. */
+  auto_expire_on_deadline: boolean;
+  /** The SlideOps payment reference this arrangement is tied to, when one exists. */
+  payment_reference?: string;
+  /** The Admin's own paper trail for an offline payment: a bank reference, a receipt number. */
+  external_reference?: string;
+  notes?: string;
+  created_by_operator_id: string;
+  created_at: string;
+}
+
+/** Every payment arrangement ever created for one Operator, newest first. */
+export function listArrangements(operatorId: string, signal?: AbortSignal): Promise<Arrangement[]> {
+  return apiRequest<{ arrangements?: Arrangement[] } | Arrangement[]>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.arrangements ?? [])));
+}
+
+/**
+ * Record a payment the customer already made outside SlideOps. Activates
+ * the tier immediately under an explicit manual payment source, never a
+ * fabricated online provider transaction, and sends the manual payment
+ * confirmation email.
+ */
+export function recordOfflinePayment(
+  operatorId: string,
+  input: {
+    tier: TierName;
+    amountMinor: number;
+    currency: string;
+    reference: string;
+    paidAt?: Date;
+    notes?: string;
+  },
+): Promise<Arrangement> {
+  return apiRequest<{ arrangement?: Arrangement } & Partial<Arrangement>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/offline-payment`,
+    {
+      method: 'POST',
+      body: {
+        tier: input.tier,
+        amount_minor: input.amountMinor,
+        currency: input.currency,
+        reference: input.reference,
+        paid_at: input.paidAt ? input.paidAt.toISOString() : undefined,
+        notes: input.notes ?? '',
+      },
+    },
+  ).then((r) => r.arrangement ?? (r as Arrangement));
+}
+
+/**
+ * Grant a tier immediately, ahead of payment, expected to complete by the
+ * deadline. No payment is created or implied: this is access on trust,
+ * tracked openly as exactly that, and sends the temporary access email.
+ */
+export function grantTemporaryAccess(
+  operatorId: string,
+  input: {
+    tier: TierName;
+    paymentDeadline?: Date;
+    autoExpireOnDeadline?: boolean;
+    notes?: string;
+  },
+): Promise<Arrangement> {
+  return apiRequest<{ arrangement?: Arrangement } & Partial<Arrangement>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/temporary-access`,
+    {
+      method: 'POST',
+      body: {
+        tier: input.tier,
+        payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
+        auto_expire_on_deadline: input.autoExpireOnDeadline ?? false,
+        notes: input.notes ?? '',
+      },
+    },
+  ).then((r) => r.arrangement ?? (r as Arrangement));
+}
+
+/** The result of starting a payment-required arrangement: the arrangement plus the real checkout link. */
+export interface PaymentRequiredArrangement {
+  arrangement: Arrangement;
+  checkout_url: string;
+}
+
+/**
+ * Start a real checkout on the customer's behalf, through the exact same
+ * pipeline a self-serve checkout already uses, and track it with a
+ * deadline. No access changes: the tier activates only once the customer
+ * completes that checkout, through the normal payment webhook, same as
+ * any other payment. Sends the payment-required email with the checkout
+ * link.
+ */
+export function createPaymentRequiredArrangement(
+  operatorId: string,
+  input: {
+    tier: TierName;
+    provider: PaymentProvider;
+    currency?: PayCurrency;
+    paymentDeadline?: Date;
+    notes?: string;
+  },
+): Promise<PaymentRequiredArrangement> {
+  return apiRequest<
+    { arrangement?: Arrangement; checkout_url?: string } & Partial<PaymentRequiredArrangement>
+  >(`/admin/operators/${encodeURIComponent(operatorId)}/arrangements/payment-required`, {
+    method: 'POST',
+    body: {
+      tier: input.tier,
+      provider: input.provider,
+      currency: input.currency,
+      payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
+      notes: input.notes ?? '',
+    },
+  }).then((r) => ({
+    arrangement: r.arrangement as Arrangement,
+    checkout_url: r.checkout_url ?? '',
+  }));
+}
+
+/**
+ * Call off an arrangement that no longer applies. Only the arrangement's
+ * own record changes: access already granted under it is not
+ * automatically revoked, since undoing access is a separate, deliberate
+ * decision.
+ */
+export function cancelArrangement(arrangementId: string, reason: string): Promise<void> {
+  return apiRequest<void>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/cancel`, {
+    method: 'POST',
+    body: { reason },
+  });
+}
+
+/**
+ * Move an awaiting-payment arrangement's deadline out. Refused for one
+ * that is not awaiting payment, since there is no deadline left to move.
+ */
+export function extendArrangementDeadline(arrangementId: string, newDeadline: Date): Promise<void> {
+  return apiRequest<void>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/extend-deadline`,
+    { method: 'POST', body: { new_deadline: newDeadline.toISOString() } },
   );
 }

@@ -180,6 +180,12 @@ export {
   listWebhookDeliveries,
   lookupLoginRateLimit,
   resetLoginRateLimit,
+  listArrangements,
+  recordOfflinePayment,
+  grantTemporaryAccess,
+  createPaymentRequiredArrangement,
+  cancelArrangement,
+  extendArrangementDeadline,
   type Overview,
   type OperatorStatus,
   type AdminOperator,
@@ -207,6 +213,10 @@ export {
   type AdminTier,
   type EmergencyControl,
   type EmergencyState,
+  type ArrangementCondition,
+  type ArrangementStatus,
+  type Arrangement,
+  type PaymentRequiredArrangement,
 } from './admin';
 export {
   listMarketplacePlugins,
