@@ -17,12 +17,14 @@ import { useAuthStore } from '../../store/auth';
 const getSubscription = vi.fn();
 const quoteCheckout = vi.fn();
 const startCheckout = vi.fn();
+const listTransactions = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getSubscription: (...a: unknown[]) => getSubscription(...a),
   quoteCheckout: (...a: unknown[]) => quoteCheckout(...a),
   startCheckout: (...a: unknown[]) => startCheckout(...a),
+  listTransactions: (...a: unknown[]) => listTransactions(...a),
 }));
 
 const { Billing } = await import('./Billing');
@@ -70,6 +72,41 @@ beforeEach(() => {
   getSubscription.mockReset().mockResolvedValue(subscription());
   quoteCheckout.mockReset().mockResolvedValue(quote());
   startCheckout.mockReset().mockResolvedValue({ checkout_url: '', reference: 'ref', provider: 'paystack', granted: false });
+  listTransactions.mockReset().mockResolvedValue({ transactions: [], limit: 5, offset: 0, has_more: false });
+});
+
+describe('Billing: Recent Transactions', () => {
+  it('shows nothing when there is no payment history yet', async () => {
+    show();
+    await waitFor(() => expect(listTransactions).toHaveBeenCalled());
+    expect(screen.queryByText('Recent Transactions')).not.toBeInTheDocument();
+  });
+
+  it('shows the most recent transactions once there is history, with a link to the full page', async () => {
+    listTransactions.mockResolvedValue({
+      transactions: [
+        {
+          reference: 'so_a',
+          status: 'success',
+          tier: 'pro',
+          provider: 'paystack',
+          amount_minor: 4900,
+          currency: 'USD',
+          base_amount_minor: 4900,
+          term_months: 1,
+          receipt_available: true,
+          created_at: '2026-09-04T00:00:00Z',
+        },
+      ],
+      limit: 5,
+      offset: 0,
+      has_more: false,
+    });
+    show();
+    expect(await screen.findByText('Recent Transactions')).toBeInTheDocument();
+    expect(screen.getByText('Payment Successful')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /View All Transactions/ })).toBeInTheDocument();
+  });
 });
 
 describe('Billing: billing cycle', () => {
