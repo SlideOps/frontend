@@ -153,6 +153,9 @@ const Subscribers = lazy(() =>
 const SubscriberDetail = lazy(() =>
   import('./admin/screens/SubscriberDetail').then((m) => ({ default: m.SubscriberDetail })),
 );
+const Arrangements = lazy(() =>
+  import('./admin/screens/Arrangements').then((m) => ({ default: m.Arrangements })),
+);
 const Emergency = lazy(() =>
   import('./admin/screens/Emergency').then((m) => ({ default: m.Emergency })),
 );
@@ -252,6 +255,7 @@ export function App() {
           <Route path="tiers" element={<Tiers />} />
           <Route path="subscribers" element={<Subscribers />} />
           <Route path="subscribers/:id" element={<SubscriberDetail />} />
+          <Route path="arrangements" element={<Arrangements />} />
           <Route path="emergency" element={<Emergency />} />
           <Route path="feature-flags" element={<FeatureFlags />} />
           <Route path="webhooks" element={<WebhookDeliveries />} />

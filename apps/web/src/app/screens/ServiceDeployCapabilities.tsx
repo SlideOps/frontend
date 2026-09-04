@@ -125,7 +125,7 @@ export function ServiceDeployCapabilities({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { state: catalogState } = useCapabilityCatalog();
+  const { state: catalogState } = useCapabilityCatalog(projectId);
 
   const refs = useRef<Record<string, CapabilityParamsHandle | null>>({});
 
@@ -318,13 +318,19 @@ export function ServiceDeployCapabilities({
   );
 }
 
-/** Loads the supported database Capabilities once, from the Core catalog. */
-function useCapabilityCatalog() {
-  return useAsyncData(async (signal) => {
-    const all = await listCapabilities({}, signal);
-    const byKey = new Map(all.map((c) => [c.key, c]));
-    return SUPPORTED_CAPABILITY_KEYS.map((key) => byKey.get(key)).filter(
-      (c): c is Capability => Boolean(c),
-    );
-  }, []);
+/** Loads the supported database Capabilities from the catalog. Passes the
+ *  chosen Project through: a Capability a Project's installed Plugins unlock
+ *  (on top of the always-available Core ones) is otherwise invisible here,
+ *  the same context every other catalog read in this app already supplies. */
+function useCapabilityCatalog(projectId: string) {
+  return useAsyncData(
+    async (signal) => {
+      const all = await listCapabilities({ projectId: projectId || undefined }, signal);
+      const byKey = new Map(all.map((c) => [c.key, c]));
+      return SUPPORTED_CAPABILITY_KEYS.map((key) => byKey.get(key)).filter(
+        (c): c is Capability => Boolean(c),
+      );
+    },
+    [projectId],
+  );
 }

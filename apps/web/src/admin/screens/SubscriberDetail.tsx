@@ -290,6 +290,8 @@ export function SubscriberDetail() {
   const [tempDeadline, setTempDeadline] = useState('');
   const [tempAutoExpire, setTempAutoExpire] = useState(false);
   const [tempTermMonths, setTempTermMonths] = useState(1);
+  const [tempProvider, setTempProvider] = useState<PaymentProvider>('paystack');
+  const [tempCurrency, setTempCurrency] = useState<PayCurrency>('USD');
   const [tempNotes, setTempNotes] = useState('');
 
   const resetTempAccessForm = () => {
@@ -297,6 +299,8 @@ export function SubscriberDetail() {
     setTempDeadline('');
     setTempAutoExpire(false);
     setTempTermMonths(1);
+    setTempProvider('paystack');
+    setTempCurrency('USD');
     setTempNotes('');
   };
 
@@ -306,15 +310,25 @@ export function SubscriberDetail() {
     }
     setActionError(null);
     setActionMessage(null);
+    setCheckoutLink(null);
     try {
-      await grantTemporaryAccess(id, {
+      const result = await grantTemporaryAccess(id, {
         tier: tempTier,
         paymentDeadline: tempDeadline ? new Date(tempDeadline) : undefined,
         autoExpireOnDeadline: tempAutoExpire,
         termMonths: tempTermMonths,
+        provider: tempProvider,
+        currency: tempCurrency,
         notes: tempNotes,
       });
-      setActionMessage('Temporary access granted. The tier is active now.');
+      setActionMessage(
+        result.checkout_url
+          ? 'Temporary access granted. The tier is active now, and a real payment for what is owed is ready to complete.'
+          : 'Temporary access granted. The tier is active now.',
+      );
+      if (result.checkout_url) {
+        setCheckoutLink(result.checkout_url);
+      }
       setGrantingAccess(false);
       resetTempAccessForm();
       loadArrangements();
@@ -980,9 +994,9 @@ export function SubscriberDetail() {
           <div className="flex flex-col gap-3">
             <p>
               Activates the tier immediately, ahead of payment, expected to complete by the deadline
-              below. No payment is created or implied — this is access on trust, tracked openly as
-              exactly that, and sends a notice with the deadline. This is written to the audit
-              trail.
+              below. Access is never conditioned on payment — but a real payment for what is owed is
+              also started, priced by tier and term, so the customer can complete it themselves from
+              their own Billing page. This is written to the audit trail.
             </p>
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-ink">Tier</span>
@@ -1012,20 +1026,48 @@ export function SubscriberDetail() {
               />
               Automatically expire access if the deadline passes with no payment
             </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-ink">Term to grant</span>
+                <select
+                  className={selectClass}
+                  value={tempTermMonths}
+                  onChange={(event) => setTempTermMonths(Number(event.target.value))}
+                >
+                  {TERM_MONTH_OPTIONS.map((option) => (
+                    <option key={option.months} value={option.months}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-ink">Provider</span>
+                <select
+                  className={selectClass}
+                  value={tempProvider}
+                  onChange={(event) => setTempProvider(event.target.value as PaymentProvider)}
+                >
+                  <option value="paystack">Paystack</option>
+                  <option value="flutterwave">Flutterwave</option>
+                </select>
+              </label>
+            </div>
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Term to grant</span>
+              <span className="text-sm font-medium text-ink">Currency</span>
               <select
                 className={selectClass}
-                value={tempTermMonths}
-                onChange={(event) => setTempTermMonths(Number(event.target.value))}
+                value={tempCurrency}
+                onChange={(event) => setTempCurrency(event.target.value as PayCurrency)}
               >
-                {TERM_MONTH_OPTIONS.map((option) => (
-                  <option key={option.months} value={option.months}>
-                    {option.label}
-                  </option>
-                ))}
+                <option value="USD">USD</option>
+                <option value="NGN">NGN</option>
               </select>
             </label>
+            <Text variant="caption" tone="secondary">
+              Used only to price the real payment behind this grant. If no provider is configured on
+              this deployment, access is still granted with nothing to resume.
+            </Text>
             <Field
               label="Notes"
               value={tempNotes}
