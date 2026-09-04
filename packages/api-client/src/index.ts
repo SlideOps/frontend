@@ -264,6 +264,26 @@ export {
   type CreatePromoCodeInput,
 } from './billing';
 export {
+  listTransactions,
+  transactionSummary,
+  getTransaction,
+  cancelTransaction,
+  resumeCheckout,
+  refreshTransactionStatus,
+  emailTransactionReceipt,
+  transactionReceiptURL,
+  transactionsExportCSVURL,
+  TransactionActionError,
+  type TransactionStatus,
+  type Transaction,
+  type TransactionListFilter,
+  type TransactionPage,
+  type TransactionSummary,
+  type TransactionPoint,
+  type TransactionSummaryResponse,
+  type ResumeCheckoutResult,
+} from './transactions';
+export {
   getTier,
   adminSetTier,
   adminSetFreeSeason,

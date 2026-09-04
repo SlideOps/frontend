@@ -19,9 +19,12 @@ import { EmptyState, PageHeader } from '@slideops/ui';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
+import { formatMoney } from '../billing-format';
+import { BillingTabs } from '../components/BillingTabs';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { RecentTransactions } from '../components/RecentTransactions';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
@@ -167,20 +170,6 @@ const tierLabel: Record<string, string> = {
   pro: 'Pro',
   enterprise: 'Enterprise',
 };
-
-/** Render an amount held in the smallest currency unit for display. */
-function formatMoney(minor: number, currency?: string): string {
-  const major = minor / 100;
-  if (currency) {
-    try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(major);
-    } catch {
-      // An unknown currency code falls back to a plain amount with the code.
-      return `${major.toLocaleString()} ${currency}`;
-    }
-  }
-  return major.toLocaleString();
-}
 
 /** A small inline badge for the subscription status, in semantic tokens only. */
 function StatusBadge({ status }: { status: SubscriptionStatus }) {
@@ -549,6 +538,7 @@ export function Billing() {
         title="Billing"
         description="Choose the plan that fits your fleet. SlideOps meters only what it provides, the servers you connect and the Projects you run, never the resources on your own servers."
       />
+      {!admin ? <BillingTabs active="overview" className="mb-6" /> : null}
 
       {state.status === 'loading' ? <Loading label="Loading your plan" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
@@ -886,6 +876,8 @@ export function Billing() {
               </div>
             </Card>
           ) : null}
+
+          {!admin ? <RecentTransactions /> : null}
         </div>
       ) : null}
 

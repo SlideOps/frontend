@@ -1,5 +1,5 @@
 import type { ChartPalette } from '@slideops/design-system';
-import type { NodeMetricSample } from '@slideops/api-client';
+import type { NodeMetricSample, TransactionPoint } from '@slideops/api-client';
 import type { EChartsOption } from 'echarts';
 
 /*
@@ -83,6 +83,65 @@ export function nodeHealthOption(
         data: history.map((sample) => sample.cpu_load ?? null),
         lineStyle: { color: palette.brand, width: 2 },
         itemStyle: { color: palette.brand },
+      },
+    ],
+  };
+}
+
+/**
+ * The Transactions page activity chart: how much was successfully paid in
+ * each period, one currency at a time (points already come pre-bucketed by
+ * currency, so amounts from different currencies are never mixed into one
+ * bar). Pending and failed counts ride along in the tooltip rather than as
+ * their own series, so the chart stays about money moving, not clutter.
+ */
+export function transactionsOverTimeOption(
+  palette: ChartPalette,
+  points: TransactionPoint[],
+  currency: string,
+): EChartsOption {
+  const filtered = points.filter((p) => p.currency === currency);
+  return {
+    grid: { top: 20, right: 16, bottom: 28, left: 56 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: palette.raised,
+      borderColor: palette.border,
+      borderWidth: 1,
+      textStyle: { color: palette.text, fontSize: 12 },
+      formatter: (params) => {
+        const items = Array.isArray(params) ? params : [params];
+        const point = filtered[items[0]?.dataIndex ?? 0];
+        if (!point) {
+          return '';
+        }
+        const paid = (point.successful_minor / 100).toLocaleString(undefined, {
+          style: 'currency',
+          currency,
+        });
+        return [
+          `<strong>${point.period}</strong>`,
+          `Paid: ${paid} (${point.successful_count})`,
+          point.pending_count ? `Pending: ${point.pending_count}` : null,
+          point.failed_count ? `Failed: ${point.failed_count}` : null,
+        ]
+          .filter(Boolean)
+          .join('<br/>');
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: filtered.map((p) => p.period),
+      ...axisStyle(palette),
+    },
+    yAxis: { type: 'value', ...axisStyle(palette) },
+    series: [
+      {
+        type: 'bar',
+        name: 'Paid',
+        data: filtered.map((p) => p.successful_minor / 100),
+        itemStyle: { color: palette.brand, borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 28,
       },
     ],
   };
