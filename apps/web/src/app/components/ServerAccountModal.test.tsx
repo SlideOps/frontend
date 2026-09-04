@@ -16,11 +16,13 @@ import { renderInApp } from '../../test/render';
  */
 
 const createOperation = vi.fn();
+const switchToServerUser = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   createOperation: (input: unknown) => createOperation(input),
   revealNodeCredential: vi.fn(),
+  switchToServerUser: (...a: unknown[]) => switchToServerUser(...a),
 }));
 
 const { ServerAccountModal } = await import('./ServerAccountModal');
@@ -38,10 +40,16 @@ function account(overrides: Partial<ServerUser> = {}): ServerUser {
   };
 }
 
-function show(user: ServerUser) {
+function show(user: ServerUser, onSwitched?: (updated: Node) => void) {
   return renderInApp(
     <MemoryRouter>
-      <ServerAccountModal open account={user} node={node} onClose={() => {}} />
+      <ServerAccountModal
+        open
+        account={user}
+        node={node}
+        onClose={() => {}}
+        onSwitched={onSwitched}
+      />
     </MemoryRouter>,
   );
 }
@@ -50,6 +58,48 @@ describe('ServerAccountModal actions', () => {
   beforeEach(() => {
     createOperation.mockReset();
     createOperation.mockResolvedValue({ id: 'op-1' });
+    switchToServerUser.mockReset();
+    switchToServerUser.mockResolvedValue({ ...node, ssh_username: 'deploy' });
+  });
+
+  // The Operator's own complaint: Switch must sit right alongside Disable and
+  // Remove, every time, never present in one place and missing from another.
+  it('always shows Switch alongside Disable and Remove for an ordinary account', async () => {
+    show(account());
+
+    expect(
+      await screen.findByRole('button', { name: 'Switch to this account' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Disable this account/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remove this account/ })).toBeInTheDocument();
+  });
+
+  it('switches to the account, verifying first, and reports success in the modal', async () => {
+    const onSwitched = vi.fn();
+    const operator = userEvent.setup();
+    show(account(), onSwitched);
+
+    await operator.click(await screen.findByRole('button', { name: 'Switch to this account' }));
+
+    await waitFor(() => expect(switchToServerUser).toHaveBeenCalledWith('n1', 'deploy'));
+    expect(await screen.findByText(/now connects to this server as deploy/)).toBeInTheDocument();
+    expect(onSwitched).toHaveBeenCalledWith({ ...node, ssh_username: 'deploy' });
+  });
+
+  it('reports a refusal to switch rather than looking like it worked', async () => {
+    const { ApiError } = await import('@slideops/api-client');
+    switchToServerUser.mockRejectedValue(
+      new ApiError(
+        409,
+        'no_stored_credential',
+        'SlideOps holds no generated credential for that server user',
+      ),
+    );
+    const operator = userEvent.setup();
+    show(account());
+
+    await operator.click(await screen.findByRole('button', { name: 'Switch to this account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('no generated credential');
   });
 
   it('starts a disable Operation for an ordinary account', async () => {
@@ -112,6 +162,9 @@ describe('ServerAccountModal actions', () => {
     expect(await screen.findByText(/end SlideOps' own access/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Disable this account/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Remove this account/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Switch to this account' }),
+    ).not.toBeInTheDocument();
   });
 
   it('offers nothing for a system account other than root', async () => {

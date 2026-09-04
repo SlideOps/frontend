@@ -397,6 +397,7 @@ export function ServerUsers({
         account={selectedAccount}
         node={node}
         onClose={() => setSelectedAccount(null)}
+        onSwitched={onSwitched}
       />
     </Card>
   );
