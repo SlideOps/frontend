@@ -44,6 +44,11 @@ const catalog: Capability[] = [
   capability({ key: 'install-mysql', name: 'MySQL' }),
   capability({ key: 'install-mariadb', name: 'MariaDB' }),
   capability({ key: 'install-mongodb', name: 'MongoDB' }),
+  capability({ key: 'install-rabbitmq', name: 'RabbitMQ', category: 'messaging' }),
+  capability({ key: 'install-nats', name: 'NATS', category: 'messaging' }),
+  capability({ key: 'install-memcached', name: 'Memcached', category: 'database' }),
+  capability({ key: 'install-minio', name: 'MinIO', category: 'storage' }),
+  capability({ key: 'install-meilisearch', name: 'Meilisearch', category: 'search' }),
 ];
 
 const node: Node = { id: 'node-1', name: 'db-server' } as Node;
@@ -64,13 +69,42 @@ function show() {
 }
 
 describe('ServiceDeployCapabilities', () => {
-  it('offers every supported database capability as a checkbox', async () => {
+  it('offers every supported backing-service capability as a checkbox', async () => {
     show();
     expect(await screen.findByText('PostgreSQL')).toBeInTheDocument();
     expect(screen.getByText('Redis')).toBeInTheDocument();
     expect(screen.getByText('MySQL')).toBeInTheDocument();
     expect(screen.getByText('MariaDB')).toBeInTheDocument();
     expect(screen.getByText('MongoDB')).toBeInTheDocument();
+    expect(screen.getByText('RabbitMQ')).toBeInTheDocument();
+    expect(screen.getByText('NATS')).toBeInTheDocument();
+    expect(screen.getByText('Memcached')).toBeInTheDocument();
+    expect(screen.getByText('MinIO')).toBeInTheDocument();
+    expect(screen.getByText('Meilisearch')).toBeInTheDocument();
+  });
+
+  it('requires a project and prevents deploying without one', async () => {
+    renderInApp(
+      <MemoryRouter>
+        <ServiceDeployCapabilities projects={[]} nodes={[node]} />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText('Create a Project to deploy a Capability Service.'),
+    ).toBeInTheDocument();
+    expect(deployCapabilitiesMock).not.toHaveBeenCalled();
+  });
+
+  it('sends the chosen project along with the deploy', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+    await userEvent.type(screen.getByLabelText('Name'), 'infra');
+    await userEvent.click(screen.getByRole('checkbox', { name: /PostgreSQL/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Deploy/ }));
+
+    await waitFor(() => expect(deployCapabilitiesMock).toHaveBeenCalledTimes(1));
+    const call = deployCapabilitiesMock.mock.calls[0]![0];
+    expect(call.project_id).toBe('proj-1');
   });
 
   it('refuses to deploy with nothing selected', async () => {
