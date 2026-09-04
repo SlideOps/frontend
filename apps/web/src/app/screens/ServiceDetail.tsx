@@ -235,6 +235,8 @@ function AddCapabilityForm({
 /** What a Capability Service tracks, with the action to grow it. */
 function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const { state: catalogState } = useAsyncData(async (signal) => {
     const all = await listCapabilities({}, signal);
     const byKey = new Map(all.map((c) => [c.key, c]));
@@ -242,6 +244,22 @@ function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged:
   }, []);
   const catalog = catalogState.status === 'ready' ? catalogState.data : [];
   const tracked = service.capabilities ?? [];
+
+  // A failed Capability is retried through the same action that adds one:
+  // the backend treats re-adding a failed key as retrying it in place
+  // rather than a duplicate, so nothing here needs its own endpoint.
+  const retry = async (capabilityKey: string) => {
+    setRetrying(capabilityKey);
+    setRetryError(null);
+    try {
+      await addServiceCapability(service.id, { capability_key: capabilityKey });
+      onChanged();
+    } catch (cause) {
+      setRetryError(cause instanceof ApiError ? cause.message : 'The capability could not be retried.');
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   return (
     <Card className="h-fit">
@@ -258,10 +276,26 @@ function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged:
               <span className="min-w-0 flex-1 truncate text-sm text-ink">
                 {capabilityLabel(catalog, c.capability_key)}
               </span>
+              {c.status === 'failed' ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => retry(c.capability_key)}
+                  disabled={retrying === c.capability_key}
+                >
+                  <RefreshCw width={14} height={14} aria-hidden />
+                  {retrying === c.capability_key ? 'Retrying' : 'Retry'}
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
+      {retryError ? (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {retryError}
+        </p>
+      ) : null}
       {adding ? (
         <AddCapabilityForm
           serviceId={service.id}
