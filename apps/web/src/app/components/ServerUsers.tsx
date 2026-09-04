@@ -3,11 +3,12 @@ import {
   ApiError,
   createOperation,
   listNodeUsers,
+  switchToServerUser,
   type Node,
   type ServerUser,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { CheckCircle2, ChevronRight, Lock, Trash2, Users } from '@slideops/icons';
+import { ArrowRightLeft, CheckCircle2, ChevronRight, Lock, Trash2, Users } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -21,6 +22,7 @@ import { ServerAccountModal } from './ServerAccountModal';
 
 const schema = z.object({
   username: z.string().trim().min(1, 'Enter a username.'),
+  authMethod: z.enum(['password', 'private_key']),
   password: z.string().optional(),
   access: z.enum(['admin', 'limited']),
 });
@@ -47,13 +49,26 @@ function AccessBadge({ level }: { level: ServerUser['access_level'] }) {
  * with is marked and can never be removed, so managing accounts never locks the
  * Operator out.
  */
-export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
+export function ServerUsers({
+  nodeId,
+  node,
+  onSwitched,
+}: {
+  nodeId: string;
+  node: Node;
+  /** Called after a successful switch, with the Node now reflecting the new
+   *  connection account, so the parent's own copy (its auth_kind, its
+   *  connection-account marker on the user list) stays in sync. */
+  onSwitched?: (updated: Node) => void;
+}) {
   const navigate = useNavigate();
   const canWrite = useCanWrite();
   const { state } = useAsyncData((signal) => listNodeUsers(nodeId, signal), [nodeId]);
 
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<ServerUser | null>(null);
 
   const {
@@ -64,10 +79,11 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { username: '', password: '', access: 'limited' },
+    defaultValues: { username: '', authMethod: 'password', password: '', access: 'limited' },
   });
 
   const access = watch('access');
+  const authMethod = watch('authMethod');
 
   const startManage = handleSubmit(async (values) => {
     setActionError(null);
@@ -79,10 +95,11 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
         parameters: {
           username: values.username.trim(),
           sudo: values.access === 'admin',
-          ...(password ? { password } : {}),
+          auth_method: values.authMethod,
+          ...(values.authMethod === 'password' && password ? { password } : {}),
         },
       });
-      reset({ username: '', password: '', access: 'limited' });
+      reset({ username: '', authMethod: 'password', password: '', access: 'limited' });
       navigate(`/app/operations/${operation.id}`);
     } catch (error) {
       setActionError(
@@ -114,14 +131,41 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
     }
   };
 
+  const runSwitch = async () => {
+    if (!pendingSwitch) {
+      return;
+    }
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const updated = await switchToServerUser(nodeId, pendingSwitch);
+      setActionMessage(`SlideOps now connects to this server as ${pendingSwitch}.`);
+      onSwitched?.(updated);
+      setPendingSwitch(null);
+    } catch (error) {
+      setActionError(
+        error instanceof ApiError ? error.message : 'Could not switch to that account. Try again.',
+      );
+      setPendingSwitch(null);
+    }
+  };
+
   return (
     <Card>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-1 flex items-center gap-2">
         <Users width={18} height={18} className="text-brand" aria-hidden />
         <Text variant="h4">Server accounts</Text>
         <Guidance for="server.users" />
       </div>
+      <Text variant="body-sm" tone="secondary" className="mb-3 block">
+        Active server user: <span className="font-medium text-ink">{node.ssh_username}</span>
+      </Text>
 
+      {actionMessage ? (
+        <p role="status" className="mb-3 text-sm text-success">
+          {actionMessage}
+        </p>
+      ) : null}
       {state.status === 'loading' ? <Loading label="Reading the accounts on this server" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
       {state.status === 'ready' ? (
@@ -160,6 +204,16 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
                   />
                 </button>
                 <AccessBadge level={user.access_level} />
+                {!user.connection && !user.system && !user.disabled && canWrite ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Switch to ${user.username}`}
+                    onClick={() => setPendingSwitch(user.username)}
+                  >
+                    <ArrowRightLeft width={15} height={15} aria-hidden />
+                  </Button>
+                ) : null}
                 {user.connection || user.system || !canWrite ? (
                   <span className="w-9" aria-hidden />
                 ) : (
@@ -194,69 +248,112 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
             Creating or updating an account needs a role above Viewer in this workspace.
           </Text>
         ) : (
-        <form className="flex flex-col gap-4" onSubmit={startManage} noValidate>
-          <Field
-            label="Username"
-            placeholder="deploy"
-            autoComplete="off"
-            error={errors.username?.message}
-            {...register('username')}
-          />
-          <Field
-            label="Password (optional)"
-            type="password"
-            autoComplete="off"
-            placeholder="Set or reset a password for this account"
-            hint="Leave blank to leave the password unchanged. It is sealed and never shown again."
-            error={errors.password?.message}
-            {...register('password')}
-          />
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium text-ink">Access level</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input
-                  type="radio"
-                  value="limited"
-                  className="mt-0.5 accent-brand"
-                  {...register('access')}
-                />
-                <span>
-                  <span className="font-medium text-ink">Limited</span>
-                  <span className="mt-0.5 block text-ink-muted">A plain account with no sudo.</span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input
-                  type="radio"
-                  value="admin"
-                  className="mt-0.5 accent-brand"
-                  {...register('access')}
-                />
-                <span>
-                  <span className="font-medium text-ink">Administrator</span>
-                  <span className="mt-0.5 block text-ink-muted">Full sudo, can act as root.</span>
-                </span>
-              </label>
+          <form className="flex flex-col gap-4" onSubmit={startManage} noValidate>
+            <Field
+              label="Username"
+              placeholder="deploy"
+              autoComplete="off"
+              error={errors.username?.message}
+              {...register('username')}
+            />
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium text-ink">Authentication method</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="password"
+                    className="mt-0.5 accent-brand"
+                    {...register('authMethod')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Password</span>
+                    <span className="mt-0.5 block text-ink-muted">
+                      Set or reset a password for this account.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="private_key"
+                    className="mt-0.5 accent-brand"
+                    {...register('authMethod')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Private key</span>
+                    <span className="mt-0.5 block text-ink-muted">
+                      SlideOps generates a key pair and installs it. You save the private key once
+                      it completes.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+            {authMethod === 'password' ? (
+              <Field
+                label="Password (optional)"
+                type="password"
+                autoComplete="off"
+                placeholder="Set or reset a password for this account"
+                hint="Leave blank to leave the password unchanged. It is sealed and never shown again."
+                error={errors.password?.message}
+                {...register('password')}
+              />
+            ) : (
+              <Text variant="body-sm" tone="secondary">
+                No password is set. A fresh SSH key pair is generated for this account when the
+                Operation runs, and the private key is shown once on its page for you to save.
+              </Text>
+            )}
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium text-ink">Access level</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="limited"
+                    className="mt-0.5 accent-brand"
+                    {...register('access')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Limited</span>
+                    <span className="mt-0.5 block text-ink-muted">
+                      A plain account with no sudo.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="admin"
+                    className="mt-0.5 accent-brand"
+                    {...register('access')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Administrator</span>
+                    <span className="mt-0.5 block text-ink-muted">Full sudo, can act as root.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            {actionError ? (
+              <p role="alert" className="text-sm text-danger">
+                {actionError}
+              </p>
+            ) : null}
+
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={isSubmitting}>
+                {access === 'admin' ? 'Prepare administrator' : 'Prepare account'}
+                <CheckCircle2 width={15} height={15} aria-hidden />
+              </Button>
+              <Text variant="body-sm" tone="secondary">
+                Opens an Operation you review and approve.
+              </Text>
             </div>
-          </fieldset>
-
-          {actionError ? (
-            <p role="alert" className="text-sm text-danger">
-              {actionError}
-            </p>
-          ) : null}
-
-          <div className="flex items-center gap-2">
-            <Button type="submit" disabled={isSubmitting}>
-              {access === 'admin' ? 'Prepare administrator' : 'Prepare account'}
-              <CheckCircle2 width={15} height={15} aria-hidden />
-            </Button>
-            <Text variant="body-sm" tone="secondary">
-              Opens an Operation you review and approve.
-            </Text>
-          </div>
-        </form>
+          </form>
         )}
       </div>
 
@@ -275,6 +372,24 @@ export function ServerUsers({ nodeId, node }: { nodeId: string; node: Node }) {
         confirmVariant="danger"
         onConfirm={runRemove}
         onCancel={() => setPendingRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingSwitch !== null}
+        title="Switch the active server user?"
+        description={
+          <>
+            SlideOps will connect to this server as{' '}
+            <span className="font-medium text-ink">{pendingSwitch}</span> from now on, using the
+            credential it generated when this account was created. This is verified against the
+            server first: if it does not sign in, nothing changes and{' '}
+            <span className="font-medium text-ink">{node.ssh_username}</span> keeps working.
+          </>
+        }
+        confirmLabel="Switch"
+        confirmVariant="primary"
+        onConfirm={runSwitch}
+        onCancel={() => setPendingSwitch(null)}
       />
 
       <ServerAccountModal

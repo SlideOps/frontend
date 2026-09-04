@@ -138,6 +138,23 @@ export function listNodeUsers(id: string, signal?: AbortSignal): Promise<ServerU
   return apiRequest<{ users: ServerUser[] }>(`/nodes/${id}/users`, { signal }).then((r) => r.users);
 }
 
+/**
+ * Make an already configured server user the account SlideOps connects with,
+ * reusing the credential SlideOps generated when it created that user (a
+ * password or a generated private key) so the Operator never has to
+ * resupply it. Verified against the Node first, exactly like a manual
+ * credential rotation, so nothing changes if the stored credential no
+ * longer signs in. Refuses with `no_stored_credential` (409) when SlideOps
+ * holds no such credential for that username -- one created by hand outside
+ * SlideOps, or before this Node used the Manage server user Capability --
+ * in which case rotateNodeCredential is the manual fallback.
+ */
+export function switchToServerUser(id: string, username: string): Promise<Node> {
+  return apiRequest<{ node: Node }>(`/nodes/${id}/users/${encodeURIComponent(username)}/switch`, {
+    method: 'POST',
+  }).then((r) => r.node);
+}
+
 /** The connection credential an Operator stored for a Node, revealed to its owner. */
 export interface NodeCredential {
   /** Whether the credential is a password or a private_key. */
