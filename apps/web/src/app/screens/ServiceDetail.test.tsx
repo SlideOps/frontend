@@ -365,6 +365,7 @@ const capabilityService = {
   capabilities: [
     { capability_key: 'install-postgresql', operation_id: 'op-1', status: 'done', created_at: '2026-07-30T10:00:00Z' },
     { capability_key: 'install-redis', operation_id: 'op-2', status: 'running', created_at: '2026-07-30T10:01:00Z' },
+    { capability_key: 'install-mongodb', operation_id: 'op-3', status: 'failed', created_at: '2026-07-30T10:02:00Z' },
   ],
 };
 
@@ -372,6 +373,7 @@ const catalog = [
   { key: 'install-postgresql', name: 'PostgreSQL', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
   { key: 'install-redis', name: 'Redis', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
   { key: 'install-mongodb', name: 'MongoDB', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
+  { key: 'install-mariadb', name: 'MariaDB', category: 'database', description: '', intent: '', risk_level: 'medium', supported_platforms: [], requirements: [], verification_strategy: '', parameters: [] },
 ];
 
 describe('ServiceDetail: a Capability Service', () => {
@@ -413,14 +415,32 @@ describe('ServiceDetail: a Capability Service', () => {
     await screen.findByText('PostgreSQL');
     await userEvent.click(await screen.findByRole('button', { name: /Add Capability/ }));
 
-    // Only the untracked engine is offered.
+    // Only the untracked engine is offered -- a failed one (MongoDB) has its
+    // own Retry action instead, so it does not show up here too.
     const select = await screen.findByLabelText('Capability');
-    expect(select).toHaveValue('install-mongodb');
+    expect(select).toHaveValue('install-mariadb');
 
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() =>
-      expect(addServiceCapability).toHaveBeenCalledWith('svc-1', expect.objectContaining({ capability_key: 'install-mongodb' })),
+      expect(addServiceCapability).toHaveBeenCalledWith('svc-1', expect.objectContaining({ capability_key: 'install-mariadb' })),
+    );
+  });
+
+  it('offers a Retry action only for the capability that failed', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+
+    // Exactly one Retry button: MongoDB is the only tracked capability at failed.
+    expect(screen.getAllByRole('button', { name: /Retry/ })).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: /Retry/ }));
+
+    await waitFor(() =>
+      expect(addServiceCapability).toHaveBeenCalledWith(
+        'svc-1',
+        expect.objectContaining({ capability_key: 'install-mongodb' }),
+      ),
     );
   });
 });
