@@ -21,6 +21,7 @@ const getServiceMetrics = vi.fn();
 const listCapabilityActions = vi.fn();
 const checkServiceUpdate = vi.fn();
 const purgeService = vi.fn();
+const removeService = vi.fn();
 const listMarketplacePlugins = vi.fn();
 const listInstalledPlugins = vi.fn();
 const getCapabilityStates = vi.fn();
@@ -38,6 +39,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   listCapabilityActions: (...a: unknown[]) => listCapabilityActions(...a),
   checkServiceUpdate: (...a: unknown[]) => checkServiceUpdate(...a),
   purgeService: (...a: unknown[]) => purgeService(...a),
+  removeService: (...a: unknown[]) => removeService(...a),
   listMarketplacePlugins: (...a: unknown[]) => listMarketplacePlugins(...a),
   listInstalledPlugins: (...a: unknown[]) => listInstalledPlugins(...a),
   getCapabilityStates: (...a: unknown[]) => getCapabilityStates(...a),
@@ -352,7 +354,7 @@ describe('ServiceDetail', () => {
 
     await userEvent.click(confirmButton);
     await waitFor(() =>
-      expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend'),
+      expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend', false),
     );
   });
 });
@@ -390,6 +392,7 @@ describe('ServiceDetail: a Capability Service', () => {
     getCapabilityStates.mockReset().mockResolvedValue({});
     listCapabilities.mockReset().mockResolvedValue(catalog);
     addServiceCapability.mockReset().mockResolvedValue({ ...capabilityService });
+    removeService.mockReset().mockResolvedValue(undefined);
   });
 
   it('shows the tracked capabilities and their status, not resource/build panels', async () => {
@@ -425,6 +428,19 @@ describe('ServiceDetail: a Capability Service', () => {
     await waitFor(() =>
       expect(addServiceCapability).toHaveBeenCalledWith('svc-1', expect.objectContaining({ capability_key: 'install-mariadb' })),
     );
+  });
+
+  it('removes a Capability Service, forwarding the drop-data choice only when asked', async () => {
+    show();
+    await screen.findByText('PostgreSQL');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove this Service' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /Also destroy each Capability's data/ }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(removeService).toHaveBeenCalledWith('svc-1', true));
   });
 
   it('offers a Retry action only for the capability that failed', async () => {

@@ -129,12 +129,20 @@ describe('services requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/start');
   });
 
-  it('removes a Service with a DELETE', async () => {
+  it('removes a Service with a DELETE, keeping data by default', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
     await removeService('sv_1');
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1');
+    expect(JSON.parse(String(init?.body))).toEqual({ drop_data: false });
+  });
+
+  it('removes a Capability Service with drop_data when the Operator asks to also destroy its data', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+    await removeService('sv_1', true);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(init?.body))).toEqual({ drop_data: true });
   });
 
   it('purges a Service with a DELETE and the typed confirmation', async () => {
@@ -143,7 +151,7 @@ describe('services requests', () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/purge');
-    expect(JSON.parse(String(init?.body))).toEqual({ confirm: 'delete web' });
+    expect(JSON.parse(String(init?.body))).toEqual({ confirm: 'delete web', drop_data: false });
   });
 
   it('reports the exact confirmation the backend refused', async () => {
