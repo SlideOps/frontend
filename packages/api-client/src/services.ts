@@ -368,10 +368,18 @@ export function restartService(id: string): Promise<void> {
   return apiRequest<void>(`/services/${id}/restart`, { method: 'POST' });
 }
 
-/** Stop and remove a Service's workload, freeing its allocation. The Service
- * stays on record, so it can still be seen and never be redeployed. */
-export function removeService(id: string): Promise<void> {
-  return apiRequest<void>(`/services/${id}`, { method: 'DELETE' });
+/**
+ * Stop and remove a Service's workload, freeing its allocation. The Service
+ * stays on record, so it can still be seen and never be redeployed.
+ *
+ * For a Capability Service, every Capability that finished installing is
+ * uninstalled from the Node through its own remove Capability (unless
+ * another Service on the same Node still depends on it, in which case that
+ * one is left in place). dropData forwards that Capability's own
+ * destructive drop-data choice; left false, its data directory is kept.
+ */
+export function removeService(id: string, dropData = false): Promise<void> {
+  return apiRequest<void>(`/services/${id}`, { method: 'DELETE', body: { drop_data: dropData } });
 }
 
 /**
@@ -382,9 +390,15 @@ export function removeService(id: string): Promise<void> {
  * Refused with confirmation_mismatch unless confirm is exactly
  * `"delete " + the Service's own name`, read back from what the Operator
  * typed rather than a checkbox, since this cannot be undone.
+ *
+ * dropData is the same Capability Service drop-data choice removeService
+ * takes.
  */
-export function purgeService(id: string, confirm: string): Promise<void> {
-  return apiRequest<void>(`/services/${id}/purge`, { method: 'DELETE', body: { confirm } });
+export function purgeService(id: string, confirm: string, dropData = false): Promise<void> {
+  return apiRequest<void>(`/services/${id}/purge`, {
+    method: 'DELETE',
+    body: { confirm, drop_data: dropData },
+  });
 }
 
 /**

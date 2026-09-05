@@ -400,10 +400,12 @@ export function ServiceDetail() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [dropDataOnRemove, setDropDataOnRemove] = useState(false);
   const [purging, setPurging] = useState(false);
   const [purgeConfirmText, setPurgeConfirmText] = useState('');
   const [purgeError, setPurgeError] = useState<string | null>(null);
   const [purgeWorking, setPurgeWorking] = useState(false);
+  const [dropDataOnPurge, setDropDataOnPurge] = useState(false);
   // A resize applies live, so reflect the new limits at once without a jarring
   // full refetch. This override is cleared whenever the Service being viewed changes.
   const [resized, setResized] = useState<Pick<
@@ -455,7 +457,7 @@ export function ServiceDetail() {
     setWorking(true);
     setActionError(null);
     try {
-      await removeService(id);
+      await removeService(id, dropDataOnRemove);
       navigate('/app/services');
     } catch (error) {
       setActionError(
@@ -469,7 +471,7 @@ export function ServiceDetail() {
     setPurgeWorking(true);
     setPurgeError(null);
     try {
-      await purgeService(id, purgeConfirmText);
+      await purgeService(id, purgeConfirmText, dropDataOnPurge);
       navigate('/app/services');
     } catch (error) {
       setPurgeError(
@@ -719,13 +721,29 @@ export function ServiceDetail() {
                               <Text variant="body-sm" tone="secondary">
                                 {service.adopted
                                   ? 'Stop managing this Service? SlideOps did not create this workload, so it keeps running on your server exactly as it is; it simply disappears from here.'
-                                  : 'Remove this Service? Its workload is stopped and removed, and the allocation is freed.'}
+                                  : isCapabilityService
+                                    ? 'Remove this Service? Every Capability that finished installing is uninstalled from the Node, unless another Service on it still depends on one.'
+                                    : 'Remove this Service? Its workload is stopped and removed, and the allocation is freed.'}
                               </Text>
+                              {isCapabilityService && !service.adopted ? (
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-brand"
+                                    checked={dropDataOnRemove}
+                                    onChange={(event) => setDropDataOnRemove(event.target.checked)}
+                                  />
+                                  Also destroy each Capability&apos;s data (permanent)
+                                </label>
+                              ) : null}
                               <div className="flex items-center gap-2">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => setConfirmRemove(false)}
+                                  onClick={() => {
+                                    setConfirmRemove(false);
+                                    setDropDataOnRemove(false);
+                                  }}
                                   disabled={working}
                                 >
                                   Keep it
@@ -766,7 +784,21 @@ export function ServiceDetail() {
                                 This permanently deletes this Service: its record, its activity, and
                                 any saved secret, wiped off the system for good. It cannot be undone
                                 and it can never be seen again.
+                                {isCapabilityService
+                                  ? ' Every Capability that finished installing is also uninstalled from the Node, unless another Service on it still depends on one.'
+                                  : ''}
                               </Text>
+                              {isCapabilityService ? (
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-brand"
+                                    checked={dropDataOnPurge}
+                                    onChange={(event) => setDropDataOnPurge(event.target.checked)}
+                                  />
+                                  Also destroy each Capability&apos;s data (permanent)
+                                </label>
+                              ) : null}
                               <Field
                                 label={`Type "delete ${service.name}" to confirm`}
                                 value={purgeConfirmText}
@@ -783,6 +815,7 @@ export function ServiceDetail() {
                                     setPurging(false);
                                     setPurgeConfirmText('');
                                     setPurgeError(null);
+                                    setDropDataOnPurge(false);
                                   }}
                                   disabled={purgeWorking}
                                 >
