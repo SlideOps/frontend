@@ -85,6 +85,13 @@ export function OperationDetail() {
   const [nodeDockerBridgeAddress, setNodeDockerBridgeAddress] = useState<string | undefined>(
     undefined,
   );
+  // Set only when the Node fetch itself failed (not merely not-yet-loaded), so
+  // the credentials card can tell an Operator why its host and connection
+  // strings are missing instead of just silently omitting them -- the failure
+  // used to be swallowed entirely, which looked identical to "this Node has no
+  // address" and left no way to tell a real fetch failure apart from that.
+  const [nodeLoadFailed, setNodeLoadFailed] = useState(false);
+  const [nodeRetryToken, setNodeRetryToken] = useState(0);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -141,6 +148,7 @@ export function OperationDetail() {
       return;
     }
     let active = true;
+    setNodeLoadFailed(false);
     getNode(nodeId)
       .then((node) => {
         if (active) {
@@ -149,12 +157,14 @@ export function OperationDetail() {
         }
       })
       .catch(() => {
-        // The host is a convenience; if it cannot be resolved the card still works.
+        if (active) {
+          setNodeLoadFailed(true);
+        }
       });
     return () => {
       active = false;
     };
-  }, [nodeId]);
+  }, [nodeId, nodeRetryToken]);
 
   const approve = async () => {
     setApproving(true);
@@ -407,11 +417,29 @@ export function OperationDetail() {
             ) : null}
 
             {status === 'completed' && !operation.capability_key.startsWith('remove-') ? (
-              <CredentialsCard
-                operation={operation}
-                host={nodeHost}
-                dockerBridgeAddress={nodeDockerBridgeAddress}
-              />
+              <>
+                {nodeLoadFailed ? (
+                  <Card className="flex flex-wrap items-center justify-between gap-3 border-warning bg-subtle">
+                    <Text variant="body-sm" tone="secondary">
+                      Could not load this Node's address, so the connection host and any
+                      connection strings below may be missing. This Operation's own secrets are
+                      unaffected.
+                    </Text>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setNodeRetryToken((token) => token + 1)}
+                    >
+                      Retry
+                    </Button>
+                  </Card>
+                ) : null}
+                <CredentialsCard
+                  operation={operation}
+                  host={nodeHost}
+                  dockerBridgeAddress={nodeDockerBridgeAddress}
+                />
+              </>
             ) : null}
           </div>
         </div>
