@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
 import { Splash } from '../components/RequireAuth';
 import { useAsyncData } from '../app/hooks/useAsyncData';
+import { useNotificationsStore } from '../app/notifications/store';
 import { useAuthStore } from '../store/auth';
 import { useWorkspaceStore } from '../store/workspace';
 
@@ -30,6 +31,7 @@ export function InvitationAccept() {
   const signOut = useAuthStore((state) => state.signOut);
   const refreshWorkspaces = useWorkspaceStore((state) => state.refresh);
   const resetWorkspaces = useWorkspaceStore((state) => state.reset);
+  const clearNotifications = useNotificationsStore((state) => state.clear);
 
   const { state } = useAsyncData(() => getInvitation(token), [token]);
 
@@ -76,6 +78,7 @@ export function InvitationAccept() {
   const switchAccount = async () => {
     await signOut();
     resetWorkspaces();
+    clearNotifications();
     navigate('/login', { state: { next } });
   };
 

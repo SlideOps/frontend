@@ -14,21 +14,15 @@ import {
   type Workspace,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
-import { ArrowRightLeft, Building2, Check, Mail, Pencil, Plus, Trash2, X } from '@slideops/icons';
+import { ArrowRightLeft, Building2, Check, Pencil, Plus, Trash2, X } from '@slideops/icons';
 import { PageHeader, Drawer } from '@slideops/ui';
 import { type FormEvent, useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { PendingInvitationCard, roleLabel } from '../components/PendingInvitationCard';
 import { useAsyncData } from '../hooks/useAsyncData';
-
-const roleLabel: Record<string, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-  viewer: 'Viewer',
-};
 
 /** The name and role form shared by create and rename, in the Drawer. */
 function WorkspaceNameForm({
@@ -136,52 +130,6 @@ function WorkspaceCard({
             Delete
           </Button>
         ) : null}
-      </div>
-    </Card>
-  );
-}
-
-/**
- * One pending invitation, discoverable here without the emailed link: which
- * workspace, at what role, and a one-click accept or decline. This is the fix
- * for the gap where an invited Operator had no way to see they had been
- * invited to anything short of finding the email.
- */
-function PendingInvitationCard({
-  invitation,
-  busy,
-  onAccept,
-  onDecline,
-}: {
-  invitation: PendingInvitation;
-  busy: boolean;
-  onAccept: () => void;
-  onDecline: () => void;
-}) {
-  return (
-    <Card className="flex flex-col gap-3 border-brand bg-brand-subtle">
-      <div className="flex items-start gap-3">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface text-brand">
-          <Mail width={16} height={16} aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <Text variant="body" className="truncate font-medium">
-            {invitation.workspace_name}
-          </Text>
-          <Text variant="caption" tone="secondary">
-            Invited as {roleLabel[invitation.role] ?? invitation.role}
-          </Text>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" disabled={busy} onClick={onAccept}>
-          <Check width={14} height={14} aria-hidden />
-          Accept
-        </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onDecline}>
-          <X width={14} height={14} aria-hidden />
-          Decline
-        </Button>
       </div>
     </Card>
   );

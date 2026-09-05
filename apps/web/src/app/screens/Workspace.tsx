@@ -1,22 +1,29 @@
 import {
+  acceptInvitation,
+  ApiError,
+  declineInvitation,
   listCapabilities,
+  listMyInvitations,
   listNodes,
   listOperations,
   listProjects,
   type Capability,
   type Node,
   type Operation,
+  type PendingInvitation,
   type Project,
 } from '@slideops/api-client';
 import { Button, StatTile, Text } from '@slideops/design-system';
 import { ArrowRight, capabilityIcon, CheckCircle2, Plus, Server, XCircle } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { activeWorkspace, useWorkspaceStore } from '../../store/workspace';
 import { StatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
+import { PendingInvitationCard } from '../components/PendingInvitationCard';
 import { TierPanel } from '../components/TierPanel';
 import { NodeRow } from './Nodes';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -75,7 +82,51 @@ export function Workspace() {
   const navigate = useNavigate();
   const { state } = useAsyncData((signal) => loadWorkspace(signal), []);
   const workspaces = useWorkspaceStore((store) => store.workspaces);
+  const refreshWorkspaces = useWorkspaceStore((store) => store.refresh);
   const active = activeWorkspace(workspaces);
+
+  // Pending invitations for this account, addressed to it by email regardless
+  // of who sent them or which workspace they are into -- shown right here, on
+  // the screen an Operator actually lands on after signing in, not only on
+  // the separate Workspaces page. An invitation with no way to be noticed is
+  // no different from one that was never sent.
+  const { state: invitationsState, reload: reloadInvitations } = useAsyncData(
+    (signal) => listMyInvitations(signal),
+    [],
+  );
+  const invitations = invitationsState.status === 'ready' ? invitationsState.data : [];
+  const [invitationBusy, setInvitationBusy] = useState('');
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+
+  const acceptPending = async (invitation: PendingInvitation) => {
+    setInvitationBusy(invitation.token);
+    setInvitationError(null);
+    try {
+      await acceptInvitation(invitation.token);
+      await Promise.all([reloadInvitations(), refreshWorkspaces()]);
+    } catch (caught) {
+      setInvitationError(
+        caught instanceof ApiError ? caught.message : 'That invitation could not be accepted.',
+      );
+    } finally {
+      setInvitationBusy('');
+    }
+  };
+
+  const declinePending = async (invitation: PendingInvitation) => {
+    setInvitationBusy(invitation.token);
+    setInvitationError(null);
+    try {
+      await declineInvitation(invitation.token);
+      await reloadInvitations();
+    } catch (caught) {
+      setInvitationError(
+        caught instanceof ApiError ? caught.message : 'That invitation could not be declined.',
+      );
+    } finally {
+      setInvitationBusy('');
+    }
+  };
 
   return (
     <OperatorShell active="home">
@@ -90,6 +141,30 @@ export function Workspace() {
           </Button>
         }
       />
+
+      {invitationError ? (
+        <p role="alert" className="mb-4 text-sm text-danger">
+          {invitationError}
+        </p>
+      ) : null}
+      {invitations.length > 0 ? (
+        <div className="mb-6">
+          <Text variant="h4" className="mb-3">
+            Waiting for you
+          </Text>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {invitations.map((invitation) => (
+              <PendingInvitationCard
+                key={invitation.token}
+                invitation={invitation}
+                busy={invitationBusy === invitation.token}
+                onAccept={() => void acceptPending(invitation)}
+                onDecline={() => void declinePending(invitation)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {state.status === 'loading' ? <Loading label="Loading your Workspace" /> : null}
       {state.status === 'error' ? <ErrorNote error={state.error} /> : null}
