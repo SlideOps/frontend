@@ -406,7 +406,7 @@ export function OperationDetail() {
               <VerificationView verification={operation.verification} />
             ) : null}
 
-            {status === 'completed' ? (
+            {status === 'completed' && !operation.capability_key.startsWith('remove-') ? (
               <CredentialsCard
                 operation={operation}
                 host={nodeHost}
