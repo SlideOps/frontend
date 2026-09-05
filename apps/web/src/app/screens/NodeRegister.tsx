@@ -180,47 +180,46 @@ export function NodeRegister() {
             </div>
           </div>
 
-          <fieldset className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <legend className="text-sm font-medium text-ink">Credential</legend>
-              <Guidance for="node.credentialSource" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input
-                  type="radio"
-                  value="paste"
-                  className="mt-0.5 accent-brand"
-                  {...register('credential_source')}
-                />
-                <span>
-                  <span className="font-medium text-ink">Paste a credential</span>
-                  <span className="mt-0.5 block text-ink-muted">
-                    A private key or a password, stored encrypted.
+          {savedKeys.length > 0 ? (
+            <fieldset className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <legend className="text-sm font-medium text-ink">Credential</legend>
+                <Guidance for="node.credentialSource" />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="paste"
+                    className="mt-0.5 accent-brand"
+                    {...register('credential_source')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Paste a credential</span>
+                    <span className="mt-0.5 block text-ink-muted">
+                      A private key or a password, stored encrypted.
+                    </span>
                   </span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
-                <input
-                  type="radio"
-                  value="saved_key"
-                  className="mt-0.5 accent-brand"
-                  disabled={savedKeys.length === 0}
-                  {...register('credential_source')}
-                />
-                <span>
-                  <span className="font-medium text-ink">Use a saved key</span>
-                  <span className="mt-0.5 block text-ink-muted">
-                    {savedKeys.length === 0
-                      ? 'No keys saved yet.'
-                      : 'Pick a key already in your library.'}
+                </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-sm has-[:checked]:border-brand has-[:checked]:bg-subtle">
+                  <input
+                    type="radio"
+                    value="saved_key"
+                    className="mt-0.5 accent-brand"
+                    {...register('credential_source')}
+                  />
+                  <span>
+                    <span className="font-medium text-ink">Use a saved key</span>
+                    <span className="mt-0.5 block text-ink-muted">
+                      Pick a key already in your library.
+                    </span>
                   </span>
-                </span>
-              </label>
-            </div>
-          </fieldset>
+                </label>
+              </div>
+            </fieldset>
+          ) : null}
 
-          {credentialSource === 'saved_key' ? (
+          {credentialSource === 'saved_key' && savedKeys.length > 0 ? (
             <div className="flex flex-col gap-2">
               <label htmlFor="ssh_key_id" className="text-sm font-medium text-ink">
                 Saved key
