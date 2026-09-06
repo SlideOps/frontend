@@ -332,6 +332,7 @@ export {
   connectCapability,
   getServiceConnections,
   getCapabilityConnections,
+  getDatabaseAccessRules,
   preflightDeploy,
   type Service,
   type ServiceSource,
@@ -361,6 +362,7 @@ export {
   type DeployCapabilitiesInput,
   type ConnectCapabilityInput,
   type ServiceConnection,
+  type DatabaseAccessRule,
   type PreflightCheck,
   type PreflightStatus,
 } from './services';

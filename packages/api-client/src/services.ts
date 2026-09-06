@@ -820,6 +820,38 @@ export function getCapabilityConnections(
   ).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
 }
 
+/**
+ * One rule protecting a database: what is currently allowed to reach it, and
+ * whether SlideOps configured it. Read from SlideOps' own record rather than
+ * derived live over SSH, so it still answers when the Node is briefly
+ * unreachable.
+ */
+export interface DatabaseAccessRule {
+  id: string;
+  source_kind: 'node' | 'cidr';
+  source_node_id?: string;
+  source_cidr: string;
+  topology: 'same_node' | 'cross_node';
+  firewall_backend: string;
+  to_port: number;
+  protocol: string;
+  db_side_change: string;
+  state: 'planned' | 'applied' | 'detected' | 'removed' | 'failed';
+  created_at: string;
+}
+
+/** What currently protects a database Capability on this Node. */
+export function getDatabaseAccessRules(
+  nodeId: string,
+  capabilityKey: string,
+  signal?: AbortSignal,
+): Promise<DatabaseAccessRule[]> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/access-rules`,
+    { signal },
+  ).then((r) => unwrap<DatabaseAccessRule[]>(r, 'rules'));
+}
+
 /** How a single Preflight check came out. */
 export type PreflightStatus = 'pass' | 'warn' | 'fail';
 
