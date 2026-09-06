@@ -208,7 +208,20 @@ export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string 
   return { env };
 }
 
-/** Turn validated form values into the deploy input the backend expects. */
+/**
+ * Turn form values into the deploy input the backend expects.
+ *
+ * Despite the type annotation promising `ServiceFormValues`' numeric fields
+ * are already real numbers, that is only true once react-hook-form's Zod
+ * resolver has actually run - true for the values `handleSubmit` hands its
+ * callback, false for `getValues()`, which reads the raw, unvalidated form
+ * state straight from the HTML inputs (strings) and is what the Preflight
+ * button calls this with. `Number(...)` here makes the output correct either
+ * way, rather than trusting the caller to have gone through validation
+ * first - the backend's `memory_mb`/`cpu_limit` are a strict int/float, and
+ * a string there fails the request outright with a decode error, not a
+ * helpful validation message.
+ */
 export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
   const source =
     values.source_type === 'image'
@@ -224,7 +237,12 @@ export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
 
   const { ports } = parsePorts(values.ports);
   const { env } = parseEnv(values.env);
-  const pids = typeof values.pids_limit === 'number' ? values.pids_limit : undefined;
+  const pids =
+    typeof values.pids_limit === 'number'
+      ? values.pids_limit
+      : values.pids_limit
+        ? Number(values.pids_limit)
+        : undefined;
 
   return {
     project_id: values.project_id,
@@ -232,8 +250,8 @@ export function toDeployInput(values: ServiceFormValues): DeployServiceInput {
     name: values.name,
     runtime: values.runtime,
     source,
-    cpu_limit: values.cpu_limit,
-    memory_mb: values.memory_mb,
+    cpu_limit: Number(values.cpu_limit),
+    memory_mb: Number(values.memory_mb),
     pids_limit: pids,
     env: env.length > 0 ? env : undefined,
     ports: ports.length > 0 ? ports : undefined,
