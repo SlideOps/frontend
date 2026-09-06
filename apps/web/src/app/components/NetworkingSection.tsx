@@ -66,7 +66,7 @@ export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: st
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => navigate(`/capabilities/configure-database-access?node=${encodeURIComponent(nodeId)}`)}
+          onClick={() => navigate(`/app/capabilities/configure-database-access?node=${encodeURIComponent(nodeId)}`)}
         >
           Configure access
         </Button>
