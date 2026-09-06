@@ -60,8 +60,10 @@ export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: st
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Text variant="body-sm" tone="secondary">
-          Every source currently allowed to reach this database, on the firewall and in the
-          database's own access control together.
+          Every server currently allowed to reach this database, on the firewall and in the
+          database's own access control together. Configuring access always describes the{' '}
+          <strong>other</strong> server (the one connecting in) and this database's own port --
+          never this database server's own address.
         </Text>
         <Button
           size="sm"
@@ -80,7 +82,9 @@ export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: st
           <ShieldCheck width={18} height={18} className="text-ink-muted" aria-hidden />
           <Text variant="body-sm" tone="secondary">
             No access rules yet. If this database is only reached from the same Node, none are
-            needed. Reaching it from another Node needs one.
+            needed. Reaching it from another Node needs one -- use Configure Access above, once
+            for each other server that needs to connect. Each run creates its own independent
+            rule, so you can add or remove one server later without affecting any other.
           </Text>
         </div>
       ) : null}
