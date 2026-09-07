@@ -26,6 +26,23 @@ describe('DiscoveryRepairs', () => {
     expect(screen.getByText(/follow in History/i)).toBeInTheDocument();
   });
 
+  it('names the other server when a repair reaches off this Node', () => {
+    // The one repair that changes a server the Operator was not looking at.
+    renderInApp(
+      <DiscoveryRepairs
+        repairs={[
+          repair({
+            problem:
+              'MONGO_URI could not reach 187.7.20.159:27017 on sali-database-server',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(/sali-database-server/)).toBeInTheDocument();
+    expect(screen.getByText(/on the server it changes/i)).toBeInTheDocument();
+  });
+
   it('counts several repairs', () => {
     renderInApp(
       <DiscoveryRepairs

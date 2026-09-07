@@ -10,6 +10,11 @@ import { Wrench } from '@slideops/icons';
  * terminal to fix the routing by hand. Now the looking is followed by fixing,
  * and this is where that is said out loud -- SlideOps acting on its own has to
  * be visible, never silent.
+ *
+ * That matters most for the one repair that reaches off this Node: opening a
+ * database on another server so a Service here can reach it. The Operator was
+ * not looking at that server, so the sentence naming it is the only place they
+ * will learn it changed before they find the Operation in its History.
  */
 export function DiscoveryRepairs({ repairs }: { repairs: DiscoveryRepair[] }) {
   const started = repairs.filter((r) => r.repairing);
@@ -34,8 +39,9 @@ export function DiscoveryRepairs({ repairs }: { repairs: DiscoveryRepair[] }) {
         ))}
       </ul>
       <Text variant="caption" tone="secondary">
-        Each runs as an ordinary Operation you can follow in History. Addresses become
-        reachable a moment after this finishes, not the instant it does.
+        Each runs as an ordinary Operation you can follow in History, on the server it
+        changes. Addresses become reachable a moment after this finishes, not the instant
+        it does.
       </Text>
     </div>
   );
