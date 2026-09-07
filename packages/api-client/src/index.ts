@@ -500,3 +500,15 @@ export {
   type DNSConnectionState,
   type WorkspaceIngressView,
 } from './dns';
+
+export {
+  addServiceDomain,
+  listServiceDomains,
+  listWorkspaceDomains,
+  provisionDomain,
+  removeDomain,
+  verifyDomain,
+  type Domain,
+  type DomainRecord,
+  type DomainState,
+} from './domains';
