@@ -2,10 +2,11 @@ import {
   ApiError,
   redeployService,
   updateServiceConfiguration,
+  updateServiceEnvVar,
   type Service,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { AlertTriangle, RefreshCw, Settings } from '@slideops/icons';
+import { AlertTriangle, Pencil, RefreshCw, Settings } from '@slideops/icons';
 import { useState } from 'react';
 import { useCanWrite } from '../../store/workspace';
 import { RevealValue } from './RevealValue';
@@ -48,6 +49,170 @@ function envToText(service: Service): string {
 }
 
 /**
+ * Rewrite one variable's line in the textarea text, so the full editor and the
+ * per-variable editor never disagree about what is stored.
+ *
+ * Without this, saving one variable inline and then opening the full editor would
+ * show the value from before that save. Because the full editor replaces the
+ * whole set, saving that stale text would quietly undo the inline edit.
+ *
+ * A sealed line is rewritten empty rather than with what was typed: the textarea
+ * form has never held a secret's plaintext and must not start now.
+ */
+function withEnvLine(text: string, key: string, value: string, secret: boolean): string {
+  const replacement = secret ? `${SECRET_PREFIX}${key}=` : `${key}=${value}`;
+  let replaced = false;
+  const lines = text.split('\n').map((line) => {
+    const trimmed = line.trim();
+    const bare = trimmed.toLowerCase().startsWith(SECRET_PREFIX)
+      ? trimmed.slice(SECRET_PREFIX.length).trim()
+      : trimmed;
+    const eq = bare.indexOf('=');
+    if (eq <= 0 || bare.slice(0, eq).trim() !== key) {
+      return line;
+    }
+    replaced = true;
+    return replacement;
+  });
+  return replaced ? lines.join('\n') : [...lines, replacement].filter(Boolean).join('\n');
+}
+
+/**
+ * One variable's row: the value, and for an Operator who may write, an Edit that
+ * turns this row alone into an editor.
+ *
+ * Editing one variable at a time is the safe way to change one variable. The full
+ * editor sends the entire set, so a slip anywhere in that text can remove a
+ * variable the Operator never meant to touch; here the request names one key and
+ * carries one value, and nothing else can be lost by omission.
+ */
+function EnvRow({
+  serviceId,
+  envKey,
+  value,
+  canWrite,
+  onSaved,
+}: {
+  serviceId: string;
+  envKey: string;
+  value: string;
+  canWrite: boolean;
+  onSaved: (key: string, value: string, secret: boolean) => void;
+}) {
+  const sealed = value === SEALED_MARKER;
+  // A sealed value has no plaintext to load, so the box starts empty rather than
+  // seeded with the marker: the marker is not the value, and saving it would
+  // store the words "[stored securely]" as the variable.
+  const [draft, setDraft] = useState(sealed ? '' : value);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const open = () => {
+    setDraft(sealed ? '' : value);
+    setError(null);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setDraft(sealed ? '' : value);
+    setError(null);
+    setEditing(false);
+  };
+
+  const save = async () => {
+    // An empty box on a sealed variable means "leave it alone", which is what the
+    // placeholder promises. Sending the empty string instead would destroy the
+    // secret, and nobody opens an editor in order to blank a password.
+    if (sealed && draft === '') {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await updateServiceEnvVar(serviceId, envKey, draft, sealed);
+      setEditing(false);
+      onSaved(envKey, draft, sealed);
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.message : `${envKey} could not be saved. Try again.`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-2 px-3 py-2 sm:grid-cols-[16rem_1fr] sm:items-center">
+      <dt className="truncate font-mono text-xs text-ink-muted" title={envKey}>
+        {envKey}
+      </dt>
+      <dd className="min-w-0">
+        {editing ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className={`${inputClass} font-mono sm:w-auto sm:min-w-0 sm:flex-1`}
+                spellCheck={false}
+                autoComplete="off"
+                aria-label={`Value for ${envKey}`}
+                placeholder={
+                  sealed
+                    ? 'Leave empty to keep the current value; type a new one to replace it'
+                    : ''
+                }
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+              />
+              <Button size="sm" onClick={save} disabled={saving} aria-label={`Save ${envKey}`}>
+                {saving ? 'Saving' : 'Save'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={cancel}
+                disabled={saving}
+                aria-label={`Cancel editing ${envKey}`}
+              >
+                Cancel
+              </Button>
+            </div>
+            {sealed ? (
+              <Text variant="caption" tone="secondary">
+                Sealed, so there is nothing to show here. Leaving this empty keeps the value it
+                already has; type a new one to replace it.
+              </Text>
+            ) : null}
+            {error ? (
+              <p role="alert" className="text-xs text-danger">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {sealed ? (
+              <Text variant="caption" tone="secondary">
+                Sealed: encrypted and never shown again
+              </Text>
+            ) : (
+              <RevealValue value={value} label={envKey} sensitive />
+            )}
+            {canWrite ? (
+              <Button variant="ghost" size="sm" onClick={open} aria-label={`Edit ${envKey}`}>
+                <Pencil width={14} height={14} aria-hidden />
+                Edit
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/**
  * The current environment, one row per variable, each value masked behind a
  * reveal. An environment holds database passwords and API keys, so it is masked
  * on load rather than printed: an Operator reveals the one they need.
@@ -55,32 +220,34 @@ function envToText(service: Service): string {
  * A sealed value cannot be read back at all, so it says so instead of offering a
  * reveal that could never work.
  */
-function EnvList({ service }: { service: Service }) {
+function EnvList({
+  service,
+  canWrite,
+  onSaved,
+}: {
+  service: Service;
+  canWrite: boolean;
+  onSaved: (key: string, value: string, secret: boolean) => void;
+}) {
   const entries = Object.entries(service.env ?? {});
   if (entries.length === 0) {
     return (
       <Text variant="body-sm" tone="secondary">
-        No environment variables set. Choose Edit to add some.
+        No environment variables set. Choose Edit all to add some.
       </Text>
     );
   }
   return (
     <dl className="divide-y divide-border rounded-md border border-border">
       {entries.map(([key, value]) => (
-        <div key={key} className="grid gap-2 px-3 py-2 sm:grid-cols-[16rem_1fr] sm:items-center">
-          <dt className="truncate font-mono text-xs text-ink-muted" title={key}>
-            {key}
-          </dt>
-          <dd className="min-w-0">
-            {value === SEALED_MARKER ? (
-              <Text variant="caption" tone="secondary">
-                Sealed: encrypted and never shown again
-              </Text>
-            ) : (
-              <RevealValue value={value} label={key} sensitive />
-            )}
-          </dd>
-        </div>
+        <EnvRow
+          key={key}
+          serviceId={service.id}
+          envKey={key}
+          value={value}
+          canWrite={canWrite}
+          onSaved={onSaved}
+        />
       ))}
     </dl>
   );
@@ -130,6 +297,18 @@ export function ServiceConfiguration({
     } finally {
       setSaving(false);
     }
+  };
+
+  /*
+   * A per-variable save lands in the same place a full save does: recorded, and
+   * not yet running. It reuses the one "Saved, but not yet running" notice so an
+   * Operator is told about the pending redeploy in exactly one way, whichever
+   * editor they used.
+   */
+  const onEnvVarSaved = (key: string, value: string, secret: boolean) => {
+    setEnvText((text) => withEnvLine(text, key, value, secret));
+    setSaved(true);
+    onChanged();
   };
 
   const applyNow = async () => {
@@ -191,7 +370,7 @@ export function ServiceConfiguration({
               className="ml-auto"
               onClick={() => setEditing((was) => !was)}
             >
-              {editing ? 'Done editing' : 'Edit'}
+              {editing ? 'Done editing' : 'Edit all'}
             </Button>
           ) : null}
         </div>
@@ -219,7 +398,7 @@ export function ServiceConfiguration({
             </Text>
           </>
         ) : (
-          <EnvList service={service} />
+          <EnvList service={service} canWrite={canWrite} onSaved={onEnvVarSaved} />
         )}
       </div>
 

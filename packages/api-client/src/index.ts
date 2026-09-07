@@ -328,6 +328,7 @@ export {
   exposeService,
   updateServiceResources,
   updateServiceConfiguration,
+  updateServiceEnvVar,
   updateServiceCICD,
   rotateDeployHookToken,
   listServiceDeployEvents,
