@@ -486,3 +486,14 @@ export type {
   DiscoveryResult,
   DiscoveryRepair,
 } from './types';
+
+export {
+  disableWorkspaceNetwork,
+  enableWorkspaceNetwork,
+  getWorkspaceNetwork,
+  joinWorkspaceNetwork,
+  reconcileWorkspaceNetwork,
+  type NetworkMember,
+  type NetworkMemberState,
+  type WorkspaceNetwork,
+} from './network';
