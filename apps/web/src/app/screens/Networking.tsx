@@ -11,12 +11,12 @@ import {
   type WorkspaceNetwork,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { AlertTriangle, Check, Network, RefreshCw } from '@slideops/icons';
+import { AlertTriangle, Check, Globe, Network, RefreshCw } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { activeRole, useWorkspaceStore } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { DomainRouting } from '../components/DomainRouting';
+import { ManageDomainsLink } from '../components/DomainStatus';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -208,10 +208,17 @@ export function Networking() {
         </>
       ) : null}
 
-      {/* How the outside reaches this Workspace, below how its servers reach
-          each other: two different layers, read in that order rather than
-          mixed together. */}
-      <DomainRouting canAdminister={canAdminister} />
+      {/* How the outside reaches this Workspace used to be answered here as
+          well, which split one setup journey across two pages: connecting DNS,
+          choosing the entry point, and adding the domain that needs both are a
+          single sitting. They now live together, and this points there. */}
+      <Section
+        title="How the outside reaches this Workspace"
+        adornment={<Globe width={16} height={16} className="text-brand" aria-hidden />}
+        description="Connecting DNS, choosing what answers for your domains, and every hostname in this Workspace are managed together on one page."
+      >
+        <ManageDomainsLink label="Open Domains and DNS" to="/app/domains" />
+      </Section>
 
       <ConfirmDialog
         open={confirmDisable}
