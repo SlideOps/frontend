@@ -9,6 +9,7 @@ import {
   resolveEndpoint,
   type ResolvedEndpoint,
 } from './connection-endpoint';
+import { CopyButton } from './CopyButton';
 import { RevealValue } from './RevealValue';
 
 /**
@@ -241,7 +242,80 @@ function ConnectionStringBlock({
         {description}
       </Text>
       <ConnectionString template={template} build={build} />
+      <ConnectionFields
+        endpoint={endpoint}
+        host={host}
+        operation={operation}
+        secretKey={secretKey}
+      />
     </div>
+  );
+}
+
+/**
+ * The same endpoint as separate values, each copyable on its own.
+ *
+ * This exists because of a production outage. An application was configured with
+ * the whole connection string where it expected a hostname, and crash-looped on
+ * "getaddrinfo ENOTFOUND postgresql://user:password@host:5432/database": a URI
+ * handed to a name resolver.
+ *
+ * That was not carelessness. Some applications read one DATABASE_URL and some
+ * read DB_HOST and DB_PORT separately, and this card offered exactly one
+ * artifact: a whole URI. An Operator wiring the second kind had nothing else to
+ * copy. Offering both shapes is what makes the right one available rather than
+ * improvised, and it is why they sit together rather than on separate screens.
+ */
+function ConnectionFields({
+  endpoint,
+  host,
+  operation,
+  secretKey,
+}: {
+  endpoint: ResolvedEndpoint;
+  host: string;
+  operation: Operation;
+  secretKey: string;
+}) {
+  const fields: { label: string; value: string }[] = [
+    { label: 'Host', value: host },
+    { label: 'Port', value: String(endpoint.port) },
+  ];
+  if (endpoint.username) {
+    fields.push({ label: 'Username', value: endpoint.username });
+  }
+  if (endpoint.database) {
+    fields.push({ label: 'Database', value: endpoint.database });
+  }
+
+  return (
+    <details className="rounded-md border border-border bg-subtle px-3 py-2">
+      <summary className="cursor-pointer text-sm text-ink">Or copy the parts separately</summary>
+      <Text variant="caption" tone="secondary" className="mt-2 block">
+        Use these when your application reads its settings as separate variables, such as{' '}
+        <code>DB_HOST</code> and <code>DB_PORT</code>. Putting the whole connection string into a
+        host setting is a common mistake and fails with a name lookup error, because the host
+        setting expects an address and nothing else.
+      </Text>
+      <dl className="mt-3 flex flex-col gap-2">
+        {fields.map((field) => (
+          <div key={field.label} className="flex items-center gap-2">
+            <dt className="w-24 shrink-0 text-sm text-ink-muted">{field.label}</dt>
+            <dd className="min-w-0 flex-1 truncate font-mono text-sm text-ink">{field.value}</dd>
+            <CopyButton value={field.value} label={`Copy the ${field.label.toLowerCase()}`} />
+          </div>
+        ))}
+        <div className="flex items-center gap-2">
+          <dt className="w-24 shrink-0 text-sm text-ink-muted">Password</dt>
+          <dd className="min-w-0 flex-1">
+            <RevealValue
+              label="the password"
+              onReveal={() => revealOperationSecret(operation.id, secretKey).then((r) => r.value)}
+            />
+          </dd>
+        </div>
+      </dl>
+    </details>
   );
 }
 
