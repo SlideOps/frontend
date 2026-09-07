@@ -509,3 +509,15 @@ export {
   type DomainRecord,
   type DomainState,
 } from './domains';
+
+export {
+  chooseWorkspaceIngress,
+  connectDNS,
+  disableWorkspaceIngress,
+  disconnectDNS,
+  getWorkspaceIngress,
+  listDNSConnections,
+  type DNSConnection,
+  type DNSConnectionState,
+  type WorkspaceIngressView,
+} from './dns';
