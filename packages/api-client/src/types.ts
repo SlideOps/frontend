@@ -115,7 +115,18 @@ export type CapabilityParameterType =
   /** A fixed set of values the Operator picks one of, listed on the
    *  parameter's own options, in display order. Unlike version, these do
    *  not depend on the Node. */
-  | 'choice';
+  | 'choice'
+  /**
+   * An address that usually belongs to another server in this Workspace,
+   * offered as a list of them rather than typed out.
+   *
+   * The value is still a plain address or CIDR, exactly as a string would be,
+   * so nothing that consumes it changes. It only means the Operator should be
+   * able to pick "my application server" instead of remembering which of their
+   * servers 187.7.20.156 is. A machine outside the Workspace is still entered
+   * by hand: SlideOps has never seen it and cannot offer what it does not know.
+   */
+  | 'node_address';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the

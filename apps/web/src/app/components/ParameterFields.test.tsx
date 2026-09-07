@@ -1,7 +1,7 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi, describe, expect, it, beforeEach } from 'vitest';
-import type { AvailableVersions, CapabilityParameter } from '@slideops/api-client';
+import type { AvailableVersions, CapabilityParameter, Node } from '@slideops/api-client';
 import { useForm } from 'react-hook-form';
 import { renderInApp } from '../../test/render';
 
@@ -18,16 +18,19 @@ const getAvailableVersions = vi.fn(async (..._a: unknown[]): Promise<AvailableVe
   versions: ['15', '16', '17'],
   latest: '17',
 }));
+const listNodes = vi.fn(async (..._a: unknown[]): Promise<Node[]> => []);
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getAvailableVersions: (...a: unknown[]) => getAvailableVersions(...a),
+  listNodes: (...a: unknown[]) => listNodes(...a),
 }));
 
 beforeEach(() => {
   getAvailableVersions
     .mockReset()
     .mockResolvedValue({ supported: true, versions: ['15', '16', '17'], latest: '17' });
+  listNodes.mockReset().mockResolvedValue([]);
 });
 
 const { ParameterFields } = await import('./ParameterFields');
@@ -77,6 +80,26 @@ function choiceParam(overrides: Partial<CapabilityParameter> = {}): CapabilityPa
     options: ['password', 'private_key'],
     ...overrides,
   };
+}
+
+/** A Node as the picker reads it: a name an Operator gave it, and an address. */
+function node(over: Partial<Node>): Node {
+  return {
+    id: 'n-1',
+    name: 'Server',
+    hostname: '',
+    address: '203.0.113.1',
+    port: 22,
+    ssh_username: 'root',
+    auth_kind: 'password',
+    ssh_key_id: null,
+    project_id: null,
+    ...over,
+  } as Node;
+}
+
+function renderFields(parameters: CapabilityParameter[], opts: { nodeId?: string } = {}) {
+  return renderInApp(<Harness parameters={parameters} nodeId={opts.nodeId} />);
 }
 
 describe('ParameterFields, a choice parameter', () => {
@@ -226,5 +249,58 @@ describe('ParameterFields, Basic vs Advanced', () => {
     // so marking one parameter notable does not silently open every other one.
     expect(screen.queryByLabelText(/^Max memory/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show (1)' })).toBeInTheDocument();
+  });
+});
+
+describe('a node_address parameter', () => {
+  const sourceParam = {
+    key: 'source',
+    label: 'Allow from (the OTHER server)',
+    type: 'node_address' as const,
+    required: true,
+    help: 'The other server that needs to reach this database.',
+    placeholder: '203.0.113.4',
+  };
+
+  it('offers the workspace servers by name, so no address has to be remembered', async () => {
+    listNodes.mockResolvedValue([
+      node({ id: 'app', name: 'App-server-1', address: '187.7.20.156' }),
+      node({ id: 'db', name: 'sali-database-server', address: '187.7.20.159' }),
+    ]);
+
+    renderFields([sourceParam], { nodeId: 'db' });
+
+    // The list arrives from the server, so the plain field shows first, the
+    // same way a version parameter's does while its own read is in flight.
+    expect(
+      await screen.findByRole('option', { name: /App-server-1 \(187\.7\.20\.156\)/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Allow from/).tagName).toBe('SELECT');
+    // Allowing a database in from itself is never the answer to "which other
+    // server needs to reach this".
+    expect(screen.queryByRole('option', { name: /sali-database-server/ })).not.toBeInTheDocument();
+  });
+
+  it('lets an address be typed for a server outside the workspace', async () => {
+    listNodes.mockResolvedValue([node({ id: 'app', name: 'App-server-1', address: '187.7.20.156' })]);
+
+    renderFields([sourceParam], { nodeId: 'db' });
+    await screen.findByRole('option', { name: /App-server-1/ });
+
+    await userEvent.click(screen.getByRole('button', { name: /enter an address instead/i }));
+
+    const input = screen.getByLabelText(/^Allow from/);
+    expect(input.tagName).toBe('INPUT');
+    await userEvent.type(input, '203.0.113.4');
+    expect(input).toHaveValue('203.0.113.4');
+  });
+
+  it('falls back to a plain field when there are no other servers to offer', async () => {
+    listNodes.mockResolvedValue([node({ id: 'db', name: 'sali-database-server', address: '187.7.20.159' })]);
+
+    renderFields([sourceParam], { nodeId: 'db' });
+
+    await waitFor(() => expect(listNodes).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByLabelText(/^Allow from/).tagName).toBe('INPUT'));
   });
 });

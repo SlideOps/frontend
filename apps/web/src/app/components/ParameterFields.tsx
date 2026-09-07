@@ -1,4 +1,4 @@
-import { getAvailableVersions, type CapabilityParameter } from '@slideops/api-client';
+import { getAvailableVersions, listNodes, type CapabilityParameter } from '@slideops/api-client';
 import { CircleHelp } from '@slideops/icons';
 import { Tooltip } from '@slideops/tooltips';
 import { useState } from 'react';
@@ -112,6 +112,115 @@ export interface ParameterFieldsProps {
   capabilityKey?: string;
 }
 
+/**
+ * A `type: 'node_address'` parameter's control: the Workspace's own servers in
+ * a list, plus a way to type an address for one that is not in it.
+ *
+ * Wiring an application on one server to a database on another meant knowing
+ * which of your servers 187.7.20.156 was, and typing it correctly, in a field
+ * whose only feedback for getting it wrong was a connection that timed out
+ * later. Every one of those addresses is already known here, so this offers
+ * them by the names their Operator gave them.
+ *
+ * The free-text escape is not a fallback for when the list fails to load, it is
+ * a real case: a server outside this Workspace, or a network rather than one
+ * machine, is something SlideOps has never seen and cannot offer. Choosing it
+ * gives back exactly the field that was here before.
+ *
+ * The Node this Capability is running on is left out of the list. Allowing a
+ * database in from itself is never the answer to "which other server needs to
+ * reach this", and offering it invites the mistake.
+ */
+function NodeAddressField({
+  fieldId,
+  nodeId,
+  placeholder,
+  className,
+  register,
+  registerKey,
+}: {
+  fieldId: string;
+  nodeId: string | undefined;
+  placeholder: string | undefined;
+  className: string;
+  register: UseFormRegister<Record<string, unknown>>;
+  registerKey: string;
+}) {
+  const result = useAsyncData((signal) => listNodes(signal), []);
+  const nodes =
+    result.state.status === 'ready'
+      ? result.state.data.filter((n) => n.id !== nodeId && n.address)
+      : [];
+
+  // The list is always the starting point: this renders into a fresh form, and
+  // picking a server is the case this exists for. Switching is local state.
+  const [manual, setManual] = useState(false);
+  const field = register(registerKey);
+
+  if (nodes.length === 0) {
+    return (
+      <input
+        id={fieldId}
+        type="text"
+        className={className}
+        placeholder={placeholder}
+        {...register(registerKey)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {manual ? (
+        <input
+          id={fieldId}
+          type="text"
+          className={className}
+          placeholder={placeholder}
+          {...field}
+        />
+      ) : (
+        <select
+          id={fieldId}
+          className={className}
+          {...field}
+          onChange={(event) => {
+            // The escape hatch is a choice in the same list, so reaching it is
+            // one interaction rather than a control the Operator has to notice
+            // first. It is never submitted as a value.
+            if (event.target.value === MANUAL_ADDRESS) {
+              setManual(true);
+              return;
+            }
+            void field.onChange(event);
+          }}
+        >
+          <option value="">Choose a server</option>
+          {nodes.map((n) => (
+            <option key={n.id} value={n.address}>
+              {n.name} ({n.address})
+            </option>
+          ))}
+          <option value={MANUAL_ADDRESS}>Another server or network...</option>
+        </select>
+      )}
+      <button
+        type="button"
+        className="self-start text-xs text-ink-muted underline hover:text-accent"
+        onClick={() => setManual((was) => !was)}
+      >
+        {manual ? 'Pick one of my servers instead' : 'Enter an address instead'}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The select value that means "not one of my servers". It can never collide
+ * with a real address, which is the only property it needs.
+ */
+const MANUAL_ADDRESS = '__manual__';
+
 /** One parameter's control, shared by both the always-visible and Advanced groups below. */
 function ParameterField({
   param,
@@ -174,6 +283,15 @@ function ParameterField({
                 </option>
               ))}
             </select>
+          ) : param.type === 'node_address' ? (
+            <NodeAddressField
+              fieldId={fieldId}
+              nodeId={nodeId}
+              placeholder={param.placeholder}
+              className={inputClass}
+              register={register}
+              registerKey={param.key}
+            />
           ) : param.type === 'version' && capabilityKey ? (
             <VersionField
               fieldId={fieldId}
