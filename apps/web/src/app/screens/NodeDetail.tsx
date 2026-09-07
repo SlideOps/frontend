@@ -24,6 +24,7 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { DetailLayout, PageHeader, TabNav, type TabNavTab } from '@slideops/ui';
+import { DiscoveryRepairs } from '../components/DiscoveryRepairs';
 import { RunningHere } from '../components/RunningHere';
 import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
@@ -363,6 +364,9 @@ export function NodeDetail() {
                         Run Discovery to read this Node over SSH. It gathers Facts and an
                         Assessment, and never changes anything.
                       </Text>
+                    ) : null}
+                    {discovery?.repairs?.length ? (
+                      <DiscoveryRepairs repairs={discovery.repairs} />
                     ) : null}
                     {discovery ? <DiscoveryScan result={discovery} /> : null}
                   </Section>
