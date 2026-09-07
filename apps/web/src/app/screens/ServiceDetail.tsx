@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Database,
   FileText,
+  Globe,
   GitBranch,
   Play,
   RefreshCw,
@@ -56,6 +57,7 @@ import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { EnvDiffPanel } from '../components/EnvDiffPanel';
+import { ServiceDomains } from '../components/ServiceDomains';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceConnectionsPanel } from '../components/ServiceConnectionsPanel';
 import { ServiceCICDPanel } from '../components/ServiceCICDPanel';
@@ -135,7 +137,9 @@ function CapabilityStatusIcon({ status }: { status: string }) {
   if (status === 'failed') {
     return <XCircle width={15} height={15} className="shrink-0 text-danger" aria-hidden />;
   }
-  return <RefreshCw width={15} height={15} className="shrink-0 animate-spin text-brand" aria-hidden />;
+  return (
+    <RefreshCw width={15} height={15} className="shrink-0 animate-spin text-brand" aria-hidden />
+  );
 }
 
 /**
@@ -213,7 +217,12 @@ function AddCapabilityForm({
         </select>
       </div>
       {chosen ? (
-        <CapabilityParamsBlock key={chosen.key} capability={chosen} nodeId={nodeId} ref={paramsRef} />
+        <CapabilityParamsBlock
+          key={chosen.key}
+          capability={chosen}
+          nodeId={nodeId}
+          ref={paramsRef}
+        />
       ) : null}
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={submit} disabled={submitting}>
@@ -240,7 +249,9 @@ function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged:
   const { state: catalogState } = useAsyncData(async (signal) => {
     const all = await listCapabilities({}, signal);
     const byKey = new Map(all.map((c) => [c.key, c]));
-    return SUPPORTED_CAPABILITY_KEYS.map((k) => byKey.get(k)).filter((c): c is Capability => Boolean(c));
+    return SUPPORTED_CAPABILITY_KEYS.map((k) => byKey.get(k)).filter((c): c is Capability =>
+      Boolean(c),
+    );
   }, []);
   const catalog = catalogState.status === 'ready' ? catalogState.data : [];
   const tracked = service.capabilities ?? [];
@@ -255,7 +266,9 @@ function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged:
       await addServiceCapability(service.id, { capability_key: capabilityKey });
       onChanged();
     } catch (cause) {
-      setRetryError(cause instanceof ApiError ? cause.message : 'The capability could not be retried.');
+      setRetryError(
+        cause instanceof ApiError ? cause.message : 'The capability could not be retried.',
+      );
     } finally {
       setRetrying(null);
     }
@@ -367,6 +380,7 @@ const SERVICE_TABS: TabNavTab[] = [
   { key: 'browse', label: 'Browse', icon: Database },
   { key: 'shell', label: 'Shell', icon: TerminalIcon },
   { key: 'logs', label: 'Logs', icon: FileText },
+  { key: 'domains', label: 'Domains', icon: Globe },
   { key: 'cicd', label: 'CI/CD', icon: GitBranch },
   { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -547,8 +561,8 @@ export function ServiceDetail() {
               main={
                 isCapabilityService ? (
                   <Text variant="body-sm" tone="secondary">
-                    This service has no address or live usage of its own: each Capability
-                    listed in the rail is its own managed engine, reachable through Browse.
+                    This service has no address or live usage of its own: each Capability listed in
+                    the rail is its own managed engine, reachable through Browse.
                   </Text>
                 ) : (
                   <>
@@ -855,7 +869,11 @@ export function ServiceDetail() {
           ) : null}
 
           {activeTab === 'stack' ? (
-            <ProjectStack projectId={service.project_id} nodeId={service.node_id} serviceId={service.id} />
+            <ProjectStack
+              projectId={service.project_id}
+              nodeId={service.node_id}
+              serviceId={service.id}
+            />
           ) : null}
 
           {activeTab === 'browse' ? (
@@ -897,6 +915,10 @@ export function ServiceDetail() {
 
           {activeTab === 'cicd' && !isCapabilityService ? (
             <ServiceCICDPanel service={service} onChanged={reload} />
+          ) : null}
+
+          {activeTab === 'domains' && !isCapabilityService ? (
+            <ServiceDomains service={service} />
           ) : null}
 
           {activeTab === 'settings' ? (

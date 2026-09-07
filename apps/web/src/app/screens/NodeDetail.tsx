@@ -48,6 +48,7 @@ import { CredentialRotation } from '../components/CredentialRotation';
 import { DiscoveryScan } from '../components/DiscoveryScan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { NodeCapacity } from '../components/NodeCapacity';
+import { NodeRoutes } from '../components/NodeRoutes';
 import { NodeHealth } from '../components/NodeHealth';
 import { NodeTransferControl } from '../components/NodeTransferControl';
 import { OperatorShell } from '../components/OperatorShell';
@@ -350,6 +351,12 @@ export function NodeDetail() {
                   <ServerReadiness nodeId={id} />
 
                   <NodeHealth nodeId={id} />
+
+                  {/* What this server is actually routing, against what SlideOps
+                      put on it. Beside health rather than under Discovery: it is
+                      a standing question about the server, not something a scan
+                      produces. */}
+                  <NodeRoutes nodeId={id} />
 
                   <Section title="Discovery" adornment={<Guidance for="node.discover" />}>
                     {discovering ? <Loading label="Reading the Node, read only" /> : null}
