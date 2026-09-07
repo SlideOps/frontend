@@ -42,9 +42,7 @@ const NodeRegister = lazy(() =>
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
 );
-const SSHKeys = lazy(() =>
-  import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
-);
+const SSHKeys = lazy(() => import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })));
 const Snippets = lazy(() =>
   import('./app/screens/Snippets').then((m) => ({ default: m.Snippets })),
 );
@@ -115,6 +113,9 @@ const TransactionDetail = lazy(() =>
   import('./app/screens/TransactionDetail').then((m) => ({ default: m.TransactionDetail })),
 );
 const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
+const Networking = lazy(() =>
+  import('./app/screens/Networking').then((m) => ({ default: m.Networking })),
+);
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -243,6 +244,7 @@ export function App() {
           <Route path="billing/transactions/:reference" element={<TransactionDetail />} />
           <Route path="security" element={<Security />} />
           <Route path="team" element={<Team />} />
+          <Route path="networking" element={<Networking />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}
