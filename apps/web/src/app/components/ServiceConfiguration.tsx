@@ -4,10 +4,11 @@ import {
   updateServiceConfiguration,
   updateServiceEnvVar,
   type Service,
+  type ServiceEnvVarEdit,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
 import { AlertTriangle, Pencil, RefreshCw, Settings } from '@slideops/icons';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useCanWrite } from '../../store/workspace';
 import { RevealValue } from './RevealValue';
 import { parseEnv, SECRET_PREFIX } from '../service-schema';
@@ -17,6 +18,16 @@ import { parseEnv, SECRET_PREFIX } from '../service-schema';
  * secret store, so this marker is all a read ever sees.
  */
 const SEALED_MARKER = '[stored securely]';
+
+/*
+ * Backend failures this editor answers by code rather than by reading the
+ * message. The wording of a message is the backend's to change; the code is the
+ * contract, and matching on prose breaks silently the day it is reworded.
+ */
+const CODE_INVALID_NAME = 'invalid_env_key';
+const CODE_NAME_EXISTS = 'env_key_exists';
+const CODE_NAME_NOT_FOUND = 'env_key_not_found';
+const CODE_CONFIG_CHANGED = 'config_changed';
 
 /*
  * Editing a deployed Service's command and environment.
@@ -49,95 +60,145 @@ function envToText(service: Service): string {
 }
 
 /**
- * Rewrite one variable's line in the textarea text, so the full editor and the
- * per-variable editor never disagree about what is stored.
+ * What is wrong with a variable name, or null when nothing is.
  *
- * Without this, saving one variable inline and then opening the full editor would
- * show the value from before that save. Because the full editor replaces the
- * whole set, saving that stale text would quietly undo the inline edit.
- *
- * A sealed line is rewritten empty rather than with what was typed: the textarea
- * form has never held a secret's plaintext and must not start now.
+ * This mirrors the backend rule exactly and deliberately stops there. The
+ * conventional `[A-Za-z_][A-Za-z0-9_]*` would be narrower, and a name is read by
+ * the Operator's own application, not by us: refusing one their program actually
+ * looks up would break a working deployment to enforce a convention we do not
+ * own. So refuse only what cannot survive in an environment at all, and let the
+ * backend stay the authority on the rest.
  */
-function withEnvLine(text: string, key: string, value: string, secret: boolean): string {
-  const replacement = secret ? `${SECRET_PREFIX}${key}=` : `${key}=${value}`;
-  let replaced = false;
-  const lines = text.split('\n').map((line) => {
-    const trimmed = line.trim();
-    const bare = trimmed.toLowerCase().startsWith(SECRET_PREFIX)
-      ? trimmed.slice(SECRET_PREFIX.length).trim()
-      : trimmed;
-    const eq = bare.indexOf('=');
-    if (eq <= 0 || bare.slice(0, eq).trim() !== key) {
-      return line;
-    }
-    replaced = true;
-    return replacement;
-  });
-  return replaced ? lines.join('\n') : [...lines, replacement].filter(Boolean).join('\n');
+function nameProblem(name: string): string | null {
+  if (name === '') {
+    return 'Give the variable a name.';
+  }
+  if (name.includes('=')) {
+    return 'A variable name cannot contain an equals sign.';
+  }
+  if (/\s/.test(name)) {
+    return 'A variable name cannot contain spaces or line breaks.';
+  }
+  return null;
 }
 
 /**
  * One variable's row: the value, and for an Operator who may write, an Edit that
- * turns this row alone into an editor.
+ * turns this row alone into an editor for its name and its value.
  *
  * Editing one variable at a time is the safe way to change one variable. The full
  * editor sends the entire set, so a slip anywhere in that text can remove a
  * variable the Operator never meant to touch; here the request names one key and
- * carries one value, and nothing else can be lost by omission.
+ * carries one variable, and nothing else can be lost by omission.
  */
 function EnvRow({
   serviceId,
   envKey,
   value,
   canWrite,
+  configChangedAt,
   onSaved,
 }: {
   serviceId: string;
   envKey: string;
   value: string;
   canWrite: boolean;
-  onSaved: (key: string, value: string, secret: boolean) => void;
+  /** The Service's `config_changed_at` as this row currently reads it. */
+  configChangedAt?: string;
+  onSaved: (updated: Service, from: string, to: string) => void;
 }) {
   const sealed = value === SEALED_MARKER;
+  const [name, setName] = useState(envKey);
   // A sealed value has no plaintext to load, so the box starts empty rather than
   // seeded with the marker: the marker is not the value, and saving it would
   // store the words "[stored securely]" as the variable.
   const [draft, setDraft] = useState(sealed ? '' : value);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  // The configuration as it read the moment this editor opened. It rides along on
+  // the save so one built on a view that has since moved is refused, not applied.
+  const openedAgainst = useRef<string | undefined>(undefined);
+  const fieldId = useId();
+
+  const nextName = name.trim();
+  const renaming = nextName !== '' && nextName !== envKey;
+
+  const reset = () => {
+    setName(envKey);
+    setDraft(sealed ? '' : value);
+    setNameError(null);
+    setError(null);
+    setStale(false);
+  };
 
   const open = () => {
-    setDraft(sealed ? '' : value);
-    setError(null);
+    reset();
+    openedAgainst.current = configChangedAt;
     setEditing(true);
   };
 
   const cancel = () => {
-    setDraft(sealed ? '' : value);
-    setError(null);
+    reset();
     setEditing(false);
   };
 
   const save = async () => {
-    // An empty box on a sealed variable means "leave it alone", which is what the
-    // placeholder promises. Sending the empty string instead would destroy the
-    // secret, and nobody opens an editor in order to blank a password.
-    if (sealed && draft === '') {
+    const problem = nameProblem(nextName);
+    if (problem) {
+      setNameError(problem);
+      setError(null);
+      return;
+    }
+
+    // An empty box on a sealed variable means "leave the value alone", which is
+    // what the placeholder promises. Sending the empty string instead would
+    // destroy the secret, and nobody opens an editor in order to blank a
+    // password. Renaming still has to reach the backend, so it says so with
+    // keep_value rather than by sending a value it cannot know.
+    const keepValue = sealed && draft === '';
+    if (keepValue && !renaming) {
       setEditing(false);
       return;
     }
+
+    const edit: ServiceEnvVarEdit = {
+      // Sent only when it actually differs, so the request states an intent to
+      // rename rather than leaving the backend to compare two strings.
+      ...(renaming ? { name: nextName } : {}),
+      // Never the marker and never a sealed plaintext: when the value is being
+      // kept, the backend ignores this field and the wire carries nothing to leak.
+      value: keepValue ? '' : draft,
+      secret: sealed,
+      ...(keepValue ? { keep_value: true } : {}),
+      // Absent on a Service whose configuration has never been edited, and there
+      // is no timestamp to echo in that case.
+      ...(openedAgainst.current ? { if_unchanged_since: openedAgainst.current } : {}),
+    };
+
     setSaving(true);
+    setNameError(null);
     setError(null);
+    setStale(false);
     try {
-      await updateServiceEnvVar(serviceId, envKey, draft, sealed);
+      const updated = await updateServiceEnvVar(serviceId, envKey, edit);
       setEditing(false);
-      onSaved(envKey, draft, sealed);
+      onSaved(updated, envKey, nextName);
     } catch (caught) {
-      setError(
-        caught instanceof ApiError ? caught.message : `${envKey} could not be saved. Try again.`,
-      );
+      if (caught instanceof ApiError) {
+        if (caught.code === CODE_INVALID_NAME || caught.code === CODE_NAME_EXISTS) {
+          setNameError(caught.message);
+        } else if (caught.code === CODE_CONFIG_CHANGED || caught.code === CODE_NAME_NOT_FOUND) {
+          setStale(true);
+          setError(caught.message);
+        } else {
+          setError(caught.message);
+        }
+      } else {
+        setError(`${envKey} could not be saved. Try again.`);
+      }
     } finally {
       setSaving(false);
     }
@@ -150,23 +211,93 @@ function EnvRow({
       </dt>
       <dd className="min-w-0">
         {editing ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3 rounded-md border border-border bg-subtle p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={`${fieldId}-name`} className="text-xs font-medium text-ink">
+                  Variable name
+                </label>
+                <input
+                  id={`${fieldId}-name`}
+                  className={`${inputClass} font-mono`}
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-invalid={nameError ? true : undefined}
+                  aria-describedby={nameError ? `${fieldId}-name-error` : undefined}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+                {nameError ? (
+                  <p id={`${fieldId}-name-error`} role="alert" className="text-xs text-danger">
+                    {nameError}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={`${fieldId}-value`} className="text-xs font-medium text-ink">
+                  Variable value
+                </label>
+                <input
+                  id={`${fieldId}-value`}
+                  className={`${inputClass} font-mono`}
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder={
+                    sealed
+                      ? 'Leave empty to keep the current value; type a new one to replace it'
+                      : ''
+                  }
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                />
+              </div>
+            </div>
+
+            {sealed ? (
+              <Text variant="body-sm" tone="secondary">
+                Sealed, so there is nothing to show here. Leaving this empty keeps the value it
+                already has; type a new one to replace it.
+              </Text>
+            ) : null}
+
+            {renaming ? (
+              <div className="flex items-start gap-2 rounded-md border border-warning bg-surface px-3 py-2">
+                <AlertTriangle
+                  width={14}
+                  height={14}
+                  className="mt-0.5 shrink-0 text-warning"
+                  aria-hidden
+                />
+                <Text variant="body-sm" tone="secondary" className="min-w-0">
+                  You are renaming {envKey} to {nextName}. Anything that still expects {envKey} will
+                  no longer receive it.
+                  {sealed && draft === ''
+                    ? ' The sealed value moves across untouched: it is never read back to be renamed.'
+                    : ''}
+                </Text>
+              </div>
+            ) : null}
+
+            {error ? (
+              <p role="alert" className="text-xs text-danger">
+                {error}
+              </p>
+            ) : null}
+            {stale ? (
+              <Text variant="body-sm" tone="secondary">
+                This editor is showing an environment that has since changed. Reload the page to
+                read the current one, then make this change again.
+              </Text>
+            ) : null}
+
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                className={`${inputClass} font-mono sm:w-auto sm:min-w-0 sm:flex-1`}
-                spellCheck={false}
-                autoComplete="off"
-                aria-label={`Value for ${envKey}`}
-                placeholder={
-                  sealed
-                    ? 'Leave empty to keep the current value; type a new one to replace it'
-                    : ''
-                }
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-              />
-              <Button size="sm" onClick={save} disabled={saving} aria-label={`Save ${envKey}`}>
-                {saving ? 'Saving' : 'Save'}
+              <Button
+                size="sm"
+                onClick={save}
+                disabled={saving}
+                aria-label={`Save changes to ${envKey}`}
+              >
+                {saving ? 'Saving' : 'Save changes'}
               </Button>
               <Button
                 variant="ghost"
@@ -178,17 +309,6 @@ function EnvRow({
                 Cancel
               </Button>
             </div>
-            {sealed ? (
-              <Text variant="caption" tone="secondary">
-                Sealed, so there is nothing to show here. Leaving this empty keeps the value it
-                already has; type a new one to replace it.
-              </Text>
-            ) : null}
-            {error ? (
-              <p role="alert" className="text-xs text-danger">
-                {error}
-              </p>
-            ) : null}
           </div>
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -227,7 +347,7 @@ function EnvList({
 }: {
   service: Service;
   canWrite: boolean;
-  onSaved: (key: string, value: string, secret: boolean) => void;
+  onSaved: (updated: Service, from: string, to: string) => void;
 }) {
   const entries = Object.entries(service.env ?? {});
   if (entries.length === 0) {
@@ -246,6 +366,7 @@ function EnvList({
           envKey={key}
           value={value}
           canWrite={canWrite}
+          configChangedAt={service.config_changed_at}
           onSaved={onSaved}
         />
       ))}
@@ -262,21 +383,39 @@ export function ServiceConfiguration({
   onChanged: () => void;
 }) {
   const canWrite = useCanWrite();
+  /*
+   * The Service as this screen last read it, from the prop or from the answer to
+   * a save. Every save returns the whole Service, so the rows, the variable count,
+   * and the full editor all read from that one answer rather than from a guess
+   * about what the save did. A rename in particular cannot be guessed at: it moves
+   * a row, and an optimistic patch would leave the old name on screen.
+   */
+  const [snapshot, setSnapshot] = useState(service);
+  const [propSeen, setPropSeen] = useState(service);
   const [command, setCommand] = useState(service.source.command ?? '');
   const [envText, setEnvText] = useState(() => envToText(service));
-  // Values are masked by default. An environment is where the database password
-  // and the API keys live, so showing it in plain text on load is wrong: it is
-  // readable over a shoulder, in a screen share, and in a screenshot. The
-  // Operator reveals what they need, one value at a time.
+  // Which Service the textarea text was built from, so reopening the full editor
+  // reseeds it only when the environment underneath has actually moved. Reseeding
+  // unconditionally would throw away text the Operator was still working on.
+  const seededFrom = useRef(service);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [redeploying, setRedeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [envNotice, setEnvNotice] = useState<string | null>(null);
 
-  const isAdopted = service.adopted === true;
+  // A reload from the screen above replaces what we know. The command text and the
+  // textarea are deliberately left alone: they may hold work in progress, and a
+  // reload triggered by an unrelated save must not discard it.
+  if (propSeen !== service) {
+    setPropSeen(service);
+    setSnapshot(service);
+  }
+
+  const isAdopted = snapshot.adopted === true;
   // An edit later than the last deploy has not reached the running container.
-  const needsRedeploy = Boolean(service.config_changed_at) || saved;
+  const needsRedeploy = Boolean(snapshot.config_changed_at) || saved;
 
   const save = async () => {
     const parsed = parseEnv(envText);
@@ -287,7 +426,11 @@ export function ServiceConfiguration({
     setSaving(true);
     setError(null);
     try {
-      await updateServiceConfiguration(service.id, { command, env: parsed.env });
+      const updated = await updateServiceConfiguration(snapshot.id, {
+        command,
+        env: parsed.env,
+      });
+      setSnapshot(updated);
       setSaved(true);
       onChanged();
     } catch (caught) {
@@ -303,19 +446,29 @@ export function ServiceConfiguration({
    * A per-variable save lands in the same place a full save does: recorded, and
    * not yet running. It reuses the one "Saved, but not yet running" notice so an
    * Operator is told about the pending redeploy in exactly one way, whichever
-   * editor they used.
+   * editor they used, and adds a line saying which of the two things happened,
+   * because a rename and a value change are not the same event to be told about.
    */
-  const onEnvVarSaved = (key: string, value: string, secret: boolean) => {
-    setEnvText((text) => withEnvLine(text, key, value, secret));
+  const onEnvVarSaved = (updated: Service, from: string, to: string) => {
+    setSnapshot(updated);
+    setEnvNotice(from === to ? `Updated ${from}.` : `Renamed ${from} to ${to}.`);
     setSaved(true);
     onChanged();
+  };
+
+  const toggleFullEditor = () => {
+    if (!editing && seededFrom.current !== snapshot) {
+      setEnvText(envToText(snapshot));
+      seededFrom.current = snapshot;
+    }
+    setEditing((was) => !was);
   };
 
   const applyNow = async () => {
     setRedeploying(true);
     setError(null);
     try {
-      await redeployService(service.id);
+      await redeployService(snapshot.id);
       onChanged();
     } catch (caught) {
       setError(
@@ -334,7 +487,7 @@ export function ServiceConfiguration({
       adornment={<Settings width={16} height={16} className="text-brand" aria-hidden />}
       description="Change what this Service runs and the variables it runs with. Saving records the change; because a container bakes these in when it is created, a redeploy is what applies it."
       collapsible
-      summary={`${Object.keys(service.env ?? {}).length} variables`}
+      summary={`${Object.keys(snapshot.env ?? {}).length} variables`}
     >
       <div className="flex flex-col gap-2">
         <label htmlFor="svc-command" className="text-sm font-medium text-ink">
@@ -344,14 +497,14 @@ export function ServiceConfiguration({
           id="svc-command"
           className={`${inputClass} font-mono`}
           placeholder={
-            service.runtime === 'systemd'
+            snapshot.runtime === 'systemd'
               ? '/usr/local/bin/app --serve'
               : 'Leave empty for the image default'
           }
           value={command}
           onChange={(event) => setCommand(event.target.value)}
         />
-        {service.runtime === 'systemd' ? (
+        {snapshot.runtime === 'systemd' ? (
           <Text variant="caption" tone="secondary">
             A systemd Service is its command, so this cannot be empty.
           </Text>
@@ -364,12 +517,7 @@ export function ServiceConfiguration({
             Environment
           </Text>
           {canWrite ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setEditing((was) => !was)}
-            >
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={toggleFullEditor}>
               {editing ? 'Done editing' : 'Edit all'}
             </Button>
           ) : null}
@@ -398,8 +546,14 @@ export function ServiceConfiguration({
             </Text>
           </>
         ) : (
-          <EnvList service={service} canWrite={canWrite} onSaved={onEnvVarSaved} />
+          <EnvList service={snapshot} canWrite={canWrite} onSaved={onEnvVarSaved} />
         )}
+
+        {envNotice ? (
+          <Text variant="body-sm" tone="secondary" role="status">
+            {envNotice}
+          </Text>
+        ) : null}
       </div>
 
       {error ? (
