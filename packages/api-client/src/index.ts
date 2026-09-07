@@ -477,3 +477,15 @@ export type {
   Assessment,
   DiscoveryResult,
 } from './types';
+
+export {
+  addServiceDomain,
+  listServiceDomains,
+  listWorkspaceDomains,
+  provisionDomain,
+  removeDomain,
+  verifyDomain,
+  type Domain,
+  type DomainRecord,
+  type DomainState,
+} from './domains';
