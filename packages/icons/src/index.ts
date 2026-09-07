@@ -99,6 +99,7 @@ export {
   Users,
   Waypoints,
   Wifi,
+  WrapText,
   X,
   XCircle,
   type LucideIcon,
