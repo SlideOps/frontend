@@ -488,3 +488,15 @@ export {
   type NetworkMemberState,
   type WorkspaceNetwork,
 } from './network';
+
+export {
+  chooseWorkspaceIngress,
+  connectDNS,
+  disableWorkspaceIngress,
+  disconnectDNS,
+  getWorkspaceIngress,
+  listDNSConnections,
+  type DNSConnection,
+  type DNSConnectionState,
+  type WorkspaceIngressView,
+} from './dns';

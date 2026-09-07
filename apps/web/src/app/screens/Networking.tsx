@@ -16,6 +16,7 @@ import { PageHeader } from '@slideops/ui';
 import { useState } from 'react';
 import { activeRole, useWorkspaceStore } from '../../store/workspace';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { DomainRouting } from '../components/DomainRouting';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -206,6 +207,11 @@ export function Networking() {
           ) : null}
         </>
       ) : null}
+
+      {/* How the outside reaches this Workspace, below how its servers reach
+          each other: two different layers, read in that order rather than
+          mixed together. */}
+      <DomainRouting canAdminister={canAdminister} />
 
       <ConfirmDialog
         open={confirmDisable}
