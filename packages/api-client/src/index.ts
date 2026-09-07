@@ -477,3 +477,26 @@ export type {
   Assessment,
   DiscoveryResult,
 } from './types';
+
+export {
+  disableWorkspaceNetwork,
+  enableWorkspaceNetwork,
+  getWorkspaceNetwork,
+  joinWorkspaceNetwork,
+  reconcileWorkspaceNetwork,
+  type NetworkMember,
+  type NetworkMemberState,
+  type WorkspaceNetwork,
+} from './network';
+
+export {
+  chooseWorkspaceIngress,
+  connectDNS,
+  disableWorkspaceIngress,
+  disconnectDNS,
+  getWorkspaceIngress,
+  listDNSConnections,
+  type DNSConnection,
+  type DNSConnectionState,
+  type WorkspaceIngressView,
+} from './dns';
