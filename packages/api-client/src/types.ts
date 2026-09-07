@@ -115,7 +115,18 @@ export type CapabilityParameterType =
   /** A fixed set of values the Operator picks one of, listed on the
    *  parameter's own options, in display order. Unlike version, these do
    *  not depend on the Node. */
-  | 'choice';
+  | 'choice'
+  /**
+   * An address that usually belongs to another server in this Workspace,
+   * offered as a list of them rather than typed out.
+   *
+   * The value is still a plain address or CIDR, exactly as a string would be,
+   * so nothing that consumes it changes. It only means the Operator should be
+   * able to pick "my application server" instead of remembering which of their
+   * servers 187.7.20.156 is. A machine outside the Workspace is still entered
+   * by hand: SlideOps has never seen it and cannot offer what it does not know.
+   */
+  | 'node_address';
 
 /**
  * One input a Capability needs before it can run, described in metadata so the
@@ -385,8 +396,31 @@ export interface Assessment {
   recommendations: AssessmentRecommendation[];
 }
 
+/**
+ * One thing a rediscovery found wrong on the Node and is putting right.
+ *
+ * Discovery itself still only observes. The repair that follows it is the
+ * ordinary Expose path -- real Capabilities, planned, approved, executed and
+ * verified -- so that SlideOps stops reporting the same broken hostname on
+ * every rediscovery and waiting for someone to fix it by hand.
+ */
+export interface DiscoveryRepair {
+  service_id: string;
+  service_name: string;
+  /** What was wrong, in the Operator's language. */
+  problem: string;
+  /**
+   * True when the repair was started. It runs in the background, so the
+   * address becomes reachable shortly after the response arrives, not by the
+   * time it does.
+   */
+  repairing: boolean;
+}
+
 /** The result of POST /nodes/{id}/discover. */
 export interface DiscoveryResult {
   facts: Facts;
   assessment: Assessment;
+  /** What the rediscovery found broken and repaired. Absent when nothing was. */
+  repairs?: DiscoveryRepair[];
 }
