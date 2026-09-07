@@ -81,6 +81,12 @@ export function removeNode(id: string): Promise<void> {
 /**
  * Discover a Node. This connects read-only and gathers Facts, then returns them
  * with a plain-language Assessment. Discovery never changes the Node.
+ *
+ * What follows it can. When the Facts show a Service on this Node whose web
+ * address answers nobody -- routing that failed, or a firewall rebuilt
+ * underneath it -- SlideOps sets it up again rather than reporting the same
+ * problem on every rediscovery. Those appear in `repairs`, and each runs as an
+ * ordinary Operation the Operator can follow in History.
  */
 export function discoverNode(id: string, signal?: AbortSignal): Promise<DiscoveryResult> {
   return apiRequest<DiscoveryResult>(`/nodes/${id}/discover`, { method: 'POST', signal });

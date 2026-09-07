@@ -385,8 +385,31 @@ export interface Assessment {
   recommendations: AssessmentRecommendation[];
 }
 
+/**
+ * One thing a rediscovery found wrong on the Node and is putting right.
+ *
+ * Discovery itself still only observes. The repair that follows it is the
+ * ordinary Expose path -- real Capabilities, planned, approved, executed and
+ * verified -- so that SlideOps stops reporting the same broken hostname on
+ * every rediscovery and waiting for someone to fix it by hand.
+ */
+export interface DiscoveryRepair {
+  service_id: string;
+  service_name: string;
+  /** What was wrong, in the Operator's language. */
+  problem: string;
+  /**
+   * True when the repair was started. It runs in the background, so the
+   * address becomes reachable shortly after the response arrives, not by the
+   * time it does.
+   */
+  repairing: boolean;
+}
+
 /** The result of POST /nodes/{id}/discover. */
 export interface DiscoveryResult {
   facts: Facts;
   assessment: Assessment;
+  /** What the rediscovery found broken and repaired. Absent when nothing was. */
+  repairs?: DiscoveryRepair[];
 }

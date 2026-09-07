@@ -483,4 +483,5 @@ export type {
   AssessmentInventoryItem,
   Assessment,
   DiscoveryResult,
+  DiscoveryRepair,
 } from './types';
