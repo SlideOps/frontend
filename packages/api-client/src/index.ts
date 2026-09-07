@@ -333,6 +333,9 @@ export {
   getServiceConnections,
   getCapabilityConnections,
   preflightDeploy,
+  diagnoseService,
+  applyRemedy,
+  applyPreflightRemedy,
   type Service,
   type ServiceSource,
   type ServicePort,
@@ -362,6 +365,8 @@ export {
   type ConnectCapabilityInput,
   type ServiceConnection,
   type PreflightCheck,
+  type Remedy,
+  type RemedyAction,
   type PreflightStatus,
 } from './services';
 export {

@@ -823,11 +823,47 @@ export function getCapabilityConnections(
 /** How a single Preflight check came out. */
 export type PreflightStatus = 'pass' | 'warn' | 'fail';
 
-/** One thing Preflight looked at. */
+/**
+ * What kind of fix a Remedy is.
+ *
+ * `run_capability` runs a Capability on a Node through the ordinary Operation
+ * lifecycle -- planned, approved, executed, verified, recorded in History.
+ * `rewrite_env` corrects one of the Service's own environment variables, which
+ * needs no Node access at all.
+ */
+export type RemedyAction = 'run_capability' | 'rewrite_env';
+
+/**
+ * The fix for a failing check.
+ *
+ * A check that explains an outage and then leaves the Operator to fix it in a
+ * terminal has moved the work, not done it. This is what turns a red row into
+ * a button: it is sent back to applyRemedy exactly as it arrived, so nothing
+ * here has to understand what a Capability is.
+ */
+export interface Remedy {
+  action: RemedyAction;
+  /** What applying this will do, in one line. Use it as the button label. */
+  title: string;
+  /** Why this is the right fix for what was observed. */
+  detail: string;
+  /** Set for run_capability: the Capability, the Node it runs on, its inputs. */
+  capability_key?: string;
+  node_id?: string;
+  node_name?: string;
+  parameters?: Record<string, string>;
+  /** Set for rewrite_env: the variable to correct and its correct value. */
+  env_key?: string;
+  env_value?: string;
+}
+
+/** One thing Preflight or Diagnose looked at, and how to fix it. */
 export interface PreflightCheck {
   name: string;
   status: PreflightStatus;
   message: string;
+  /** Absent when the check passed, or when no fix SlideOps can run would help. */
+  remedy?: Remedy;
 }
 
 /**
@@ -841,4 +877,49 @@ export function preflightDeploy(input: DeployServiceInput): Promise<PreflightChe
   return apiRequest<unknown>('/services/preflight', { method: 'POST', body: input }).then((r) =>
     unwrap<PreflightCheck[]>(r, 'checks'),
   );
+}
+
+/**
+ * Find out why a Service that already deployed is not working.
+ *
+ * Preflight answers "would this deploy". This answers "why has this stopped",
+ * which is a different question with different causes: a container that is
+ * crash-looping (reported with its own last output), a dependency that is no
+ * longer reachable from its Node, or a hostname with nothing listening to
+ * answer it. Read only -- it never changes the Node.
+ */
+export function diagnoseService(serviceId: string, signal?: AbortSignal): Promise<PreflightCheck[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/diagnose`, {
+    method: 'POST',
+    signal,
+  }).then((r) => unwrap<PreflightCheck[]>(r, 'checks'));
+}
+
+/**
+ * Apply the fix a check offered, and return the Operation to follow.
+ *
+ * A fix that runs a Capability returns its `operation_id`; one that only
+ * corrects the Service's own configuration needs no Operation and returns an
+ * empty string. Send the Remedy back exactly as the check handed it out.
+ */
+export function applyRemedy(serviceId: string, remedy: Remedy): Promise<string> {
+  return apiRequest<{ operation_id?: string }>(
+    `/services/${encodeURIComponent(serviceId)}/remedy`,
+    { method: 'POST', body: { remedy } },
+  ).then((r) => r.operation_id ?? '');
+}
+
+/**
+ * Apply a fix a Preflight offered, before the Service exists.
+ *
+ * A firewall dropping the traffic is worth fixing when the check finds it, not
+ * after a deploy proves it again. Only Capability fixes can be applied this
+ * way: one that rewrites a Service's own configuration has no Service to
+ * rewrite yet, and is refused.
+ */
+export function applyPreflightRemedy(remedy: Remedy, projectId: string): Promise<string> {
+  return apiRequest<{ operation_id?: string }>('/services/remedy', {
+    method: 'POST',
+    body: { remedy, project_id: projectId },
+  }).then((r) => r.operation_id ?? '');
 }
