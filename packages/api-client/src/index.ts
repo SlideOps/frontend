@@ -180,6 +180,7 @@ export {
   deleteFeatureFlag,
   addSupportNote,
   deleteSupportNote,
+  listAdminDomains,
   listEmailDeliveries,
   listSupportNotes,
   listWebhookDeliveries,
@@ -207,6 +208,7 @@ export {
   type FeatureFlag,
   type WebhookDelivery,
   type RateLimitEntry,
+  type AdminDomain,
   type EmailDelivery,
   type SupportNote,
   type AdminOperation,
@@ -326,6 +328,7 @@ export {
   exposeService,
   updateServiceResources,
   updateServiceConfiguration,
+  updateServiceEnvVar,
   updateServiceCICD,
   rotateDeployHookToken,
   listServiceDeployEvents,
@@ -477,3 +480,41 @@ export type {
   Assessment,
   DiscoveryResult,
 } from './types';
+
+export {
+  disableWorkspaceNetwork,
+  enableWorkspaceNetwork,
+  getWorkspaceNetwork,
+  joinWorkspaceNetwork,
+  reconcileWorkspaceNetwork,
+  type NetworkMember,
+  type NetworkMemberState,
+  type WorkspaceNetwork,
+} from './network';
+
+export {
+  chooseWorkspaceIngress,
+  connectDNS,
+  disableWorkspaceIngress,
+  disconnectDNS,
+  getWorkspaceIngress,
+  listDNSConnections,
+  type DNSConnection,
+  type DNSConnectionState,
+  type WorkspaceIngressView,
+} from './dns';
+
+export {
+  addServiceDomain,
+  inspectNodeRoutes,
+  listServiceDomains,
+  listWorkspaceDomains,
+  provisionDomain,
+  removeDomain,
+  repairNodeRoutes,
+  verifyDomain,
+  type Domain,
+  type DomainRecord,
+  type DomainState,
+  type RouteDrift,
+} from './domains';

@@ -42,9 +42,7 @@ const NodeRegister = lazy(() =>
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
 );
-const SSHKeys = lazy(() =>
-  import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
-);
+const SSHKeys = lazy(() => import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })));
 const Snippets = lazy(() =>
   import('./app/screens/Snippets').then((m) => ({ default: m.Snippets })),
 );
@@ -115,6 +113,9 @@ const TransactionDetail = lazy(() =>
   import('./app/screens/TransactionDetail').then((m) => ({ default: m.TransactionDetail })),
 );
 const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
+const Networking = lazy(() =>
+  import('./app/screens/Networking').then((m) => ({ default: m.Networking })),
+);
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -175,6 +176,9 @@ const WebhookDeliveries = lazy(() =>
 );
 const RateLimits = lazy(() =>
   import('./admin/screens/RateLimits').then((m) => ({ default: m.RateLimits })),
+);
+const AdminDomains = lazy(() =>
+  import('./admin/screens/Domains').then((m) => ({ default: m.Domains })),
 );
 const EmailDeliveries = lazy(() =>
   import('./admin/screens/EmailDeliveries').then((m) => ({ default: m.EmailDeliveries })),
@@ -243,6 +247,7 @@ export function App() {
           <Route path="billing/transactions/:reference" element={<TransactionDetail />} />
           <Route path="security" element={<Security />} />
           <Route path="team" element={<Team />} />
+          <Route path="networking" element={<Networking />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}
@@ -271,6 +276,7 @@ export function App() {
           <Route path="webhooks" element={<WebhookDeliveries />} />
           <Route path="rate-limits" element={<RateLimits />} />
           <Route path="email-deliveries" element={<EmailDeliveries />} />
+          <Route path="domains" element={<AdminDomains />} />
         </Route>
 
         {/* Anything else returns to the marketing home. */}

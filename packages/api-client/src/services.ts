@@ -602,6 +602,36 @@ export function updateServiceConfiguration(
 }
 
 /**
+ * Set one environment variable on a deployed Service, leaving every other
+ * variable exactly as it is.
+ *
+ * This exists because {@link updateServiceConfiguration} replaces the whole set.
+ * Correcting a single mistyped variable through that route means the caller
+ * reassembles every other one first, and a value it cannot read back (a sealed
+ * secret) is one it cannot resend, so the safe edit was the expensive one. Here
+ * the wire carries only the variable being changed, so nothing else can be lost
+ * by omission.
+ *
+ * `secret` seals the value in the secret store rather than storing it in the
+ * clear; a sealed value reads back as a redaction marker and never as itself.
+ *
+ * The change is saved but **not yet live**: a container bakes its environment in
+ * when it is created, so `redeployService` is what applies it. The returned
+ * Service carries `config_changed_at` so a screen can say so.
+ */
+export function updateServiceEnvVar(
+  serviceId: string,
+  key: string,
+  value: string,
+  secret: boolean,
+): Promise<Service> {
+  return apiRequest<unknown>(
+    `/services/${encodeURIComponent(serviceId)}/environment/${encodeURIComponent(key)}`,
+    { method: 'PATCH', body: { value, secret } },
+  ).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/**
  * Stop a deploy that is still running and leave the Service in place.
  *
  * It stops the work; it does not undo it. A build that had begun is abandoned, and
