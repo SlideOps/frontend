@@ -124,3 +124,36 @@ export function removeDomain(id: string): Promise<void> {
 export function listWorkspaceDomains(): Promise<Domain[]> {
   return apiRequest<{ domains: Domain[] }>('/domains').then((r) => r.domains ?? []);
 }
+
+/**
+ * What a server is actually routing, against what SlideOps intends.
+ *
+ * The two directions mean different things. A domain SlideOps expects and does
+ * not find has been removed by something and can be put back. A site the server
+ * answers for that no domain claims is almost always the Operator's own work, and
+ * is reported rather than touched.
+ */
+export interface RouteDrift {
+  node_id: string;
+  /** Domains SlideOps believes are serving that have no route on the server. */
+  missing: string[];
+  /** Sites the server serves that no domain claims. Never removed. */
+  unmanaged: string[];
+  healthy: boolean;
+  summary: string;
+}
+
+/** Read a server's routing against what was intended. Changes nothing. */
+export function inspectNodeRoutes(nodeId: string): Promise<RouteDrift> {
+  return apiRequest<RouteDrift>(`/nodes/${encodeURIComponent(nodeId)}/routes`);
+}
+
+/**
+ * Put back the routes a server is missing. Sites SlideOps did not set up are
+ * never removed.
+ */
+export function repairNodeRoutes(nodeId: string): Promise<RouteDrift> {
+  return apiRequest<RouteDrift>(`/nodes/${encodeURIComponent(nodeId)}/routes/repair`, {
+    method: 'POST',
+  });
+}

@@ -409,12 +409,7 @@ export interface AdminSubscriber {
  *  Transaction status vocabulary exactly -- there is one status system, not
  *  a separate Admin one. */
 export type AdminPaymentStatus =
-  | 'pending'
-  | 'success'
-  | 'failed'
-  | 'cancelled'
-  | 'refunded'
-  | 'disputed';
+  'pending' | 'success' | 'failed' | 'cancelled' | 'refunded' | 'disputed';
 
 /** One payment attempt, successful or not. */
 export interface AdminPayment {
@@ -1155,4 +1150,37 @@ export function extendArrangementDeadline(arrangementId: string, newDeadline: Da
     `/admin/arrangements/${encodeURIComponent(arrangementId)}/extend-deadline`,
     { method: 'POST', body: { new_deadline: newDeadline.toISOString() } },
   );
+}
+
+/**
+ * One hostname on the platform with the whole chain behind it.
+ *
+ * The four states are separate because they fail separately, and the question an
+ * admin has is which of them broke: a domain whose DNS is verified and whose
+ * certificate is missing is a different problem from one that never resolved.
+ */
+export interface AdminDomain {
+  hostname: string;
+  workspace_id: string;
+  project_id?: string;
+  service_id: string;
+  node_id?: string;
+  state: string;
+  state_detail: string;
+  dns_observed?: string;
+  tls_state: string;
+  serving: boolean;
+  target_port: number;
+  ingress_kind: string;
+  dns_mode: string;
+  last_error?: string;
+  dns_checked_at?: string;
+  last_verified_at?: string;
+  tls_expires_at?: string;
+  created_at: string;
+}
+
+/** Every domain on the platform, newest first. Admin only, and read only. */
+export function listAdminDomains(): Promise<AdminDomain[]> {
+  return apiRequest<{ domains: AdminDomain[] }>('/admin/domains').then((r) => r.domains ?? []);
 }

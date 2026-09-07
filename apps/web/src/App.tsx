@@ -177,6 +177,9 @@ const WebhookDeliveries = lazy(() =>
 const RateLimits = lazy(() =>
   import('./admin/screens/RateLimits').then((m) => ({ default: m.RateLimits })),
 );
+const AdminDomains = lazy(() =>
+  import('./admin/screens/Domains').then((m) => ({ default: m.Domains })),
+);
 const EmailDeliveries = lazy(() =>
   import('./admin/screens/EmailDeliveries').then((m) => ({ default: m.EmailDeliveries })),
 );
@@ -273,6 +276,7 @@ export function App() {
           <Route path="webhooks" element={<WebhookDeliveries />} />
           <Route path="rate-limits" element={<RateLimits />} />
           <Route path="email-deliveries" element={<EmailDeliveries />} />
+          <Route path="domains" element={<AdminDomains />} />
         </Route>
 
         {/* Anything else returns to the marketing home. */}

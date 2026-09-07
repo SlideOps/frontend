@@ -7,6 +7,7 @@ import {
   Layers,
   LayoutDashboard,
   ListChecks,
+  Globe,
   Mail,
   ShieldAlert,
   ShieldCheck,
@@ -36,7 +37,8 @@ export type ActiveKey =
   | 'feature-flags'
   | 'webhooks'
   | 'rate-limits'
-  | 'email-deliveries';
+  | 'email-deliveries'
+  | 'domains';
 
 /**
  * The Admin app frame: shared side navigation on wide screens, a bottom bar on
@@ -153,6 +155,13 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
       onSelect: () => navigate('/admin/email-deliveries'),
     },
     {
+      key: 'domains',
+      label: 'Domains',
+      icon: Globe,
+      active: active === 'domains',
+      onSelect: () => navigate('/admin/domains'),
+    },
+    {
       key: 'app',
       label: 'Exit to app',
       icon: LayoutDashboard,
@@ -162,12 +171,17 @@ export function AdminShell({ active, children }: { active: ActiveKey; children: 
   ];
 
   return (
-    <AppShell surface="Admin" nav={nav} dense actions={
-          <>
-            <InstallApp />
-            <LogoutButton />
-          </>
-        }>
+    <AppShell
+      surface="Admin"
+      nav={nav}
+      dense
+      actions={
+        <>
+          <InstallApp />
+          <LogoutButton />
+        </>
+      }
+    >
       {children}
     </AppShell>
   );
