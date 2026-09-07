@@ -1,22 +1,14 @@
-import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Domain, Service } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 
 const listServiceDomains = vi.fn();
-const addServiceDomain = vi.fn();
-const verifyDomain = vi.fn();
-const provisionDomain = vi.fn();
-const removeDomain = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   listServiceDomains: (...a: unknown[]) => listServiceDomains(...a),
-  addServiceDomain: (...a: unknown[]) => addServiceDomain(...a),
-  verifyDomain: (...a: unknown[]) => verifyDomain(...a),
-  provisionDomain: (...a: unknown[]) => provisionDomain(...a),
-  removeDomain: (...a: unknown[]) => removeDomain(...a),
 }));
 
 const { ServiceDomains } = await import('./ServiceDomains');
@@ -43,16 +35,16 @@ function domain(over: Partial<Domain> = {}): Domain {
   } as Domain;
 }
 
+function show() {
+  return renderInApp(
+    <MemoryRouter>
+      <ServiceDomains service={service()} />
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
-  for (const fn of [
-    listServiceDomains,
-    addServiceDomain,
-    verifyDomain,
-    provisionDomain,
-    removeDomain,
-  ]) {
-    fn.mockReset();
-  }
+  listServiceDomains.mockReset();
   listServiceDomains.mockResolvedValue([]);
 });
 
@@ -61,7 +53,7 @@ describe('ServiceDomains', () => {
   // administration, so the words that would make it the latter must not appear.
   it('never asks the Operator to understand the infrastructure', async () => {
     listServiceDomains.mockResolvedValue([domain()]);
-    const { container } = renderInApp(<ServiceDomains service={service()} />);
+    const { container } = show();
 
     await screen.findByText('api.example.com');
     const text = container.textContent ?? '';
@@ -79,7 +71,7 @@ describe('ServiceDomains', () => {
 
   it('shows the exact record to create, each part copyable on its own', async () => {
     listServiceDomains.mockResolvedValue([domain()]);
-    renderInApp(<ServiceDomains service={service()} />);
+    show();
 
     await screen.findByText('api.example.com');
     expect(screen.getByText('Type')).toBeInTheDocument();
@@ -89,74 +81,47 @@ describe('ServiceDomains', () => {
     expect(screen.getByRole('button', { name: /Copy the value/i })).toBeInTheDocument();
   });
 
-  it('says where the hostname currently resolves when it points elsewhere', async () => {
+  it('reads DNS as expected against found rather than as a verdict', async () => {
     listServiceDomains.mockResolvedValue([
-      domain({ dns_observed: '198.51.100.7', last_error: 'resolves to 198.51.100.7' }),
+      domain({ dns_observed: '198.51.100.7', dns_checked_at: '2026-09-07T11:00:00Z' }),
     ]);
-    renderInApp(<ServiceDomains service={service()} />);
+    show();
 
-    expect(await screen.findByText(/Currently resolves to 198.51.100.7/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Expected 203.0.113.10, found 198.51.100.7/),
+    ).toBeInTheDocument();
   });
 
-  it('adds a domain with the port the application listens on', async () => {
-    addServiceDomain.mockResolvedValue(domain());
-    renderInApp(<ServiceDomains service={service()} />);
-
-    await userEvent.type(await screen.findByLabelText('Add a domain'), 'api.example.com');
-    await userEvent.type(screen.getByLabelText(/Port your application listens on/), '3000');
-    await userEvent.click(screen.getByRole('button', { name: 'Add domain' }));
-
-    await waitFor(() =>
-      expect(addServiceDomain).toHaveBeenCalledWith('svc-1', 'api.example.com', 3000),
-    );
-  });
-
-  // Publishing the port to the internet is exactly what this replaces, so the
-  // form has to say the visitor never uses it.
-  it('says the port does not need publishing', async () => {
-    renderInApp(<ServiceDomains service={service()} />);
-    expect(await screen.findByText(/you do not need to publish it/i)).toBeInTheDocument();
-  });
-
-  it('offers Check DNS while waiting, and Put it live once DNS points here', async () => {
+  // Adding, checking and provisioning moved to one page. What must not happen is
+  // this tab quietly keeping a second copy of them.
+  it('offers no way to change a domain, only the way to the page that does', async () => {
     listServiceDomains.mockResolvedValue([domain()]);
-    const { unmount } = renderInApp(<ServiceDomains service={service()} />);
-    expect(await screen.findByRole('button', { name: /Check DNS/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Put it live' })).not.toBeInTheDocument();
-    unmount();
+    show();
 
-    listServiceDomains.mockResolvedValue([
-      domain({ state: 'dns_verified', state_detail: 'DNS points here. Setting up routing.' }),
-    ]);
-    renderInApp(<ServiceDomains service={service()} />);
-    expect(await screen.findByRole('button', { name: 'Put it live' })).toBeInTheDocument();
+    await screen.findByText('api.example.com');
+    for (const gone of ['Add domain', 'Check DNS', 'Put it live', 'Remove']) {
+      expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('link', { name: /Manage domains and DNS/ })).toHaveAttribute(
+      'href',
+      '/app/domains?service=svc-1',
+    );
   });
 
   it('links a serving domain at its https address', async () => {
     listServiceDomains.mockResolvedValue([
       domain({ state: 'active', state_detail: 'Serving.', serving: true, tls_state: 'active' }),
     ]);
-    renderInApp(<ServiceDomains service={service()} />);
+    show();
 
     const link = await screen.findByRole('link', { name: 'api.example.com' });
     expect(link).toHaveAttribute('href', 'https://api.example.com');
   });
 
-  // Removing a domain does not remove the DNS record, and the Operator is the
-  // only one who can do that, so they have to be told.
-  it('warns what removing does and does not do, before removing', async () => {
-    listServiceDomains.mockResolvedValue([domain()]);
-    renderInApp(<ServiceDomains service={service()} />);
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
-    expect(await screen.findByText(/no DNS record is touched/i)).toBeInTheDocument();
-    expect(removeDomain).not.toHaveBeenCalled();
-  });
-
   it('tells an empty Service what a domain would give it', async () => {
-    renderInApp(<ServiceDomains service={service()} />);
+    show();
     expect(
-      await screen.findByText(/reachable at a name instead of an address and a port/i),
+      await screen.findByText(/reachable at\s+a name instead of an address and a port/i),
     ).toBeInTheDocument();
   });
 });
