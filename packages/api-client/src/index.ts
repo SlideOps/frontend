@@ -339,6 +339,7 @@ export {
   applyPreflightRemedy,
   type Service,
   type ServiceSource,
+  type ServiceSourceEdit,
   type ServicePort,
   type ServiceEnvVar,
   type StackPlan,

@@ -516,13 +516,17 @@ export interface DeployHookToken {
  * call authenticates from; it is never shown again after this call returns.
  */
 export function rotateDeployHookToken(id: string): Promise<DeployHookToken> {
-  return apiRequest<DeployHookToken>(`/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`, {
-    method: 'POST',
-  });
+  return apiRequest<DeployHookToken>(
+    `/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 /** What caused a deploy attempt to run, for the CI/CD activity trail. */
-export type DeployEventTrigger = 'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
+export type DeployEventTrigger =
+  'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
 
 /** What happened once that trigger fired. */
 export type DeployEventOutcome = 'redeploy_started' | 'skipped' | 'error';
@@ -581,19 +585,50 @@ export function updateServiceResources(id: string, resources: ServiceResources):
 }
 
 /**
- * Edit a deployed Service's command and environment variables.
+ * An edit to where a Service is pulled or built from. Send the whole source, not
+ * a patch: switching `type` is how a Service moves between an image and a
+ * repository, and the fields belonging to the type being left behind are cleared
+ * by the backend so a Service never describes two origins at once.
+ *
+ * `adopted` and `capability` are not editable source types. Neither was built by
+ * SlideOps, so neither can be rebuilt from a different source.
+ */
+export interface ServiceSourceEdit {
+  type: 'image' | 'repository';
+  image?: string;
+  repository_url?: string;
+  branch?: string;
+  build?: string;
+}
+
+/**
+ * Edit a deployed Service's source, published ports, command and environment
+ * variables.
  *
  * `env` **replaces** rather than merges, so send the complete set you want:
  * leaving one out is how it is removed, and a previously sealed secret you do not
- * resend is dropped for the same reason.
+ * resend is dropped for the same reason. `ports` replaces in the same way, so
+ * sending `[]` publishes nothing.
  *
- * The change is saved but **not yet live**: a container bakes its command and
- * environment in when it is created, so `redeployService` is what applies it. The
- * returned Service carries `config_changed_at` so a screen can say so.
+ * `source` and `ports` are **optional, and omitting them leaves them unchanged**.
+ * That is deliberately different from sending an empty value: a caller editing
+ * only an env var must not have to resend the source to avoid clearing it.
+ *
+ * The change is saved but **not yet live**: a container bakes all of this in when
+ * it is created, so `redeployService` is what applies it. The returned Service
+ * carries `config_changed_at` so a screen can say so.
+ *
+ * An adopted Service refuses a source or port edit with `adopted_not_buildable`:
+ * SlideOps never built it, so it cannot rebuild it either.
  */
 export function updateServiceConfiguration(
   id: string,
-  configuration: { command: string; env: ServiceEnvVar[] },
+  configuration: {
+    command: string;
+    env: ServiceEnvVar[];
+    source?: ServiceSourceEdit;
+    ports?: ServicePort[];
+  },
 ): Promise<Service> {
   return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/configuration`, {
     method: 'PATCH',
@@ -779,7 +814,10 @@ export interface ConnectCapabilityInput {
  * applies immediately. One call, not a config edit followed by a separate
  * redeploy.
  */
-export function connectCapability(serviceId: string, input: ConnectCapabilityInput): Promise<Service> {
+export function connectCapability(
+  serviceId: string,
+  input: ConnectCapabilityInput,
+): Promise<Service> {
   return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connect`, {
     method: 'POST',
     body: input,
@@ -798,10 +836,13 @@ export interface ServiceConnection {
 }
 
 /** What a Service is connected to. */
-export function getServiceConnections(serviceId: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
-  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, { signal }).then((r) =>
-    unwrap<ServiceConnection[]>(r, 'connections'),
-  );
+export function getServiceConnections(
+  serviceId: string,
+  signal?: AbortSignal,
+): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, {
+    signal,
+  }).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
 }
 
 /**
