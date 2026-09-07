@@ -14,6 +14,7 @@ import {
   ListChecks,
   Package,
   Search,
+  Network,
   Server,
   Shield,
   ShieldCheck,
@@ -35,6 +36,7 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 export type ActiveKey =
   | 'home'
   | 'workspaces'
+  | 'networking'
   | 'nodes'
   | 'projects'
   | 'services'
@@ -145,6 +147,14 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Users,
       active: active === 'team',
       onSelect: () => navigate('/app/team'),
+    },
+    {
+      key: 'networking',
+      group: 'Your infrastructure',
+      label: 'Network',
+      icon: Network,
+      active: active === 'networking',
+      onSelect: () => navigate('/app/networking'),
     },
     {
       key: 'nodes',

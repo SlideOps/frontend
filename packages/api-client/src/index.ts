@@ -477,3 +477,14 @@ export type {
   Assessment,
   DiscoveryResult,
 } from './types';
+
+export {
+  disableWorkspaceNetwork,
+  enableWorkspaceNetwork,
+  getWorkspaceNetwork,
+  joinWorkspaceNetwork,
+  reconcileWorkspaceNetwork,
+  type NetworkMember,
+  type NetworkMemberState,
+  type WorkspaceNetwork,
+} from './network';
