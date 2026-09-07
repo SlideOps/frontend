@@ -8,6 +8,7 @@ import {
   listNodes,
   listProjects,
   preflightDeploy,
+  applyPreflightRemedy,
   type GitHubRepo,
   type GitHubStatus,
   type Node,
@@ -15,17 +16,15 @@ import {
   type Project,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
+import { CheckList } from '../components/ServiceChecks';
 import {
-  AlertTriangle,
   ArrowRight,
   Boxes,
-  CheckCircle2,
   Container,
   Database,
   GitBranch,
   Lock,
   Search,
-  XCircle,
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { EmptyState, PageHeader } from '@slideops/ui';
@@ -659,34 +658,17 @@ function PreflightPanel({ getValues }: { getValues: () => ServiceFormValues }) {
         </p>
       ) : null}
       {state.status === 'ready' ? (
-        <ul className="flex flex-col divide-y divide-border">
-          {state.checks.map((check) => (
-            <li key={check.name} className="flex items-start gap-2 py-2">
-              <PreflightStatusIcon status={check.status} />
-              <div className="min-w-0">
-                <Text variant="body-sm" className="font-medium text-ink">
-                  {check.name}
-                </Text>
-                <Text variant="body-sm" tone="secondary">
-                  {check.message}
-                </Text>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <CheckList
+          checks={state.checks}
+          // A firewall dropping the traffic is worth fixing when the check
+          // finds it, not after a deploy proves it again. There is no Service
+          // yet, so the fix is scoped by the Project the deploy is going into.
+          onApply={(remedy) => applyPreflightRemedy(remedy, getValues().project_id)}
+          onApplied={() => void run()}
+        />
       ) : null}
     </div>
   );
-}
-
-function PreflightStatusIcon({ status }: { status: PreflightCheck['status'] }) {
-  if (status === 'pass') {
-    return <CheckCircle2 width={16} height={16} className="mt-0.5 shrink-0 text-success" aria-hidden />;
-  }
-  if (status === 'fail') {
-    return <XCircle width={16} height={16} className="mt-0.5 shrink-0 text-danger" aria-hidden />;
-  }
-  return <AlertTriangle width={16} height={16} className="mt-0.5 shrink-0 text-warning" aria-hidden />;
 }
 
 /** Deploy a Service: choose a Project and Node, a source, a runtime, and limits within quota. */

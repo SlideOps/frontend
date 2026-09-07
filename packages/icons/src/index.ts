@@ -16,6 +16,8 @@ export {
   CalendarClock,
   Pause,
   Upload,
+  Stethoscope,
+  Wrench,
   Unlock,
   MessageSquare,
   Building2,

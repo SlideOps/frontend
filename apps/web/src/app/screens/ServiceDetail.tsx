@@ -58,6 +58,7 @@ import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
 import { EnvDiffPanel } from '../components/EnvDiffPanel';
 import { ServiceConfiguration } from '../components/ServiceConfiguration';
 import { ServiceConnectionsPanel } from '../components/ServiceConnectionsPanel';
+import { ServiceDiagnosePanel } from '../components/ServiceDiagnosePanel';
 import { ServiceCICDPanel } from '../components/ServiceCICDPanel';
 import { ServiceUpdatePanel } from '../components/ServiceUpdatePanel';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -893,7 +894,17 @@ export function ServiceDetail() {
             />
           ) : null}
 
-          {activeTab === 'logs' ? <LogsAndActivity id={service.id} /> : null}
+          {/*
+            Diagnose sits with the Logs, because that is where an Operator
+            goes when something is wrong -- and reading logs is exactly the
+            manual step it exists to replace.
+          */}
+          {activeTab === 'logs' ? (
+            <>
+              <ServiceDiagnosePanel serviceId={service.id} onFixed={reload} />
+              <LogsAndActivity id={service.id} />
+            </>
+          ) : null}
 
           {activeTab === 'cicd' && !isCapabilityService ? (
             <ServiceCICDPanel service={service} onChanged={reload} />

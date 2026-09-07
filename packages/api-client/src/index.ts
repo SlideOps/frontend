@@ -334,6 +334,9 @@ export {
   getCapabilityConnections,
   getDatabaseAccessRules,
   preflightDeploy,
+  diagnoseService,
+  applyRemedy,
+  applyPreflightRemedy,
   type Service,
   type ServiceSource,
   type ServicePort,
@@ -364,6 +367,8 @@ export {
   type ServiceConnection,
   type DatabaseAccessRule,
   type PreflightCheck,
+  type Remedy,
+  type RemedyAction,
   type PreflightStatus,
 } from './services';
 export {
