@@ -240,7 +240,7 @@ describe('ServiceDetail', () => {
   it.each([
     ['Live usage', 'Overview' as const],
     ['Manage', 'Browse' as const],
-    ['Command and environment', 'Settings' as const],
+    ['Deployment configuration', 'Settings' as const],
   ])('lets the Operator fold %s', async (title, tab) => {
     show();
 
