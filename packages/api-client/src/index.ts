@@ -180,6 +180,7 @@ export {
   deleteFeatureFlag,
   addSupportNote,
   deleteSupportNote,
+  listAdminDomains,
   listEmailDeliveries,
   listSupportNotes,
   listWebhookDeliveries,
@@ -207,6 +208,7 @@ export {
   type FeatureFlag,
   type WebhookDelivery,
   type RateLimitEntry,
+  type AdminDomain,
   type EmailDelivery,
   type SupportNote,
   type AdminOperation,
@@ -503,12 +505,15 @@ export {
 
 export {
   addServiceDomain,
+  inspectNodeRoutes,
   listServiceDomains,
   listWorkspaceDomains,
   provisionDomain,
   removeDomain,
+  repairNodeRoutes,
   verifyDomain,
   type Domain,
   type DomainRecord,
   type DomainState,
+  type RouteDrift,
 } from './domains';
