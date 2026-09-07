@@ -194,7 +194,7 @@ describe('toDeployInput', () => {
       values({
         cpu_limit: '0.5' as unknown as number,
         memory_mb: '512' as unknown as number,
-        pids_limit: '100' as unknown as string,
+        pids_limit: '100' as unknown as number,
       }),
     );
     expect(input.cpu_limit).toBe(0.5);
