@@ -340,6 +340,7 @@ export {
   type ServiceSource,
   type ServicePort,
   type ServiceEnvVar,
+  type ServiceEnvVarEdit,
   type StackPlan,
   type StackStep,
   type StackEnvAssignment,

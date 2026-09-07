@@ -602,8 +602,42 @@ export function updateServiceConfiguration(
 }
 
 /**
- * Set one environment variable on a deployed Service, leaving every other
- * variable exactly as it is.
+ * An edit to one environment variable. The variable being edited is named in the
+ * request path under the name it carries *now*, so that path is the identity of
+ * the edit and this body carries only what changes about it.
+ */
+export interface ServiceEnvVarEdit {
+  /**
+   * The name to give the variable. Omitted, or equal to the name in the path,
+   * leaves the name alone.
+   */
+  name?: string;
+  /** The new value. Ignored when `keep_value` is set. */
+  value: string;
+  /** Seal the value in the secret store. Ignored when `keep_value` is set. */
+  secret: boolean;
+  /**
+   * Rename without touching the stored value.
+   *
+   * This is the only way to rename a sealed variable. Its plaintext is not
+   * readable, so there is nothing to resend, and echoing the redaction marker
+   * back would store those words as the variable's value.
+   */
+  keep_value?: boolean;
+  /**
+   * The `config_changed_at` read when the editor was opened, echoed back verbatim.
+   * The save is refused when the configuration moved since then.
+   *
+   * Worth sending on every edit, because a save writes the whole environment: a
+   * stale one does not merely lose the field in hand, it reinstates every other
+   * variable as the stale copy remembered them.
+   */
+  if_unchanged_since?: string;
+}
+
+/**
+ * Edit one environment variable on a deployed Service -- its value, its name, or
+ * both -- leaving every other variable exactly as it is.
  *
  * This exists because {@link updateServiceConfiguration} replaces the whole set.
  * Correcting a single mistyped variable through that route means the caller
@@ -612,8 +646,8 @@ export function updateServiceConfiguration(
  * the wire carries only the variable being changed, so nothing else can be lost
  * by omission.
  *
- * `secret` seals the value in the secret store rather than storing it in the
- * clear; a sealed value reads back as a redaction marker and never as itself.
+ * `key` is the variable's name as it stands right now; `edit.name` is what to
+ * rename it to.
  *
  * The change is saved but **not yet live**: a container bakes its environment in
  * when it is created, so `redeployService` is what applies it. The returned
@@ -622,12 +656,11 @@ export function updateServiceConfiguration(
 export function updateServiceEnvVar(
   serviceId: string,
   key: string,
-  value: string,
-  secret: boolean,
+  edit: ServiceEnvVarEdit,
 ): Promise<Service> {
   return apiRequest<unknown>(
     `/services/${encodeURIComponent(serviceId)}/environment/${encodeURIComponent(key)}`,
-    { method: 'PATCH', body: { value, secret } },
+    { method: 'PATCH', body: edit },
   ).then((r) => unwrap<Service>(r, 'service'));
 }
 
