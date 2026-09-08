@@ -176,25 +176,87 @@ export const SECRET_PREFIX = 'secret:';
 export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string } {
   const env: ServiceEnvVar[] = [];
   const seen = new Set<string>();
-  const lines = (text ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const lines = (text ?? '').split('\n');
 
-  for (const raw of lines) {
-    let line = raw;
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i] ?? '';
+    let line = raw.trim();
+    if (line === '') {
+      continue;
+    }
+    // A whole line beginning with # is a comment, which every real env file has.
+    // An inline # is deliberately NOT treated as one: it is a perfectly ordinary
+    // character in a password or a URL fragment, and stripping it would corrupt
+    // more values than it would tidy.
+    if (line.startsWith('#')) {
+      continue;
+    }
+
     let secret = false;
     if (line.toLowerCase().startsWith(SECRET_PREFIX)) {
       secret = true;
       line = line.slice(SECRET_PREFIX.length).trim();
     }
+    // `export KEY=value` is how a file meant to be sourced by a shell writes it,
+    // and pasting one should not be an error.
+    if (line.toLowerCase().startsWith('export ')) {
+      line = line.slice('export '.length).trim();
+    }
 
     const eq = line.indexOf('=');
     if (eq <= 0) {
-      return { env: [], error: `Write each variable as KEY=value. Got "${raw}".` };
+      return { env: [], error: `Write each variable as KEY=value. Got "${raw.trim()}".` };
     }
     const key = line.slice(0, eq).trim();
-    const value = line.slice(eq + 1).trim();
+    let rest = line.slice(eq + 1);
+
+    /*
+     * A quoted value keeps its contents and loses its quotes.
+     *
+     * Every env file quotes a value containing spaces or JSON, because the
+     * shells and loaders that read those files require it. Storing the quotes
+     * as part of the value is what shipped `'{"k":"v"}'` into a container and
+     * made the application fail to parse its own configuration: the quotes are
+     * the file's syntax, not the customer's data.
+     *
+     * A quoted value may also run over several lines, which is how anybody
+     * pastes a formatted JSON blob or a PEM key, so an unterminated quote keeps
+     * reading until it closes.
+     */
+    const quote = rest.trimStart().startsWith('"') ? '"' : rest.trimStart().startsWith("'") ? "'" : '';
+    let value: string;
+    if (quote !== '') {
+      rest = rest.trimStart().slice(1);
+      const closed = closingQuoteIndex(rest, quote);
+      if (closed >= 0) {
+        value = rest.slice(0, closed);
+      } else {
+        const collected = [rest];
+        let found = false;
+        while (i + 1 < lines.length) {
+          i += 1;
+          const next = lines[i] ?? '';
+          const at = closingQuoteIndex(next, quote);
+          if (at >= 0) {
+            collected.push(next.slice(0, at));
+            found = true;
+            break;
+          }
+          collected.push(next);
+        }
+        if (!found) {
+          return { env: [], error: `${key} opens a quote that is never closed.` };
+        }
+        value = collected.join('\n');
+      }
+      if (quote === '"') {
+        value = unescapeDoubleQuoted(value);
+      }
+    } else {
+      // Unquoted, so surrounding whitespace is formatting rather than content.
+      value = rest.trim();
+    }
+
     const keep = secret && value === '';
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
       return { env: [], error: `"${key}" is not a valid variable name.` };
@@ -206,6 +268,47 @@ export function parseEnv(text?: string): { env: ServiceEnvVar[]; error?: string 
     env.push({ key, value, secret, keep });
   }
   return { env };
+}
+
+/**
+ * Where a quoted value ends, skipping a quote the value escaped for itself.
+ *
+ * Returns -1 when the quote does not close on this line, which is what tells the
+ * parser to keep reading into the next one.
+ */
+function closingQuoteIndex(text: string, quote: string): number {
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\\' && quote === '"') {
+      i += 1;
+      continue;
+    }
+    if (text[i] === quote) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Apply the escapes a double quoted value is allowed to carry.
+ *
+ * Only inside double quotes, matching how env files are read everywhere else: a
+ * single quoted value is literal, so a backslash in a Windows path or a regular
+ * expression stays exactly as it was typed.
+ */
+function unescapeDoubleQuoted(value: string): string {
+  return value.replace(/\\(.)/g, (_match, char: string) => {
+    switch (char) {
+      case 'n':
+        return '\n';
+      case 'r':
+        return '\r';
+      case 't':
+        return '\t';
+      default:
+        return char;
+    }
+  });
 }
 
 /**
