@@ -9,6 +9,7 @@ import {
   redeployService,
   removeService,
   startService,
+  updateServiceEnvVar,
   updateServiceResources,
 } from './services';
 
@@ -290,5 +291,65 @@ describe('services requests', () => {
     await expect(
       updateServiceResources('sv_1', { cpu_limit: 0, memory_mb: 512, pids_limit: 256 }),
     ).rejects.toMatchObject({ name: 'ApiError', status: 400, code: 'invalid_resources' });
+  });
+
+  it('edits one environment variable against the name it carries now', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        service: { id: 'sv_1', env: { DB_URL: 'postgres://db' }, config_changed_at: '2026-02-02' },
+      }),
+    );
+
+    const service = await updateServiceEnvVar('sv_1', 'DATABASE URL', {
+      name: 'DB_URL',
+      value: 'postgres://db',
+      secret: false,
+      if_unchanged_since: '2026-02-01',
+    });
+
+    expect(service.env?.DB_URL).toBe('postgres://db');
+    // The name in the path is the identity of the edit, so it is escaped rather
+    // than trusted to be URL safe.
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/services/sv_1/environment/DATABASE%20URL',
+    );
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PATCH');
+    expect(init?.credentials).toBe('include');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      name: 'DB_URL',
+      value: 'postgres://db',
+      secret: false,
+      if_unchanged_since: '2026-02-01',
+    });
+  });
+
+  it('renames a sealed variable by keeping its value rather than sending one', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { service: { id: 'sv_1' } }));
+
+    await updateServiceEnvVar('sv_1', 'SECRET_KEY', {
+      name: 'SESSION_KEY',
+      value: '',
+      secret: true,
+      keep_value: true,
+    });
+
+    const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
+    expect(sent.keep_value).toBe(true);
+    expect(sent.value).toBe('');
+  });
+
+  it('surfaces the code when a rename lands on a name that is already taken', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(409, {
+        error: { code: 'env_key_exists', message: 'LOG_LEVEL is already set on this Service.' },
+      }),
+    );
+
+    await expect(
+      updateServiceEnvVar('sv_1', 'DATABASE_URL', { name: 'LOG_LEVEL', value: 'x', secret: false }),
+    ).rejects.toMatchObject({ name: 'ApiError', status: 409, code: 'env_key_exists' });
   });
 });
