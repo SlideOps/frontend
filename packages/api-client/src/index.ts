@@ -267,8 +267,10 @@ export {
 } from './marketplace';
 export {
   listBillingArrangements,
+  completeArrangementPayment,
   type BillingArrangement,
   type BillingArrangementStatus,
+  type ArrangementPaymentResult,
 } from './arrangements';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
 export { getSampleApp, type SampleApp } from './sample-app';
@@ -313,6 +315,7 @@ export {
   TransactionActionError,
   type TransactionStatus,
   type Transaction,
+  type TransactionGrant,
   type TransactionListFilter,
   type TransactionPage,
   type TransactionSummary,

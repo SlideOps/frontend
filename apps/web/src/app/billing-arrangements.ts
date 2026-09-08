@@ -62,6 +62,20 @@ export function isOutstanding(arrangement: BillingArrangement): boolean {
  * never do is start a second charge beside a payment already waiting.
  */
 export function canComplete(arrangement: BillingArrangement): boolean {
+  // The server decides this, and says so in one field. It used to be worked out
+  // here from `resumable` and the presence of a reference, which asks a
+  // different question: whether a checkout is already open. An arrangement whose
+  // price an Admin has just corrected has no open checkout, because the one
+  // charging the old figure was voided, and it is exactly the arrangement the
+  // customer most needs to be able to pay.
+  //
+  // `payable` is absent on a server that predates it, and the old reading is
+  // what answers then. It is narrower rather than wrong: it offers no button
+  // where the newer server would have offered one, which is the safe direction
+  // to be out of date in.
+  if (typeof arrangement.payable === 'boolean') {
+    return arrangement.payable;
+  }
   return (
     isOutstanding(arrangement) &&
     arrangement.resumable === true &&
