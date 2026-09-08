@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BillingSubscription, Quote } from '@slideops/api-client';
+import { ApiError, type BillingSubscription, type Quote } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useAuthStore } from '../../store/auth';
 
@@ -18,6 +18,7 @@ const getSubscription = vi.fn();
 const quoteCheckout = vi.fn();
 const startCheckout = vi.fn();
 const listTransactions = vi.fn();
+const listBillingArrangements = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -25,6 +26,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   quoteCheckout: (...a: unknown[]) => quoteCheckout(...a),
   startCheckout: (...a: unknown[]) => startCheckout(...a),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
+  listBillingArrangements: (...a: unknown[]) => listBillingArrangements(...a),
 }));
 
 const { Billing } = await import('./Billing');
@@ -73,6 +75,48 @@ beforeEach(() => {
   quoteCheckout.mockReset().mockResolvedValue(quote());
   startCheckout.mockReset().mockResolvedValue({ checkout_url: '', reference: 'ref', provider: 'paystack', granted: false });
   listTransactions.mockReset().mockResolvedValue({ transactions: [], limit: 5, offset: 0, has_more: false });
+  listBillingArrangements.mockReset().mockResolvedValue([]);
+});
+
+describe('Billing: access arranged for you', () => {
+  it('shows the arrangement and what is owed on the page the customer already uses', async () => {
+    listBillingArrangements.mockResolvedValue([
+      {
+        id: 'arr_1',
+        tier: 'pro',
+        condition: 'temporary_access',
+        status: 'awaiting_payment',
+        amount_minor: 150000,
+        currency: 'USD',
+        payment_deadline: new Date(Date.now() + 10 * 86400000).toISOString(),
+        payment_reference: 'so_open_payment',
+        resumable: true,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    show();
+
+    expect(await screen.findByText('Access arranged for you')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
+  });
+
+  it('shows no arrangement section when the customer has none', async () => {
+    show();
+    await waitFor(() => expect(listBillingArrangements).toHaveBeenCalled());
+
+    expect(screen.queryByText('Access arranged for you')).not.toBeInTheDocument();
+  });
+
+  it('renders the billing page as before when the arrangements endpoint fails', async () => {
+    listBillingArrangements.mockRejectedValue(new ApiError(503, 'unavailable', 'No arrangements.'));
+    show();
+
+    expect(await screen.findByText('Total charged today')).toBeInTheDocument();
+    expect(screen.getByText('Plans')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upgrade to/ })).toBeInTheDocument();
+    expect(screen.queryByText('Access arranged for you')).not.toBeInTheDocument();
+    expect(screen.queryByText('No arrangements.')).not.toBeInTheDocument();
+  });
 });
 
 describe('Billing: Recent Transactions', () => {

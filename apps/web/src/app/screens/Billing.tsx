@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { formatMoney } from '../billing-format';
+import { BillingArrangements } from '../components/BillingArrangements';
 import { BillingTabs } from '../components/BillingTabs';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -591,6 +592,11 @@ export function Billing() {
               </Text>
             </Card>
           )}
+
+          {/* Directly under the current plan, because an unpaid arrangement is
+              the most urgent thing on this page for whoever has one, and
+              invisible to everyone who does not. */}
+          <BillingArrangements />
 
           {admin ? (
             <Card>
