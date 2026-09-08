@@ -113,6 +113,15 @@ export interface Service {
    */
   adopted?: boolean;
   /**
+   * Whether the next deploy replaces this Service's containers instead of
+   * reusing the ones already there.
+   *
+   * Off by default. Optional rather than required because a server that has not
+   * been updated yet simply omits it, and "absent" has to read as off rather
+   * than as an unchecked box flipping itself on.
+   */
+  force_recreate?: boolean;
+  /**
    * Why the most recent deploy failed, empty once one succeeds. Kept so an
    * Operator who was not watching the live stream can still find out.
    */
@@ -567,6 +576,31 @@ export function redeployService(id: string): Promise<Service> {
   return apiRequest<unknown>(`/services/${id}/redeploy`, { method: 'POST' }).then((r) =>
     unwrap<Service>(r, 'service'),
   );
+}
+
+/**
+ * Choose whether the next deploy replaces this Service's containers instead of
+ * reusing the ones already there.
+ *
+ * `docker compose up` reuses a container it judges unchanged, and a change to a
+ * value it reads from an env file does not reliably change that judgement. An
+ * Operator who corrects a variable and redeploys can therefore watch the deploy
+ * report success while the stack comes back up on the containers it already had,
+ * still carrying the old values.
+ *
+ * Nothing on the server changes when this is called: it only records what the
+ * next deploy should do, which is why it is not gated the way a deploy is. The
+ * updated Service is returned, so the stored answer is read back rather than
+ * assumed.
+ *
+ * A missing Service comes back as 404 and an already removed one as 409, both
+ * surfaced as a typed ApiError.
+ */
+export function setServiceForceRecreate(id: string, enabled: boolean): Promise<Service> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/force-recreate`, {
+    method: 'PATCH',
+    body: { enabled },
+  }).then((r) => unwrap<Service>(r, 'service'));
 }
 
 /**

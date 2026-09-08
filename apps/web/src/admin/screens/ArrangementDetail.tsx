@@ -402,7 +402,11 @@ export function ArrangementDetail() {
       return 'Working out what this comes to.';
     }
     if (pricingInPlay && quote.state.status !== 'ready') {
-      return 'What this comes to could not be worked out, so there is no figure to save. Fix the plan, term and currency above, or clear the term to save the rest.';
+      // The breakdown above already says the amount could not be worked out and
+      // that it cannot be saved. Repeating the same sentence under the button
+      // does not tell an Admin anything they have not just read, so this adds
+      // only the way out of it.
+      return 'Fix the plan, term and currency above, or clear the term to save everything else.';
     }
     return null;
   })();
