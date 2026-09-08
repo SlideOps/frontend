@@ -10,11 +10,11 @@ import { OperatorShell, type ActiveKey } from './OperatorShell';
 /*
  * The Operator sidebar, as an information architecture rather than a list.
  *
- * What matters is not which words are on it but what it guarantees: that the
- * groups an Operator opens daily are open, that the ones they visit on purpose
- * are folded away without being taken away, that the workspace they are
- * operating is asked about separately from what they want to do in it, and that
- * every address the app has ever had is still one click away.
+ * What matters is not which words are on it but what it guarantees: that every
+ * group is open until this Operator closes one, that the one they close stays
+ * closed, that the workspace they are operating is asked about once in the top
+ * bar rather than from inside the navigation, and that every address the app has
+ * ever had is still one click away.
  */
 
 const api = vi.hoisted(() => ({
@@ -115,6 +115,24 @@ function sidebar() {
   return within(screen.getByRole('navigation', { name: 'Operator navigation' }));
 }
 
+/** The phone bar, which carries every destination the sidebar carries. */
+function phoneBar() {
+  return within(screen.getByRole('navigation', { name: 'Operator navigation, compact' }));
+}
+
+/** The top bar, where the questions about the whole page are asked. */
+function topBar() {
+  return within(screen.getByRole('banner'));
+}
+
+/** An Operator with somewhere to be, so the switcher has a name to show. */
+function actingIn(name: string) {
+  useWorkspaceStore.setState({
+    workspaces: [{ id: 'ws-1', name, is_personal: false, role: 'owner', active: true }],
+    loaded: true,
+  });
+}
+
 function signedInAs(role: 'operator' | 'admin') {
   useAuthStore.setState({
     status: 'authenticated',
@@ -141,27 +159,42 @@ beforeEach(() => {
 });
 
 describe('the Operator sidebar', () => {
-  it('opens Build, Infrastructure and Connect and leaves every other group closed', () => {
+  it('opens every group for an Operator who has not collapsed any of them', () => {
     show();
 
-    for (const open of ['Build section', 'Infrastructure section', 'Connect section']) {
-      expect(sidebar().getByRole('button', { name: open })).toHaveAttribute(
+    for (const group of structure) {
+      if (!group.heading) {
+        continue;
+      }
+      expect(sidebar().getByRole('button', { name: group.heading })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
     }
-    for (const closed of [
-      'Observe section',
-      'Configure section',
-      'Automate section',
-      'Discover section',
-      'Account section',
-    ]) {
-      expect(sidebar().getByRole('button', { name: closed })).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      );
-    }
+  });
+
+  it('remembers the one group an Operator collapsed and leaves the rest open', async () => {
+    const operator = userEvent.setup();
+    const first = show();
+
+    await operator.click(sidebar().getByRole('button', { name: 'Discover section' }));
+    expect(sidebar().getByRole('button', { name: 'Discover section' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+
+    // The next visit starts from what they chose, not from the default again.
+    first.unmount();
+    show();
+
+    expect(sidebar().getByRole('button', { name: 'Discover section' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(sidebar().getByRole('button', { name: 'Observe section' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
   });
 
   it('offers Overview on its own, outside every group', () => {
@@ -189,7 +222,30 @@ describe('the Operator sidebar', () => {
     });
   }
 
-  it('asks which workspace separately, and never as another navigation entry', () => {
+  it('asks which workspace in the top bar beside search, and not in the sidebar', () => {
+    actingIn('Client X');
+    show();
+
+    expect(topBar().getByRole('button', { name: 'Client X' })).toBeInTheDocument();
+    expect(topBar().getByRole('button', { name: 'Search the workspace' })).toBeInTheDocument();
+    expect(sidebar().queryByRole('button', { name: 'Client X' })).toBeNull();
+    expect(
+      within(screen.getByRole('region', { name: 'Workspace' })).queryByRole('button', {
+        name: 'Client X',
+      }),
+    ).toBeNull();
+  });
+
+  it('mounts exactly one workspace switcher, however many places could show one', () => {
+    actingIn('Client X');
+    show();
+
+    // Two would double the pending invitation and node transfer reads the
+    // switcher makes on every page an Operator opens.
+    expect(screen.getAllByRole('button', { name: 'Client X' })).toHaveLength(1);
+  });
+
+  it('keeps All Workspaces and Team out of every navigation group', () => {
     show();
 
     const workspace = within(screen.getByRole('region', { name: 'Workspace' }));
@@ -198,6 +254,17 @@ describe('the Operator sidebar', () => {
 
     expect(sidebar().queryByRole('button', { name: 'All Workspaces' })).toBeNull();
     expect(sidebar().queryByRole('button', { name: 'Team' })).toBeNull();
+  });
+
+  it('reaches All Workspaces and Team from the phone bar as well', async () => {
+    const operator = userEvent.setup();
+    show();
+
+    await operator.click(phoneBar().getByRole('button', { name: 'All Workspaces' }));
+    expect(screen.getByText('at /app/workspaces')).toBeInTheDocument();
+
+    await operator.click(phoneBar().getByRole('button', { name: 'Team' }));
+    expect(screen.getByText('at /app/team')).toBeInTheDocument();
   });
 
   it('reaches All Workspaces and Team from the workspace block', async () => {
@@ -218,19 +285,32 @@ describe('the Operator sidebar', () => {
 
   it('shows the admin group only to an Operator carrying the admin role', async () => {
     const operator = userEvent.setup();
-    show();
+    const plain = show();
     expect(sidebar().queryByRole('button', { name: 'Admin section' })).toBeNull();
+    plain.unmount();
 
     signedInAs('admin');
     show();
-    const [heading] = screen.getAllByRole('button', { name: 'Admin section' });
-    await operator.click(heading as HTMLElement);
-    expect(heading).toHaveAttribute('aria-expanded', 'true');
+    expect(sidebar().getByRole('button', { name: 'Admin section' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await operator.click(sidebar().getByRole('button', { name: 'Admin' }));
+    expect(screen.getByText('at /admin')).toBeInTheDocument();
   });
 
   it('opens the group holding the current page even when that group was collapsed', () => {
-    // Reports is in a group that starts closed, so a deep link to it would
-    // otherwise land on a page whose own entry cannot be seen.
+    // A deep link into a group this Operator closed would otherwise land them
+    // on a page whose own entry cannot be seen.
+    window.localStorage.setItem(
+      'slideops.navigation',
+      JSON.stringify({
+        collapsed_groups: ['observe'],
+        pinned: [],
+        recents: [],
+        sidebar_collapsed: false,
+      }),
+    );
     show('reports');
 
     expect(sidebar().getByRole('button', { name: 'Observe section' })).toHaveAttribute(
@@ -254,7 +334,7 @@ describe('the Operator sidebar', () => {
     expect(sidebar().getByRole('button', { name: 'Projects' })).toBeInTheDocument();
     expect(sidebar().getByRole('button', { name: 'Observe section' })).toHaveAttribute(
       'aria-expanded',
-      'false',
+      'true',
     );
   });
 

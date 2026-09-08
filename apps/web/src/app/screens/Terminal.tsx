@@ -7,6 +7,7 @@ import { SnippetPicker } from '../components/shell/SnippetPicker';
 import { TabStrip } from '../components/shell/TabStrip';
 import { TargetPicker, type PickedTarget } from '../components/shell/TargetPicker';
 import { OperatorShell } from '../components/OperatorShell';
+import { shellScopeFor } from '../shell-scope';
 
 /*
  * One terminal home for the whole Workspace: pick any server or Service,
@@ -43,10 +44,7 @@ function tabFor(target: PickedTarget): OpenTab {
     label: service.name,
     urlFor: (cols, rows) => serviceShellUrl(service.id, cols, rows),
     scopeLabel: service.name,
-    scopeDetail:
-      service.runtime === 'systemd'
-        ? 'A shell on the server in this Service’s own directory. Opening it is recorded in the audit trail.'
-        : 'A shell inside this Service’s own container. Opening it is recorded in the audit trail.',
+    scopeDetail: shellScopeFor(service.runtime).detail,
     unavailableReason:
       service.status === 'running'
         ? undefined

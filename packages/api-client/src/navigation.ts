@@ -28,25 +28,16 @@ export interface NavigationPreferences {
 }
 
 /**
- * The groups that start closed for an Operator who has never chosen.
+ * The groups that start closed for an Operator who has never chosen: none.
  *
- * Build, Infrastructure and Connect are the daily work and stay open; the rest
- * are visited on purpose rather than continuously, so they start out of the way
- * and the sidebar opens short enough to read in one glance. The admin surface's
- * groups are prefixed so both sidebars can share one stored list without two
- * groups named the same thing colliding.
+ * Deciding for an Operator which parts of their own product are worth seeing
+ * hides destinations from the one person who has not yet learned they exist,
+ * and the sidebar cannot know which groups this Operator's work lives in. So
+ * everything is open until they close it, and what they close is remembered.
+ * Both sidebars share one stored list, which is why the admin groups are
+ * prefixed: two groups named the same thing must not close each other.
  */
-export const DEFAULT_COLLAPSED_GROUPS: readonly string[] = [
-  'observe',
-  'configure',
-  'automate',
-  'discover',
-  'account',
-  'admin',
-  'admin-delivery',
-  'admin-insight',
-  'admin-controls',
-];
+export const DEFAULT_COLLAPSED_GROUPS: readonly string[] = [];
 
 /** The preferences an Operator has before they have expressed any. */
 export function defaultNavigationPreferences(): NavigationPreferences {

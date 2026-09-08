@@ -2,7 +2,6 @@ import { Audience } from './sections/Audience';
 import { CapabilitiesShowcase } from './sections/CapabilitiesShowcase';
 import { ClosingCta } from './sections/ClosingCta';
 import { DeployMonitor } from './sections/DeployMonitor';
-import { Docs } from './sections/Docs';
 import { Faq } from './sections/Faq';
 import { Hero } from './sections/Hero';
 import { Lifecycle } from './sections/Lifecycle';
@@ -49,11 +48,6 @@ export function CapabilitiesPage() {
 /** Who SlideOps is for, on its own route. */
 export function AudiencePage() {
   return <Audience />;
-}
-
-/** The docs rendered from markdown, on their own route. */
-export function DocsPage() {
-  return <Docs />;
 }
 
 /** Pricing, on its own route. */

@@ -1,7 +1,7 @@
 import { cn, prefersReducedMotion } from '@slideops/design-system';
 import { ChevronDown, type LucideIcon } from '@slideops/icons';
 import { Tooltip } from '@slideops/tooltips';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /*
  * The grouped sidebar navigation, shared by the Operator and the Admin surface.
@@ -265,7 +265,14 @@ function Group({
  * stored preferences say, so an Operator following a deep link never arrives at
  * a page whose own entry is hidden.
  */
-export function SidebarNav({
+/*
+ * Memoised because the whole sidebar renders every destination at once now that
+ * groups start open. Its props change only when the page or the collapsed set
+ * does, while the shell around it re-renders on anything a screen does, so
+ * without this the entire navigation was rebuilt on every keystroke typed into
+ * any form on any page.
+ */
+export const SidebarNav = memo(function SidebarNav({
   primary,
   groups,
   collapsedGroups,
@@ -290,4 +297,4 @@ export function SidebarNav({
       ))}
     </div>
   );
-}
+});

@@ -31,9 +31,10 @@ const columns: { heading: string; links: FooterLink[] }[] = [
   {
     heading: 'Learn',
     links: [
-      { to: '/docs', label: 'Getting started' },
-      { to: '/docs', label: 'Servers and Projects' },
-      { to: '/docs', label: 'How an Operation works' },
+      { to: '/docs', label: 'Documentation' },
+      { to: '/docs/start/quick-start', label: 'Quick start' },
+      { to: '/docs/start/how-an-operation-works', label: 'How an Operation works' },
+      { to: '/docs/reference/glossary', label: 'Glossary' },
     ],
   },
   {

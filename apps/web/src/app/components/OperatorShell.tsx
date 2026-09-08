@@ -24,7 +24,7 @@ import {
   X,
 } from '@slideops/icons';
 import { AppShell, type NavGroup, type NavItem } from '@slideops/ui';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { useWorkspaceStore } from '../../store/workspace';
@@ -34,6 +34,7 @@ import { CommandPalette } from './CommandPalette';
 import { InstallApp } from './InstallApp';
 import { LogoutButton } from './LogoutButton';
 import { WorkspaceContextPanel } from './WorkspaceContextPanel';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 export type ActiveKey =
   | 'home'
@@ -130,22 +131,31 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
   }, [refreshWorkspaces]);
 
   /** One entry, with the active marking every entry needs. */
-  const item = (key: ActiveKey, label: string, icon: NavItem['icon'], path: string): NavItem => ({
-    key,
-    label,
-    icon,
-    active: active === key,
-    onSelect: () => navigate(path),
-  });
+  const item = useCallback(
+    (key: ActiveKey, label: string, icon: NavItem['icon'], path: string): NavItem => ({
+      key,
+      label,
+      icon,
+      active: active === key,
+      onSelect: () => navigate(path),
+    }),
+    [active, navigate],
+  );
 
   /*
    * The navigation, grouped by what an Operator came to do rather than by which
    * part of the system answers it. Build is what they are shipping,
    * Infrastructure is what it runs on, Connect is how the world reaches it, and
    * the rest are the things they look at on purpose. Order is deliberate: the
-   * three groups an Operator opens daily come first and start open.
+   * groups an Operator opens daily come first. Every group starts open, and
+   * then stays however that Operator leaves it.
    */
-  const groups: NavGroup[] = [
+  // Rebuilt only when the current page, or who is looking, actually changes.
+  // With every group open the sidebar renders every destination at once, and
+  // without this it rebuilt all of them on each keystroke typed anywhere on the
+  // page, which is work nobody asked for and enough of it to be felt.
+  const groups: NavGroup[] = useMemo(() => {
+    const built: NavGroup[] = [
     {
       key: 'build',
       label: 'Build',
@@ -210,31 +220,48 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
         item('security', 'Security', Shield, '/app/security'),
       ],
     },
-  ];
+    ];
 
-  // The admin group is offered only when this account carries the admin role,
-  // and it crosses into the separate /admin area rather than an app screen.
-  if (isAdmin(operator)) {
-    groups.push({
-      key: 'admin',
-      label: 'Admin',
-      items: [
-        {
-          key: 'admin',
-          label: 'Admin',
-          icon: ShieldCheck,
-          active: false,
-          onSelect: () => navigate('/admin'),
-        },
-      ],
-    });
-  }
+    // The admin group is offered only when this account carries the admin role,
+    // and it crosses into the separate /admin area rather than an app screen.
+    if (isAdmin(operator)) {
+      built.push({
+        key: 'admin',
+        label: 'Admin',
+        items: [
+          {
+            key: 'admin',
+            label: 'Admin',
+            icon: ShieldCheck,
+            active: false,
+            onSelect: () => navigate('/admin'),
+          },
+        ],
+      });
+    }
+    return built;
+  }, [item, navigate, operator]);
+
+  // Both are single element lists rebuilt on every render otherwise, which is
+  // enough on its own to defeat the memo around the navigation: a new array is
+  // a new prop however identical its contents.
+  const primary = useMemo(
+    () => [item('home', 'Overview', LayoutDashboard, '/app')],
+    [item],
+  );
+  const contextNav = useMemo(
+    () => [
+      item('workspaces', 'All Workspaces', Building2, '/app/workspaces'),
+      item('team', 'Team', Users, '/app/team'),
+    ],
+    [item],
+  );
 
   return (
     <>
       <AppShell
         surface="Operator"
-        primary={[item('home', 'Overview', LayoutDashboard, '/app')]}
+        primary={primary}
         groups={groups}
         context={
           <WorkspaceContextPanel
@@ -242,16 +269,17 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
             current={active === 'workspaces' ? 'workspaces' : active === 'team' ? 'team' : 'none'}
           />
         }
-        contextNav={[
-          item('workspaces', 'All Workspaces', Building2, '/app/workspaces'),
-          item('team', 'Team', Users, '/app/team'),
-        ]}
+        contextNav={contextNav}
         collapsedGroups={preferences.collapsed_groups}
         onToggleGroup={toggleGroup}
         railCollapsed={rail}
         onToggleRail={toggleSidebar}
         actions={
           <>
+            {/* The only switcher in the app. Mounting a second one anywhere
+                would double the pending invitation and node transfer reads it
+                makes on every page an Operator opens. */}
+            <WorkspaceSwitcher />
             <InstallApp />
             <SearchTrigger onOpen={() => setPaletteOpen(true)} />
             <NotificationsBell />

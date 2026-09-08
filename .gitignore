@@ -7,6 +7,12 @@ dist/
 build/
 *.tsbuildinfo
 
+# The documentation section named Build is prose, not build output, and the bare
+# pattern above swallowed it whole: the files existed on disk and git never saw
+# them. Re-included by name rather than by narrowing the pattern, so genuine
+# build directories anywhere else in the tree stay ignored.
+!apps/web/src/marketing/docs/build/
+
 # turbo
 .turbo/
 

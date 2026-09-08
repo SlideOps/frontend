@@ -11,6 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ShellTabs } from '../components/shell/ShellTabs';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { shellScopeFor } from '../shell-scope';
 
 /*
  * A shell on a page of its own.
@@ -66,12 +67,8 @@ export function ServiceShellPage() {
     >
       <ShellTabs
         urlFor={(cols, rows) => serviceShellUrl(id, cols, rows)}
-        scopeLabel={service?.runtime === 'systemd' ? 'This Service, on the server' : 'Inside this Service'}
-        scopeDetail={
-          service?.runtime === 'systemd'
-            ? 'A shell on the server in this Service’s own directory. Opening it is recorded in the audit trail.'
-            : 'A shell inside this Service’s own container. Opening it is recorded in the audit trail.'
-        }
+        scopeLabel={shellScopeFor(service?.runtime).label}
+        scopeDetail={shellScopeFor(service?.runtime).detail}
         unavailableReason={
           !service || service.status === 'running'
             ? undefined

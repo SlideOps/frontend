@@ -2,6 +2,7 @@ import { cn } from '@slideops/design-system';
 import { AlertTriangle, ArrowRight, CheckCircle2, Info, X, XCircle } from '@slideops/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hasToastShown, rememberToastShown } from './shownToasts';
 import type { AppNotification, NotificationTone } from './store';
 import { useNotificationsStore } from './store';
 
@@ -31,46 +32,74 @@ export function Toaster() {
   const navigate = useNavigate();
   const items = useNotificationsStore((state) => state.items);
   const [active, setActive] = useState<AppNotification[]>([]);
-  const seen = useRef<Set<string>>(new Set());
+  /** The pending dismiss countdown for each toast on screen, by notification id. */
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    const fresh = items.filter((item) => !seen.current.has(item.id));
-    if (fresh.length === 0) {
-      return;
-    }
-    for (const item of fresh) {
-      seen.current.add(item.id);
-    }
-    // An inbox notification the durable backend already has marked read (from a
-    // prior session, or an earlier visit this same one) has already been shown
-    // to the Operator once. It still belongs in the bell's list, but "not yet
-    // seen by this particular page load" is not the same question as "not yet
-    // seen by the Operator", and toasting it again on every fresh login was
-    // exactly that mistake: the same already-read notification popping up
-    // forever, on every browser, since a fresh mount has never personally seen
-    // it before either.
-    const toastWorthy = fresh.filter((item) => !item.read);
+    // Two independent reasons not to toast, and both are needed.
+    //
+    // Read covers an inbox notification the durable backend already has marked
+    // read, from a prior session or an earlier visit this same one: the
+    // Operator has dealt with it, so it belongs in the bell's list and nowhere
+    // else. But read alone was the whole guard, and for a notification that
+    // lives only in the live event stream, read state never leaves memory. A
+    // reload rebuilt it unread and it popped up again, forever.
+    //
+    // So the second reason is this browser's own record of having already put
+    // the thing on screen, which survives the reload that read state does not.
+    const toastWorthy = items.filter((item) => !item.read && !hasToastShown(item.id));
     if (toastWorthy.length === 0) {
       return;
     }
+    // Recorded as it appears rather than as it is dismissed, so a toast the
+    // Operator watched ease away on its own still counts as having been shown.
+    for (const item of toastWorthy) {
+      rememberToastShown(item.id);
+    }
     setActive((current) => [...toastWorthy, ...current].slice(0, 3));
     // A persistent notification waits until acted on, so it gets no dismiss timer.
-    const timers = toastWorthy
-      .filter((item) => !item.persistent)
-      .map((item) =>
-        setTimeout(() => {
-          setActive((current) => current.filter((toast) => toast.id !== item.id));
-        }, TOAST_MS),
-      );
-    return () => timers.forEach(clearTimeout);
+    //
+    // The timers are held across renders rather than cleaned up when items
+    // changes. Clearing them there cancelled the countdown of every toast
+    // already on screen the moment a new notification arrived, so a busy
+    // Workspace left toasts stacked up and never leaving: the effect tidied
+    // away the timers of toasts it had nothing to do with.
+    for (const item of toastWorthy) {
+      if (item.persistent) {
+        continue;
+      }
+      const timer = setTimeout(() => {
+        timers.current.delete(item.id);
+        setActive((current) => current.filter((toast) => toast.id !== item.id));
+      }, TOAST_MS);
+      timers.current.set(item.id, timer);
+    }
   }, [items]);
+
+  // Only unmounting cancels a countdown, which is the one moment there is
+  // nothing left to count down for.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending.values()) {
+        clearTimeout(timer);
+      }
+      pending.clear();
+    };
+  }, []);
 
   if (active.length === 0) {
     return null;
   }
 
-  const dismiss = (id: string) =>
+  const dismiss = (id: string) => {
+    const pending = timers.current.get(id);
+    if (pending !== undefined) {
+      clearTimeout(pending);
+      timers.current.delete(id);
+    }
     setActive((current) => current.filter((toast) => toast.id !== id));
+  };
 
   return (
     <div

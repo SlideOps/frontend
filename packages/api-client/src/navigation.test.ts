@@ -26,15 +26,10 @@ afterEach(() => {
 });
 
 describe('navigation preferences', () => {
-  it('starts an Operator with the three daily groups open and the rest closed', () => {
+  it('starts an Operator with every group open and nothing collapsed for them', () => {
     const preferences = defaultNavigationPreferences();
 
-    expect(preferences.collapsed_groups).not.toContain('build');
-    expect(preferences.collapsed_groups).not.toContain('infrastructure');
-    expect(preferences.collapsed_groups).not.toContain('connect');
-    expect(preferences.collapsed_groups).toEqual(
-      expect.arrayContaining(['observe', 'configure', 'automate', 'discover', 'account']),
-    );
+    expect(preferences.collapsed_groups).toEqual([]);
     expect(preferences.sidebar_collapsed).toBe(false);
   });
 
@@ -43,7 +38,10 @@ describe('navigation preferences', () => {
     expect(normalizeNavigationPreferences('nonsense')).toEqual(defaultNavigationPreferences());
   });
 
-  it('keeps an empty set of collapsed groups apart from a missing one', () => {
+  it('keeps every group an Operator collapsed, and collapses nothing they did not', () => {
+    expect(
+      normalizeNavigationPreferences({ collapsed_groups: ['observe'] }).collapsed_groups,
+    ).toEqual(['observe']);
     expect(normalizeNavigationPreferences({ collapsed_groups: [] }).collapsed_groups).toEqual([]);
     expect(normalizeNavigationPreferences({}).collapsed_groups).toEqual(
       defaultNavigationPreferences().collapsed_groups,

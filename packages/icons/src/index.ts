@@ -46,6 +46,8 @@ export {
   Eye,
   EyeOff,
   ExternalLink,
+  Hash,
+  Link2,
   FileText,
   FolderKanban,
   Fingerprint,
