@@ -109,7 +109,8 @@ beforeEach(() => {
       type: 'access_revoked',
       label: 'Access revoked',
       applicable: false,
-      reason: 'this arrangement has not ended, so telling the customer their access is gone would not be true',
+      reason:
+        'this arrangement has not ended, so telling the customer their access is gone would not be true',
     },
   ]);
   api.listArrangementEmails.mockReset().mockResolvedValue([
@@ -127,9 +128,9 @@ beforeEach(() => {
     { name: 'pro', currency: 'USD', amount_minor: 4900, purchasable: true },
   ]);
   api.listArrangementCurrencies.mockReset().mockResolvedValue(['USD', 'NGN']);
-  api.quoteArrangement.mockReset().mockImplementation((_operatorId, input) =>
-    Promise.resolve(quoteFor(input)),
-  );
+  api.quoteArrangement
+    .mockReset()
+    .mockImplementation((_operatorId, input) => Promise.resolve(quoteFor(input)));
   api.updateArrangement.mockReset().mockResolvedValue(detail);
   api.revokeArrangementAccess.mockReset().mockResolvedValue(detail);
   api.restoreArrangementAccess.mockReset().mockResolvedValue(detail);
@@ -274,7 +275,9 @@ describe('managing one arrangement', () => {
     await waitFor(() =>
       expect(api.sendArrangementEmail).toHaveBeenCalledWith('arr-1', 'payment_reminder'),
     );
-    expect(await screen.findByText(/Nothing else about this arrangement changed/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Nothing else about this arrangement changed/),
+    ).toBeInTheDocument();
   });
 
   it('lists what was already sent to the customer, with who sent it and how it went', async () => {
@@ -299,9 +302,7 @@ describe('managing one arrangement', () => {
     await userEvent.selectOptions(screen.getByLabelText('Plan'), 'starter');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
-    expect(
-      await screen.findByText('The amount must be greater than zero.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('The amount must be greater than zero.')).toBeInTheDocument();
   });
 });
 
@@ -313,9 +314,7 @@ describe('a server build without the lifecycle endpoints', () => {
     api.listArrangementEmails.mockRejectedValue(missing);
 
     renderScreen();
-    expect(
-      await screen.findByText(/cannot be opened on this server build/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/cannot be opened on this server build/i)).toBeInTheDocument();
     expect(screen.getByText(/still work from the Subscriber page/i)).toBeInTheDocument();
   });
 });
@@ -626,7 +625,7 @@ describe('an edit that appeared to do nothing', () => {
     expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
     expect(await screen.findByText(/nothing has been changed yet/i)).toBeInTheDocument();
   });
-})
+});
 
 /*
  * The term an arrangement was priced from.
@@ -802,7 +801,7 @@ describe('choosing a message to send', () => {
     expect(await screen.findByText(/has not ended/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
   });
-})
+});
 
 /*
  * The code behind the figure.
@@ -854,5 +853,83 @@ describe('the discount an arrangement was granted under', () => {
 
     await waitFor(() => expect(api.quoteArrangement).toHaveBeenCalled());
     expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBeUndefined();
+  });
+});
+
+/*
+ * What the screen says about a revocation.
+ *
+ * It said nothing at all: the status badge moved and everything else on the
+ * page read exactly as before, so an Admin who had just taken a customer's
+ * plan away had no confirmation it happened, no record of the reason they had
+ * been made to type, and no way to see what the customer was left with. Two of
+ * those three fields had never even been declared on the client type, so
+ * nothing could have shown them.
+ */
+describe('seeing that access was actually revoked', () => {
+  /** The same arrangement, after an Admin took the access back. */
+  function revoked(over: Record<string, unknown> = {}) {
+    return {
+      ...detail,
+      access_state: 'revoked',
+      arrangement: {
+        ...detail.arrangement,
+        status: 'revoked',
+        revoked_at: '2026-09-08T12:00:00Z',
+        revoked_by_operator_id: 'admin-1',
+        revocation_reason: 'Payment never arrived after two reminders',
+        ...over,
+      },
+    };
+  }
+
+  it('states the revocation, its reason, and what the customer was left with', async () => {
+    api.getArrangement.mockResolvedValue(
+      revoked({
+        superseded_subscription: {
+          tier: 'starter',
+          provider: 'paystack',
+          current_period_end: '2126-12-01T00:00:00Z',
+        },
+      }),
+    );
+
+    renderScreen();
+
+    expect(await screen.findByText(/Access withdrawn/)).toBeInTheDocument();
+    expect(screen.getByText('Payment never arrived after two reminders')).toBeInTheDocument();
+    // The part that matters most: they were put back on what they paid for.
+    expect(screen.getByText(/Returned to starter/)).toBeInTheDocument();
+  });
+
+  it('says plainly when the revocation did drop them to free', async () => {
+    api.getArrangement.mockResolvedValue(revoked());
+
+    renderScreen();
+
+    expect(await screen.findByText(/Access withdrawn/)).toBeInTheDocument();
+    expect(screen.getByText(/Returned to Free/)).toBeInTheDocument();
+  });
+
+  it('says what a revoke will return them to before it is confirmed', async () => {
+    api.getArrangement.mockResolvedValue({
+      ...detail,
+      arrangement: {
+        ...detail.arrangement,
+        superseded_subscription: {
+          tier: 'starter',
+          provider: 'paystack',
+          current_period_end: '2126-12-01T00:00:00Z',
+        },
+      },
+    });
+
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
+
+    // "Am I about to take away something they paid for" is the question this
+    // dialog exists to let an Admin ask.
+    expect(await screen.findByText(/They go back to/)).toBeInTheDocument();
+    expect(screen.getByText(/That plan is not affected/)).toBeInTheDocument();
   });
 });

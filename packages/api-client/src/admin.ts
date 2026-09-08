@@ -995,6 +995,28 @@ export interface Arrangement {
   notes?: string;
   created_by_operator_id: string;
   created_at: string;
+  /**
+   * The revocation record, present only once access has been taken back.
+   *
+   * The backend has always returned all three. Only revoked_at was declared
+   * here, so a screen could tell that a revocation had happened but could not
+   * say why or by whom, and none of it was shown anywhere.
+   */
+  revoked_at?: string;
+  revoked_by_operator_id?: string;
+  revocation_reason?: string;
+  /**
+   * The paid plan this grant displaced, absent when it displaced nothing.
+   *
+   * An Operator has one subscription, so a grant overwrites whatever was there.
+   * This is what revoking returns them to: what it is before revoking, what
+   * they got back after.
+   */
+  superseded_subscription?: {
+    tier: string;
+    provider?: string;
+    current_period_end?: string;
+  };
 }
 
 /** Every payment arrangement ever created for one Operator, newest first. */

@@ -204,8 +204,7 @@ export function ArrangementDetail() {
 
   // The row the list handed over, used only when the server has no detail
   // endpoint yet. It is never preferred over what the server says.
-  const carried = (location.state as { arrangement?: ArrangementWithOperator } | null)
-    ?.arrangement;
+  const carried = (location.state as { arrangement?: ArrangementWithOperator } | null)?.arrangement;
 
   const { state, reload } = useAsyncData(
     (signal) => readIfSupported(() => getArrangement(id, signal)),
@@ -323,9 +322,7 @@ export function ArrangementDetail() {
   const currencyOptions = useMemo(
     () =>
       Array.from(
-        new Set(
-          [...chargeableCurrencies, baseline?.currency].filter(Boolean) as string[],
-        ),
+        new Set([...chargeableCurrencies, baseline?.currency].filter(Boolean) as string[]),
       ),
     [chargeableCurrencies, baseline?.currency],
   );
@@ -497,10 +494,7 @@ export function ArrangementDetail() {
   // Read from its own endpoint. The detail response never carried these, so the
   // list was empty, no type was ever selected, and the control that sends
   // returned immediately: pressing it did nothing at all.
-  const emailTypeList = useAsyncData(
-    (signal) => listArrangementEmailTypes(id, signal),
-    [id],
-  );
+  const emailTypeList = useAsyncData((signal) => listArrangementEmailTypes(id, signal), [id]);
   const emailTypes = useMemo(
     () =>
       emailTypeList.state.status === 'ready'
@@ -517,7 +511,9 @@ export function ArrangementDetail() {
     // Follow the server's own list of message types; never invent one.
     // The first one that can actually be sent, so an Admin does not open on a
     // message the server would refuse.
-    setEmailType((emailTypes.find((type) => type.applicable !== false) ?? emailTypes[0])?.type ?? '');
+    setEmailType(
+      (emailTypes.find((type) => type.applicable !== false) ?? emailTypes[0])?.type ?? '',
+    );
     setPreview(null);
   }, [emailTypes]);
 
@@ -601,8 +597,8 @@ export function ArrangementDetail() {
             This arrangement cannot be opened on this server build. {notOnThisServerYet}
           </Text>
           <Text variant="body-sm" tone="secondary" className="mt-2">
-            Creating arrangements, cancelling one, and extending a deadline are unaffected and
-            still work from the Subscriber page.
+            Creating arrangements, cancelling one, and extending a deadline are unaffected and still
+            work from the Subscriber page.
           </Text>
         </Card>
       ) : null}
@@ -628,6 +624,35 @@ export function ArrangementDetail() {
                 <RotateCcw width={14} height={14} aria-hidden />
                 Reload it
               </Button>
+            </div>
+          ) : null}
+
+          {detail.arrangement.revoked_at ? (
+            <div className="mb-4 rounded-md border border-danger bg-subtle px-4 py-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert width={16} height={16} className="shrink-0 text-danger" aria-hidden />
+                <Text as="span" variant="body-sm" className="font-medium">
+                  Access withdrawn {moment(detail.arrangement.revoked_at)}
+                </Text>
+              </div>
+              {detail.arrangement.revocation_reason ? (
+                <Text variant="body-sm" className="mt-2 block">
+                  {detail.arrangement.revocation_reason}
+                </Text>
+              ) : null}
+              <Text variant="caption" tone="secondary" className="mt-2 block">
+                {/* What actually happened to their access, which is the part an
+                    Admin has to be able to check. A grant laid over a paid plan
+                    returns them to that plan, not to Free. */}
+                {detail.arrangement.superseded_subscription
+                  ? `Returned to ${detail.arrangement.superseded_subscription.tier}, paid until ${moment(
+                      detail.arrangement.superseded_subscription.current_period_end,
+                    )}.`
+                  : 'Returned to Free: this grant did not displace a paid plan.'}
+                {detail.arrangement.revoked_by_operator_id
+                  ? ` Revoked by ${detail.arrangement.revoked_by_operator_id}.`
+                  : ''}
+              </Text>
             </div>
           ) : null}
 
@@ -719,9 +744,7 @@ export function ArrangementDetail() {
               <Fact
                 label="Currency"
                 value={
-                  obligation.kind === 'free'
-                    ? 'Not applicable'
-                    : detail.currency || 'Not recorded'
+                  obligation.kind === 'free' ? 'Not applicable' : detail.currency || 'Not recorded'
                 }
               />
               <Fact label="Payment deadline" value={moment(detail.payment_deadline)} />
@@ -1215,7 +1238,9 @@ export function ArrangementDetail() {
                     <TD>
                       <span
                         className={
-                          email.outcome === 'sent' ? 'font-medium text-success' : 'font-medium text-danger'
+                          email.outcome === 'sent'
+                            ? 'font-medium text-success'
+                            : 'font-medium text-danger'
                         }
                       >
                         {email.outcome}
@@ -1302,19 +1327,43 @@ export function ArrangementDetail() {
               <div className="flex flex-col gap-3">
                 <p>
                   This takes <strong className="text-ink">{detail.arrangement.tier}</strong> away
-                  from <strong className="text-ink">{detail.operator_email || detail.operator_id}</strong>{' '}
+                  from{' '}
+                  <strong className="text-ink">
+                    {detail.operator_email || detail.operator_id}
+                  </strong>{' '}
                   right now.
                 </p>
                 <ul className="flex list-disc flex-col gap-1 pl-5">
-                  <li>Access today: {access.label}. {access.detail}</li>
-                  <li>Payment today: {payment.label}. {payment.detail}</li>
+                  <li>
+                    Access today: {access.label}. {access.detail}
+                  </li>
+                  <li>
+                    Payment today: {payment.label}. {payment.detail}
+                  </li>
                   <li>Outstanding: {obligationText(obligation)}</li>
                   <li>
-                    Access period:{' '}
-                    {moment(detail.access_start ?? detail.arrangement.created_at)} to{' '}
+                    Access period: {moment(detail.access_start ?? detail.arrangement.created_at)} to{' '}
                     {moment(detail.access_end)}
                   </li>
                 </ul>
+                <p className="text-ink">
+                  {/* The answer to "am I about to take away something they paid
+                      for", which is the question this dialog exists to let an
+                      Admin ask. */}
+                  {detail.arrangement.superseded_subscription ? (
+                    <>
+                      They go back to{' '}
+                      <strong className="text-ink">
+                        {detail.arrangement.superseded_subscription.tier}
+                      </strong>
+                      , which they paid for and which runs until{' '}
+                      {moment(detail.arrangement.superseded_subscription.current_period_end)}. That
+                      plan is not affected.
+                    </>
+                  ) : (
+                    'They go back to Free. This grant did not displace a paid plan.'
+                  )}
+                </p>
                 <p>This is written to the audit trail with the reason you give.</p>
                 <Field
                   label="Reason"
