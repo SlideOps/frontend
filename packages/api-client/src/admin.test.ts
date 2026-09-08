@@ -10,6 +10,8 @@ import {
   emergencyEngageMaintenance,
   emergencyReleaseIncident,
   emergencyReleaseMaintenance,
+  getArrangement,
+  updateArrangement,
   getOverview,
   grantEntitlement,
   listAdminOperations,
@@ -671,3 +673,75 @@ describe('admin requests', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/support-notes/note-1');
   });
 });
+
+/*
+ * The revision an editor carries.
+ *
+ * The detail endpoint calls this "revision"; the arrangement inside it calls
+ * the same instant "updated_at". Reading neither and falling through to
+ * created_at meant every save echoed back the moment the arrangement was made
+ * rather than the moment it last changed, so the server correctly refused every
+ * edit as overtaken and an Admin was told to reload and try again, forever.
+ */
+describe('the revision an arrangement editor works from', () => {
+  const detailBody = {
+    arrangement: {
+      id: 'arr-1',
+      operator_id: 'op-1',
+      tier: 'pro',
+      amount_minor: 150000,
+      currency: 'USD',
+      condition: 'temporary_access',
+      status: 'active',
+      created_at: '2026-09-01T10:00:00Z',
+      updated_at: '2026-09-08T11:22:33.456789Z',
+      term_months: 6,
+    },
+    operator_email: 'customer@slideops.com',
+    revision: '2026-09-08T11:22:33.456789Z',
+  };
+
+  it('reads the revision the detail endpoint actually names', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detailBody));
+
+    const detail = await getArrangement('arr-1');
+
+    expect(detail.updated_at).toBe('2026-09-08T11:22:33.456789Z');
+    // The moment it was created is a different instant, and sending it as the
+    // revision is what made every save fail.
+    expect(detail.updated_at).not.toBe('2026-09-01T10:00:00Z');
+  });
+
+  it('falls back to the arrangement own updated_at, never to when it was created', async () => {
+    const withoutRevision = { ...detailBody, revision: undefined };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, withoutRevision));
+
+    const detail = await getArrangement('arr-1');
+
+    expect(detail.updated_at).toBe('2026-09-08T11:22:33.456789Z');
+  });
+
+  it('sends the revision it read back as if_unchanged_since', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, detailBody));
+
+    await updateArrangement('arr-1', { notes: 'a note' }, '2026-09-08T11:22:33.456789Z');
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const sent = JSON.parse(String((init as RequestInit).body));
+    expect(sent.if_unchanged_since).toBe('2026-09-08T11:22:33.456789Z');
+  });
+
+  it('sends no revision at all rather than an empty one', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, detailBody));
+
+    await updateArrangement('arr-1', { notes: 'a note' }, '');
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const sent = JSON.parse(String((init as RequestInit).body));
+    expect('if_unchanged_since' in sent).toBe(false);
+  });
+})

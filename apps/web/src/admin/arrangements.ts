@@ -564,15 +564,82 @@ export function matchesArrangementSearch(row: ArrangementWithOperator, query: st
  * never looked at.
  */
 
-/** The edit form's values, as typed. Amounts are in minor units, as the API takes them. */
+/**
+ * The edit form's values, as typed. Amounts are in minor units, as the API takes
+ * them, and dates are local datetimes as an `<input type="datetime-local">`
+ * produces them, or empty for a date the arrangement does not have.
+ *
+ * The condition is not here on purpose. Everything recorded about an arrangement
+ * can be corrected, but turning a settled payment into a gift after the fact
+ * rewrites what happened rather than correcting it, and revoke, restore and free
+ * grant already exist for changing the arrangement itself.
+ */
 export interface ArrangementEditDraft {
   tier: string;
   amountMinor: string;
   currency: string;
-  /** A local datetime as an `<input type="datetime-local">` produces it, or empty. */
+  /** How many months the amount covers, as typed. Empty means none was recorded. */
+  termMonths: string;
   paymentDeadline: string;
+  accessStart: string;
   accessEnd: string;
+  /** Whether access lapses on its own once the deadline passes. */
+  autoExpireOnDeadline: boolean;
+  /** The admin's own paper trail. Never checked against anything. */
+  externalReference: string;
+  /** When the customer actually paid. */
+  paidAt: string;
   notes: string;
+}
+
+/** One value in the draft, in whichever shape the field it belongs to holds. */
+type ArrangementEditValue = ArrangementEditDraft[keyof ArrangementEditDraft];
+
+/**
+ * Why a stated term cannot be used, when it cannot.
+ *
+ * The backend refuses a negative term with `invalid_term`, but a rule this
+ * simple is better enforced before the request: an admin finds out while they
+ * are still looking at the box they typed it into.
+ *
+ * An empty term is not a problem. It is an arrangement that never recorded one,
+ * which is the ordinary state of everything agreed before the backend began
+ * keeping it.
+ */
+export function termProblem(value: string): string | null {
+  const typed = value.trim();
+  if (typed === '') {
+    return null;
+  }
+  const months = Number(typed);
+  if (!Number.isFinite(months)) {
+    return 'The term has to be a number of months.';
+  }
+  if (!Number.isInteger(months)) {
+    return 'The term has to be a whole number of months.';
+  }
+  if (months < 0) {
+    return 'A term cannot be negative. Enter how many months the amount covers, or clear the box.';
+  }
+  return null;
+}
+
+/**
+ * The term the arrangement itself recorded, ready for the form.
+ *
+ * A zero is the placeholder an arrangement carries when no term was recorded,
+ * which every arrangement agreed before the backend kept one carries. It is read
+ * as unknown and asked for once, never as a term of zero months that could be
+ * priced or shown as a fact.
+ */
+export function recordedTerm(termMonths: number | undefined | null): string {
+  return typeof termMonths === 'number' && termMonths > 0 ? String(termMonths) : '';
+}
+
+/** Whether a term states a period there is something to price. */
+export function pricesFromTerm(termMonths: string): boolean {
+  const months = Number(termMonths.trim());
+  return termMonths.trim() !== '' && Number.isFinite(months) && months >= 1;
 }
 
 /** One field an edit would change, phrased for the confirmation before saving. */
@@ -589,17 +656,41 @@ export interface ArrangementEdit {
   patch: ArrangementUpdate;
 }
 
+// The order the summary reads in: what access was granted, then what it costs
+// and how it was settled, then when it all happens, then the note.
 const editFieldLabels: Record<keyof ArrangementEditDraft, string> = {
   tier: 'Plan',
+  accessStart: 'Access starts',
+  accessEnd: 'Access ends',
+  termMonths: 'Term',
   amountMinor: 'Amount',
   currency: 'Currency',
+  externalReference: 'External reference',
+  paidAt: 'Paid at',
   paymentDeadline: 'Payment deadline',
-  accessEnd: 'Access ends',
+  autoExpireOnDeadline: 'Expire when the deadline passes',
   notes: 'Internal notes',
 };
 
+/** The fields holding a moment, so one rule reads all of them the same way. */
+const momentFields = new Set<keyof ArrangementEditDraft>([
+  'paymentDeadline',
+  'accessStart',
+  'accessEnd',
+  'paidAt',
+]);
+
 /** How a value reads in the summary, with a name for the absence of one. */
-function shownValue(field: keyof ArrangementEditDraft, value: string, currency: string): string {
+function shownValue(
+  field: keyof ArrangementEditDraft,
+  value: ArrangementEditValue,
+  currency: string,
+): string {
+  if (typeof value === 'boolean') {
+    // A switch reads as what it does rather than as true or false, because the
+    // summary is what an admin checks before changing somebody's access.
+    return value ? 'Yes' : 'No';
+  }
   if (!value) {
     return 'Not set';
   }
@@ -607,11 +698,20 @@ function shownValue(field: keyof ArrangementEditDraft, value: string, currency: 
     const minor = Number(value);
     return Number.isFinite(minor) ? formatAmount(minor, currency || undefined) : value;
   }
-  if (field === 'paymentDeadline' || field === 'accessEnd') {
+  if (field === 'termMonths') {
+    const months = Number(value);
+    return Number.isFinite(months) ? termText(months) : value;
+  }
+  if (momentFields.has(field)) {
     const when = new Date(value);
     return Number.isNaN(when.getTime()) ? value : when.toLocaleString();
   }
   return value;
+}
+
+/** A local datetime as the API takes it, with an empty box meaning cleared. */
+function momentOrCleared(value: string): Date | null {
+  return value ? new Date(value) : null;
 }
 
 /**
@@ -632,11 +732,11 @@ export function arrangementEdit(
     if (before[field] === after[field]) {
       continue;
     }
-    if (field === 'amountMinor' && !Number.isFinite(Number(after[field]))) {
-      continue;
-    }
-    if (field === 'amountMinor' && after[field].trim() === '') {
-      continue;
+    if (field === 'amountMinor') {
+      const typed = after.amountMinor.trim();
+      if (typed === '' || !Number.isFinite(Number(typed))) {
+        continue;
+      }
     }
     changes.push({
       field,
@@ -655,11 +755,36 @@ export function arrangementEdit(
       case 'currency':
         patch.currency = after.currency;
         break;
+      case 'termMonths': {
+        const months = Number(after.termMonths.trim());
+        if (after.termMonths.trim() === '') {
+          // A cleared box says the arrangement records no term, which is the
+          // zero the backend reads as unknown rather than as zero months.
+          patch.termMonths = 0;
+        } else if (Number.isFinite(months)) {
+          patch.termMonths = Math.trunc(months);
+        }
+        // A term that is not a number at all is left out and never sent:
+        // termProblem stops the save before this patch reaches the wire.
+        break;
+      }
       case 'paymentDeadline':
-        patch.paymentDeadline = after.paymentDeadline ? new Date(after.paymentDeadline) : null;
+        patch.paymentDeadline = momentOrCleared(after.paymentDeadline);
+        break;
+      case 'accessStart':
+        patch.accessStart = momentOrCleared(after.accessStart);
         break;
       case 'accessEnd':
-        patch.accessEnd = after.accessEnd ? new Date(after.accessEnd) : null;
+        patch.accessEnd = momentOrCleared(after.accessEnd);
+        break;
+      case 'autoExpireOnDeadline':
+        patch.autoExpireOnDeadline = after.autoExpireOnDeadline;
+        break;
+      case 'externalReference':
+        patch.externalReference = after.externalReference;
+        break;
+      case 'paidAt':
+        patch.paidAt = momentOrCleared(after.paidAt);
         break;
       case 'notes':
         patch.notes = after.notes;

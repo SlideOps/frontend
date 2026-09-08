@@ -11,7 +11,10 @@ import {
   obligationOf,
   obligationText,
   paymentReading,
+  pricesFromTerm,
   readIfSupported,
+  recordedTerm,
+  termProblem,
   type ArrangementEditDraft,
   type ArrangementFacts,
 } from './arrangements';
@@ -276,8 +279,13 @@ describe('editing an arrangement', () => {
     tier: 'pro',
     amountMinor: '15000000',
     currency: 'NGN',
+    termMonths: '9',
     paymentDeadline: '2026-08-22T00:00',
+    accessStart: '2026-07-01T00:00',
     accessEnd: '',
+    autoExpireOnDeadline: false,
+    externalReference: '',
+    paidAt: '',
     notes: 'Agreed by phone',
   };
 
@@ -309,6 +317,95 @@ describe('editing an arrangement', () => {
     const { patch, changes } = arrangementEdit(before, { ...before });
     expect(changes).toHaveLength(0);
     expect(patch).toEqual({});
+  });
+
+  it('carries a changed term into both the summary and the patch', () => {
+    const { patch, changes } = arrangementEdit(before, { ...before, termMonths: '12' });
+    expect(patch).toEqual({ termMonths: 12 });
+    expect(changes).toHaveLength(1);
+    expect(changes[0]?.label).toBe('Term');
+    expect(changes[0]?.from).toBe('9 months');
+    expect(changes[0]?.to).toBe('12 months');
+  });
+
+  it('reads a cleared term as the arrangement recording none rather than as zero months', () => {
+    const { patch, changes } = arrangementEdit(before, { ...before, termMonths: '' });
+    expect(patch).toEqual({ termMonths: 0 });
+    expect(changes[0]?.to).toBe('Not set');
+  });
+
+  it('carries a changed access start into both the summary and the patch', () => {
+    const { patch, changes } = arrangementEdit(before, {
+      ...before,
+      accessStart: '2026-07-15T09:30',
+    });
+    expect(patch.accessStart).toEqual(new Date('2026-07-15T09:30'));
+    expect(changes[0]?.label).toBe('Access starts');
+  });
+
+  it('carries a changed auto expire into both the summary and the patch', () => {
+    const { patch, changes } = arrangementEdit(before, {
+      ...before,
+      autoExpireOnDeadline: true,
+    });
+    expect(patch).toEqual({ autoExpireOnDeadline: true });
+    expect(changes[0]?.label).toBe('Expire when the deadline passes');
+    expect(changes[0]?.from).toBe('No');
+    expect(changes[0]?.to).toBe('Yes');
+  });
+
+  it('carries a changed external reference into both the summary and the patch', () => {
+    const { patch, changes } = arrangementEdit(before, {
+      ...before,
+      externalReference: 'bank-transfer-9931',
+    });
+    expect(patch).toEqual({ externalReference: 'bank-transfer-9931' });
+    expect(changes[0]?.label).toBe('External reference');
+    expect(changes[0]?.to).toBe('bank-transfer-9931');
+  });
+
+  it('carries a changed paid at into both the summary and the patch', () => {
+    const { patch, changes } = arrangementEdit(before, { ...before, paidAt: '2026-07-02T11:00' });
+    expect(patch.paidAt).toEqual(new Date('2026-07-02T11:00'));
+    expect(changes[0]?.label).toBe('Paid at');
+  });
+
+  it('offers no way to change what kind of arrangement this is', () => {
+    // Turning a settled payment into a gift after the fact rewrites what
+    // happened rather than correcting it, so the condition is not a field.
+    expect(Object.keys(before)).not.toContain('condition');
+    const { patch } = arrangementEdit(before, { ...before, tier: 'enterprise' });
+    expect(patch).not.toHaveProperty('condition');
+  });
+});
+
+describe('the term an arrangement was priced from', () => {
+  it('reads a recorded term as the number of months it says', () => {
+    expect(recordedTerm(9)).toBe('9');
+  });
+
+  it('reads a zero term as unknown rather than as a term of zero months', () => {
+    expect(recordedTerm(0)).toBe('');
+    expect(recordedTerm(undefined)).toBe('');
+  });
+
+  it('prices only from a term that states a period there is something to price', () => {
+    expect(pricesFromTerm('12')).toBe(true);
+    expect(pricesFromTerm('')).toBe(false);
+    expect(pricesFromTerm('0')).toBe(false);
+  });
+
+  it('says a negative term cannot be used, before the backend has to refuse it', () => {
+    expect(termProblem('-3')).toMatch(/cannot be negative/i);
+  });
+
+  it('says a term that is not a whole number of months cannot be used', () => {
+    expect(termProblem('1.5')).toMatch(/whole number/i);
+  });
+
+  it('finds no fault with an empty term, which is an arrangement that recorded none', () => {
+    expect(termProblem('')).toBeNull();
+    expect(termProblem('12')).toBeNull();
   });
 });
 
