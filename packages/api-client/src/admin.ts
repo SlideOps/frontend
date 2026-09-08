@@ -1626,14 +1626,50 @@ export function listArrangementEmails(
  * and the customer is not written to, which is the whole point of being able
  * to read it first.
  */
+
+/**
+ * The message envelope, as the endpoints actually return it.
+ *
+ * Both of these answer with `{ message, sent }`, and the message carries its
+ * body as `body_text` and `body_html`. The readers below looked for `preview`
+ * and `email`, found neither, and cast the whole envelope, so every field they
+ * went on to read was undefined: no recipient, no subject, no body. The preview
+ * rendered blank, and because the control that actually sends sits inside the
+ * preview, there was nothing to press either.
+ *
+ * The plain text is what a preview shows. It is what the customer reads when
+ * their client will not render HTML, and it is the version that can be shown in
+ * a page without the message's own styling escaping into it.
+ */
+interface ArrangementMessageEnvelope {
+  message?: {
+    type?: string;
+    to?: string;
+    subject?: string;
+    body_text?: string;
+    body_html?: string;
+  };
+  sent?: boolean;
+}
+
+function readArrangementMessage(body: ArrangementMessageEnvelope): ArrangementEmailPreview {
+  const message = body.message ?? {};
+  return {
+    type: message.type ?? '',
+    to: message.to ?? '',
+    subject: message.subject ?? '',
+    body: message.body_text ?? message.body_html ?? '',
+  };
+}
+
 export function previewArrangementEmail(
   arrangementId: string,
   type: string,
 ): Promise<ArrangementEmailPreview> {
-  return apiRequest<{ preview?: ArrangementEmailPreview } & Partial<ArrangementEmailPreview>>(
+  return apiRequest<ArrangementMessageEnvelope>(
     `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails/preview`,
     { method: 'POST', body: { type } },
-  ).then((r) => r.preview ?? (r as ArrangementEmailPreview));
+  ).then(readArrangementMessage);
 }
 
 /**
@@ -1643,11 +1679,11 @@ export function previewArrangementEmail(
 export function sendArrangementEmail(
   arrangementId: string,
   type: string,
-): Promise<ArrangementEmail> {
-  return apiRequest<{ email?: ArrangementEmail } & Partial<ArrangementEmail>>(
+): Promise<ArrangementEmailPreview> {
+  return apiRequest<ArrangementMessageEnvelope>(
     `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails`,
     { method: 'POST', body: { type } },
-  ).then((r) => r.email ?? (r as ArrangementEmail));
+  ).then(readArrangementMessage);
 }
 
 /**

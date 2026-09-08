@@ -11,6 +11,8 @@ import {
   emergencyReleaseIncident,
   emergencyReleaseMaintenance,
   getArrangement,
+  previewArrangementEmail,
+  sendArrangementEmail,
   updateArrangement,
   getOverview,
   grantEntitlement,
@@ -743,5 +745,77 @@ describe('the revision an arrangement editor works from', () => {
     const [, init] = fetchMock.mock.calls[0]!;
     const sent = JSON.parse(String((init as RequestInit).body));
     expect('if_unchanged_since' in sent).toBe(false);
+  });
+})
+
+/*
+ * The message these endpoints actually return.
+ *
+ * Both answer with `{ message, sent }`, and the message carries its body as
+ * body_text and body_html. The readers looked for `preview` and `email`, found
+ * neither, and cast the whole envelope, so every field was undefined. The
+ * preview rendered blank, and because the control that sends sits inside the
+ * preview, there was nothing to press either.
+ */
+describe('a customer message on an arrangement', () => {
+  const envelope = {
+    message: {
+      type: 'payment_reminder',
+      to: 'customer@slideops.com',
+      subject: 'Reminder: payment for your SlideOps pro plan',
+      body_html: '<!doctype html><p>Payment reminder</p>',
+      body_text: 'Payment reminder\n\nYour payment is due.',
+    },
+    sent: false,
+  };
+
+  it('reads the recipient, the subject and the body a preview came back with', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    const preview = await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(preview.to).toBe('customer@slideops.com');
+    expect(preview.subject).toBe('Reminder: payment for your SlideOps pro plan');
+    expect(preview.body).toContain('Your payment is due.');
+    expect(preview.type).toBe('payment_reminder');
+  });
+
+  it('shows the plain text rather than the markup the customer never sees as source', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    const preview = await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(preview.body).not.toContain('<!doctype html>');
+  });
+
+  it('reads back who a sent message went to', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, { ...envelope, sent: true }),
+    );
+
+    const sent = await sendArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(sent.to).toBe('customer@slideops.com');
+  });
+
+  it('asks the preview endpoint, which sends nothing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('/emails/preview');
+  });
+
+  it('asks the send endpoint, and names the message type it was told to send', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { ...envelope, sent: true }));
+
+    await sendArrangementEmail('arr-1', 'access_granted');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toMatch(/\/emails$/);
+    expect(JSON.parse(String((init as RequestInit).body)).type).toBe('access_granted');
   });
 })

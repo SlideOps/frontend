@@ -1058,6 +1058,21 @@ export function ArrangementDetail() {
                     <Eye width={14} height={14} aria-hidden />
                     {previewing ? 'Rendering' : 'Preview'}
                   </Button>
+                  {/* Sending is confirmed from inside the preview, which is the
+                      right order: read it, then send it. But the preview is the
+                      only way through, so a render that fails would otherwise
+                      leave no way to write to the customer at all. */}
+                  {!preview ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={runSend}
+                      disabled={sending || !emailType}
+                    >
+                      <Mail width={14} height={14} aria-hidden />
+                      {sending ? 'Sending' : 'Send without previewing'}
+                    </Button>
+                  ) : null}
                 </div>
                 {emailTypes.find((type) => type.type === emailType)?.description ? (
                   <Text variant="caption" tone="secondary" className="mt-2 block">
