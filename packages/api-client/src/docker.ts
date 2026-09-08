@@ -4,11 +4,11 @@ import { apiRequest, unwrap } from './http';
 /*
  * The Docker control centre: what Docker is actually running on one Node.
  *
- * Every call here reads. Nothing in this module starts, stops, prunes, or
- * removes anything, because inspecting a Node must never change it, and an
- * Operator opening a screen has approved nothing. Lifecycle actions on a
- * container go through the Operation approval gate like every other change, and
- * do not belong on a read path.
+ * The reads come first and are the bulk of it: opening a screen must never
+ * change a Node, so nothing on the read path starts, stops, prunes or removes
+ * anything. The lifecycle calls at the foot of the file are the other half, and
+ * every one of them is reached only from a control the Operator pressed. None
+ * of them is issued to populate a view.
  *
  * The Node is the unit, not the Workspace. Docker is a daemon on one machine;
  * there is no meaningful Workspace-wide container list, and pretending there is
@@ -302,4 +302,305 @@ export const DOCKER_NOT_ENABLED_CODE = 'docker_not_enabled';
 /** Whether this deployment serves the Docker workspace at all. */
 export function isDockerNotEnabled(error: unknown): boolean {
   return error instanceof ApiError && error.code === DOCKER_NOT_ENABLED_CODE;
+}
+
+/* ------------------------------------------------------------------ *
+ * Inspecting one container
+ * ------------------------------------------------------------------ */
+
+/**
+ * One filesystem the container has attached, however it was attached.
+ *
+ * `name` is the Docker volume's name and is present only for a volume mount; a
+ * bind mount has a path on the Node and no name, and a tmpfs has neither. The
+ * distinction matters because a named volume survives the container being
+ * removed and a tmpfs does not, which is the difference between a database that
+ * still exists tomorrow and one that does not.
+ */
+export interface DockerMount {
+  type: string;
+  source: string;
+  destination: string;
+  read_only: boolean;
+  name?: string;
+}
+
+/**
+ * The healthcheck the image declares, and what came of it last.
+ *
+ * `test` is Docker's own array form, dispatch token included ("CMD-SHELL", then
+ * the command). `last_status` is absent when the check has never produced a
+ * verdict, which is a real state and not a synonym for unhealthy: a container
+ * inside its start period has been checked by nobody yet.
+ */
+export interface DockerHealthcheck {
+  test: string[];
+  interval_seconds?: number;
+  retries?: number;
+  last_status?: string;
+  last_output?: string;
+}
+
+/** What the container is and when it came to exist. */
+export interface DockerInspectGeneral {
+  id: string;
+  name: string;
+  created_at: string;
+  state: string;
+  status: string;
+  platform: string;
+  runtime: string;
+}
+
+/**
+ * How the container was configured to run.
+ *
+ * There is deliberately no environment here, and there must never be one. A
+ * container's environment is where database passwords, API keys and signing
+ * secrets live, and an inspect panel is a screen that gets left open, screen
+ * shared and pasted into a support thread. SlideOps does not carry those values
+ * to the browser at all, so no screen can leak what it was never given.
+ */
+export interface DockerInspectConfiguration {
+  image: string;
+  command: string;
+  entrypoint: string;
+  working_dir: string;
+  user: string;
+  labels: Record<string, string>;
+}
+
+/**
+ * The ceilings and floors set on the container. Every field is optional because
+ * every one of them is optional in Docker: an absent limit means the Operator
+ * set none, and the container may use whatever the Node has.
+ */
+export interface DockerInspectResources {
+  cpu_limit_cores?: number;
+  cpu_reservation_cores?: number;
+  cpu_shares?: number;
+  memory_limit_mb?: number;
+  memory_reservation_mb?: number;
+  pids_limit?: number;
+}
+
+/** What the container is attached to, and what can reach it. */
+export interface DockerInspectNetworking {
+  networks: string[];
+  /** The container's address on each network it joined, keyed by network name. */
+  ip_addresses: Record<string, string>;
+  ports: DockerPort[];
+  dns: string[];
+  hostname: string;
+}
+
+/** What the container has mounted. */
+export interface DockerInspectStorage {
+  mounts: DockerMount[];
+}
+
+/**
+ * How the container has behaved while running. `pid` and `exit_code` are
+ * mutually exclusive in practice: a running container has a process id and has
+ * not exited, and an exited one has a code and no process.
+ */
+export interface DockerInspectRuntime {
+  restart_policy: string;
+  restart_count: number;
+  healthcheck?: DockerHealthcheck;
+  oom_killed: boolean;
+  pid?: number;
+  exit_code?: number;
+}
+
+/**
+ * Everything the daemon knows about one container, grouped the way it is read
+ * rather than the way Docker nests it.
+ *
+ * `docker inspect` returns a deep tree in which the same fact appears in two
+ * places and half the keys are historical. The backend flattens it into these
+ * six sections so the client never has to know which of `HostConfig`,
+ * `Config` or `State` a given field happens to live under this year.
+ */
+export interface DockerInspect {
+  general: DockerInspectGeneral;
+  configuration: DockerInspectConfiguration;
+  resources: DockerInspectResources;
+  networking: DockerInspectNetworking;
+  storage: DockerInspectStorage;
+  runtime: DockerInspectRuntime;
+}
+
+/**
+ * Everything about one container. Reads only, however much detail it returns.
+ *
+ * `ref` is whatever identifies the container to the daemon: the full id, the
+ * short id, or the name. It is encoded rather than trusted, because a container
+ * name is chosen by whoever created the container and a slash in one must not
+ * become a path segment here.
+ */
+export function inspectDockerContainer(
+  nodeId: string,
+  ref: string,
+  signal?: AbortSignal,
+): Promise<DockerInspect> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/inspect`,
+    { signal },
+  ).then((r) => unwrap<DockerInspect>(r, 'inspect'));
+}
+
+/* ------------------------------------------------------------------ *
+ * Acting on one container
+ * ------------------------------------------------------------------ */
+
+/**
+ * The lifecycle actions that change a running container's state without
+ * destroying it.
+ *
+ * Removal is not one of them and is a separate call on purpose. These six are
+ * reversible -- a stopped container starts again, a paused one unpauses -- and
+ * removal is not, so it does not belong behind the same generic verb where a
+ * screen could reach it by passing a different string.
+ */
+export type DockerContainerAction = 'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'kill';
+
+/**
+ * Run one lifecycle action and return the container as it stands afterwards.
+ *
+ * The response is the container itself rather than an acknowledgement, so a
+ * screen shows the state the daemon reports rather than the state it assumed
+ * the action produced. A stop that left a container in `restarting` because a
+ * policy brought it back must read as `restarting`, not as `exited` because
+ * that is what stopping usually means.
+ *
+ * Exported alongside the six named calls because a row of lifecycle buttons is
+ * one control with six values, and writing it as a switch over six imports
+ * would put the mapping in the screen instead of here.
+ */
+export function runDockerContainerAction(
+  nodeId: string,
+  ref: string,
+  action: DockerContainerAction,
+): Promise<DockerContainer> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/${action}`,
+    { method: 'POST' },
+  ).then((r) => unwrap<DockerContainer>(r, 'container'));
+}
+
+/** Start a stopped container. */
+export function startDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'start');
+}
+
+/** Stop a running container, giving its process the chance to shut down. */
+export function stopDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'stop');
+}
+
+/** Stop and start a container in one step. */
+export function restartDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'restart');
+}
+
+/** Freeze every process in the container, leaving it in memory. */
+export function pauseDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'pause');
+}
+
+/** Resume a paused container. */
+export function unpauseDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'unpause');
+}
+
+/**
+ * Kill a container outright. Unlike stopping, this gives the process no chance
+ * to finish what it was doing, so a screen offering it must say so.
+ */
+export function killDockerContainer(nodeId: string, ref: string): Promise<DockerContainer> {
+  return runDockerContainerAction(nodeId, ref, 'kill');
+}
+
+/** What removal is allowed to take with it. Both are decisions the Operator
+ *  makes explicitly, so neither has a default here. */
+export interface DockerContainerRemoval {
+  /** Remove the container even while it is running, killing it first. */
+  force: boolean;
+  /**
+   * Remove the anonymous volumes created with the container.
+   *
+   * Anonymous only: named volumes survive, because they are shared and outlive
+   * whatever container happened to mount them. This is still the destructive
+   * half of the call, and it is the one that loses data.
+   */
+  remove_volumes: boolean;
+}
+
+/**
+ * Remove a container.
+ *
+ * Returns nothing. The backend answers with the container's last state, but a
+ * removed container has no state left to be true about: by the time a screen
+ * reads it, the thing it describes does not exist on the Node. Handing that
+ * object back would invite a panel to keep rendering a container that is gone,
+ * so the call resolves empty and the screen re-reads the Node instead.
+ */
+export function removeDockerContainer(
+  nodeId: string,
+  ref: string,
+  removal: DockerContainerRemoval,
+): Promise<void> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}`,
+    { method: 'DELETE', body: removal },
+  ).then(() => undefined);
+}
+
+/**
+ * The code the backend returns when a container may not be removed here because
+ * a SlideOps Service owns it.
+ *
+ * Removing it behind the Service's back would leave the Service describing a
+ * container that no longer exists, and the next deploy would fight whatever the
+ * Operator did by hand. The refusal names the Service so the screen can send
+ * them to the place where the same change is a supported one.
+ */
+export const MANAGED_BY_SERVICE_CODE = 'managed_by_service';
+
+/**
+ * Whether the failure means "a Service owns this container" rather than
+ * "removal failed".
+ *
+ * Matched on the code and not the status, for the same reason as
+ * {@link isDockerUnavailable}: 409 is an ordinary conflict throughout this API.
+ */
+export function isManagedByService(error: unknown): boolean {
+  return error instanceof ApiError && error.code === MANAGED_BY_SERVICE_CODE;
+}
+
+/**
+ * The Service that owns the container, read off the refusal, or null when the
+ * error carries no id.
+ *
+ * Null is a real answer and a screen must handle it: the sentence "a Service
+ * manages this container" is still true and still worth saying without a link
+ * to follow. Guessing an id, or linking to a Service page with an empty id,
+ * would send an Operator somewhere that does not exist.
+ */
+export function managedByServiceId(error: unknown): string | null {
+  if (!isManagedByService(error)) {
+    return null;
+  }
+  const details = (error as ApiError).details;
+  if (typeof details === 'string' && details) {
+    return details;
+  }
+  if (details && typeof details === 'object') {
+    const id = (details as Record<string, unknown>).service_id;
+    if (typeof id === 'string' && id) {
+      return id;
+    }
+  }
+  return null;
 }

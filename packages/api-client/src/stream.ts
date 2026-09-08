@@ -100,12 +100,44 @@ export function serviceLogStreamUrl(serviceID: string): string {
 }
 
 /**
- * One frame of a Service log stream. `type` says what the rest means:
+ * The websocket carrying a shell inside one Docker container on a Node.
+ *
+ * Addressed through the Node because the container is the daemon's, not a
+ * Service's: this is the way into a container SlideOps did not deploy and may
+ * know nothing else about. `ref` is the id or the name, encoded rather than
+ * trusted, since whoever created the container chose that name.
+ */
+export function dockerContainerShellUrl(
+  nodeID: string,
+  ref: string,
+  cols: number,
+  rows: number,
+): string {
+  return websocketUrl(
+    `/nodes/${encodeURIComponent(nodeID)}/docker/containers/${encodeURIComponent(ref)}/shell`,
+    { cols, rows },
+  );
+}
+
+/** The websocket carrying one container's live output: recent history, then
+ * every new line as the container prints it. */
+export function dockerContainerLogStreamUrl(nodeID: string, ref: string): string {
+  return websocketUrl(
+    `/nodes/${encodeURIComponent(nodeID)}/docker/containers/${encodeURIComponent(ref)}/logs/stream`,
+  );
+}
+
+/**
+ * One frame of a log stream. `type` says what the rest means:
  * `history` and `log` carry `data`, the workload's own text; `status` carries
  * a connection state and an optional human sentence for it; `diagnostic`
  * carries a message about the stream itself (attached, reconnected, a
  * replacement container) rather than the workload's own output; `error` means
  * the stream cannot continue and `message` says why.
+ *
+ * One shape for both log streams. A Service's output and a Docker container's
+ * output are the same bytes read the same way, and giving them two frame types
+ * would only mean two decoders to keep in step.
  */
 export interface ServiceLogFrame {
   type: 'history' | 'log' | 'status' | 'diagnostic' | 'error';
@@ -122,9 +154,15 @@ export type ServiceLogConnectionState =
   | 'disconnected'
   | 'stream_ended';
 
-export interface ServiceLogStreamOptions {
-  /** The Service whose live output to follow. */
-  serviceId: string;
+/**
+ * Everything a log stream needs apart from which socket to open.
+ *
+ * Shared, because a Service's live output and one Docker container's live
+ * output are the same stream read the same way. The two differ in the URL they
+ * point at and in nothing else, so they share the client rather than each
+ * carrying a copy of the reconnect policy that would then drift.
+ */
+export interface LogStreamHandlers {
   /** Called once with the recent output, before anything else. */
   onHistory: (history: string) => void;
   /** Called for each new line, in the order it was printed. */
@@ -140,6 +178,18 @@ export interface ServiceLogStreamOptions {
   url?: string;
   /** The largest reconnect delay, in milliseconds. */
   maxBackoffMs?: number;
+}
+
+export interface ServiceLogStreamOptions extends LogStreamHandlers {
+  /** The Service whose live output to follow. */
+  serviceId: string;
+}
+
+export interface DockerContainerLogStreamOptions extends LogStreamHandlers {
+  /** The Node running the daemon that holds the container. */
+  nodeId: string;
+  /** The container's id or name, as the daemon knows it. */
+  containerRef: string;
 }
 
 const LOG_STREAM_INITIAL_BACKOFF_MS = 500;
@@ -166,7 +216,34 @@ const LOG_STATUS_STATE: Record<string, ServiceLogConnectionState> = {
  * Close the returned handle to stop for good; that, too, does not reconnect.
  */
 export function openServiceLogStream(options: ServiceLogStreamOptions): StreamHandle {
-  const url = options.url ?? serviceLogStreamUrl(options.serviceId);
+  return openLogStream(options.url ?? serviceLogStreamUrl(options.serviceId), options);
+}
+
+/**
+ * Open one Docker container's live output, on the same terms as a Service's.
+ *
+ * The same client, pointed at the Node's own container stream rather than at a
+ * Service's. A container SlideOps did not deploy has no Service to read logs
+ * through, and it is exactly the container an Operator is most often trying to
+ * understand.
+ */
+export function openDockerContainerLogStream(
+  options: DockerContainerLogStreamOptions,
+): StreamHandle {
+  return openLogStream(
+    options.url ?? dockerContainerLogStreamUrl(options.nodeId, options.containerRef),
+    options,
+  );
+}
+
+/**
+ * The one log stream client, shared by both entry points above.
+ *
+ * It takes a URL rather than deriving one, so what it connects to is the
+ * caller's decision and the reconnect policy -- the part that is easy to get
+ * subtly wrong -- exists once.
+ */
+function openLogStream(url: string, options: LogStreamHandlers): StreamHandle {
   const maxBackoff = options.maxBackoffMs ?? LOG_STREAM_DEFAULT_MAX_BACKOFF_MS;
 
   let socket: WebSocket | null = null;
@@ -211,7 +288,7 @@ export function openServiceLogStream(options: ServiceLogStreamOptions): StreamHa
           options.onDiagnostic?.(frame.message ?? '');
           break;
         case 'error':
-          permanentError = frame.message ?? 'The service logs could not be streamed.';
+          permanentError = frame.message ?? 'These logs could not be streamed.';
           setState('disconnected', permanentError);
           break;
       }

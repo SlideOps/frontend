@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openServiceLogStream, type ServiceLogConnectionState } from './stream';
+import {
+  dockerContainerLogStreamUrl,
+  dockerContainerShellUrl,
+  openDockerContainerLogStream,
+  openServiceLogStream,
+  type ServiceLogConnectionState,
+} from './stream';
 
 /*
  * The Service log stream connection.
@@ -149,5 +155,97 @@ describe('openServiceLogStream', () => {
     vi.advanceTimersByTime(30000);
 
     expect(FakeSocket.instances.length).toBe(1);
+  });
+});
+
+describe('the websockets on one Docker container', () => {
+  it('addresses a container through the Node that runs the daemon', () => {
+    // Through the Node and not through a Service, because this is the way into
+    // a container SlideOps did not deploy and knows nothing else about.
+    expect(dockerContainerLogStreamUrl('nd_1', 'shop-web')).toContain(
+      '/nodes/nd_1/docker/containers/shop-web/logs/stream',
+    );
+    expect(dockerContainerShellUrl('nd_1', 'shop-web', 120, 40)).toContain(
+      '/nodes/nd_1/docker/containers/shop-web/shell',
+    );
+  });
+
+  it('carries the terminal size the way the Service and Node shells do', () => {
+    const url = dockerContainerShellUrl('nd_1', 'shop-web', 120, 40);
+
+    expect(url).toContain('cols=120');
+    expect(url).toContain('rows=40');
+  });
+
+  it('encodes a Node id and a container name that are not URL safe', () => {
+    const url = dockerContainerLogStreamUrl('nd/1', 'shop/web');
+
+    expect(url).toContain('/nodes/nd%2F1/docker/containers/shop%2Fweb/logs/stream');
+  });
+
+  it('opens a ws or wss URL, never an http one', () => {
+    expect(dockerContainerLogStreamUrl('nd_1', 'shop-web').startsWith('ws')).toBe(true);
+  });
+});
+
+describe('openDockerContainerLogStream', () => {
+  it('delivers history, lines and diagnostics exactly as the Service stream does', () => {
+    const history: string[] = [];
+    const lines: string[] = [];
+    const diagnostics: string[] = [];
+    openDockerContainerLogStream({
+      nodeId: 'nd_1',
+      containerRef: 'shop-web',
+      url: 'ws://test/containers/logs/stream',
+      onHistory: (h) => history.push(h),
+      onLine: (l) => lines.push(l),
+      onStateChange: () => {},
+      onDiagnostic: (m) => diagnostics.push(m),
+    });
+    const socket = FakeSocket.last!;
+    socket.openIt();
+    socket.message({ type: 'history', data: 'boot' });
+    socket.message({ type: 'diagnostic', message: 'Docker stream attached.' });
+    socket.message({ type: 'log', data: 'listening on :8000' });
+
+    expect(socket.url).toBe('ws://test/containers/logs/stream');
+    expect(history).toEqual(['boot']);
+    expect(lines).toEqual(['listening on :8000']);
+    expect(diagnostics).toEqual(['Docker stream attached.']);
+  });
+
+  it('derives the container URL when none is given', () => {
+    openDockerContainerLogStream({
+      nodeId: 'nd_1',
+      containerRef: 'shop-web',
+      onHistory: () => {},
+      onLine: () => {},
+      onStateChange: () => {},
+    });
+
+    expect(FakeSocket.last!.url).toContain('/nodes/nd_1/docker/containers/shop-web/logs/stream');
+  });
+
+  it('does not reconnect after a permanent error, as the Service stream does not', () => {
+    // The same client underneath, so the reconnect policy cannot drift between
+    // the two: a container that no longer exists will not exist on a retry.
+    const states: ServiceLogConnectionState[] = [];
+    openDockerContainerLogStream({
+      nodeId: 'nd_1',
+      containerRef: 'shop-web',
+      url: 'ws://test/containers/logs/stream',
+      onHistory: () => {},
+      onLine: () => {},
+      onStateChange: (s) => states.push(s),
+    });
+    const first = FakeSocket.last!;
+    first.openIt();
+    first.message({ type: 'error', message: 'That container is gone.' });
+    first.emit('close', { wasClean: false, code: 1008, reason: 'gone' });
+
+    vi.advanceTimersByTime(30000);
+
+    expect(FakeSocket.instances.length).toBe(1);
+    expect(states.at(-1)).toBe('disconnected');
   });
 });
