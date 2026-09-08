@@ -342,6 +342,31 @@ export function ArrangementDetail() {
     : null;
   const edit = baseline && draftWithQuote ? arrangementEdit(baseline, draftWithQuote) : null;
 
+  /*
+   * Why Save cannot be pressed, when it cannot.
+   *
+   * A disabled button explains nothing. An Admin who edits something, presses
+   * Save and sees no change, no message and no error has been told only that
+   * the product is broken, which is what happened here: the currency select
+   * moved a value the form was not comparing, so a real edit registered as no
+   * edit and the button quietly refused.
+   */
+  const saveBlockedReason = ((): string | null => {
+    if (!canMutate) {
+      return 'This build of the API cannot change an arrangement, so there is nothing to save to.';
+    }
+    if (edit && edit.changes.length === 0) {
+      return 'Nothing has been changed yet, so there is nothing to save.';
+    }
+    if (pricingInPlay && quote.state.status === 'loading') {
+      return 'Working out what this comes to.';
+    }
+    if (pricingInPlay && quote.state.status !== 'ready') {
+      return 'What this comes to could not be worked out, so there is no figure to save. Fix the plan, term and currency above, or clear the term to save the rest.';
+    }
+    return null;
+  })();
+
   const runSave = async () => {
     if (!detail || !edit || edit.changes.length === 0) {
       return;
@@ -776,7 +801,15 @@ export function ArrangementDetail() {
                     id="edit-currency"
                     label="Currency"
                     value={quoteCurrency}
-                    onChange={setQuoteCurrency}
+                    // Both, because they are the same fact. The select used to
+                    // move only the quote's input, so an Admin who changed just
+                    // the currency changed nothing the form could see: no edit
+                    // was recorded, Save stayed disabled, and clicking it did
+                    // nothing at all with nothing said about why.
+                    onChange={(next) => {
+                      setQuoteCurrency(next);
+                      setDraft((current) => (current ? { ...current, currency: next } : current));
+                    }}
                     options={currencyOptions}
                     hint="What this deployment is able to charge in, as the server named them."
                   />
@@ -852,6 +885,7 @@ export function ArrangementDetail() {
                     (pricingInPlay && quote.state.status !== 'ready')
                   }
                   onClick={runSave}
+                  title={saveBlockedReason ?? undefined}
                 >
                   {saving ? 'Saving' : 'Save changes'}
                 </Button>
@@ -867,6 +901,11 @@ export function ArrangementDetail() {
                   Cancel
                 </Button>
               </div>
+              {saveBlockedReason ? (
+                <Text variant="body-sm" tone="secondary" className="mt-2">
+                  {saveBlockedReason}
+                </Text>
+              ) : null}
             </Card>
           ) : null}
 
