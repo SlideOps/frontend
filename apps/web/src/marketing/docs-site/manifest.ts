@@ -108,6 +108,16 @@ const sources: readonly SectionSource[] = [
         summary: 'Where a workload comes from and how it runs on the machine.',
       },
       {
+        slug: 'deploying-with-a-dockerfile',
+        title: 'Deploying with a Dockerfile',
+        summary: 'Step by step, one container built from your repository.',
+      },
+      {
+        slug: 'deploying-a-compose-stack',
+        title: 'Deploying a Compose stack',
+        summary: 'Step by step, several containers that find each other by name.',
+      },
+      {
         slug: 'environment-and-secrets',
         title: 'Environment and secrets',
         summary: 'Configuration values, sealed secrets, and when they take effect.',
