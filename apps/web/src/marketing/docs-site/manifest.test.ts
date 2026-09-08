@@ -53,6 +53,46 @@ describe('the documentation manifest', () => {
   });
 });
 
+describe('the links the prose hands a reader', () => {
+  /** Every `/docs/...` target a page's markdown links to, in source order. */
+  function docsLinksIn(markdown: string): string[] {
+    const targets: string[] = [];
+    for (const match of markdown.matchAll(/\]\((\/docs[^)\s]*)\)/g)) {
+      targets.push(match[1]!);
+    }
+    return targets;
+  }
+
+  const anchorsByPath = new Map(
+    docsPages.map((page) => [
+      page.path,
+      new Set(readHeadings(docsContent(page)).map((heading) => heading.id)),
+    ]),
+  );
+
+  it('sends every internal link to a page that exists', () => {
+    for (const page of docsPages) {
+      for (const target of docsLinksIn(docsContent(page))) {
+        const [path] = target.split('#');
+        if (path === DOCS_ROOT_PATH || path === '') continue;
+        expect(anchorsByPath.has(path!), `${page.contentKey} links to ${target}`).toBe(true);
+      }
+    }
+  });
+
+  it('sends every deep link to a heading that page actually has', () => {
+    for (const page of docsPages) {
+      for (const target of docsLinksIn(docsContent(page))) {
+        const [path, fragment] = target.split('#');
+        if (!fragment) continue;
+        // A bare `#anchor` link points inside the page holding it.
+        const anchors = anchorsByPath.get(path === '' ? page.path : path!);
+        expect(anchors?.has(fragment), `${page.contentKey} links to ${target}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('reading the docs straight through', () => {
   it('walks previous and next in the order the manifest declares', () => {
     docsPages.forEach((page, index) => {

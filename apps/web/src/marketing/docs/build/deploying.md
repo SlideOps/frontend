@@ -2,6 +2,25 @@
 
 Getting a workload onto a server is two separate choices: **where the workload comes from**, and **how it runs on the machine**. They combine, and the combination decides what SlideOps can do for it afterwards. This page covers both, plus what happens during a deploy, adopting what is already running, and deploying automatically.
 
+If you want the steps rather than the map, start with one of the two step-by-step guides below.
+
+## Which guide do you need?
+
+Nearly every first deploy is one of two shapes, and one question tells them apart.
+
+**Open your application's configuration and look at the addresses it points at.**
+
+| What you find | Deploy it as | The guide |
+| --- | --- | --- |
+| Bare names such as `postgres`, `redis`, `nats` or `clamav` | A Compose stack | [Deploying a Compose stack](/docs/build/deploying-a-compose-stack) |
+| Real addresses, or connection details a Capability gave it | A single container | [Deploying with a Dockerfile](/docs/build/deploying-with-a-dockerfile) |
+
+Those bare names are what the other services in a compose file are called. They resolve only on the network Compose builds for a stack. A single container joins Docker's default bridge with nothing else on it, so there is nobody there called `postgres`, and an application configured that way fails at startup every time.
+
+If you are unsure, read the opening section of either guide. Each one begins by ruling itself out.
+
+The rest of this page is the reference behind those two: every source, every runtime, what actually happens during a deploy, and the cases neither guide covers.
+
 ## Where it comes from
 
 ### From a repository
@@ -32,19 +51,21 @@ See [Adopting what is already running](#adopting-what-is-already-running) below.
 
 ### A container
 
-One container, with hard limits on CPU, memory, and processes. The most common choice and the one with the most management available.
+One container, with hard limits on CPU, memory, and processes. The most common choice and the one with the most management available. Step by step: [Deploying with a Dockerfile](/docs/build/deploying-with-a-dockerfile).
+
+It is removed and recreated on every deploy, which is why a configuration change here always takes effect with nothing to remember.
 
 Docker must be installed on the server. If it is not, the deploy is refused with a message telling you to apply the Enable Containers Capability first, rather than failing obscurely partway through.
 
 ### A Compose stack
 
-Several containers described by a compose file in your repository: an application, its database, its cache, whatever it declares. SlideOps reads the file and runs the stack.
+Several containers described by a compose file in your repository: an application, its database, its cache, whatever it declares. SlideOps reads the file and runs the stack. Step by step: [Deploying a Compose stack](/docs/build/deploying-a-compose-stack).
 
 Because a stack is described by a file, **this is only available from a repository**. An image alone cannot describe one, and the deploy is refused with that as the reason.
 
 Docker Compose must be installed on the server, and the repository must actually contain a compose file. Both refusals name what is missing.
 
-If you deploy a repository that contains a compose file as a *single container*, SlideOps warns you rather than letting you find out later: the file expects other containers alongside it, so a hostname like `postgres` or `redis` in your configuration will not resolve. It suggests the two real options: deploy it as a Compose stack, or install what it needs as Capabilities and point its environment at those.
+If you deploy a repository that contains a compose file as a *single container*, SlideOps warns you during the deploy rather than letting you find out later, and names the two real options: deploy it as a Compose stack, or install what it needs as Capabilities and point its environment at those.
 
 ### A systemd service
 
@@ -190,6 +211,8 @@ All of them are equal for the parts that matter day to day: every one gets an ad
 
 ## Where to go next
 
+- [Deploying with a Dockerfile](/docs/build/deploying-with-a-dockerfile) for the step by step of a single container.
+- [Deploying a Compose stack](/docs/build/deploying-a-compose-stack) for the step by step of a whole stack.
 - [Services](/docs/build/services) for what you can do with a Service once it is running.
 - [Redeploying and rollback](/docs/build/redeploying-and-rollback) for what a redeploy applies.
 - [Troubleshooting](/docs/reference/troubleshooting) for deploys that did not work.
