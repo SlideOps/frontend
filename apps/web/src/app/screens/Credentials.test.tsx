@@ -52,8 +52,43 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 
 const { Credentials } = await import('./Credentials');
 
+/**
+ * The connection the server reports for an Operation, which is where the screen
+ * now reads a service's family from rather than searching the Capability key
+ * for a name it keeps its own list of. The fixture mirrors the server so a test
+ * Operation looks like one the API actually returns.
+ */
+const FIXTURE_SERVICES: { match: string; family: string; scheme: string; port: number }[] = [
+  { match: 'postgres', family: 'postgresql', scheme: 'postgresql', port: 5432 },
+  { match: 'mariadb', family: 'mariadb', scheme: 'mysql', port: 3306 },
+  { match: 'mysql', family: 'mysql', scheme: 'mysql', port: 3306 },
+  { match: 'mongo', family: 'mongodb', scheme: 'mongodb', port: 27017 },
+  { match: 'redis', family: 'redis', scheme: 'redis', port: 6379 },
+  { match: 'clamav', family: 'clamav', scheme: 'clamav', port: 3310 },
+  { match: 'nats', family: 'nats', scheme: 'nats', port: 4222 },
+];
+
+function connectionFor(capabilityKey: string): Operation['connection'] {
+  const service = FIXTURE_SERVICES.find((candidate) => capabilityKey.includes(candidate.match));
+  if (!service) {
+    return null;
+  }
+  return {
+    scheme: service.scheme,
+    protocol: 'tcp',
+    host: '10.0.0.1',
+    port: service.port,
+    url: `${service.scheme}://10.0.0.1:${service.port}`,
+    has_password: false,
+    family: service.family,
+    env_prefix: service.family.toUpperCase(),
+    variables: [],
+  };
+}
+
 function op(over: Partial<Operation>): Operation {
   return {
+    connection: connectionFor(over.capability_key ?? 'manage-postgresql'),
     id: 'op-1',
     node_id: 'n-1',
     capability_key: 'manage-postgresql',
@@ -210,10 +245,11 @@ describe('Credentials: Node connections', () => {
  * Redis has no manage step the way Postgres, MySQL, MariaDB, and MongoDB do
  * (there is no per-app database and account to create), so a bare
  * install-redis never stores a secret at all. That must not mean it is
- * invisible: it is a real, reachable database an Operator could easily
+ * invisible: it is a real, reachable service an Operator could easily
  * forget they left running, which is exactly the credentials page's job to
- * surface. The same applies to any of the five engines before its first
- * manage-X run.
+ * surface. The same applies to any service before its first manage-X run, and
+ * to ClamAV, NATS, Memcached, Meilisearch and MinIO, which have no manage step
+ * at all and so are only ever seen this way.
  */
 describe('Credentials: bare installs with no secret', () => {
   it('shows a bare install of an engine with no manage step, no secret needed', async () => {
@@ -222,6 +258,19 @@ describe('Credentials: bare installs with no secret', () => {
         id: 'op-redis',
         capability_key: 'install-redis',
         parameters: { version: '7.2.4' },
+        // The server resolves the connection from the Capability's own
+        // declaration and sends it with the Operation; nothing here derives it.
+        connection: {
+          scheme: 'redis',
+          protocol: 'tcp',
+          host: '10.0.0.1',
+          port: 6379,
+          url: 'redis://10.0.0.1:6379',
+          has_password: false,
+          family: 'redis',
+          env_prefix: 'REDIS',
+          variables: ['REDIS_HOST', 'REDIS_PORT', 'REDIS_URL'],
+        },
       }),
     ]);
     listNodes.mockResolvedValue([node()]);
@@ -231,9 +280,36 @@ describe('Credentials: bare installs with no secret', () => {
 
     expect(await screen.findByText('Install redis')).toBeInTheDocument();
     await userEvent.click(screen.getByText('Install redis'));
-    // CredentialsCard resolves the family's default port even with nothing
-    // in the parameters naming one.
-    expect(await screen.findByText('6379')).toBeInTheDocument();
+    // CredentialsCard shows the port the server resolved, even with nothing in
+    // the parameters naming one.
+    // Once as its own row and once beside the connection string.
+    expect((await screen.findAllByText('6379')).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The six services the page could not see. It grouped credentials by
+   * searching the Capability key for one of five engine names it kept itself,
+   * so a bare install-clamav or install-nats matched nothing, counted as not an
+   * engine install, and was filtered out of the list before it could ever be
+   * rendered. An Operator who had installed ClamAV was told they had no
+   * credentials at all.
+   *
+   * The family now comes from the server, which has known about all of these
+   * for as long as they have existed.
+   */
+  it.each([
+    ['clamav', 'install-clamav', 'Install clamav', '3310'],
+    ['nats', 'install-nats', 'Install nats', '4222'],
+  ])('shows a bare install of %s, which no list of five engines contained', async (_family, capabilityKey, label, port) => {
+    listOperations.mockResolvedValue([op({ id: `op-${capabilityKey}`, capability_key: capabilityKey, parameters: {} })]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(label));
+    expect((await screen.findAllByText(port)).length).toBeGreaterThan(0);
   });
 
   it('does not shadow a real credential with its own bare install record', async () => {

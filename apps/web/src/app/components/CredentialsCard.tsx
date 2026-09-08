@@ -19,7 +19,12 @@ import { RevealValue } from './RevealValue';
  */
 const SECRET_PLACEHOLDER = '[stored securely]';
 
-/** The fixed masked stand-in for the secret inside a connection template. */
+/**
+ * The masked stand-in for a secret inside a connection template, used for the
+ * addresses the server did not resolve for itself. The server sends the mark it
+ * used in its own URL, so the two read identically; this is only the fallback
+ * for a response that carried none.
+ */
 const MASKED_SECRET = '••••••';
 
 /**
@@ -88,10 +93,14 @@ function ConnectionString({
   template,
   build,
 }: {
-  /** The masked URL shown before the Operator reveals the real one. */
+  /** The URL to show: masked where a password exists, whole where none does. */
   template: string;
-  /** Fetch the secret and assemble the full URL; called at most once per reveal. */
-  build: () => Promise<string>;
+  /**
+   * Fetch the secret and assemble the full URL; called at most once per reveal.
+   * Absent for a service with no password at all, such as ClamAV, NATS or
+   * Memcached, whose URL is already complete and is shown and copied as it is.
+   */
+  build?: () => Promise<string>;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,6 +140,9 @@ function ConnectionString({
   );
 
   const revealAndCopy = useCallback(async () => {
+    if (!build) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -158,7 +170,11 @@ function ConnectionString({
         {value ? 'Connection string revealed and copied.' : ''}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {value === null ? (
+        {!build ? (
+          // Nothing to reveal: the string is whole already, so the only useful
+          // action is to take it.
+          <CopyButton value={template} label="the connection string" />
+        ) : value === null ? (
           <button
             type="button"
             onClick={() => void revealAndCopy()}
@@ -208,9 +224,10 @@ function ConnectionString({
 
 /**
  * One connection string block: a heading, a one-line explanation of when this
- * particular host is the right one, and the masked-until-revealed string
- * itself. Shared by the two hosts a data store endpoint can have, so the two
- * blocks read identically apart from which host and words apply.
+ * particular host is the right one, and the string itself: masked until
+ * revealed where a password exists, whole and copyable where none does.
+ * Shared by the two hosts an endpoint can have, so the two blocks read
+ * identically apart from which host and words apply.
  */
 function ConnectionStringBlock({
   title,
@@ -218,6 +235,7 @@ function ConnectionStringBlock({
   operation,
   endpoint,
   host,
+  template,
   secretKey,
 }: {
   title: string;
@@ -225,13 +243,17 @@ function ConnectionStringBlock({
   operation: Operation;
   endpoint: ResolvedEndpoint;
   host: string;
-  secretKey: string;
+  /** The URL to show for this host: masked where a password exists. */
+  template: string;
+  /** The key of the secret used to build the string, or null when there is none. */
+  secretKey: string | null;
 }) {
-  const template = connectionUrlTemplate(endpoint, host, MASKED_SECRET);
-  const build = () =>
-    revealOperationSecret(operation.id, secretKey).then((revealed) =>
-      buildConnectionUrl(endpoint, host, revealed.value),
-    );
+  const build = secretKey
+    ? () =>
+        revealOperationSecret(operation.id, secretKey).then((revealed) =>
+          buildConnectionUrl(endpoint, host, revealed.value),
+        )
+    : undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -245,6 +267,7 @@ function ConnectionStringBlock({
       <ConnectionFields
         endpoint={endpoint}
         host={host}
+        url={template}
         operation={operation}
         secretKey={secretKey}
       />
@@ -253,7 +276,8 @@ function ConnectionStringBlock({
 }
 
 /**
- * The same endpoint as separate values, each copyable on its own.
+ * The same endpoint as separate values, each copyable on its own, and the names
+ * of the environment variables to put them under.
  *
  * This exists because of a production outage. An application was configured with
  * the whole connection string where it expected a hostname, and crash-looped on
@@ -265,17 +289,25 @@ function ConnectionStringBlock({
  * artifact: a whole URI. An Operator wiring the second kind had nothing else to
  * copy. Offering both shapes is what makes the right one available rather than
  * improvised, and it is why they sit together rather than on separate screens.
+ *
+ * The variable names are here for the same reason one step further on. An
+ * Operator filling in a .env file was left to guess what SlideOps would call
+ * each value, so a connection made by hand and one made by Connect could
+ * disagree on the name of the very variable the application reads. The server
+ * states the names it writes, and this shows them.
  */
 function ConnectionFields({
   endpoint,
   host,
+  url,
   operation,
   secretKey,
 }: {
   endpoint: ResolvedEndpoint;
   host: string;
+  url: string;
   operation: Operation;
-  secretKey: string;
+  secretKey: string | null;
 }) {
   const fields: { label: string; value: string }[] = [
     { label: 'Host', value: host },
@@ -287,6 +319,7 @@ function ConnectionFields({
   if (endpoint.database) {
     fields.push({ label: 'Database', value: endpoint.database });
   }
+  fields.push({ label: 'Connection URL', value: url });
 
   return (
     <details className="rounded-md border border-border bg-subtle px-3 py-2">
@@ -302,39 +335,84 @@ function ConnectionFields({
           <div key={field.label} className="flex items-center gap-2">
             <dt className="w-24 shrink-0 text-sm text-ink-muted">{field.label}</dt>
             <dd className="min-w-0 flex-1 truncate font-mono text-sm text-ink">{field.value}</dd>
-            <CopyButton value={field.value} label={`Copy the ${field.label.toLowerCase()}`} />
+            <CopyButton value={field.value} label={`the ${field.label.toLowerCase()}`} />
           </div>
         ))}
-        <div className="flex items-center gap-2">
-          <dt className="w-24 shrink-0 text-sm text-ink-muted">Password</dt>
-          <dd className="min-w-0 flex-1">
-            <RevealValue
-              label="the password"
-              onReveal={() => revealOperationSecret(operation.id, secretKey).then((r) => r.value)}
-            />
-          </dd>
-        </div>
+        {secretKey ? (
+          <div className="flex items-center gap-2">
+            <dt className="w-24 shrink-0 text-sm text-ink-muted">Password</dt>
+            <dd className="min-w-0 flex-1">
+              <RevealValue
+                label="the password"
+                onReveal={() => revealOperationSecret(operation.id, secretKey).then((r) => r.value)}
+              />
+            </dd>
+          </div>
+        ) : null}
       </dl>
     </details>
   );
 }
 
 /**
- * The connection section for a known endpoint.
+ * The names of the environment variables this connection is written under, each
+ * copyable on its own.
  *
- * A server login account gets the SSH sign in command and a pointer to the
- * revealable password above — never a second, "from a container" variant,
- * since nothing containerized ever calls SSH.
+ * Shown outright rather than behind a disclosure, and once for the endpoint
+ * rather than once per address, because the names are the same wherever the
+ * service is reached from and because being left to guess them is what sent an
+ * Operator back to ask. Only the names: a name is not a secret, and putting a
+ * value beside one here would be a second place a password could reach the
+ * page. The values are the rows above, and the password stays behind its own
+ * reveal.
+ */
+function EnvironmentVariableNames({ names }: { names: string[] }) {
+  if (names.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <Text variant="body-sm" className="font-medium text-ink">
+        Environment variable names
+      </Text>
+      <Text variant="body-sm" tone="secondary">
+        Your application reads this connection under these names. SlideOps writes exactly these when
+        it connects a Service to this itself, so a connection you wire by hand and one it makes
+        agree.
+      </Text>
+      <ul className="flex flex-col gap-1">
+        {names.map((name) => (
+          <li key={name} className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate font-mono text-sm text-ink">{name}</code>
+            <CopyButton value={name} label={`the ${name} variable name`} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The connection section for a Capability that has one.
  *
- * A data store gets up to two connection strings, so which host to use is
+ * A server login account gets the sign in command and a pointer to the
+ * revealable password above, never a "from a container" variant, since nothing
+ * containerized ever calls it.
+ *
+ * Everything else gets up to two connection strings, so which host to use is
  * never something to guess at or come back and ask about: privateHost, the
- * Docker bridge address, is what an app running as a Service on this same
- * Node reaches it at, and is shown first since that is the common case this
- * card exists for; host, the Node's own public address, works only if this
- * Node's firewall has been opened for a remote connection, which is not the
- * default and is called out as such. Either may be absent — a Node with no
- * saved Discovery has no privateHost yet, for instance — and only what is
- * actually known is ever shown.
+ * Docker bridge address, is what an app running as a Service on this same Node
+ * reaches it at, and is shown first since that is the common case this card
+ * exists for; host, the address the server resolved, works only if this Node's
+ * firewall has been opened for a remote connection, which is not the default and
+ * is called out as such. Either may be absent, since a Node with no saved
+ * Discovery has no privateHost yet, and only what is actually known is ever
+ * shown.
+ *
+ * A Capability with no password of any kind still shows all of this. It used to
+ * show none of it, because the whole section was gated on there being a secret
+ * to reveal, which is how a running ClamAV or NATS ended up with no port and no
+ * connection string on the one page meant to state them.
  */
 function EndpointConnection({
   operation,
@@ -348,7 +426,7 @@ function EndpointConnection({
 }) {
   const host = endpoint.host;
 
-  if (endpoint.scheme === 'ssh') {
+  if (endpoint.personSignsIn) {
     if (!host) {
       return null;
     }
@@ -358,7 +436,7 @@ function EndpointConnection({
           Server login
         </Text>
         <Text variant="body-sm" tone="secondary">
-          Sign in over SSH with this account, then enter the password revealed above.
+          Sign in with this account, then enter the password revealed above.
         </Text>
         <RevealValue
           value={buildSshSignIn(endpoint, host)}
@@ -369,19 +447,24 @@ function EndpointConnection({
     );
   }
 
-  if (!secretKey || (!host && !endpoint.privateHost)) {
+  if (!host && !endpoint.privateHost) {
     return null;
   }
+
+  // The mask the server used inside its own URL, so a template built here for
+  // another address reads identically to the one it sent.
+  const mask = endpoint.hasPassword ? (endpoint.maskedPassword ?? MASKED_SECRET) : '';
 
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
       {endpoint.privateHost ? (
         <ConnectionStringBlock
           title="Connection string — from a container on this Node"
-          description="Use this in a Service's environment. A database or cache installed on this Node is not reachable at its public address by design; this is the address a container reaches it at instead."
+          description="Use this in a Service's environment. A service installed on this Node is not reachable at its public address by design; this is the address a container reaches it at instead."
           operation={operation}
           endpoint={endpoint}
           host={endpoint.privateHost}
+          template={connectionUrlTemplate(endpoint, endpoint.privateHost, mask)}
           secretKey={secretKey}
         />
       ) : null}
@@ -395,14 +478,18 @@ function EndpointConnection({
           description={
             endpoint.privateHost
               ? "Only reachable if this Node's firewall was explicitly configured to allow a remote connection. Not the default, and not what a Service on this Node should use."
-              : 'The password stays hidden until you reveal it. Revealing copies the full string.'
+              : secretKey
+                ? 'The password stays hidden until you reveal it. Revealing copies the full string.'
+                : 'This service has no password of its own, so this is the whole string.'
           }
           operation={operation}
           endpoint={endpoint}
           host={host}
+          template={endpoint.url}
           secretKey={secretKey}
         />
       ) : null}
+      <EnvironmentVariableNames names={endpoint.variables} />
     </div>
   );
 }
@@ -569,12 +656,11 @@ export function CredentialsCard({
   const hasPrivateKey = allSecretKeys.includes('private_key');
   const secretKeys = allSecretKeys.filter((key) => key !== 'private_key');
 
-  const endpoint = resolveEndpoint(
-    operation.capability_key,
-    parameters,
-    host ?? null,
-    dockerBridgeAddress ?? null,
-  );
+  // The server resolves the scheme, the host, the port and the variable names
+  // from the Capability's own declaration. Nothing about a service is decided
+  // here: a table of five engines lived in this component's helper, and every
+  // Capability it had never heard of fell past it into the raw parameters below.
+  const endpoint = resolveEndpoint(operation.connection, dockerBridgeAddress ?? null);
 
   const plainRows: PlainRow[] = [];
   if (endpoint) {

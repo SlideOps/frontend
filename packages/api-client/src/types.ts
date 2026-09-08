@@ -302,6 +302,69 @@ export interface Operation {
   started_at: string | null;
   completed_at: string | null;
   events?: OperationEvent[];
+  /**
+   * How the service this Operation created is reached, resolved by the server.
+   * Absent when the Capability is not a network service at all, which is an
+   * answer rather than a gap: an installed runtime has nothing to connect to.
+   */
+  connection?: OperationConnection | null;
+}
+
+/**
+ * How one Operation's service is reached, and what to call it in a `.env` file.
+ *
+ * Every field here comes from the server, which resolves it from the
+ * Capability's own declaration. The browser used to keep a list of five
+ * services and their ports, so a Capability it had never heard of, ClamAV and
+ * NATS among them, showed a host and nothing else. Nothing in this shape is
+ * derived here, and nothing about a service belongs in the client again.
+ */
+export interface OperationConnection {
+  /** The URI scheme a client uses, such as `postgresql`, `nats` or `clamav`. */
+  scheme: string;
+  /** `tcp` for everything today; named rather than assumed. */
+  protocol: string;
+  /** The address to reach it at. Absent when the Node's address is unknown. */
+  host?: string;
+  port: number;
+  /** Absent for a service with no account of its own. */
+  username?: string;
+  /** Absent for a service with no database, such as Redis, NATS or ClamAV. */
+  database?: string;
+  /**
+   * The whole connection string. Where a password exists it reads as
+   * `masked_password`, never the secret: the reveal endpoint is the only thing
+   * in the API that produces one.
+   */
+  url: string;
+  /** Whether a secret exists to reveal. Never the secret itself. */
+  has_password: boolean;
+  /** The mark standing in for the password inside `url`. */
+  masked_password?: string;
+  /**
+   * A service a person signs in to rather than one an application connects to,
+   * which is a server login account and nothing else here. It has no
+   * environment variables, and is presented as a sign in.
+   */
+  person_signs_in?: boolean;
+  /**
+   * The engine word every Capability key for this service is built from:
+   * `clamav` for `install-clamav` and `configure-clamav` alike, `postgresql`
+   * for `install-postgresql`. It is what tells a screen that a bare install and
+   * a later configure are one service rather than two, and it names the install
+   * and remove steps that go with it.
+   *
+   * It comes from the server because deriving it in the browser meant keeping a
+   * list of engines here, and that list had five of the eleven.
+   */
+  family?: string;
+  /** The prefix the variables below share, such as `DATABASE` or `CLAMAV`. */
+  env_prefix?: string;
+  /**
+   * The exact environment variable names Connect writes, so an Operator wiring
+   * this by hand writes the same names an automatic connection would.
+   */
+  variables?: string[];
 }
 
 /**
