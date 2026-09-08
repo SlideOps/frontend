@@ -37,7 +37,7 @@ import {
   X,
 } from '@slideops/icons';
 import { EmptyState, PageHeader } from '@slideops/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminShell } from '../components/AdminShell';
 import { ArrangementStatusBadge } from '../components/Badges';
@@ -118,7 +118,12 @@ export function SubscriberDetail() {
   const tierNames = knownTiers.map((tier) => tier.name);
   // Only a tier carrying a self serve price can be sold through a real checkout.
   const purchasableTierNames = knownTiers.filter((t) => t.purchasable).map((t) => t.name);
-  const chargeableCurrencies = currencies.state.status === 'ready' ? currencies.state.data : [];
+  // Memoised because it is the dependency of the effect that settles the
+  // currency below, and a fresh array every render would re-run it every render.
+  const chargeableCurrencies = useMemo(
+    () => (currencies.state.status === 'ready' ? currencies.state.data : []),
+    [currencies.state],
+  );
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -458,6 +463,22 @@ export function SubscriberDetail() {
   const [checkoutTier, setCheckoutTier] = useState('');
   const [checkoutProvider, setCheckoutProvider] = useState<PaymentProvider>('paystack');
   const [checkoutCurrency, setCheckoutCurrency] = useState('');
+
+  // Settle on a real currency as soon as the deployment says what it can charge.
+  // The selects used to carry an empty choice meaning "the plan's own currency",
+  // which asked an Admin to know what a plan is priced in before they could
+  // answer, and sent an empty currency to the quote. Every charge is in a
+  // currency somebody can actually be charged in, so the first one published is
+  // the starting point until the Admin says otherwise.
+  useEffect(() => {
+    const first = chargeableCurrencies[0];
+    if (!first) {
+      return;
+    }
+    setOfflineCurrency((current) => current || first);
+    setTempCurrency((current) => current || first);
+    setCheckoutCurrency((current) => current || first);
+  }, [chargeableCurrencies]);
   const [checkoutDeadline, setCheckoutDeadline] = useState('');
   const [checkoutTermMonths, setCheckoutTermMonths] = useState('1');
   const [checkoutNotes, setCheckoutNotes] = useState('');
@@ -1234,7 +1255,6 @@ export function SubscriberDetail() {
                 value={tempCurrency}
                 onChange={setTempCurrency}
                 options={chargeableCurrencies}
-                allowNative
                 hint="Used only to price the real payment behind this grant. If no provider is configured on this deployment, access is still granted with nothing to resume."
               />
             )}
@@ -1318,7 +1338,6 @@ export function SubscriberDetail() {
               value={checkoutCurrency}
               onChange={setCheckoutCurrency}
               options={chargeableCurrencies}
-              allowNative
             />
             <TermMonthsField
               label="Billing period"

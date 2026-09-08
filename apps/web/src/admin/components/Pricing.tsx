@@ -76,7 +76,6 @@ export interface CurrencySelectProps {
    * does when no currency is named. Not offered where a currency has to be
    * stated outright, such as recording a payment that already happened.
    */
-  allowNative?: boolean;
   hint?: string;
 }
 
@@ -87,7 +86,6 @@ export function CurrencySelect({
   value,
   onChange,
   options,
-  allowNative = false,
   hint,
 }: CurrencySelectProps) {
   return (
@@ -103,8 +101,13 @@ export function CurrencySelect({
       >
         {/* Never a list written here. What this deployment can charge in
             depends on which providers are configured and whether a live
-            exchange rate is available, and only the backend knows that. */}
-        {allowNative ? <option value="">The plan&apos;s own currency</option> : null}
+            exchange rate is available, and only the backend knows that.
+
+            And never an empty choice either. "The plan's own currency" was an
+            option once, which asked the Admin to know what a plan is priced in
+            before they could answer, and read as a currency in its own right
+            beside real ones. Every choice here is now a currency somebody can
+            actually be charged in. */}
         {options.map((code) => (
           <option key={code} value={code}>
             {code}

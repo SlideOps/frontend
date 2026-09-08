@@ -370,6 +370,31 @@ describe('pricing an arrangement instead of typing an amount into it', () => {
     expect(api.listArrangementCurrencies).toHaveBeenCalled();
   });
 
+  it('offers only currencies somebody can actually be charged in', async () => {
+    renderScreen();
+    await openEditor();
+
+    const currency = screen.getByLabelText('Currency') as HTMLSelectElement;
+    const offered = Array.from(currency.options).map((option) => option.value);
+
+    // The empty choice used to read "The plan's own currency", which asked an
+    // Admin to know what a plan is priced in before they could answer, and sat
+    // in the list looking like a currency of its own.
+    expect(offered).not.toContain('');
+    for (const option of Array.from(currency.options)) {
+      expect(option.textContent).not.toMatch(/own currency/i);
+    }
+  });
+
+  it('starts on a real currency rather than on nothing', async () => {
+    renderScreen();
+    await openEditor();
+
+    const currency = screen.getByLabelText('Currency') as HTMLSelectElement;
+    expect(currency.value).not.toBe('');
+    expect(['USD', 'NGN']).toContain(currency.value);
+  });
+
   it('has no field for the admin to type the obligation into', async () => {
     renderScreen();
     await priceFor('12', 'USD');
