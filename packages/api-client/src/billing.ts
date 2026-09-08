@@ -164,6 +164,11 @@ export interface Quote {
   /** The USD to NGN rate used, present only for a Naira quote. */
   fx_rate?: number;
   promo_applied: boolean;
+  /** What the code takes off, in the currency being charged. Absent when no
+   *  code applied. The code's own preview states its figure in the tier's
+   *  native currency and before the fee, so it is not the one to show beside
+   *  a total. */
+  promo_discount_minor?: number;
   promo_descriptions: string[];
   free_grant: boolean;
   grant_tier?: string;
