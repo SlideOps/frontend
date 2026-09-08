@@ -940,7 +940,12 @@ export interface Arrangement {
   id: string;
   operator_id: string;
   tier: string;
-  amount_minor: number;
+  /**
+   * What is owed, in minor units. Absent or null when the backend has not
+   * stated one, which is not the same as zero: a zero would read as "owes
+   * nothing" on every screen that shows it.
+   */
+  amount_minor?: number | null;
   currency?: string;
   condition: ArrangementCondition;
   status: ArrangementStatus;
@@ -967,9 +972,27 @@ export function listArrangements(operatorId: string, signal?: AbortSignal): Prom
   ).then((r) => (Array.isArray(r) ? r : (r.arrangements ?? [])));
 }
 
-/** One arrangement on the Admin-wide list, with the Operator it belongs to. */
+/**
+ * One arrangement on the Admin-wide list, with the Operator it belongs to.
+ *
+ * The lifecycle fields are optional because the list endpoint predates them.
+ * Where the backend states access and payment itself, the list shows what it
+ * says; where it does not, the reading is derived from the condition and the
+ * status, which the list has always carried. Either way the list never has to
+ * be opened to see what an arrangement is doing.
+ */
 export interface ArrangementWithOperator extends Arrangement {
   operator_email: string;
+  /** Whether the customer currently has access. */
+  access_state?: string;
+  /** Whether the expected payment has arrived. */
+  payment_state?: string;
+  /** When access under this arrangement ends, when it is time limited. */
+  access_end?: string;
+  /** When the customer was last written to about this arrangement. */
+  last_communication_at?: string;
+  /** The revision, for an editor opened straight from the list. */
+  updated_at?: string;
 }
 
 /** Filters listAllArrangements accepts. An empty filter matches everything. */
@@ -1150,6 +1173,283 @@ export function extendArrangementDeadline(arrangementId: string, newDeadline: Da
     `/admin/arrangements/${encodeURIComponent(arrangementId)}/extend-deadline`,
     { method: 'POST', body: { new_deadline: newDeadline.toISOString() } },
   );
+}
+
+/*
+ * The arrangement lifecycle: everything that happens to an arrangement after
+ * it is created.
+ *
+ * Creating one is already covered above. What was missing was the rest of the
+ * customer relationship: reading one arrangement on its own, correcting what
+ * was agreed, taking access back, putting it back, writing to the customer,
+ * and seeing what was already done to it and by whom.
+ *
+ * Two rules hold across every mutation here.
+ *
+ * The revision, `if_unchanged_since`, is the `updated_at` the caller last read,
+ * echoed back. The backend refuses with 409 when the arrangement moved in the
+ * meantime, which is the only way a second admin's correction does not get
+ * silently overwritten by a form that was opened before it.
+ *
+ * The states are carried as plain strings rather than a union. The backend owns
+ * that vocabulary and can add to it; a union here would make this client reject
+ * a value the server legitimately sends, which is a worse failure than showing
+ * an unfamiliar word.
+ */
+
+/** How the customer was last written to under an arrangement. */
+export interface ArrangementEmail {
+  id: string;
+  /** The message type the backend knows it by. */
+  type: string;
+  /** The address it went to. */
+  to: string;
+  subject?: string;
+  /** Whether the send succeeded, in the backend's own words. */
+  outcome: string;
+  detail?: string;
+  sent_at: string;
+  /** Which admin sent it, when the backend records that. */
+  sent_by_email?: string;
+}
+
+/** A message type this arrangement can be sent, as the backend names it. */
+export interface ArrangementEmailType {
+  type: string;
+  label?: string;
+  description?: string;
+}
+
+/** A rendered message, produced without sending anything. */
+export interface ArrangementEmailPreview {
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+}
+
+/**
+ * One arrangement read on its own.
+ *
+ * Access, payment, and what is owed are three separate fields because they are
+ * three separate questions. An arrangement whose access is active, whose payment
+ * has not arrived, and which owes a named sum by a named date is not in a
+ * contradictory state; it is the ordinary state of temporary access, and
+ * collapsing the three into one status is what loses that.
+ */
+export interface ArrangementDetail {
+  arrangement: Arrangement;
+  operator_id: string;
+  operator_email: string;
+  /** Whether the customer currently has access. */
+  access_state: string;
+  /** Whether the expected payment has arrived. */
+  payment_state: string;
+  /** What is owed, in minor units. Absent when the backend has not stated one. */
+  amount_minor?: number | null;
+  currency?: string;
+  /** False when this arrangement carries no payment obligation at all. */
+  amount_applicable?: boolean;
+  /** When access under this arrangement began. */
+  access_start?: string;
+  /** When access under this arrangement ends, when it is time limited. */
+  access_end?: string;
+  payment_deadline?: string;
+  /** The revision to echo back as if_unchanged_since on the next mutation. */
+  updated_at: string;
+  /** When the customer was last written to about this arrangement. */
+  last_communication_at?: string;
+  /** The message types this arrangement can be sent, named by the backend. */
+  email_types?: ArrangementEmailType[];
+}
+
+/**
+ * Read whatever shape the detail arrives in.
+ *
+ * The backend may send the arrangement nested under `arrangement` alongside the
+ * lifecycle fields, or send one flat object. Both are accepted, the same way the
+ * create calls above accept either, so this client does not break on an envelope
+ * decision made after it shipped.
+ */
+function toArrangementDetail(raw: unknown): ArrangementDetail {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  const nested = body.arrangement as Arrangement | undefined;
+  const arrangement = nested ?? (body as unknown as Arrangement);
+  const amount = body.amount_minor as number | null | undefined;
+
+  return {
+    arrangement,
+    operator_id: (body.operator_id as string) ?? arrangement.operator_id ?? '',
+    operator_email: (body.operator_email as string) ?? '',
+    access_state: (body.access_state as string) ?? '',
+    payment_state: (body.payment_state as string) ?? '',
+    // The amount is read from the envelope first and from the arrangement only
+    // as a fallback, and an absent one stays absent: turning "not stated" into
+    // a zero here would put "owes nothing" on a screen the backend never said it.
+    amount_minor: amount === undefined ? arrangement.amount_minor : amount,
+    currency: (body.currency as string) ?? arrangement.currency,
+    amount_applicable: body.amount_applicable as boolean | undefined,
+    access_start: body.access_start as string | undefined,
+    access_end: body.access_end as string | undefined,
+    payment_deadline: (body.payment_deadline as string) ?? arrangement.payment_deadline,
+    updated_at: (body.updated_at as string) ?? arrangement.created_at ?? '',
+    last_communication_at: body.last_communication_at as string | undefined,
+    email_types: body.email_types as ArrangementEmailType[] | undefined,
+  };
+}
+
+/** One arrangement, with the access, payment, and obligation readings behind it. */
+export function getArrangement(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}`, {
+    signal,
+  }).then(toArrangementDetail);
+}
+
+/**
+ * A correction to an arrangement. Every field is optional and only the ones
+ * present are sent, so an edit says exactly what it changed and nothing else.
+ * A null clears a date the arrangement no longer has.
+ */
+export interface ArrangementUpdate {
+  tier?: string;
+  amountMinor?: number;
+  currency?: string;
+  paymentDeadline?: Date | null;
+  accessEnd?: Date | null;
+  notes?: string;
+}
+
+/** Serialize a date field for the wire, keeping an explicit null as a clear. */
+function isoOrNull(value: Date | null): string | null {
+  return value === null ? null : value.toISOString();
+}
+
+/**
+ * Correct what was agreed. Sends only the fields that changed, plus the
+ * revision the editor was working from. A 409 means another admin changed this
+ * first and the caller must show what happened rather than resend.
+ */
+export function updateArrangement(
+  arrangementId: string,
+  changes: ArrangementUpdate,
+  ifUnchangedSince: string,
+): Promise<ArrangementDetail> {
+  const body: Record<string, unknown> = { if_unchanged_since: ifUnchangedSince };
+  if (changes.tier !== undefined) {
+    body.tier = changes.tier;
+  }
+  if (changes.amountMinor !== undefined) {
+    body.amount_minor = changes.amountMinor;
+  }
+  if (changes.currency !== undefined) {
+    body.currency = changes.currency;
+  }
+  if (changes.paymentDeadline !== undefined) {
+    body.payment_deadline = isoOrNull(changes.paymentDeadline);
+  }
+  if (changes.accessEnd !== undefined) {
+    body.access_end = isoOrNull(changes.accessEnd);
+  }
+  if (changes.notes !== undefined) {
+    body.notes = changes.notes;
+  }
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}`, {
+    method: 'PATCH',
+    body,
+  }).then(toArrangementDetail);
+}
+
+/**
+ * Take back the access this arrangement granted. Distinct from cancelling the
+ * arrangement, which calls off the agreement and leaves granted access alone;
+ * this is the deliberate withdrawal of what the customer currently has, so it
+ * demands a reason and carries the revision.
+ */
+export function revokeArrangementAccess(
+  arrangementId: string,
+  reason: string,
+  ifUnchangedSince: string,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/revoke`, {
+    method: 'POST',
+    body: { reason, if_unchanged_since: ifUnchangedSince },
+  }).then(toArrangementDetail);
+}
+
+/** Put back access that was revoked or that lapsed. */
+export function restoreArrangementAccess(
+  arrangementId: string,
+  reason?: string,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/restore`, {
+    method: 'POST',
+    body: reason ? { reason } : {},
+  }).then(toArrangementDetail);
+}
+
+/** One audited thing that happened to an arrangement. */
+export interface ArrangementTimelineEntry {
+  id: string;
+  /** What happened, as the backend names it. */
+  action: string;
+  actor_email?: string;
+  actor_operator_id?: string;
+  detail?: string;
+  created_at: string;
+}
+
+/** Everything that has happened to one arrangement, newest first. */
+export function listArrangementTimeline(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementTimelineEntry[]> {
+  return apiRequest<{ entries?: ArrangementTimelineEntry[] } | ArrangementTimelineEntry[]>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/timeline`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.entries ?? [])));
+}
+
+/** Every message sent to the customer about one arrangement, newest first. */
+export function listArrangementEmails(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementEmail[]> {
+  return apiRequest<{ emails?: ArrangementEmail[] } | ArrangementEmail[]>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.emails ?? [])));
+}
+
+/**
+ * Render a message without sending it. Nothing about the arrangement changes
+ * and the customer is not written to, which is the whole point of being able
+ * to read it first.
+ */
+export function previewArrangementEmail(
+  arrangementId: string,
+  type: string,
+): Promise<ArrangementEmailPreview> {
+  return apiRequest<{ preview?: ArrangementEmailPreview } & Partial<ArrangementEmailPreview>>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails/preview`,
+    { method: 'POST', body: { type } },
+  ).then((r) => r.preview ?? (r as ArrangementEmailPreview));
+}
+
+/**
+ * Send the message. This is a communication and nothing else: no tier moves,
+ * no access changes, no payment is recorded.
+ */
+export function sendArrangementEmail(
+  arrangementId: string,
+  type: string,
+): Promise<ArrangementEmail> {
+  return apiRequest<{ email?: ArrangementEmail } & Partial<ArrangementEmail>>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails`,
+    { method: 'POST', body: { type } },
+  ).then((r) => r.email ?? (r as ArrangementEmail));
 }
 
 /**
