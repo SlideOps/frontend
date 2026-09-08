@@ -1,36 +1,40 @@
 import { cn, useTheme } from '@slideops/design-system';
-import { Logo, Moon, Sun, type LucideIcon } from '@slideops/icons';
-import { Fragment, type ReactNode } from 'react';
-
-export interface NavItem {
-  key: string;
-  label: string;
-  icon: LucideIcon;
-  active?: boolean;
-  onSelect?: () => void;
-  /**
-   * The section this entry belongs to, shown as a heading above the first entry
-   * carrying it. A flat list of a dozen equally weighted destinations makes an
-   * Operator read all of them to find one; grouping says what each part of the
-   * product is for before they have to guess.
-   *
-   * Entries are rendered in the order given, so items sharing a group must be
-   * adjacent. An entry with no group renders with no heading, which is what the
-   * first, most used entry wants.
-   */
-  group?: string;
-}
+import { Logo, Moon, PanelLeftClose, PanelLeftOpen, Sun } from '@slideops/icons';
+import { Tooltip } from '@slideops/tooltips';
+import { type ReactNode } from 'react';
+import { SidebarNav, type NavGroup, type NavItem } from './SidebarNav';
 
 export interface AppShellProps {
-  /** Navigation entries. Rendered as a side rail on wide screens and a bottom bar on phones. */
-  nav: NavItem[];
   /** Product surface name shown by the logo, for example Operator or Admin. */
   surface: string;
-  children: ReactNode;
+  /** Entries above every group: the one or two destinations always worth a click. */
+  primary: NavItem[];
+  /** The grouped destinations, in the order they should read. */
+  groups: NavGroup[];
+  /**
+   * A block above the navigation answering which context the Operator is
+   * working in, not what they want to do. Held apart from the navigation on
+   * purpose, so those two questions never look like the same list.
+   */
+  context?: ReactNode;
+  /**
+   * Destinations that live in the context block on a wide screen. The phone bar
+   * has no context block, so they are folded into it rather than lost.
+   */
+  contextNav?: NavItem[];
+  /** A quiet entry below the navigation, for example leaving the admin area. */
+  footer?: NavItem;
   /** Optional slot at the top right of the shell, for account or notifications. */
   actions?: ReactNode;
   /** Denser spacing, used by the admin surface. */
   dense?: boolean;
+  children: ReactNode;
+  /** Keys of the groups this Operator has closed. */
+  collapsedGroups: readonly string[];
+  onToggleGroup: (key: string) => void;
+  /** Whether the sidebar is reduced to an icon rail. */
+  railCollapsed: boolean;
+  onToggleRail: () => void;
 }
 
 function ThemeToggle() {
@@ -52,62 +56,111 @@ function ThemeToggle() {
   );
 }
 
-function NavButton({ item }: { item: NavItem }) {
-  const Icon = item.icon;
-  return (
+/** The control that trades labels for width, and back again. */
+function RailToggle({ rail, onToggle }: { rail: boolean; onToggle: () => void }) {
+  const label = rail ? 'Expand the sidebar' : 'Collapse the sidebar';
+  const Icon = rail ? PanelLeftOpen : PanelLeftClose;
+  const button = (
     <button
       type="button"
-      onClick={item.onSelect}
-      aria-current={item.active ? 'page' : undefined}
-      className={cn(
-        'group flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-        item.active ? 'bg-subtle text-brand' : 'text-ink-muted hover:bg-subtle hover:text-ink',
-      )}
+      onClick={onToggle}
+      aria-label={label}
+      aria-pressed={rail}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
-      <Icon width={17} height={17} aria-hidden />
-      <span>{item.label}</span>
+      <Icon width={16} height={16} aria-hidden />
     </button>
+  );
+  if (!rail) {
+    return button;
+  }
+  return (
+    <Tooltip content={label} placement="right">
+      {button}
+    </Tooltip>
   );
 }
 
 /**
- * The shared application frame. On wide screens it shows a side navigation rail
- * and a scrolling content column. On phones it moves navigation to a bottom bar
- * with large touch targets, respecting safe-area insets. Both surfaces share it
- * so the operator and the admin never drift.
+ * The shared application frame. On wide screens it shows a sidebar that can be
+ * reduced to an icon rail, and a scrolling content column. On phones it moves
+ * navigation to a bottom bar with large touch targets, respecting safe-area
+ * insets. Both surfaces share it so the operator and the admin never drift.
  */
-export function AppShell({ nav, surface, children, actions, dense = false }: AppShellProps) {
+export function AppShell({
+  surface,
+  primary,
+  groups,
+  context,
+  contextNav = [],
+  footer,
+  children,
+  actions,
+  dense = false,
+  collapsedGroups,
+  onToggleGroup,
+  railCollapsed,
+  onToggleRail,
+}: AppShellProps) {
+  const rail = railCollapsed;
+  // The phone bar has one row and no hierarchy to show, so the groups are
+  // flattened into it. Every destination the sidebar offers is still here.
+  const phoneNav: NavItem[] = [
+    ...primary,
+    ...groups.flatMap((group) => group.items),
+    ...contextNav,
+    ...(footer ? [footer] : []),
+  ];
+
   return (
     <div className="flex min-h-dvh bg-app text-ink">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-2.5 py-3 md:flex">
-        <div className="flex items-center gap-2 px-2 pb-4">
-          <Logo size={26} />
-          <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-            {surface}
-          </span>
-        </div>
-        <nav
-          className="flex flex-1 flex-col gap-0.5 overflow-y-auto"
-          aria-label={`${surface} navigation`}
+      <aside
+        className={cn(
+          'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-surface px-2.5 py-3 md:flex',
+          'transition-[width] duration-base ease-standard motion-reduce:transition-none',
+          rail ? 'w-16' : 'w-60',
+        )}
+      >
+        <div
+          className={cn(
+            'flex pb-3',
+            rail ? 'flex-col items-center gap-2' : 'items-center gap-2 px-1',
+          )}
         >
-          {nav.map((item, index) => {
-            // A heading appears the first time a group is seen. Comparing against
-            // the previous entry keeps the grouping in the caller's ordering rather
-            // than reordering their navigation behind their back.
-            const heading = item.group && item.group !== nav[index - 1]?.group ? item.group : null;
-            return (
-              <Fragment key={item.key}>
-                {heading ? (
-                  <div className="px-3 pb-1 pt-3 text-[11px] font-medium text-ink-muted first:pt-1">
-                    {heading}
-                  </div>
-                ) : null}
-                <NavButton item={item} />
-              </Fragment>
-            );
-          })}
+          <Logo size={rail ? 24 : 26} markOnly={rail} />
+          {rail ? null : (
+            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+              {surface}
+            </span>
+          )}
+          <div className={rail ? undefined : 'ml-auto'}>
+            <RailToggle rail={rail} onToggle={onToggleRail} />
+          </div>
+        </div>
+
+        {context ? <div className="mb-2 border-b border-border pb-2">{context}</div> : null}
+
+        <nav className="flex-1 overflow-y-auto" aria-label={`${surface} navigation`}>
+          <SidebarNav
+            primary={primary}
+            groups={groups}
+            collapsedGroups={collapsedGroups}
+            onToggleGroup={onToggleGroup}
+            rail={rail}
+          />
         </nav>
+
+        {footer ? (
+          <div className="mt-2 border-t border-border pt-2">
+            <SidebarNav
+              primary={[footer]}
+              groups={[]}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={onToggleGroup}
+              rail={rail}
+            />
+          </div>
+        ) : null}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -135,13 +188,13 @@ export function AppShell({ nav, surface, children, actions, dense = false }: App
       </div>
 
       <nav
-        aria-label={`${surface} navigation`}
+        aria-label={`${surface} navigation, compact`}
         // Scrolls rather than dividing the screen by however many destinations
         // exist. Squeezing a dozen into a phone's width left every label truncated
         // to a few characters, which is not a navigation bar, it is a puzzle.
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 overflow-x-auto border-t border-border bg-surface px-1 pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] md:hidden"
       >
-        {nav.map((item) => {
+        {phoneNav.map((item) => {
           const Icon = item.icon;
           return (
             <button

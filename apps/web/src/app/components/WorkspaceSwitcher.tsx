@@ -25,12 +25,27 @@ function workspaceSubtitle(isPersonal: boolean, role: string): string {
 }
 
 /**
+ * How the trigger is drawn. `inline` is a control among other controls;
+ * `sidebar` fills the width of the workspace block it heads; `rail` is that
+ * same block reduced to one icon.
+ */
+export type WorkspaceSwitcherVariant = 'inline' | 'sidebar' | 'rail';
+
+const triggerClass: Record<WorkspaceSwitcherVariant, string> = {
+  inline: 'h-9 max-w-48 px-2.5',
+  sidebar: 'h-9 w-full px-2.5',
+  rail: 'h-9 w-9 justify-center px-0',
+};
+
+/**
  * Which workspace the Operator is acting in, and a way to move between every
  * one they can act in, create another, or open the fuller picker. Always
  * rendered, even with only one workspace: creating a second one must always
  * be one click away, the same as Vercel's own team switcher.
  */
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({
+  variant = 'inline',
+}: { variant?: WorkspaceSwitcherVariant } = {}) {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const switchTo = useWorkspaceStore((state) => state.switchTo);
   const navigate = useNavigate();
@@ -98,17 +113,25 @@ export function WorkspaceSwitcher() {
       trigger={(props) => (
         <button
           type="button"
-          className="relative inline-flex h-9 max-w-48 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          aria-label={variant === 'rail' ? `Workspace: ${active?.name ?? ''}` : undefined}
+          className={cn(
+            'relative inline-flex items-center gap-2 rounded-md border border-border bg-surface text-sm text-ink transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+            triggerClass[variant],
+          )}
           {...props}
         >
           <Building2 width={16} height={16} className="shrink-0 text-ink-muted" aria-hidden />
-          <span className="min-w-0 truncate">{active?.name}</span>
-          <ChevronsUpDown
-            width={14}
-            height={14}
-            className="ml-auto shrink-0 text-ink-muted"
-            aria-hidden
-          />
+          {variant === 'rail' ? null : (
+            <>
+              <span className="min-w-0 truncate">{active?.name}</span>
+              <ChevronsUpDown
+                width={14}
+                height={14}
+                className="ml-auto shrink-0 text-ink-muted"
+                aria-hidden
+              />
+            </>
+          )}
           {pendingCount > 0 ? (
             <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-pill bg-brand px-1 text-[10px] font-semibold text-brand-fg">
               {pendingCount > 9 ? '9+' : pendingCount}

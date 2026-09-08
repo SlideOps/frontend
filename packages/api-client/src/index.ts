@@ -455,6 +455,14 @@ export {
   type IncomingNodeTransfer,
 } from './nodeTransfers';
 export {
+  DEFAULT_COLLAPSED_GROUPS,
+  defaultNavigationPreferences,
+  getNavigationPreferences,
+  normalizeNavigationPreferences,
+  saveNavigationPreferences,
+  type NavigationPreferences,
+} from './navigation';
+export {
   listNotifications,
   unreadNotificationCount,
   markNotificationRead,
