@@ -33,6 +33,8 @@ export interface UseShellSessionResult {
   close: () => void;
   /** Re-measures the container and tells the remote, for callers that resize the container themselves (an expand toggle, a tab becoming active). */
   refit: () => void;
+  /** Puts the caret back in the terminal, for a caller whose own control took the focus. */
+  focus: () => void;
   /** Sends raw input to the active session exactly as if it had been typed, for a snippet picker that fills in a command without inventing a second protocol. */
   send: (data: string) => void;
 }
@@ -226,7 +228,19 @@ export function useShellSession(urlFor: (cols: number, rows: number) => string):
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: 'resize', ...geometry(terminal) }));
     }
-    terminal.focus();
+  }, []);
+
+  /*
+   * Focus is deliberately not part of refitting.
+   *
+   * Refitting now also happens on an ordinary window resize and whenever the box
+   * itself is dragged taller, and a terminal that grabbed the caret every time
+   * somebody resized their browser would take it away from whatever they were
+   * actually typing in. Callers that mean "and put me back in the terminal", such
+   * as an expand toggle, ask for it.
+   */
+  const focus = useCallback(() => {
+    terminalRef.current?.focus();
   }, []);
 
   const send = useCallback((data: string) => {
@@ -236,5 +250,5 @@ export function useShellSession(urlFor: (cols: number, rows: number) => string):
     }
   }, []);
 
-  return { containerRef, status, error, attached, live, open, close, refit, send };
+  return { containerRef, status, error, attached, live, open, close, refit, focus, send };
 }

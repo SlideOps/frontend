@@ -54,6 +54,15 @@
      should not invert in light mode, so this is not a light/dark pair. */
   --color-overlay: rgba(0, 0, 0, 0.6);
 
+  /* The pool of light a terminal or log surface floats above. Declared once,
+     in terms of the semantic tokens rather than a literal colour, so it
+     inverts with the theme for free: near-black in light, so the surface reads
+     as lifted off the page, and near-white in dark, so it reads as lit from
+     underneath. Custom properties substitute at use time, so both of these
+     resolve against whichever theme's values won on this element. */
+  --color-surface-glow: color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+  --color-surface-glow-accent: color-mix(in srgb, var(--color-info) 16%, transparent);
+
   /* Spacing on a 4px base scale */
   --so-space-1: 0.25rem;
   --so-space-2: 0.5rem;

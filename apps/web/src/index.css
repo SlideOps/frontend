@@ -116,6 +116,66 @@
     animation: so-drift 22s var(--so-ease-standard) infinite;
   }
 
+  /*
+   * The light a terminal or a log view floats above.
+   *
+   * It sits behind an opaque content box and only ever peeks out of the couple
+   * of pixels around its edge, so it can never overlay, blur or wash out the
+   * text: contrast inside the box is exactly what it would be with no glow at
+   * all. The frame around it reserves the room, so the light has somewhere to
+   * fall without pushing anything, and it is absolutely positioned, so it takes
+   * part in no layout and can shift nothing.
+   *
+   * Transform only, never opacity, so it stays on the compositor and never
+   * flickers, and the loop closes on the frame it opened with so there is no
+   * seam. Two offset pools rather than one, weighted toward the bottom edge, so
+   * the light reads as moving underneath the surface rather than pulsing in
+   * place.
+   */
+  .so-glow-pool {
+    position: absolute;
+    /* 2px outside the content box, inside the frame's 5px of reserved room. */
+    inset: 3px;
+    border-radius: var(--so-radius-md);
+    background:
+      radial-gradient(65% 130% at 22% 0%, var(--color-surface-glow-accent) 0%, transparent 68%),
+      radial-gradient(60% 130% at 78% 100%, var(--color-surface-glow) 0%, transparent 68%);
+    filter: blur(5px);
+    pointer-events: none;
+    will-change: transform;
+    animation: so-glow-drift 24s var(--so-ease-standard) infinite;
+  }
+
+  @keyframes so-glow-drift {
+    0%,
+    100% {
+      transform: translate3d(-1.5%, 0.5%, 0) scale(1.01);
+    }
+    50% {
+      transform: translate3d(1.5%, -0.5%, 0) scale(1.04);
+    }
+  }
+
+  /*
+   * Reduced motion leaves the light there and stops it moving, subdued rather
+   * than removed: the surface still reads as lifted, nothing drifts. Applied as
+   * a class by the surface itself and as a media query here, so a preference
+   * set after the page loaded is honoured either way.
+   */
+  .so-glow-pool-static {
+    animation: none;
+    transform: none;
+    opacity: 0.6;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .so-glow-pool {
+      animation: none;
+      transform: none;
+      opacity: 0.6;
+    }
+  }
+
   /* A notification toast eases in and settles, never a jarring pop. It plays
      once when the toast mounts, respecting reduced motion like everything else. */
   @keyframes so-toast-in {

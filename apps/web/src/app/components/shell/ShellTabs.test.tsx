@@ -126,6 +126,39 @@ describe('ShellTabs', () => {
     expect(FakeSocket.all[0]!.readyState).toBe(FakeSocket.OPEN);
   });
 
+  /*
+   * A tab that reconnected on being expanded would drop the session an Operator
+   * was in the middle of, which is the one thing making the box bigger must
+   * never cost. The surface only changes classes, so the socket is untouched.
+   */
+  it('keeps a tab’s session and scrollback when that tab fills the window', async () => {
+    render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.all).toHaveLength(1));
+    FakeSocket.all[0]!.openIt();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /fill the window with the terminal for/i }),
+    );
+
+    expect(FakeSocket.all).toHaveLength(1);
+    expect(FakeSocket.all[0]!.readyState).toBe(FakeSocket.OPEN);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /leave full screen for the terminal for/i }),
+    );
+    expect(FakeSocket.all).toHaveLength(1);
+    expect(FakeSocket.all[0]!.readyState).toBe(FakeSocket.OPEN);
+  });
+
+  // The expand control is withheld until there is something worth filling the
+  // window with, rather than offering a full window of empty frame.
+  it('offers no expand control on a tab with no terminal in it yet', () => {
+    render();
+
+    expect(screen.queryByRole('button', { name: /fill the window/i })).not.toBeInTheDocument();
+  });
+
   it('closing a tab ends its session', async () => {
     const { container } = render();
     const firstTabButton = container.querySelector('button[aria-pressed]') as HTMLButtonElement;

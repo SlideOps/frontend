@@ -216,6 +216,83 @@ describe('ServiceLogView', () => {
     );
   });
 
+  /*
+   * Wrapping, and being able to turn it off.
+   *
+   * A line that runs off the right edge is a line somebody has to go looking
+   * for, so wrapping is the default. Aligned output and stack traces with long
+   * paths are the opposite case: folding them is what destroys the shape, so it
+   * can be turned off and the surface scrolls sideways instead. Whitespace is
+   * preserved either way, because a log's indentation is often the only
+   * structure it has.
+   */
+  it('wraps long lines by default and stops when the Operator turns wrapping off', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'log', data: '    indented and rather long' });
+
+    const row = (await screen.findByText('indented and rather long')).parentElement!;
+    expect(row).toHaveClass('whitespace-pre-wrap');
+
+    const wrap = screen.getByRole('button', { name: /stop wrapping long lines/i });
+    expect(wrap).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(wrap);
+
+    const unwrapped = screen.getByText('indented and rather long').parentElement!;
+    // Still pre, so every leading space survives: only the folding stopped.
+    expect(unwrapped).toHaveClass('whitespace-pre');
+    expect(unwrapped).not.toHaveClass('whitespace-pre-wrap');
+    expect(unwrapped.textContent).toBe('    indented and rather long');
+    expect(screen.getByRole('button', { name: /^wrap long lines$/i })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  // Colour is resolved into per-segment styles, so folding or not folding a line
+  // can never be what loses it.
+  it('keeps ANSI colour on a line whether it is wrapped or not', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'log', data: '[31mconnection refused[0m' });
+
+    const coloured = await screen.findByText('connection refused');
+    expect(coloured.getAttribute('style')).toContain('--color-danger');
+
+    await userEvent.click(screen.getByRole('button', { name: /stop wrapping long lines/i }));
+
+    expect(screen.getByText('connection refused').getAttribute('style')).toContain(
+      '--color-danger',
+    );
+  });
+
+  // Expanding is a bigger box, not a fresh view. The moment an Operator wants
+  // the whole window is the moment they are reading something that already
+  // happened, so nothing may reconnect and nothing may be cleared.
+  it('keeps the scrollback and the open connection when the log fills the window', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+    FakeSocket.last!.message({ type: 'log', data: 'ValueError: boom' });
+    await screen.findByText('ValueError: boom');
+
+    await userEvent.click(screen.getByRole('button', { name: /fill the window with the log/i }));
+
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(screen.getByText('ValueError: boom')).toBeInTheDocument();
+    expect(screen.getByRole('log', { name: 'Live Service output' })).toBeInTheDocument();
+  });
+
+  // Every control that was on this view before it was given a shared surface is
+  // still on it: copying, reconnecting, and following the tail.
+  it('still offers copy, reconnect and the expand control side by side', async () => {
+    renderInApp(<ServiceLogView id="svc-1" />);
+    FakeSocket.last!.openIt();
+
+    expect(screen.getByRole('button', { name: /copy the log output/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reconnect/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /fill the window with the log/i })).toBeInTheDocument();
+  });
+
   it('closes the socket when it unmounts, rather than leaving a session open', () => {
     const { unmount } = renderInApp(<ServiceLogView id="svc-1" />);
     const socket = FakeSocket.last!;

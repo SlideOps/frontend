@@ -1,9 +1,10 @@
 import { openServiceLogStream, type ServiceLogConnectionState } from '@slideops/api-client';
 import { Button, Text, cn } from '@slideops/design-system';
-import { RefreshCw } from '@slideops/icons';
+import { RefreshCw, WrapText } from '@slideops/icons';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ansiSegmentStyle, parseAnsiLine } from './ansi';
 import { CopyButton } from './CopyButton';
+import { TerminalSurface } from './TerminalSurface';
 
 /*
  * The Service's live output: `docker logs --follow`, `docker compose logs
@@ -88,7 +89,7 @@ function ConnectionIndicator({ state }: { state: ServiceLogConnectionState }) {
 
 /** One entry: the workload's own line, ANSI colour preserved and every other
  * escape sequence stripped, or a dimmed marker about the stream itself. */
-function LogEntryRow({ entry }: { entry: LogEntry }) {
+function LogEntryRow({ entry, wrap }: { entry: LogEntry; wrap: boolean }) {
   if (entry.kind === 'diagnostic') {
     // A diagnostic can carry more than one line -- a replacement container's
     // id and start time alongside the marker itself -- so line breaks are
@@ -104,7 +105,13 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
   }
   const segments = parseAnsiLine(entry.text);
   return (
-    <div className="whitespace-pre-wrap break-all">
+    // Both settings preserve whitespace exactly -- a log's indentation is often
+    // the only structure it has -- and neither touches the ANSI colouring, which
+    // is already resolved into per-segment styles below. Wrapped, a long line
+    // folds and everything stays on screen; unwrapped, it runs on and the
+    // surface scrolls sideways, which is what somebody reading aligned columns
+    // or a stack trace with long paths asked for.
+    <div className={wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'}>
       {segments.map((segment, index) => (
         <span key={index} style={ansiSegmentStyle(segment.style)}>
           {segment.text}
@@ -120,6 +127,11 @@ export function ServiceLogView({ id }: { id: string }) {
   const [state, setState] = useState<ServiceLogConnectionState>('connecting');
   const [detail, setDetail] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  // Wrapping is the default because a line that runs off the right edge is a
+  // line an Operator has to go looking for. Turning it off is for reading
+  // aligned output, where folding is what destroys the shape.
+  const [wrap, setWrap] = useState(true);
   // Bumped when the Operator asks to reconnect, so the connect effect below
   // reruns without id itself needing to change -- and, deliberately, without
   // the entries effect above it rerunning, so a manual reconnect never clears
@@ -165,7 +177,9 @@ export function ServiceLogView({ id }: { id: string }) {
         receivedHistoryRef.current = true;
         const historyLines = history.split('\n');
         setEntries((current) =>
-          current.concat(historyLines.map((text) => ({ id: seqRef.current++, kind: 'line', text }))),
+          current.concat(
+            historyLines.map((text) => ({ id: seqRef.current++, kind: 'line', text })),
+          ),
         );
       },
       // Appended the instant it arrives: no buffering, no batching, so an
@@ -220,69 +234,87 @@ export function ServiceLogView({ id }: { id: string }) {
   const fullText = useMemo(() => entries.map((entry) => entry.text).join('\n'), [entries]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
+    <TerminalSurface
+      label="the log"
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      contentRef={containerRef}
+      onContentScroll={handleScroll}
+      contentRole="log"
+      contentLabel="Live Service output"
+      // A plain-text log scrolls itself, unlike an emulator, and the same drag
+      // handle a textarea has lets it be pulled open without leaving the page.
+      // min-h keeps it from being dragged down to nothing; there is deliberately
+      // no max-h, since the whole point is letting it grow past its default.
+      scrolls
+      resizable
+      contentClassName="min-h-32 font-mono text-xs leading-relaxed text-ink"
+      toolbar={
         <span className="flex items-center gap-3">
           <Text variant="body-sm" tone="secondary">
             Live output from the running workload.
           </Text>
           <ConnectionIndicator state={state} />
         </span>
-        <span className="flex items-center gap-2">
+      }
+      actions={
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setWrap((was) => !was)}
+            aria-pressed={wrap}
+            aria-label={wrap ? 'Stop wrapping long lines' : 'Wrap long lines'}
+            title={wrap ? 'Stop wrapping long lines' : 'Wrap long lines'}
+          >
+            <WrapText width={14} height={14} aria-hidden />
+            Wrap
+          </Button>
           <CopyButton value={fullText} label="the log output" />
           <Button variant="ghost" size="sm" onClick={reconnect}>
             <RefreshCw width={14} height={14} aria-hidden />
             Reconnect
           </Button>
-        </span>
-      </div>
+        </>
+      }
+      notice={
+        <>
+          {/* A permanent refusal -- the Service does not exist, or never created
+              a workload -- is the actual reason, not a generic failure. */}
+          {state === 'disconnected' && detail ? (
+            <p role="alert" className="text-sm text-danger">
+              {detail}
+            </p>
+          ) : null}
 
-      {/* A permanent refusal -- the Service does not exist, or never created a
-          workload -- is the actual reason, not a generic failure. */}
-      {state === 'disconnected' && detail ? (
-        <p role="alert" className="text-sm text-danger">
-          {detail}
-        </p>
-      ) : null}
-
-      {/* A stopped Service is not an error: this view keeps watching for it to
-          run again on its own, and says so rather than reading as broken. */}
-      {state === 'stopped' ? (
-        <p className="text-sm text-ink-muted">
-          {detail ?? 'Service stopped.'} Watching for it to start again.
-        </p>
-      ) : null}
-
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        role="log"
-        aria-label="Live Service output"
-        // resize-y gives this its own drag handle in the bottom-right corner, the
-        // same native control a textarea offers, so an Operator can pull it open
-        // for more context and pull it back down again. min-h keeps it from being
-        // dragged down to nothing; there is deliberately no max-h, since the
-        // whole point is letting it grow past its default.
-        className="h-80 min-h-32 w-full min-w-0 max-w-full resize-y overflow-auto rounded-md border border-border bg-app p-3 font-mono text-xs leading-relaxed text-ink"
-      >
-        {entries.length > 0 ? (
-          entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} />)
-        ) : (
-          <Text variant="body-sm" tone="secondary">
-            {state === 'connecting' ? 'Reading recent output…' : 'No logs yet.'}
-          </Text>
-        )}
-      </div>
-
-      {!autoScroll ? (
-        <button
-          type="button"
-          onClick={() => setAutoScroll(true)}
-          className="self-end text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-        >
-          New output is arriving below. Jump to latest.
-        </button>
-      ) : null}
-    </div>
+          {/* A stopped Service is not an error: this view keeps watching for it
+              to run again on its own, and says so rather than reading as broken. */}
+          {state === 'stopped' ? (
+            <p className="text-sm text-ink-muted">
+              {detail ?? 'Service stopped.'} Watching for it to start again.
+            </p>
+          ) : null}
+        </>
+      }
+      footer={
+        !autoScroll ? (
+          <button
+            type="button"
+            onClick={() => setAutoScroll(true)}
+            className="self-end text-xs text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+          >
+            New output is arriving below. Jump to latest.
+          </button>
+        ) : null
+      }
+    >
+      {entries.length > 0 ? (
+        entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} wrap={wrap} />)
+      ) : (
+        <Text variant="body-sm" tone="secondary">
+          {state === 'connecting' ? 'Reading recent output…' : 'No logs yet.'}
+        </Text>
+      )}
+    </TerminalSurface>
   );
 }
