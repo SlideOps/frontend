@@ -16,10 +16,11 @@ import {
   Users,
   Waypoints,
 } from '@slideops/icons';
-import { AppShell, type NavItem } from '@slideops/ui';
+import { AppShell, type NavGroup, type NavItem } from '@slideops/ui';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InstallApp } from '../../app/components/InstallApp';
+import { useNavigationPreferences } from '../../app/hooks/useNavigationPreferences';
 import { LogoutButton } from './LogoutButton';
 
 export type ActiveKey =
@@ -41,140 +42,100 @@ export type ActiveKey =
   | 'domains';
 
 /**
- * The Admin app frame: shared side navigation on wide screens, a bottom bar on
- * phones, both from the design system, plus a working sign out. Denser than the
+ * The Admin app frame: the same grouped, collapsible sidebar the Operator
+ * surface uses, a bottom bar on phones, and a working sign out. Denser than the
  * Operator surface, calmer, and the same in both themes.
+ *
+ * The group keys are prefixed, so both sidebars can share one stored set of
+ * collapsed groups without an admin group and an operator group of the same
+ * name closing each other.
  */
 export function AdminShell({ active, children }: { active: ActiveKey; children: ReactNode }) {
   const navigate = useNavigate();
+  const { preferences, toggleGroup, toggleSidebar } = useNavigationPreferences();
 
-  const nav: NavItem[] = [
+  const item = (key: ActiveKey, label: string, icon: NavItem['icon'], path: string): NavItem => ({
+    key,
+    label,
+    icon,
+    active: active === key,
+    onSelect: () => navigate(path),
+  });
+
+  const groups: NavGroup[] = [
     {
-      key: 'overview',
-      label: 'Overview',
-      icon: Gauge,
-      active: active === 'overview',
-      onSelect: () => navigate('/admin'),
+      key: 'admin-people',
+      label: 'People',
+      items: [item('operators', 'Operators', Users, '/admin/operators')],
     },
     {
-      key: 'operators',
-      label: 'Operators',
-      icon: Users,
-      active: active === 'operators',
-      onSelect: () => navigate('/admin/operators'),
+      key: 'admin-billing',
+      label: 'Billing',
+      items: [
+        item('subscribers', 'Subscribers', CreditCard, '/admin/subscribers'),
+        item('tiers', 'Tiers', Layers, '/admin/tiers'),
+        item('arrangements', 'Arrangements', FileText, '/admin/arrangements'),
+        item('promo-codes', 'Promo Codes', TicketPercent, '/admin/promo-codes'),
+        item(
+          'billing-communications',
+          'Billing Communications',
+          Mail,
+          '/admin/billing-communications',
+        ),
+      ],
     },
     {
-      key: 'subscribers',
-      label: 'Subscribers',
-      icon: CreditCard,
-      active: active === 'subscribers',
-      onSelect: () => navigate('/admin/subscribers'),
+      key: 'admin-platform',
+      label: 'Platform',
+      items: [
+        item('operations', 'Operations', Activity, '/admin/operations'),
+        item('domains', 'Domains', Globe, '/admin/domains'),
+        item('feature-flags', 'Feature Flags', Flag, '/admin/feature-flags'),
+      ],
     },
     {
-      key: 'arrangements',
-      label: 'Arrangements',
-      icon: FileText,
-      active: active === 'arrangements',
-      onSelect: () => navigate('/admin/arrangements'),
+      key: 'admin-delivery',
+      label: 'Delivery',
+      items: [
+        item('webhooks', 'Webhooks', Waypoints, '/admin/webhooks'),
+        item('email-deliveries', 'Email Deliveries', Mail, '/admin/email-deliveries'),
+        item('rate-limits', 'Rate Limits', ShieldAlert, '/admin/rate-limits'),
+      ],
     },
     {
-      key: 'billing-communications',
-      label: 'Billing Communications',
-      icon: Mail,
-      active: active === 'billing-communications',
-      onSelect: () => navigate('/admin/billing-communications'),
+      key: 'admin-insight',
+      label: 'Insight',
+      items: [
+        item('analytics', 'Analytics', Sparkles, '/admin/analytics'),
+        item('audit', 'Audit', ListChecks, '/admin/audit'),
+      ],
     },
     {
-      key: 'operations',
-      label: 'Operations',
-      icon: Activity,
-      active: active === 'operations',
-      onSelect: () => navigate('/admin/operations'),
-    },
-    {
-      key: 'analytics',
-      label: 'Analytics',
-      icon: Sparkles,
-      active: active === 'analytics',
-      onSelect: () => navigate('/admin/analytics'),
-    },
-    {
-      key: 'audit',
-      label: 'Audit log',
-      icon: ListChecks,
-      active: active === 'audit',
-      onSelect: () => navigate('/admin/audit'),
-    },
-    {
-      key: 'promo-codes',
-      label: 'Promo codes',
-      icon: TicketPercent,
-      active: active === 'promo-codes',
-      onSelect: () => navigate('/admin/promo-codes'),
-    },
-    {
-      key: 'tiers',
-      label: 'Tiers',
-      icon: Layers,
-      active: active === 'tiers',
-      onSelect: () => navigate('/admin/tiers'),
-    },
-    {
-      key: 'emergency',
-      label: 'Emergency',
-      icon: ShieldCheck,
-      active: active === 'emergency',
-      onSelect: () => navigate('/admin/emergency'),
-    },
-    {
-      key: 'feature-flags',
-      label: 'Feature flags',
-      icon: Flag,
-      active: active === 'feature-flags',
-      onSelect: () => navigate('/admin/feature-flags'),
-    },
-    {
-      key: 'webhooks',
-      label: 'Webhooks',
-      icon: Waypoints,
-      active: active === 'webhooks',
-      onSelect: () => navigate('/admin/webhooks'),
-    },
-    {
-      key: 'rate-limits',
-      label: 'Rate limits',
-      icon: ShieldAlert,
-      active: active === 'rate-limits',
-      onSelect: () => navigate('/admin/rate-limits'),
-    },
-    {
-      key: 'email-deliveries',
-      label: 'Email deliveries',
-      icon: Mail,
-      active: active === 'email-deliveries',
-      onSelect: () => navigate('/admin/email-deliveries'),
-    },
-    {
-      key: 'domains',
-      label: 'Domains',
-      icon: Globe,
-      active: active === 'domains',
-      onSelect: () => navigate('/admin/domains'),
-    },
-    {
-      key: 'app',
-      label: 'Exit to app',
-      icon: LayoutDashboard,
-      active: false,
-      onSelect: () => navigate('/app'),
+      key: 'admin-controls',
+      label: 'Controls',
+      items: [item('emergency', 'Emergency', ShieldCheck, '/admin/emergency')],
     },
   ];
 
   return (
     <AppShell
       surface="Admin"
-      nav={nav}
       dense
+      primary={[item('overview', 'Control Center', Gauge, '/admin')]}
+      groups={groups}
+      // The way back out of the admin area is not one of the admin
+      // destinations, so it sits under the navigation rather than inside it.
+      footer={{
+        key: 'app',
+        label: 'Exit to app',
+        icon: LayoutDashboard,
+        active: false,
+        onSelect: () => navigate('/app'),
+      }}
+      collapsedGroups={preferences.collapsed_groups}
+      onToggleGroup={toggleGroup}
+      railCollapsed={preferences.sidebar_collapsed}
+      onToggleRail={toggleSidebar}
       actions={
         <>
           <InstallApp />

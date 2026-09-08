@@ -74,6 +74,8 @@ export {
   Moon,
   Network,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Play,
   Plus,

@@ -15,7 +15,11 @@ import { Subscribers } from './Subscribers';
 
 const { listSubscribers } = vi.hoisted(() => ({ listSubscribers: vi.fn() }));
 
-vi.mock('@slideops/api-client', () => ({
+// Only listSubscribers is replaced. The rest of the client is kept, because the
+// admin frame around this screen reads its own things from it, and a total mock
+// makes this test fail for a reason that has nothing to do with subscribers.
+vi.mock('@slideops/api-client', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   listSubscribers,
   ApiError: class ApiError extends Error {},
 }));
