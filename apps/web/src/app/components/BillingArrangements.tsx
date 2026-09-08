@@ -1,8 +1,8 @@
 import {
   ApiError,
   TransactionActionError,
+  completeArrangementPayment,
   listBillingArrangements,
-  resumeCheckout,
   type BillingArrangement,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
@@ -53,8 +53,8 @@ const deadlineTone = {
 /**
  * The failure to show when resuming is refused.
  *
- * `resumeCheckout` reports a refusal as a TransactionActionError rather than an
- * ApiError, so matching on ApiError alone would throw away the backend's own
+ * The payment endpoints report a refusal as a TransactionActionError rather than
+ * an ApiError, so matching on ApiError alone would throw away the backend's own
  * words for what went wrong and replace them with a guess.
  */
 function resumeFailureMessage(error: unknown): string {
@@ -180,22 +180,35 @@ function OpenArrangement({
               <Banknote width={16} height={16} aria-hidden />
               {completing ? 'Opening your payment' : 'Complete this payment'}
             </Button>
-            {/* Non null: completable is only ever true with a reference. */}
-            <PaymentLink reference={arrangement.payment_reference!} />
+            {/* Only when one exists. A payable arrangement need not have one:
+                the checkout for a price an Admin has since corrected is voided,
+                and the new one is made when the customer chooses to pay. */}
+            {arrangement.payment_reference ? (
+              <PaymentLink reference={arrangement.payment_reference} />
+            ) : null}
           </div>
           <Text variant="body-sm" tone="secondary" className="mt-2">
-            Completing takes you back to the payment already open for this arrangement. It does not
-            start a new one, and you will not be charged twice. Viewing it opens the payment in
-            full, where you can see everything about it and complete it from there.
+            Completing takes you to the payment for this arrangement, at the amount shown here. It
+            never starts a second payment for the same thing, and you will not be charged twice.
           </Text>
         </div>
       ) : arrangement.payment_reference ? (
-        // Not resumable, or nothing left to settle, but the payment still
-        // exists and is still the answer to what happened, so it is still
-        // reachable. Only the resuming is withheld.
+        // Nothing left to settle, but the payment still exists and is still the
+        // answer to what happened, so it stays reachable. Only paying is
+        // withheld, and the reason is the server's own words rather than a
+        // guess made from the status.
         <div className="mt-4">
+          {arrangement.unpayable_reason ? (
+            <Text variant="body-sm" tone="secondary" className="mb-2 block">
+              {arrangement.unpayable_reason}
+            </Text>
+          ) : null}
           <PaymentLink reference={arrangement.payment_reference} />
         </div>
+      ) : arrangement.unpayable_reason ? (
+        <Text variant="body-sm" tone="secondary" className="mt-4">
+          {arrangement.unpayable_reason}
+        </Text>
       ) : isOutstanding(arrangement) ? (
         <Text variant="body-sm" tone="secondary" className="mt-4">
           There is no payment open for this yet, so there is nothing to complete here. Ask whoever
@@ -214,18 +227,23 @@ export function BillingArrangements() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const runComplete = async (arrangement: BillingArrangement) => {
-    const reference = arrangement.payment_reference;
-    // The only payment this panel may open is one that already exists. Without
-    // a reference there is nothing to resume, and starting a checkout instead
-    // is exactly the double charge this whole surface exists to prevent.
-    if (!reference) {
+    // One call, and the server decides what it means: returning to the checkout
+    // already open, or opening one at terms an Admin has since changed. The
+    // panel used to resume a reference itself, which could only ever do the
+    // first, so an arrangement whose price had been corrected had its old
+    // checkout voided and nothing to offer in its place.
+    //
+    // Nothing here can start a second debt for the same arrangement. That is a
+    // property of the endpoint rather than of this button, which is what makes
+    // it true of every other caller too.
+    if (completing) {
       return;
     }
     setCompleting(arrangement.id);
     setActionError(null);
     setActionNotice(null);
     try {
-      const result = await resumeCheckout(reference);
+      const result = await completeArrangementPayment(arrangement.id);
       if (result.already_succeeded) {
         setActionNotice(
           'That payment already went through. Your plan is being brought up to date.',
@@ -233,6 +251,14 @@ export function BillingArrangements() {
         setCompleting(null);
         reload();
         return;
+      }
+      if (result.superseded) {
+        // The customer is told before they are sent anywhere. Being taken to a
+        // checkout showing a number other than the one just on screen, with no
+        // explanation, reads as the platform having got it wrong.
+        setActionNotice(
+          'The terms of this were updated, so a new payment was prepared at the current amount. Taking you there now.',
+        );
       }
       window.location.href = result.checkout_url;
     } catch (error) {

@@ -16,12 +16,14 @@ import { transactionDetailPath } from '../billing-routes';
 
 const listBillingArrangements = vi.fn();
 const resumeCheckout = vi.fn();
+const completeArrangementPayment = vi.fn();
 const startCheckout = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   listBillingArrangements: (...a: unknown[]) => listBillingArrangements(...a),
   resumeCheckout: (...a: unknown[]) => resumeCheckout(...a),
+  completeArrangementPayment: (...a: unknown[]) => completeArrangementPayment(...a),
   startCheckout: (...a: unknown[]) => startCheckout(...a),
 }));
 
@@ -49,6 +51,21 @@ function money(minor: number, currency: string): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(minor / 100);
 }
 
+/**
+ * Whether the server would call this payable, mirrored here so a fixture looks
+ * like a real response. It is the arrangement's own lifecycle and condition that
+ * decide, never whether a checkout happens to be open: an arrangement whose
+ * price was just corrected has no open checkout and is very much payable.
+ */
+function serverPayable(over: Partial<BillingArrangement>): boolean {
+  const status = over.status ?? 'awaiting_payment';
+  const condition = over.condition ?? 'temporary_access';
+  if (status === 'cancelled' || status === 'revoked' || status === 'completed') {
+    return false;
+  }
+  return condition !== 'free_grant' && condition !== 'offline_settled';
+}
+
 function arrangement(over: Partial<BillingArrangement> = {}): BillingArrangement {
   return {
     id: 'arr_1',
@@ -60,6 +77,7 @@ function arrangement(over: Partial<BillingArrangement> = {}): BillingArrangement
     payment_deadline: daysFromNow(10),
     payment_reference: 'so_open_payment',
     resumable: true,
+    payable: serverPayable(over),
     created_at: daysFromNow(-4),
     ...over,
   };
@@ -84,6 +102,7 @@ let sentTo = '';
 beforeEach(() => {
   listBillingArrangements.mockReset().mockResolvedValue([]);
   resumeCheckout.mockReset();
+  completeArrangementPayment.mockReset();
   startCheckout.mockReset();
   sentTo = '';
   Object.defineProperty(window, 'location', {
@@ -119,22 +138,42 @@ describe('the arrangement panel on Billing', () => {
     expect(screen.getByText(`Due by ${day(deadline)}`)).toBeInTheDocument();
   });
 
-  it('completes an arrangement through the payment already open for it and never a new checkout', async () => {
+  it('completes an arrangement through the one endpoint that decides, and never a new checkout', async () => {
     listBillingArrangements.mockResolvedValue([
       arrangement({ payment_reference: 'so_open_payment' }),
     ]);
-    resumeCheckout.mockResolvedValue({
+    completeArrangementPayment.mockResolvedValue({
       checkout_url: 'https://pay.example/so_open_payment',
       already_succeeded: false,
-      transaction: {},
+      superseded: false,
     });
 
     show();
     await userEvent.click(await screen.findByRole('button', { name: /Complete this payment/ }));
 
-    await waitFor(() => expect(resumeCheckout).toHaveBeenCalledWith('so_open_payment'));
+    // The arrangement is named, never the payment reference. Which payment can
+    // settle it is the server's decision, because only the server knows whether
+    // the terms have moved since the open one was created.
+    await waitFor(() => expect(completeArrangementPayment).toHaveBeenCalledWith('arr_1'));
     expect(startCheckout).not.toHaveBeenCalled();
     await waitFor(() => expect(sentTo).toBe('https://pay.example/so_open_payment'));
+  });
+
+  it('says the amount changed before sending the customer to a repriced checkout', async () => {
+    listBillingArrangements.mockResolvedValue([arrangement()]);
+    completeArrangementPayment.mockResolvedValue({
+      checkout_url: 'https://pay.example/repriced',
+      already_succeeded: false,
+      superseded: true,
+    });
+
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: /Complete this payment/ }));
+
+    // Arriving at a checkout showing a different number than the page just
+    // showed, with no explanation, reads as the platform having got it wrong.
+    expect(await screen.findByText(/new payment was prepared at the current amount/)).toBeInTheDocument();
+    await waitFor(() => expect(sentTo).toBe('https://pay.example/repriced'));
   });
 
   it('links the arrangement through to the payment detail page the Transactions list opens', async () => {
@@ -157,7 +196,7 @@ describe('the arrangement panel on Billing', () => {
 
     expect(await screen.findByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View payment/ })).toBeInTheDocument();
-    expect(resumeCheckout).not.toHaveBeenCalled();
+    expect(completeArrangementPayment).not.toHaveBeenCalled();
   });
 
   it('still links to the payment when it can no longer be resumed', async () => {
@@ -165,8 +204,10 @@ describe('the arrangement panel on Billing', () => {
 
     show();
 
+    // The payment stays reachable whether or not it can be returned to: it is
+    // still the record of what happened. Whether paying is offered alongside it
+    // is a separate question, and one the server answers.
     expect(await screen.findByRole('link', { name: /View payment so_open_payment/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Complete this payment/ })).not.toBeInTheDocument();
   });
 
   it('links nowhere when the arrangement carries no payment reference', async () => {
@@ -186,7 +227,7 @@ describe('the arrangement panel on Billing', () => {
     show();
 
     expect(
-      await screen.findByText(/does not start a new one, and you will not be charged twice/i),
+      await screen.findByText(/never starts a second payment for the same thing/i),
     ).toBeInTheDocument();
   });
 
@@ -233,7 +274,7 @@ describe('the arrangement panel on Billing', () => {
 
     expect(await screen.findByText(/Settled\. Nothing is outstanding on it\./)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Complete this payment/ })).not.toBeInTheDocument();
-    expect(resumeCheckout).not.toHaveBeenCalled();
+    expect(completeArrangementPayment).not.toHaveBeenCalled();
   });
 
   it('offers nothing to complete on a revoked arrangement and reads it as history', async () => {
@@ -282,29 +323,59 @@ describe('the arrangement panel on Billing', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
-  it('offers nothing to complete when no payment is open, and says what to do instead', async () => {
+  it('still offers to pay an outstanding debt with no payment open for it', async () => {
+    // The case the panel used to give up on. An Admin correcting the price
+    // voids the checkout that would have charged the old figure, so an
+    // arrangement that is very much owed has nothing open against it, and this
+    // is exactly when the customer most needs to be able to pay.
     listBillingArrangements.mockResolvedValue([
       arrangement({ payment_reference: undefined, resumable: false }),
     ]);
+    completeArrangementPayment.mockResolvedValue({
+      checkout_url: 'https://pay.example/fresh',
+      already_succeeded: false,
+      superseded: false,
+    });
 
     show();
+    await userEvent.click(await screen.findByRole('button', { name: /Complete this payment/ }));
 
-    expect(await screen.findByText(/There is no payment open for this yet/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Complete this payment/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(completeArrangementPayment).toHaveBeenCalledWith('arr_1'));
+    await waitFor(() => expect(sentTo).toBe('https://pay.example/fresh'));
   });
 
-  it('offers nothing to complete when the open payment can no longer be returned to', async () => {
+  it('offers to pay a debt whose open payment can no longer be returned to', async () => {
+    // Not resumable is not the same as not payable, and reading it as though it
+    // were is what left a customer looking at a debt with no way to settle it.
     listBillingArrangements.mockResolvedValue([arrangement({ resumable: false })]);
 
     show();
 
     await screen.findByText('Pro plan');
+    expect(screen.getByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
+  });
+
+  it('offers no way to pay for access that was withdrawn', async () => {
+    // A revoked grant reads as finished, so it is summarised rather than given a
+    // card of its own. What matters either way is that there is no route from
+    // here to paying for access the customer no longer has.
+    listBillingArrangements.mockResolvedValue([
+      arrangement({
+        status: 'revoked',
+        unpayable_reason: 'This access was withdrawn, so the payment is no longer required.',
+      }),
+    ]);
+
+    show();
+
+    await screen.findByText(/Pro/);
     expect(screen.queryByRole('button', { name: /Complete this payment/ })).not.toBeInTheDocument();
+    expect(completeArrangementPayment).not.toHaveBeenCalled();
   });
 
   it('surfaces the backend message when resuming the payment fails', async () => {
     listBillingArrangements.mockResolvedValue([arrangement()]);
-    resumeCheckout.mockRejectedValue(
+    completeArrangementPayment.mockRejectedValue(
       new TransactionActionError('not_pending', 'This payment is no longer pending.'),
     );
 
@@ -317,7 +388,7 @@ describe('the arrangement panel on Billing', () => {
 
   it('surfaces the backend message when the resume request itself is refused', async () => {
     listBillingArrangements.mockResolvedValue([arrangement()]);
-    resumeCheckout.mockRejectedValue(new ApiError(409, 'conflict', 'The gateway rejected this.'));
+    completeArrangementPayment.mockRejectedValue(new ApiError(409, 'conflict', 'The gateway rejected this.'));
 
     show();
     await userEvent.click(await screen.findByRole('button', { name: /Complete this payment/ }));
@@ -327,10 +398,10 @@ describe('the arrangement panel on Billing', () => {
 
   it('says so rather than inventing a redirect when the payment already went through', async () => {
     listBillingArrangements.mockResolvedValue([arrangement()]);
-    resumeCheckout.mockResolvedValue({
+    completeArrangementPayment.mockResolvedValue({
       checkout_url: '',
       already_succeeded: true,
-      transaction: {},
+      superseded: false,
     });
 
     show();

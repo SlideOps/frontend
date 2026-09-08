@@ -140,3 +140,67 @@ describe('TransactionDetail: unknown reference', () => {
     expect(await screen.findByText('Transaction not found')).toBeInTheDocument();
   });
 });
+
+describe('a payment somebody else arranged', () => {
+  /*
+   * A customer who did not start a payment sees an amount they never chose. The
+   * page used to show only that amount, so the one question it raised, what am I
+   * paying for and until when, was the one question it did not answer.
+   */
+  it('says what an arranged payment buys, and until when', async () => {
+    getTransaction.mockResolvedValue(
+      tx({
+        grant: {
+          arrangement_id: 'arr_1',
+          condition: 'temporary_access',
+          status: 'active',
+          payment_deadline: '2026-09-22T12:00:00Z',
+          access_start: '2026-09-08T12:00:00Z',
+          access_end: '2026-09-22T12:00:00Z',
+          payable: true,
+        },
+      }),
+    );
+
+    show();
+
+    expect(
+      await screen.findByText(/This payment is for access arranged for your SlideOps account/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Payment Deadline')).toBeInTheDocument();
+    expect(screen.getByText('Access Period')).toBeInTheDocument();
+  });
+
+  it('says why an arranged payment can no longer be settled', async () => {
+    getTransaction.mockResolvedValue(
+      tx({
+        status: 'cancelled',
+        grant: {
+          arrangement_id: 'arr_1',
+          condition: 'temporary_access',
+          status: 'revoked',
+          payable: false,
+          unpayable_reason: 'This access was withdrawn, so the payment is no longer required.',
+        },
+      }),
+    );
+
+    show();
+
+    expect(await screen.findByText(/This access was withdrawn/)).toBeInTheDocument();
+  });
+
+  it('leaves an ordinary purchase exactly as it was', async () => {
+    // The customer should never have to know how a transaction came about. One
+    // nobody arranged carries no grant, and nothing about it changes.
+    getTransaction.mockResolvedValue(tx());
+
+    show();
+
+    await screen.findByText('so_a');
+    expect(
+      screen.queryByText(/This payment is for access arranged for your SlideOps account/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Access Period')).not.toBeInTheDocument();
+  });
+});

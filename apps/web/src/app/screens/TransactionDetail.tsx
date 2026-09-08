@@ -20,6 +20,15 @@ import { OperatorShell } from '../components/OperatorShell';
 import { TransactionStatusBadge } from '../components/TransactionStatusBadge';
 import { useAsyncData } from '../hooks/useAsyncData';
 
+/** A date on its own, for the grant dates, which are days rather than moments. */
+function day(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 /*
  * One payment in full, and exactly the actions its own state allows -- the
  * available actions come straight from `transaction.status`, never a fixed
@@ -234,7 +243,35 @@ export function TransactionDetail() {
                 <Fact label="Receipt" value={transaction.receipt_available ? 'Available' : 'Not available'} />
               ) : null}
               {transaction.promo_code ? <Fact label="Promo Code" value={transaction.promo_code} /> : null}
+              {/* What an arranged debt is for. A payment the customer did not
+                  start otherwise reads as an amount with no explanation: these
+                  say what it buys and until when, which is the difference
+                  between a bill and a mystery. */}
+              {transaction.grant?.payment_deadline ? (
+                <Fact label="Payment Deadline" value={day(transaction.grant.payment_deadline)} />
+              ) : null}
+              {transaction.grant?.access_end ? (
+                <Fact
+                  label="Access Period"
+                  value={
+                    transaction.grant.access_start
+                      ? `${day(transaction.grant.access_start)} to ${day(transaction.grant.access_end)}`
+                      : `Until ${day(transaction.grant.access_end)}`
+                  }
+                />
+              ) : null}
             </div>
+
+            {transaction.grant ? (
+              <Text variant="body-sm" tone="secondary" className="mt-4 block">
+                This payment is for access arranged for your SlideOps account.
+                {transaction.grant.payable
+                  ? ' Complete it to settle what is owed.'
+                  : transaction.grant.unpayable_reason
+                    ? ` ${transaction.grant.unpayable_reason}`
+                    : ''}
+              </Text>
+            ) : null}
 
             {transaction.status === 'pending' ? (
               <Text variant="caption" tone="secondary" className="mt-4 block">
