@@ -568,6 +568,13 @@ export const guidance: GuidanceRegistry = {
     detail:
       'Every Operator sits on a tier that sets hard ceilings on Nodes, Projects, Services, and the total vCPU and memory your Services may allocate. This panel reads your current usage against those ceilings so you can see your headroom. When a meter is close to full, remove something or ask an admin to raise your tier.',
   },
+  'domains.overview': {
+    label: 'Domains and DNS',
+    summary:
+      'Every hostname in this Workspace, which Service it points at, and which part of the chain is not working.',
+    detail:
+      'A hostname serves an application only when four separate things are true: DNS answers with the target SlideOps expects, a route for that hostname exists on the server, a certificate was issued, and the Service behind it is answering. They fail independently and each has a different fix, so they are kept apart here rather than reported as one status. A domain belongs to a Service rather than to a server, which is why several Services on one server each get their own hostname. Nothing on this page changes anything until you press a control that says what it will do first.',
+  },
   'services.overview': {
     label: 'Services',
     summary:

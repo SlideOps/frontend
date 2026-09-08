@@ -116,6 +116,9 @@ const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.T
 const Networking = lazy(() =>
   import('./app/screens/Networking').then((m) => ({ default: m.Networking })),
 );
+const OperatorDomains = lazy(() =>
+  import('./app/screens/Domains').then((m) => ({ default: m.Domains })),
+);
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -248,6 +251,7 @@ export function App() {
           <Route path="security" element={<Security />} />
           <Route path="team" element={<Team />} />
           <Route path="networking" element={<Networking />} />
+          <Route path="domains" element={<OperatorDomains />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}

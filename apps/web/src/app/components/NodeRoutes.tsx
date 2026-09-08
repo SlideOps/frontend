@@ -1,46 +1,27 @@
-import {
-  ApiError,
-  inspectNodeRoutes,
-  repairNodeRoutes,
-  type RouteDrift,
-} from '@slideops/api-client';
-import { Button, Section, Text } from '@slideops/design-system';
-import { AlertTriangle, Check, Network, RefreshCw } from '@slideops/icons';
-import { useState } from 'react';
-import { useCanWrite } from '../../store/workspace';
+import { inspectNodeRoutes, type RouteDrift } from '@slideops/api-client';
+import { Section, Text } from '@slideops/design-system';
+import { AlertTriangle, Check, Network } from '@slideops/icons';
+import { ManageDomainsLink } from './DomainStatus';
 import { ErrorNote, Loading } from './Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
- * What this server is routing, against what SlideOps intends.
+ * What this server is routing, against what SlideOps intends. Read only.
  *
- * The two lists mean opposite things and the screen has to say so, because the
- * obvious reading of "SlideOps did not set this up" is that it should be cleaned
- * away, and that is exactly wrong. A site the Operator put there themselves is
- * theirs; SlideOps reports it and leaves it, and Repair only ever puts back what
- * is missing.
+ * The repair used to be here too, next to the same repair on the Node's own
+ * page and the same again inside a Service's domain tab. The state is still
+ * worth having on a server's page, because "what does this box answer for" is a
+ * question about the server. Putting it back is not: that is one of four things
+ * that can be wrong with a hostname, and doing it from here means doing it
+ * without seeing the other three.
+ *
+ * The two lists mean opposite things and the screen still has to say so. A site
+ * the Operator put there themselves is theirs; SlideOps reports it and leaves
+ * it, and the summary deliberately ignores it.
  */
 
 export function NodeRoutes({ nodeId }: { nodeId: string }) {
-  const canWrite = useCanWrite();
   const drift = useAsyncData<RouteDrift>(() => inspectNodeRoutes(nodeId), [nodeId]);
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const repair = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await repairNodeRoutes(nodeId);
-      drift.reload();
-    } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'That did not work. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const data = drift.state.status === 'ready' ? drift.state.data : undefined;
 
   return (
@@ -50,6 +31,12 @@ export function NodeRoutes({ nodeId }: { nodeId: string }) {
       description="What this server is actually serving, checked against the domains SlideOps put on it."
       collapsible
       summary={data?.summary}
+      action={
+        <ManageDomainsLink
+          label="Manage domains and DNS"
+          to={`/app/domains?node=${encodeURIComponent(nodeId)}`}
+        />
+      }
     >
       {drift.state.status === 'loading' ? <Loading /> : null}
       {/* A server that cannot be read is not a server with no routes, and the
@@ -68,12 +55,6 @@ export function NodeRoutes({ nodeId }: { nodeId: string }) {
             <Text variant="body-sm" tone="secondary" className="min-w-0 flex-1">
               {data.summary}
             </Text>
-            {canWrite && data.missing.length > 0 ? (
-              <Button size="sm" disabled={busy} onClick={repair}>
-                <RefreshCw width={15} height={15} aria-hidden />
-                {busy ? 'Putting them back' : 'Put them back'}
-              </Button>
-            ) : null}
           </div>
 
           {data.missing.length > 0 ? (
@@ -83,7 +64,8 @@ export function NodeRoutes({ nodeId }: { nodeId: string }) {
               </Text>
               <Text variant="caption" tone="secondary" className="mt-1 block">
                 SlideOps put these here and they are gone. Something removed them: a rebuilt server,
-                a restored snapshot, or an edit by hand. They can be put back.
+                a restored snapshot, or an edit by hand. They can be put back from Domains and DNS,
+                where you can see the rest of the chain at the same time.
               </Text>
               <ul className="mt-2 flex flex-col gap-1">
                 {data.missing.map((hostname: string) => (
@@ -116,12 +98,6 @@ export function NodeRoutes({ nodeId }: { nodeId: string }) {
             </div>
           ) : null}
         </div>
-      ) : null}
-
-      {error ? (
-        <p role="alert" className="mt-3 text-sm text-danger">
-          {error}
-        </p>
       ) : null}
     </Section>
   );

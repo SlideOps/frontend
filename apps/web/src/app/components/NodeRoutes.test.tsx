@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RouteDrift } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
@@ -26,6 +26,14 @@ function drift(over: Partial<RouteDrift> = {}): RouteDrift {
   };
 }
 
+function show() {
+  return renderInApp(
+    <MemoryRouter>
+      <NodeRoutes nodeId="n-1" />
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   inspectNodeRoutes.mockReset();
   repairNodeRoutes.mockReset();
@@ -34,14 +42,13 @@ beforeEach(() => {
 
 describe('NodeRoutes', () => {
   it('says everything is routed when it is', async () => {
-    renderInApp(<NodeRoutes nodeId="n-1" />);
+    show();
     expect(
       await screen.findByText(/Every domain SlideOps manages on this server is routed/),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Put them back/ })).not.toBeInTheDocument();
   });
 
-  it('lists what is missing and offers to put it back', async () => {
+  it('lists what is missing without offering to change it from here', async () => {
     inspectNodeRoutes.mockResolvedValue(
       drift({
         missing: ['api.example.com'],
@@ -49,19 +56,26 @@ describe('NodeRoutes', () => {
         summary: '1 domain is missing a route on this server.',
       }),
     );
-    repairNodeRoutes.mockResolvedValue(drift());
-    renderInApp(<NodeRoutes nodeId="n-1" />);
+    show();
 
     expect(await screen.findByText('api.example.com')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Put them back/ }));
-    await waitFor(() => expect(repairNodeRoutes).toHaveBeenCalledWith('n-1'));
+    expect(screen.queryByRole('button', { name: /Put them back/ })).not.toBeInTheDocument();
+    expect(repairNodeRoutes).not.toHaveBeenCalled();
+  });
+
+  it('points at the one page where a missing route can be put back', async () => {
+    show();
+    expect(await screen.findByRole('link', { name: /Manage domains and DNS/ })).toHaveAttribute(
+      'href',
+      '/app/domains?node=n-1',
+    );
   });
 
   it('says why a route went missing rather than only that it did', async () => {
     inspectNodeRoutes.mockResolvedValue(
       drift({ missing: ['api.example.com'], healthy: false, summary: 'x' }),
     );
-    renderInApp(<NodeRoutes nodeId="n-1" />);
+    show();
     expect(
       await screen.findByText(/rebuilt server, a restored snapshot, or an edit by hand/i),
     ).toBeInTheDocument();
@@ -73,27 +87,17 @@ describe('NodeRoutes', () => {
     inspectNodeRoutes.mockResolvedValue(
       drift({ unmanaged: ['blog.operators-own.com'], summary: 'x' }),
     );
-    renderInApp(<NodeRoutes nodeId="n-1" />);
+    show();
 
     expect(await screen.findByText('blog.operators-own.com')).toBeInTheDocument();
     expect(screen.getByText(/not a problem and nothing\s+will touch them/i)).toBeInTheDocument();
-  });
-
-  it('offers no repair when the only thing here is somebody else’s site', async () => {
-    inspectNodeRoutes.mockResolvedValue(
-      drift({ unmanaged: ['blog.operators-own.com'], summary: 'x' }),
-    );
-    renderInApp(<NodeRoutes nodeId="n-1" />);
-
-    await screen.findByText('blog.operators-own.com');
-    expect(screen.queryByRole('button', { name: /Put them back/ })).not.toBeInTheDocument();
   });
 
   // A server that cannot be read is not a server with no routes, and showing an
   // empty healthy panel would be a lie.
   it('shows the error when the server could not be read', async () => {
     inspectNodeRoutes.mockRejectedValue(new Error('the node could not be reached'));
-    renderInApp(<NodeRoutes nodeId="n-1" />);
+    show();
 
     await waitFor(() => expect(inspectNodeRoutes).toHaveBeenCalled());
     expect(screen.queryByText(/is routed/)).not.toBeInTheDocument();
