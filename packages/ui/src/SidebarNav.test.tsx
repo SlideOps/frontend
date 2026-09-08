@@ -7,8 +7,8 @@ import { SidebarNav, type NavGroup, type NavItem } from './SidebarNav';
 
 /*
  * The grouping is what an Operator navigates by, so the properties worth
- * pinning are the ones they would notice: that the daily groups are open and
- * the occasional ones are not, that a heading says whether it is open, that
+ * pinning are the ones they would notice: that a group they collapsed is closed
+ * and every other one is open, that a heading says whether it is open, that
  * following a deep link never hides the entry for the page you landed on, and
  * that nothing is ever reduced to an unlabelled icon.
  */
@@ -74,7 +74,7 @@ afterEach(() => {
 });
 
 describe('the grouped sidebar navigation', () => {
-  it('opens the daily groups and leaves the occasional ones closed', () => {
+  it('opens every group except the one the Operator collapsed', () => {
     render(<Harness initialCollapsed={['discover']} />);
 
     expect(screen.getByRole('button', { name: 'Build section' })).toHaveAttribute(

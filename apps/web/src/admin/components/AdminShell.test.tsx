@@ -99,21 +99,36 @@ beforeEach(() => {
 });
 
 describe('the admin sidebar', () => {
-  it('opens People, Billing and Platform and leaves Delivery, Insight and Controls closed', () => {
+  it('opens every group for an admin who has not collapsed any of them', () => {
     show();
 
-    for (const open of ['People section', 'Billing section', 'Platform section']) {
-      expect(sidebar().getByRole('button', { name: open })).toHaveAttribute(
+    for (const group of structure) {
+      if (!group.heading) {
+        continue;
+      }
+      expect(sidebar().getByRole('button', { name: group.heading })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
     }
-    for (const closed of ['Delivery section', 'Insight section', 'Controls section']) {
-      expect(sidebar().getByRole('button', { name: closed })).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      );
-    }
+  });
+
+  it('remembers the one group an admin collapsed and opens the rest', async () => {
+    const operator = userEvent.setup();
+    show();
+
+    await operator.click(sidebar().getByRole('button', { name: 'Delivery section' }));
+
+    expect(sidebar().getByRole('button', { name: 'Delivery section' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(sidebar().getByRole('button', { name: 'Insight section' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    const stored = JSON.parse(window.localStorage.getItem('slideops.navigation') ?? '{}');
+    expect(stored.collapsed_groups).toEqual(['admin-delivery']);
   });
 
   for (const group of structure) {

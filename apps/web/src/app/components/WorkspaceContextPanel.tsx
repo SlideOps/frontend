@@ -2,20 +2,23 @@ import { cn } from '@slideops/design-system';
 import { Building2, Users, type LucideIcon } from '@slideops/icons';
 import { Tooltip } from '@slideops/tooltips';
 import { useNavigate } from 'react-router-dom';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 /*
- * Which workspace is being operated, kept apart from what the Operator wants to
- * do in it.
+ * The two pages about the workspace itself, kept apart from what the Operator
+ * wants to do inside one.
  *
- * These two questions were previously answered by the same list, so "All
- * Workspaces" sat among Servers and Projects as though it were another kind of
- * infrastructure. It is not: it is the frame everything below it happens
- * inside. So it gets its own block at the top of the sidebar, with a rule under
- * it, and it appears nowhere in the navigation.
+ * They were once ordinary entries among Servers and Projects, which read as
+ * though a workspace were another kind of infrastructure. It is not: it is the
+ * frame everything below it happens inside. So they get their own small block
+ * at the top of the sidebar, with a rule under it, and they appear in no group.
+ *
+ * The switcher is not here. Which workspace is being operated is a question
+ * about the whole page, so it is asked once in the top bar beside search, and
+ * mounting it a second time here would double the pending invitation and node
+ * transfer reads it makes on every page.
  */
 
-/** Where the workspace block can lead. Deliberately only these two. */
+/** Where this block can lead. Deliberately only these two. */
 export type WorkspaceContextTarget = 'workspaces' | 'team' | 'none';
 
 function ContextLink({
@@ -60,7 +63,7 @@ function ContextLink({
   );
 }
 
-/** The workspace block: the current workspace, the switcher, and its two pages. */
+/** The workspace block: the two pages about the workspace, and nothing else. */
 export function WorkspaceContextPanel({
   current,
   rail,
@@ -69,28 +72,25 @@ export function WorkspaceContextPanel({
   rail: boolean;
 }) {
   const navigate = useNavigate();
+  // Rows stretch rather than centre: in the rail each entry centres its own
+  // icon inside a full width row, so the two line up with the navigation below
+  // them instead of drifting off it.
   return (
-    <section
-      aria-label="Workspace"
-      className={cn('flex flex-col gap-1', rail ? 'items-center' : undefined)}
-    >
-      <WorkspaceSwitcher variant={rail ? 'rail' : 'sidebar'} />
-      <div className={cn('flex flex-col gap-0.5', rail ? 'w-full' : undefined)}>
-        <ContextLink
-          icon={Building2}
-          label="All Workspaces"
-          rail={rail}
-          active={current === 'workspaces'}
-          onSelect={() => navigate('/app/workspaces')}
-        />
-        <ContextLink
-          icon={Users}
-          label="Team"
-          rail={rail}
-          active={current === 'team'}
-          onSelect={() => navigate('/app/team')}
-        />
-      </div>
+    <section aria-label="Workspace" className="flex flex-col gap-0.5">
+      <ContextLink
+        icon={Building2}
+        label="All Workspaces"
+        rail={rail}
+        active={current === 'workspaces'}
+        onSelect={() => navigate('/app/workspaces')}
+      />
+      <ContextLink
+        icon={Users}
+        label="Team"
+        rail={rail}
+        active={current === 'team'}
+        onSelect={() => navigate('/app/team')}
+      />
     </section>
   );
 }

@@ -15,13 +15,26 @@ export interface PopoverProps {
   /** Accessible label for the panel. */
   label: string;
   placement?: Placement;
+  /**
+   * Which of the trigger's edges the panel lines up with. A trigger sitting at
+   * the right of the screen, the header bell being the case that forced this,
+   * needs 'end' so the panel opens inward across the app rather than outward
+   * off the edge, where the edge clamp can only drag it partly back.
+   */
+  align?: PopoverAlign;
 }
 
-const placementClass: Record<Placement, string> = {
-  top: 'bottom-full left-0 mb-2',
-  bottom: 'top-full left-0 mt-2',
-  left: 'right-full top-0 mr-2',
-  right: 'left-full top-0 ml-2',
+export type PopoverAlign = 'start' | 'end';
+
+/**
+ * Where the panel sits relative to the trigger. A panel above or below lines up
+ * with a horizontal edge; one to the side lines up with a vertical one.
+ */
+const placementClass: Record<Placement, Record<PopoverAlign, string>> = {
+  top: { start: 'bottom-full left-0 mb-2', end: 'bottom-full right-0 mb-2' },
+  bottom: { start: 'top-full left-0 mt-2', end: 'top-full right-0 mt-2' },
+  left: { start: 'right-full top-0 mr-2', end: 'right-full bottom-0 mr-2' },
+  right: { start: 'left-full top-0 ml-2', end: 'left-full bottom-0 ml-2' },
 };
 
 /**
@@ -29,7 +42,13 @@ const placementClass: Record<Placement, string> = {
  * Escape and on an outside click, and never traps focus. It is labelled for
  * screen readers and is keyboard reachable through its trigger.
  */
-export function Popover({ trigger, children, label, placement = 'bottom' }: PopoverProps) {
+export function Popover({
+  trigger,
+  children,
+  label,
+  placement = 'bottom',
+  align = 'start',
+}: PopoverProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const containerRef = useRef<HTMLSpanElement>(null);
@@ -74,7 +93,7 @@ export function Popover({ trigger, children, label, placement = 'bottom' }: Popo
           role="dialog"
           id={panelId}
           aria-label={label}
-          className={`absolute z-50 w-72 max-w-[min(20rem,calc(100vw_-_1rem))] rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-ink shadow-lg ${placementClass[placement]}`}
+          className={`absolute z-50 w-72 max-w-[min(20rem,calc(100vw_-_1rem))] rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-ink shadow-lg ${placementClass[placement][align]}`}
         >
           {children}
         </div>

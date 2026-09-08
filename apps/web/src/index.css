@@ -534,3 +534,166 @@
     padding: 0 !important;
   }
 }
+
+/*
+ * Documentation prose.
+ *
+ * A fuller set than .so-prose, because a docs page carries tables, callouts,
+ * code blocks and four levels of heading where a marketing card carries two.
+ * Every value is a design token, so both themes are correct without a second
+ * rule, and no color is hard-coded. Nothing here sets a width: the measure is
+ * held by the column the prose sits in.
+ */
+.so-docs-prose {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.so-docs-prose > :first-child {
+  margin-top: 0;
+}
+
+.so-docs-prose h2,
+.so-docs-prose h3,
+.so-docs-prose h4 {
+  color: var(--color-text-primary);
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-weight: 600;
+  /* Clears the sticky site header, so a deep link does not land under it. */
+  scroll-margin-top: calc(var(--so-space-16) + var(--so-space-4));
+}
+
+.so-docs-prose h2 {
+  font-size: 1.375rem;
+  line-height: 1.3;
+  letter-spacing: -0.011em;
+  margin-top: var(--so-space-12);
+  margin-bottom: var(--so-space-4);
+  padding-top: var(--so-space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.so-docs-prose h3 {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  margin-top: var(--so-space-8);
+  margin-bottom: var(--so-space-3);
+}
+
+.so-docs-prose h4 {
+  font-size: 0.9375rem;
+  margin-top: var(--so-space-6);
+  margin-bottom: var(--so-space-2);
+}
+
+/* The first heading follows the page title, which is already a separation, so
+   the rule that divides one section from the next would only crowd it. */
+.so-docs-prose > h2:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* The heading is the link, so it must not read as one until it is hovered. */
+.so-docs-prose h2 > a,
+.so-docs-prose h3 > a,
+.so-docs-prose h4 > a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.so-docs-prose p {
+  margin-bottom: var(--so-space-4);
+}
+
+.so-docs-prose ul,
+.so-docs-prose ol {
+  margin-bottom: var(--so-space-4);
+  padding-left: var(--so-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--so-space-2);
+}
+
+.so-docs-prose ul {
+  list-style: disc;
+}
+
+.so-docs-prose ol {
+  list-style: decimal;
+}
+
+.so-docs-prose li::marker {
+  color: var(--color-text-secondary);
+}
+
+.so-docs-prose strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.so-docs-prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.so-docs-prose code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+  padding: 0.1em 0.35em;
+  border-radius: var(--so-radius-sm);
+}
+
+/* Inside a block the code already sits on the subtle ground, so a second
+   background and padding would draw a box around every line. */
+.so-docs-prose pre code {
+  background-color: transparent;
+  padding: 0;
+  font-size: inherit;
+  color: var(--color-text-primary);
+}
+
+.so-docs-prose blockquote {
+  margin: var(--so-space-6) 0;
+  padding: var(--so-space-4) var(--so-space-6);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 var(--so-radius-md) var(--so-radius-md) 0;
+  background-color: var(--color-bg-subtle);
+}
+
+.so-docs-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.so-docs-prose th,
+.so-docs-prose td {
+  padding: var(--so-space-3) var(--so-space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.so-docs-prose th {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  background-color: var(--color-bg-subtle);
+  white-space: nowrap;
+}
+
+.so-docs-prose tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.so-docs-prose hr {
+  margin: var(--so-space-12) 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.so-docs-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--so-radius-lg);
+}

@@ -9,10 +9,10 @@ import { LogoLoader } from './components/LogoLoader';
 import { RequireAdmin } from './components/RequireAdmin';
 import { RequireAuth } from './components/RequireAuth';
 import { MarketingLayout } from './marketing/MarketingLayout';
+import { docsRoutes } from './marketing/docs-site';
 import {
   AudiencePage,
   CapabilitiesPage,
-  DocsPage,
   MarketingHome,
   PricingPage,
   StoryPage,
@@ -205,7 +205,9 @@ export function App() {
           <Route path="/story" element={<StoryPage />} />
           <Route path="/capabilities" element={<CapabilitiesPage />} />
           <Route path="/audience" element={<AudiencePage />} />
-          <Route path="/docs" element={<DocsPage />} />
+          {/* The documentation site. /docs is its index and every page lives
+              at /docs/<section>/<page>, in manifest order. */}
+          {docsRoutes()}
           <Route path="/pricing" element={<PricingPage />} />
         </Route>
 
