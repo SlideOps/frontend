@@ -27,7 +27,9 @@ import {
   recoverPayment,
   resendPaymentReceipt,
   resetLoginRateLimit,
+  restoreArrangementAccess,
   resumeSubscriber,
+  revokeArrangementAccess,
   revokeEntitlement,
   setFeatureFlagEnabled,
   suspendOperator,
@@ -156,17 +158,15 @@ describe('admin requests', () => {
   });
 
   it('posts a receipt resend and unwraps the returned payment', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { payment: { reference: 'pay_1', status: 'success' } }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { payment: { reference: 'pay_1', status: 'success' } }));
 
     await resendPaymentReceipt('pay_1');
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      '/admin/payments/pay_1/resend-receipt',
-    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/payments/pay_1/resend-receipt');
   });
 
   it('posts a pause with its reason and unwraps the returned subscription', async () => {
@@ -281,9 +281,11 @@ describe('admin requests', () => {
   });
 
   it('posts an engage to the maintenance path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
+      );
 
     await emergencyEngageMaintenance();
 
@@ -293,9 +295,11 @@ describe('admin requests', () => {
   });
 
   it('posts a release to the maintenance path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
+      );
 
     await emergencyReleaseMaintenance();
 
@@ -305,9 +309,11 @@ describe('admin requests', () => {
   });
 
   it('posts an engage to the incident path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
+      );
 
     await emergencyEngageIncident();
 
@@ -317,9 +323,11 @@ describe('admin requests', () => {
   });
 
   it('posts a release to the incident path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
+      );
 
     await emergencyReleaseIncident();
 
@@ -564,7 +572,9 @@ describe('admin requests', () => {
   });
 
   it('lists webhook deliveries with no limit when none is given', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { deliveries: [] }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { deliveries: [] }));
 
     await listWebhookDeliveries();
 
@@ -575,19 +585,25 @@ describe('admin requests', () => {
   it('looks up a login rate limit by email and unwraps the array', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(200, {
-        entries: [{ subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 }],
+        entries: [
+          { subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 },
+        ],
       }),
     );
 
     const entries = await lookupLoginRateLimit('op@slideops.com');
 
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/rate-limits/login?email=op%40slideops.com');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/rate-limits/login?email=op%40slideops.com',
+    );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.attempts).toBe(3);
   });
 
   it('posts a reset with the email and returns how many were cleared', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { cleared: 2 }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { cleared: 2 }));
 
     const cleared = await resetLoginRateLimit('op@slideops.com');
 
@@ -672,7 +688,9 @@ describe('admin requests', () => {
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/support-notes/note-1');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/operators/op-1/support-notes/note-1',
+    );
   });
 });
 
@@ -746,7 +764,7 @@ describe('the revision an arrangement editor works from', () => {
     const sent = JSON.parse(String((init as RequestInit).body));
     expect('if_unchanged_since' in sent).toBe(false);
   });
-})
+});
 
 /*
  * The message these endpoints actually return.
@@ -789,9 +807,7 @@ describe('a customer message on an arrangement', () => {
   });
 
   it('reads back who a sent message went to', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { ...envelope, sent: true }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { ...envelope, sent: true }));
 
     const sent = await sendArrangementEmail('arr-1', 'payment_reminder');
 
@@ -818,4 +834,53 @@ describe('a customer message on an arrangement', () => {
     expect(String(url)).toMatch(/\/emails$/);
     expect(JSON.parse(String((init as RequestInit).body)).type).toBe('access_granted');
   });
-})
+});
+
+/*
+ * The bodies these two send, pinned.
+ *
+ * The API rejects an unknown field outright rather than ignoring it, so a name
+ * the endpoint does not have is not a field that gets dropped: it is the whole
+ * request refused with "the request body was not valid". Both of these sent one
+ * and neither could be used at all, which is not something a test of the
+ * response shape would ever notice.
+ */
+describe('taking an arrangement back, and putting it back', () => {
+  const detail = {
+    arrangement: { id: 'arr_1', tier: 'pro', status: 'revoked', condition: 'temporary_access' },
+  };
+
+  it('revokes with the reason and the revision the screen was read at', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await revokeArrangementAccess('arr_1', 'payment never arrived', '2026-09-08T10:00:00.000000Z');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/arrangements/arr_1/revoke');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      reason: 'payment never arrived',
+      if_unchanged_since: '2026-09-08T10:00:00.000000Z',
+    });
+  });
+
+  it('restores with the reason under the name the endpoint actually accepts', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await restoreArrangementAccess('arr_1', 'payment confirmed by the bank');
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    // notes, not reason: a restore creates a new arrangement and this is what
+    // it is written down against.
+    expect(JSON.parse(String(init?.body))).toEqual({ notes: 'payment confirmed by the bank' });
+  });
+
+  it('sends an empty body when a restore is given no reason', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await restoreArrangementAccess('arr_1');
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(String(init?.body))).toEqual({});
+  });
+});
