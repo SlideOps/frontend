@@ -248,7 +248,10 @@ export function TerminalSurface({
             // than being added to the height the caller asked for.
             'relative z-10 box-border w-full min-w-0 rounded-md border border-border bg-app p-[5px]',
             scrolls ? 'overflow-auto' : 'overflow-hidden',
-            resizable && !expanded ? 'resize-y' : null,
+            // A floor as well as a handle: dragged to nothing, a terminal cannot
+            // be found again, because the thing you would grab to grow it is the
+            // edge you just collapsed.
+            resizable && !expanded ? 'resize-y min-h-32' : null,
             expanded || fill ? 'h-full' : null,
             contentHidden ? 'hidden' : 'block',
             contentClassName,
