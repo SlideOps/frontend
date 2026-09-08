@@ -41,6 +41,11 @@ export interface ArrangementQuoteRequest {
    * is sent either: there is no charge for one to denominate.
    */
   free?: boolean;
+  /**
+   * A discount code to price this under. Empty or undefined means none, and
+   * the backend is then never told about a code at all.
+   */
+  promoCode?: string;
   /** Ask at all. A closed dialog should not be quoting. */
   enabled?: boolean;
 }
@@ -55,7 +60,15 @@ function toApiError(error: unknown): ApiError {
 export function useArrangementQuote(
   request: ArrangementQuoteRequest,
 ): { state: ArrangementQuoteState } {
-  const { operatorId, tier, termMonths, currency, free = false, enabled = true } = request;
+  const {
+    operatorId,
+    tier,
+    termMonths,
+    currency,
+    free = false,
+    promoCode = '',
+    enabled = true,
+  } = request;
   const [state, setState] = useState<ArrangementQuoteState>({ status: 'idle' });
 
   // The number every request is issued under. Compared on arrival, so a stale
@@ -88,6 +101,9 @@ export function useArrangementQuote(
           termMonths,
           currency: free ? undefined : currency || undefined,
           free: free || undefined,
+          // A gift is not priced at all, so there is nothing for a code to come
+          // off. Sending one would ask for a discount on nothing.
+          promoCode: free ? undefined : promoCode.trim() || undefined,
         },
         controller.signal,
       )
@@ -107,7 +123,7 @@ export function useArrangementQuote(
       clearTimeout(timer);
       controller.abort();
     };
-  }, [operatorId, tier, termMonths, currency, free, enabled]);
+  }, [operatorId, tier, termMonths, currency, free, promoCode, enabled]);
 
   return { state };
 }

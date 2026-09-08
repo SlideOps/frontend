@@ -57,7 +57,12 @@ import { AdminShell } from '../components/AdminShell';
 import { ArrangementStatusBadge, ReadingBadge } from '../components/Badges';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
-import { CurrencySelect, QuoteBreakdown, TermMonthsField } from '../components/Pricing';
+import {
+  CurrencySelect,
+  PromoCodeField,
+  QuoteBreakdown,
+  TermMonthsField,
+} from '../components/Pricing';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import { useArrangementQuote } from '../hooks/useArrangementQuote';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -276,6 +281,23 @@ export function ArrangementDetail() {
 
   const [quoteCurrency, setQuoteCurrency] = useState('');
 
+  /*
+   * The discount code this arrangement was priced under.
+   *
+   * Held beside the draft rather than in it, because it is an input to the
+   * quote and not a field of the correction: the code an arrangement was
+   * granted under is a fact about what happened, and the edit endpoint does not
+   * rewrite it. Seeding it from the record matters all the same. Without it,
+   * opening the editor of a discounted arrangement would re-quote at full price
+   * and quietly save the customer a larger debt than they agreed to.
+   */
+  const recordedPromoCode = detail?.arrangement.promo_code ?? '';
+  const [quotePromoCode, setQuotePromoCode] = useState('');
+
+  useEffect(() => {
+    setQuotePromoCode(recordedPromoCode);
+  }, [recordedPromoCode]);
+
   useEffect(() => {
     // A reload brings new values; the form follows them rather than holding a
     // draft written against a state that is no longer current.
@@ -340,6 +362,7 @@ export function ArrangementDetail() {
     tier: draft?.tier ?? '',
     termMonths: Number(termValue),
     currency: quoteCurrency,
+    promoCode: quotePromoCode,
     enabled: editing && detail !== null && pricingInPlay,
   });
   const quoted = quote.state.status === 'ready' ? quote.state.quote : null;
@@ -698,6 +721,12 @@ export function ArrangementDetail() {
                 }
               />
               <Fact label="Payment deadline" value={moment(detail.payment_deadline)} />
+              {/* Only when there is one. A "Discount code: none" row on every
+                  arrangement ever made would answer a question nobody asked and
+                  bury the ones that do carry a code. */}
+              {detail.arrangement.promo_code ? (
+                <Fact label="Discount code" value={detail.arrangement.promo_code} />
+              ) : null}
             </div>
 
             {detail.arrangement.notes ? (
@@ -875,9 +904,19 @@ export function ArrangementDetail() {
                   />
                 </div>
                 <div className="mt-4">
+                  <PromoCodeField
+                    id="edit-promo-code"
+                    value={quotePromoCode}
+                    onChange={setQuotePromoCode}
+                    state={quote.state}
+                    hint="Optional. Prices the figure below. The code this arrangement was granted under is shown above and is not rewritten here."
+                  />
+                </div>
+                <div className="mt-4">
                   <QuoteBreakdown
                     state={quote.state}
                     availableCurrencies={chargeableCurrencies}
+                    promoCode={quotePromoCode}
                   />
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">

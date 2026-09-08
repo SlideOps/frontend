@@ -982,6 +982,14 @@ export interface Arrangement {
   auto_expire_on_deadline: boolean;
   /** The SlideOps payment reference this arrangement is tied to, when one exists. */
   payment_reference?: string;
+  /**
+   * The discount code this was arranged under, when one was applied.
+   *
+   * Kept on the record rather than only in the figure, because months later the
+   * question is not what the amount was but why it was that amount, and a total
+   * on its own cannot answer that.
+   */
+  promo_code?: string;
   /** The Admin's own paper trail for an offline payment: a bank reference, a receipt number. */
   external_reference?: string;
   notes?: string;
@@ -1110,6 +1118,17 @@ export interface ArrangementQuote {
   /** The rate the conversion used, absent when no conversion happened. */
   fx_rate?: number;
   /**
+   * The discount code the backend actually accepted, absent when none was
+   * applied. Echoed back rather than assumed from what was asked for, so the
+   * breakdown can only name a code the pricing really used.
+   */
+  promo_code?: string;
+  /**
+   * What that code took off, in `currency`, absent when no code was applied.
+   * Worked out by the backend like every other line here; nothing recomputes it.
+   */
+  promo_discount_minor?: number;
+  /**
    * True when this was asked for as a gift. The tier is deliberately not priced
    * in that case and the currency comes back empty, so the real figure is never
    * carried alongside where it could be shown or saved by mistake.
@@ -1132,11 +1151,14 @@ export interface ArrangementQuoteInput {
   currency?: string;
   /** Ask for this as a gift, which quotes as nothing and prices nothing. */
   free?: boolean;
+  /** A discount code to price this under. Omitted, and no code is applied. */
+  promoCode?: string;
 }
 
 /**
  * Quote one arrangement without creating anything. A currency this deployment
- * cannot charge is refused with a 400 carrying `currency_unsupported`.
+ * cannot charge is refused with a 400 carrying `currency_unsupported`, and a
+ * discount code the backend does not recognise is refused with its own message.
  */
 export function quoteArrangement(
   operatorId: string,
@@ -1151,6 +1173,9 @@ export function quoteArrangement(
         term_months: input.termMonths,
         currency: input.currency,
         free: input.free ? true : undefined,
+        // An empty box is not a code. Sending one would ask the backend to
+        // price against nothing and answer with a refusal nobody asked for.
+        promo_code: input.promoCode || undefined,
       },
       signal,
     },
@@ -1162,6 +1187,11 @@ export function quoteArrangement(
  * the tier immediately under an explicit manual payment source, never a
  * fabricated online provider transaction, and sends the manual payment
  * confirmation email.
+ *
+ * Deliberately carries no discount code. This records what somebody already
+ * paid outside SlideOps, so any reduction in it was negotiated between them and
+ * whoever took the money; applying a code here would claim SlideOps priced a
+ * payment it never took.
  */
 export function recordOfflinePayment(
   operatorId: string,
@@ -1212,6 +1242,8 @@ export function grantTemporaryAccess(
     termMonths?: number;
     provider?: PaymentProvider;
     currency?: string;
+    /** A discount code to price the payment behind this grant under. */
+    promoCode?: string;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -1226,6 +1258,9 @@ export function grantTemporaryAccess(
       term_months: input.termMonths ?? 1,
       provider: input.provider,
       currency: input.currency,
+      // Left out entirely when no code was given, so a grant with no discount
+      // says nothing about discounts rather than saying "none" in a field.
+      promo_code: input.promoCode || undefined,
       notes: input.notes ?? '',
     },
   }).then((r) => ({
@@ -1281,6 +1316,8 @@ export function createPaymentRequiredArrangement(
     currency?: string;
     paymentDeadline?: Date;
     termMonths?: number;
+    /** A discount code to price this checkout under. */
+    promoCode?: string;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -1294,6 +1331,8 @@ export function createPaymentRequiredArrangement(
       currency: input.currency,
       payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
       term_months: input.termMonths ?? 1,
+      // Left out entirely when no code was given, for the same reason as above.
+      promo_code: input.promoCode || undefined,
       notes: input.notes ?? '',
     },
   }).then((r) => ({

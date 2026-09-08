@@ -5,6 +5,7 @@ import {
   billingPeriodMonths,
   freeGrantReason,
   noChargeReason,
+  promoCodeFailure,
   quoteConversionNote,
   quoteFailureText,
   quoteLines,
@@ -140,12 +141,57 @@ export function CurrencySelect({
   );
 }
 
+export interface PromoCodeFieldProps {
+  id: string;
+  /** The code as typed, so a half-finished one is not rewritten under the admin. */
+  value: string;
+  onChange: (value: string) => void;
+  /**
+   * The quote this code is being priced into. Read for its failure only: a code
+   * the backend turned down is said here, beside the box that caused it, rather
+   * than only in the breakdown where it reads as a pricing outage.
+   */
+  state: ArrangementQuoteState;
+  hint?: string;
+}
+
+/**
+ * An optional discount code, applied by the backend and never by this screen.
+ *
+ * Nothing here works out what a code is worth. The code is one more input to the
+ * quote, exactly like the plan and the term, and the figure that comes back is
+ * the only figure anybody sees. Left empty it is not sent at all, so an
+ * arrangement made without one says nothing about discounts anywhere.
+ */
+export function PromoCodeField({ id, value, onChange, state, hint }: PromoCodeFieldProps) {
+  const refusal = state.status === 'error' ? promoCodeFailure(state.error, value) : null;
+  return (
+    <Field
+      id={id}
+      label="Discount code"
+      hint={hint ?? 'Optional. Leave it empty for no discount.'}
+      error={refusal ?? undefined}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      autoComplete="off"
+      spellCheck={false}
+    />
+  );
+}
+
 export interface QuoteBreakdownProps {
   state: ArrangementQuoteState;
   /** Named back to the admin when the backend refuses the chosen currency. */
   availableCurrencies: string[];
   /** What this figure is, said above it. */
   caption?: string;
+  /**
+   * The discount code the form beside this has in it, when it has a box for
+   * one. A refusal that belongs to that box is already said there, in red,
+   * against the field that caused it; repeating the identical sentence here
+   * would read as two separate things having gone wrong.
+   */
+  promoCode?: string;
 }
 
 /**
@@ -157,7 +203,17 @@ export interface QuoteBreakdownProps {
  * currency reads as what the backend said, which is also an answer. Neither is
  * a blank.
  */
-export function QuoteBreakdown({ state, availableCurrencies, caption }: QuoteBreakdownProps) {
+export function QuoteBreakdown({
+  state,
+  availableCurrencies,
+  caption,
+  promoCode,
+}: QuoteBreakdownProps) {
+  const saidByTheCodeField =
+    state.status === 'error' &&
+    promoCode !== undefined &&
+    promoCodeFailure(state.error, promoCode) !== null;
+
   return (
     <div className="rounded-md border border-border bg-subtle px-4 py-3">
       <div className="flex items-center gap-2">
@@ -181,9 +237,11 @@ export function QuoteBreakdown({ state, availableCurrencies, caption }: QuoteBre
 
       {state.status === 'error' ? (
         <div role="alert" className="mt-2">
-          <Text variant="body-sm" className="block text-danger">
-            {quoteFailureText(state.error, availableCurrencies)}
-          </Text>
+          {saidByTheCodeField ? null : (
+            <Text variant="body-sm" className="block text-danger">
+              {quoteFailureText(state.error, availableCurrencies)}
+            </Text>
+          )}
           <Text variant="body-sm" tone="secondary" className="mt-1 block">
             {quoteUnavailableMessage}
           </Text>

@@ -1,8 +1,10 @@
 import { ApiError, TransactionActionError, type BillingArrangement } from '@slideops/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderInApp } from '../../test/render';
+import { transactionDetailPath } from '../billing-routes';
 
 /*
  * The arrangement panel on the Operator's own Billing page.
@@ -63,8 +65,14 @@ function arrangement(over: Partial<BillingArrangement> = {}): BillingArrangement
   };
 }
 
+// The panel links through to a payment's own page, so it needs a router the
+// same way every other screen that navigates does.
 function show() {
-  return renderInApp(<BillingArrangements />);
+  return renderInApp(
+    <MemoryRouter>
+      <BillingArrangements />
+    </MemoryRouter>,
+  );
 }
 
 // Handing the Operator to the hosted checkout is a real navigation, which jsdom
@@ -127,6 +135,49 @@ describe('the arrangement panel on Billing', () => {
     await waitFor(() => expect(resumeCheckout).toHaveBeenCalledWith('so_open_payment'));
     expect(startCheckout).not.toHaveBeenCalled();
     await waitFor(() => expect(sentTo).toBe('https://pay.example/so_open_payment'));
+  });
+
+  it('links the arrangement through to the payment detail page the Transactions list opens', async () => {
+    listBillingArrangements.mockResolvedValue([
+      arrangement({ payment_reference: 'so_open_payment' }),
+    ]);
+
+    show();
+
+    const link = await screen.findByRole('link', { name: /View payment so_open_payment/ });
+    // The same path the Transactions list hands to the router for one payment,
+    // taken from the one place that path is written down.
+    expect(link).toHaveAttribute('href', transactionDetailPath('so_open_payment'));
+  });
+
+  it('offers opening the payment and resuming it as two separate things', async () => {
+    listBillingArrangements.mockResolvedValue([arrangement()]);
+
+    show();
+
+    expect(await screen.findByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /View payment/ })).toBeInTheDocument();
+    expect(resumeCheckout).not.toHaveBeenCalled();
+  });
+
+  it('still links to the payment when it can no longer be resumed', async () => {
+    listBillingArrangements.mockResolvedValue([arrangement({ resumable: false })]);
+
+    show();
+
+    expect(await screen.findByRole('link', { name: /View payment so_open_payment/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Complete this payment/ })).not.toBeInTheDocument();
+  });
+
+  it('links nowhere when the arrangement carries no payment reference', async () => {
+    listBillingArrangements.mockResolvedValue([
+      arrangement({ payment_reference: undefined, resumable: false }),
+    ]);
+
+    show();
+
+    await screen.findByText('Pro plan');
+    expect(screen.queryByRole('link', { name: /View payment/ })).not.toBeInTheDocument();
   });
 
   it('says the completing payment is the one already waiting rather than a new charge', async () => {

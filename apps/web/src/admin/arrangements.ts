@@ -904,6 +904,15 @@ export function quoteLines(quote: ArrangementQuote): QuoteLine[] {
       value: `-${formatAmount(quote.annual_discount_minor, quote.currency)}`,
     });
   }
+  // Named after the code the backend says it applied, and shown only when the
+  // backend says so. A code the admin typed but the pricing did not use would
+  // otherwise appear here as a discount that was never taken off.
+  if (quote.promo_code) {
+    lines.push({
+      label: `Discount ${quote.promo_code}`,
+      value: `-${formatAmount(quote.promo_discount_minor ?? 0, quote.currency)}`,
+    });
+  }
   lines.push({ label: 'Tax', value: formatAmount(quote.tax_minor, quote.currency) });
   lines.push({
     label: 'Total',
@@ -958,6 +967,26 @@ export function isUnsupportedCurrencyError(error: unknown): boolean {
 export function quoteFailureText(error: ApiError, available: string[]): string {
   if (isUnsupportedCurrencyError(error) && available.length > 0) {
     return `${error.message} This deployment can charge in ${available.join(', ')}.`;
+  }
+  return error.message;
+}
+
+/**
+ * What to say beside the discount code box when the quote came back refused.
+ *
+ * Only while a code is actually in the box. A quote fails for reasons that have
+ * nothing to do with a code, and pinning one of those to this field would blame
+ * a box the admin never touched. A refused currency is excluded for the same
+ * reason: it names a currency, and it is already said where currencies are
+ * chosen.
+ *
+ * The backend's own words are passed through unchanged. It is the only thing
+ * that knows why a code was turned down, and a rewrite here could only be a
+ * guess at what it meant.
+ */
+export function promoCodeFailure(error: ApiError, code: string): string | null {
+  if (code.trim() === '' || isUnsupportedCurrencyError(error)) {
+    return null;
   }
   return error.message;
 }
