@@ -1,4 +1,4 @@
-import type { PayCurrency, PaymentProvider } from './billing';
+import type { PaymentProvider } from './billing';
 import { apiBase, apiRequest, unwrap } from './http';
 import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
@@ -928,8 +928,14 @@ export function deleteSupportNote(operatorId: string, noteId: string): Promise<v
  * through the normal payment webhook, once the customer actually pays.
  */
 
-/** Why this arrangement exists, which decides how it reached its Status. */
-export type ArrangementCondition = 'offline_settled' | 'temporary_access' | 'payment_required';
+/**
+ * Why this arrangement exists, which decides how it reached its Status.
+ *
+ * `free_grant` is a deliberate gift and not a debt: access given at no charge,
+ * as a decision, distinct from access granted with a payment still pending.
+ */
+export type ArrangementCondition =
+  'offline_settled' | 'temporary_access' | 'payment_required' | 'free_grant';
 
 /** The arrangement's own lifecycle, distinct from the subscription or payment it may involve. */
 export type ArrangementStatus =
@@ -1031,6 +1037,107 @@ export function listAllArrangements(
   });
 }
 
+/*
+ * Pricing an arrangement.
+ *
+ * A customer paying for themselves never types an amount: they choose a plan
+ * and a billing period and the figure follows from the price table, the annual
+ * discount, the exchange rate and the tax. An admin arranging the same access
+ * on the customer's behalf gets that same figure from the same place, so the
+ * CRM and the real charge cannot drift apart.
+ */
+
+/**
+ * The currencies this deployment can actually charge in.
+ *
+ * Deliberately not the currencies the tiers happen to be priced in. Every tier
+ * price is written in one currency, and checkout has always been able to charge
+ * another by converting at a live rate, so the price table answers a different
+ * question from the one an admin is asking. Naira appears here only while a
+ * live rate is available, which is why this is read rather than assumed.
+ */
+export function listArrangementCurrencies(signal?: AbortSignal): Promise<string[]> {
+  return apiRequest<{ currencies?: string[] } | string[]>('/admin/arrangements/currencies', {
+    signal,
+  }).then((r) => (Array.isArray(r) ? r : (r.currencies ?? [])));
+}
+
+/**
+ * What an arrangement would cost, worked out by the same pricing the customer's
+ * own checkout uses.
+ *
+ * The breakdown is carried in full rather than as one total because an admin who
+ * cannot see where a figure came from will not trust it, and because the figure
+ * has to be explainable on the day it was quoted: the monthly price in the
+ * tier's own currency, the term it is multiplied by, what a full year takes off,
+ * the tax, and the rate any conversion used.
+ */
+export interface ArrangementQuote {
+  tier: string;
+  term_months: number;
+  /** The currency the tier's own price is written in. */
+  native_currency: string;
+  /** One month at the tier's own price, in native_currency. */
+  unit_amount_minor: number;
+  /** What the customer would be charged in. */
+  currency: string;
+  /** Price times term, converted, before tax. */
+  subtotal_minor: number;
+  /** What a full year takes off, already converted. */
+  annual_discount_minor: number;
+  tax_minor: number;
+  /** What the customer would actually be charged. */
+  total_minor: number;
+  /** The rate the conversion used, absent when no conversion happened. */
+  fx_rate?: number;
+  /**
+   * True when this was asked for as a gift. The tier is deliberately not priced
+   * in that case and the currency comes back empty, so the real figure is never
+   * carried alongside where it could be shown or saved by mistake.
+   */
+  free_grant: boolean;
+  /**
+   * False for a tier with no self serve price, which quotes as zero. That is a
+   * real answer and not a failure: granting such a tier at no charge is an
+   * ordinary thing for an admin to arrange.
+   */
+  purchasable: boolean;
+}
+
+/** What a quote is asked for: a plan, how long for, and what to charge in. */
+export interface ArrangementQuoteInput {
+  tier: string;
+  /** Months of access being arranged. One month when omitted. */
+  termMonths?: number;
+  /** What to charge in. Omitted means the tier's own currency. */
+  currency?: string;
+  /** Ask for this as a gift, which quotes as nothing and prices nothing. */
+  free?: boolean;
+}
+
+/**
+ * Quote one arrangement without creating anything. A currency this deployment
+ * cannot charge is refused with a 400 carrying `currency_unsupported`.
+ */
+export function quoteArrangement(
+  operatorId: string,
+  input: ArrangementQuoteInput,
+  signal?: AbortSignal,
+): Promise<ArrangementQuote> {
+  return apiRequest<{ quote?: ArrangementQuote } & Partial<ArrangementQuote>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/quote`,
+    {
+      query: {
+        tier: input.tier,
+        term_months: input.termMonths,
+        currency: input.currency,
+        free: input.free ? true : undefined,
+      },
+      signal,
+    },
+  ).then((r) => r.quote ?? (r as ArrangementQuote));
+}
+
 /**
  * Record a payment the customer already made outside SlideOps. Activates
  * the tier immediately under an explicit manual payment source, never a
@@ -1040,7 +1147,7 @@ export function listAllArrangements(
 export function recordOfflinePayment(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     amountMinor: number;
     currency: string;
     reference: string;
@@ -1080,12 +1187,12 @@ export function recordOfflinePayment(
 export function grantTemporaryAccess(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     paymentDeadline?: Date;
     autoExpireOnDeadline?: boolean;
     termMonths?: number;
     provider?: PaymentProvider;
-    currency?: PayCurrency;
+    currency?: string;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -1108,6 +1215,31 @@ export function grantTemporaryAccess(
   }));
 }
 
+/**
+ * Give a tier away at no charge, as a deliberate decision.
+ *
+ * Distinct from temporary access, which grants ahead of a payment that is still
+ * expected. Nothing is owed here and nothing is ever collected, which is why the
+ * body carries no amount and no currency: there is no charge to denominate, and
+ * a figure sent here could only ever be shown as a debt that does not exist.
+ */
+export function createFreeGrant(
+  operatorId: string,
+  input: { tier: string; termMonths?: number; notes?: string },
+): Promise<Arrangement> {
+  return apiRequest<{ arrangement?: Arrangement } & Partial<Arrangement>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/free-grant`,
+    {
+      method: 'POST',
+      body: {
+        tier: input.tier,
+        term_months: input.termMonths ?? 1,
+        notes: input.notes ?? '',
+      },
+    },
+  ).then((r) => r.arrangement ?? (r as Arrangement));
+}
+
 /** The result of starting a payment-required arrangement: the arrangement plus the real checkout link. */
 export interface PaymentRequiredArrangement {
   arrangement: Arrangement;
@@ -1125,9 +1257,9 @@ export interface PaymentRequiredArrangement {
 export function createPaymentRequiredArrangement(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     provider: PaymentProvider;
-    currency?: PayCurrency;
+    currency?: string;
     paymentDeadline?: Date;
     termMonths?: number;
     notes?: string;

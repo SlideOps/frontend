@@ -3,6 +3,7 @@ import {
   extendArrangementDeadline,
   getArrangement,
   listAdminTiers,
+  listArrangementCurrencies,
   listArrangementEmails,
   listArrangementTimeline,
   previewArrangementEmail,
@@ -40,6 +41,7 @@ import {
   isStaleEditorError,
   notOnThisServerYet,
   obligationOf,
+  obligationReason,
   obligationText,
   obligationTone,
   paymentReading,
@@ -51,7 +53,9 @@ import { AdminShell } from '../components/AdminShell';
 import { ArrangementStatusBadge, ReadingBadge } from '../components/Badges';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { CurrencySelect, QuoteBreakdown, TermMonthsField } from '../components/Pricing';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
+import { useArrangementQuote } from '../hooks/useArrangementQuote';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { formatAmount } from '../subscribers';
 
@@ -207,6 +211,10 @@ export function ArrangementDetail() {
     [id],
   );
   const tiers = useAsyncData((signal) => listAdminTiers(signal), []);
+  // What this deployment can actually charge in. Read, never assumed: the tier
+  // prices are all written in one currency and say nothing about what checkout
+  // is able to convert to.
+  const currencies = useAsyncData((signal) => listArrangementCurrencies(signal), []);
 
   const served = state.status === 'ready' ? state.data : null;
   const detail = useMemo(
@@ -253,13 +261,19 @@ export function ArrangementDetail() {
     [detail],
   );
 
+  // What the amount is worked out from. An arrangement does not record the term
+  // it was agreed for, so nothing is assumed: until the admin states one there is
+  // no question to price, and opening the editor proposes no change of its own.
+  const [termMonths, setTermMonths] = useState('');
+  const [quoteCurrency, setQuoteCurrency] = useState('');
+
   useEffect(() => {
     // A reload brings new values; the form follows them rather than holding a
     // draft written against a state that is no longer current.
     setDraft(baseline);
+    setQuoteCurrency(baseline?.currency ?? '');
+    setTermMonths('');
   }, [baseline]);
-
-  const edit = baseline && draft ? arrangementEdit(baseline, draft) : null;
 
   const knownTiers = useMemo(
     () => (tiers.state.status === 'ready' ? tiers.state.data : []),
@@ -272,15 +286,48 @@ export function ArrangementDetail() {
       ),
     [knownTiers, draft?.tier],
   );
+  const chargeableCurrencies = useMemo(
+    () => (currencies.state.status === 'ready' ? currencies.state.data : []),
+    [currencies.state],
+  );
   const currencyOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          [draft?.currency, ...knownTiers.map((tier) => tier.currency)].filter(Boolean) as string[],
+          [...chargeableCurrencies, baseline?.currency].filter(Boolean) as string[],
         ),
       ),
-    [knownTiers, draft?.currency],
+    [chargeableCurrencies, baseline?.currency],
   );
+
+  /*
+   * The amount, worked out rather than typed.
+   *
+   * An admin used to do this arithmetic in their head and type the result, so
+   * the CRM's figure and the real charge agreed only by luck. The plan, the
+   * term and the currency are the inputs; the figure comes back from the same
+   * pricing the customer's own checkout uses.
+   */
+  // A stated term is what turns the pricing inputs into a question. Without one
+  // the payment side of the form is dormant and the other fields save as before.
+  const pricingInPlay = termMonths.trim() !== '';
+  const quote = useArrangementQuote({
+    operatorId: detail?.operator_id ?? '',
+    tier: draft?.tier ?? '',
+    termMonths: Number(termMonths),
+    currency: quoteCurrency,
+    enabled: editing && detail !== null && pricingInPlay,
+  });
+  const quoted = quote.state.status === 'ready' ? quote.state.quote : null;
+
+  // The obligation carries what was quoted, in the currency the backend said it
+  // charged in. Nothing here is a number the admin wrote.
+  const draftWithQuote: ArrangementEditDraft | null = draft
+    ? quoted
+      ? { ...draft, amountMinor: String(quoted.total_minor), currency: quoted.currency }
+      : draft
+    : null;
+  const edit = baseline && draftWithQuote ? arrangementEdit(baseline, draftWithQuote) : null;
 
   const runSave = async () => {
     if (!detail || !edit || edit.changes.length === 0) {
@@ -530,9 +577,8 @@ export function ArrangementDetail() {
                 </Text>
               }
               detail={
-                obligation.kind === 'unknown' || obligation.kind === 'none'
-                  ? obligation.reason
-                  : 'What this arrangement obliges the customer to pay, in the currency it was agreed in.'
+                obligationReason(obligation) ??
+                'What this arrangement obliges the customer to pay, in the currency it was agreed in.'
               }
             />
           </div>
@@ -555,14 +601,23 @@ export function ArrangementDetail() {
               <Fact
                 label="Payment amount"
                 value={
-                  detail.amount_minor === undefined ||
-                  detail.amount_minor === null ||
-                  detail.amount_minor === 0
-                    ? 'Not recorded'
-                    : formatAmount(detail.amount_minor, detail.currency)
+                  obligation.kind === 'free'
+                    ? 'No charge'
+                    : detail.amount_minor === undefined ||
+                        detail.amount_minor === null ||
+                        detail.amount_minor === 0
+                      ? 'Not recorded'
+                      : formatAmount(detail.amount_minor, detail.currency)
                 }
               />
-              <Fact label="Currency" value={detail.currency || 'Not recorded'} />
+              <Fact
+                label="Currency"
+                value={
+                  obligation.kind === 'free'
+                    ? 'Not applicable'
+                    : detail.currency || 'Not recorded'
+                }
+              />
               <Fact label="Payment deadline" value={moment(detail.payment_deadline)} />
             </div>
 
@@ -692,37 +747,33 @@ export function ArrangementDetail() {
 
               <fieldset className="mt-4 rounded-md border border-border p-4">
                 <legend className="px-1.5 text-sm font-semibold text-ink">Payment</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field
-                    label="Amount in minor units"
-                    inputMode="numeric"
-                    hint={
-                      draft.amountMinor && Number.isFinite(Number(draft.amountMinor))
-                        ? `Reads as ${formatAmount(Number(draft.amountMinor), draft.currency || undefined)}`
-                        : 'The smallest unit of the currency, the way the payment provider counts it.'
-                    }
-                    value={draft.amountMinor}
-                    onChange={(event) => setDraft({ ...draft, amountMinor: event.target.value })}
+                <Text variant="body-sm" tone="secondary">
+                  What the customer is expected to pay follows from the plan above, the term, and
+                  the currency, priced by the same pricing their own checkout uses. It is not typed
+                  here: a figure typed here and the figure really charged agree only by luck.
+                </Text>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <TermMonthsField
+                    label="Term"
+                    hint="How many months this covers. Set it to work out what is owed."
+                    value={termMonths}
+                    onChange={setTermMonths}
                   />
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="edit-currency" className="text-sm font-medium text-ink">
-                      Currency
-                    </label>
-                    <select
-                      id="edit-currency"
-                      className={selectClass}
-                      value={draft.currency}
-                      onChange={(event) => setDraft({ ...draft, currency: event.target.value })}
-                    >
-                      {/* The currencies the platform actually prices in, read
-                          from the tier definitions rather than listed here. */}
-                      {currencyOptions.map((code) => (
-                        <option key={code} value={code}>
-                          {code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <CurrencySelect
+                    id="edit-currency"
+                    label="Currency"
+                    value={quoteCurrency}
+                    onChange={setQuoteCurrency}
+                    options={currencyOptions}
+                    allowNative
+                    hint="What this deployment is able to charge in, as the server named them."
+                  />
+                </div>
+                <div className="mt-4">
+                  <QuoteBreakdown
+                    state={quote.state}
+                    availableCurrencies={chargeableCurrencies}
+                  />
                 </div>
               </fieldset>
 
@@ -780,7 +831,14 @@ export function ArrangementDetail() {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={saving || edit.changes.length === 0 || !canMutate}
+                  disabled={
+                    saving ||
+                    edit.changes.length === 0 ||
+                    !canMutate ||
+                    // Never a figure that was never computed. When the quote did
+                    // not come back there is nothing honest to save.
+                    (pricingInPlay && quote.state.status !== 'ready')
+                  }
                   onClick={runSave}
                 >
                   {saving ? 'Saving' : 'Save changes'}

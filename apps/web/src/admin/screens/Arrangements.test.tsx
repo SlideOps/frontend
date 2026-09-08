@@ -66,9 +66,22 @@ const paid = {
   created_at: '2026-07-03T00:00:00Z',
 };
 
+const gifted = {
+  id: 'arr-gifted',
+  operator_id: 'op-4',
+  operator_email: 'ngozi@example.test',
+  tier: 'pro',
+  amount_minor: 0,
+  condition: 'free_grant',
+  status: 'active',
+  auto_expire_on_deadline: false,
+  created_by_operator_id: 'admin-1',
+  created_at: '2026-07-04T00:00:00Z',
+};
+
 beforeEach(() => {
   listAllArrangements.mockReset().mockResolvedValue({
-    arrangements: [granted, unpriced, paid],
+    arrangements: [granted, unpriced, paid, gifted],
     limit: 25,
     offset: 0,
     has_more: false,
@@ -175,5 +188,19 @@ describe('the arrangements list', () => {
     listAllArrangements.mockRejectedValue(new Error('unreachable'));
     renderScreen();
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  });
+});
+
+describe('an arrangement that was given away, on the list', () => {
+  it('reads as no charge and never as a debt somebody has left unpaid', async () => {
+    renderScreen();
+    const row = await rowFor('ngozi@example.test');
+
+    // Twice over: the payment reading and what is owed both have to say it, or
+    // the two disagree about the same arrangement on the same row.
+    expect(within(row).getAllByText('No charge').length).toBeGreaterThan(0);
+    expect(within(row).queryByText('Pending')).toBeNull();
+    expect(within(row).queryByText('Overdue')).toBeNull();
+    expect(within(row).queryByText('Amount not recorded')).toBeNull();
   });
 });
