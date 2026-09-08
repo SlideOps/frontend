@@ -127,6 +127,9 @@ export function OperationTerminal({ events }: OperationTerminalProps) {
       onExpandedChange={setExpanded}
       // The window resize listener this used to register itself now lives in the
       // surface, alongside the expand and drag-taller cases it never covered.
+      // Draggable for the same reason the log view is: a terminal is only as
+      // useful as the number of lines it shows, and that is the Operator's call.
+      resizable
       onResize={refit}
       contentRef={containerRef}
       contentRole="log"

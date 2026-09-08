@@ -71,6 +71,9 @@ export function ShellTerminal({
       onExpandedChange={toggleExpanded}
       // Expanding an empty frame gives an Operator a full window of nothing.
       canExpand={attached}
+      // Draggable for the same reason the log view is: a terminal is only as
+      // useful as the number of lines it shows, and that is the Operator's call.
+      resizable
       onResize={refit}
       contentRef={containerRef}
       // Shown while a terminal exists, which outlasts the session in it. Keyed on

@@ -76,7 +76,10 @@ export function ShellTabPanel({
         expanded={expanded}
         onExpandedChange={toggleExpanded}
         canExpand={attached}
-        onResize={refit}
+        // Draggable for the same reason the log view is: a terminal is only as
+      // useful as the number of lines it shows, and that is the Operator's call.
+      resizable
+      onResize={refit}
         contentRef={containerRef}
         contentHidden={!attached}
         // This tab is the whole point of the page it sits on, so it takes the

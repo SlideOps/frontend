@@ -140,3 +140,41 @@ describe('TerminalSurface', () => {
     expect(container.querySelector('.so-glow-pool')).toHaveAttribute('aria-hidden');
   });
 });
+
+/*
+A terminal is only as useful as the number of lines it shows.
+
+The log view could be dragged taller from the day it existed, and the terminals
+beside it could not, though a shell is exactly where a fixed twenty four lines
+hurts most: a directory listing or a stack trace scrolls its own beginning away.
+The handle and its floor are the same on every surface now.
+*/
+describe('a surface the Operator can drag taller', () => {
+  it('offers a handle on a terminal, the way the log view already did', () => {
+    const { container } = renderInApp(
+      <TerminalSurface label="the terminal" resizable expanded={false} onExpandedChange={() => {}}>
+        <div>output</div>
+      </TerminalSurface>,
+    );
+    const box = container.querySelector('.resize-y');
+    expect(box).not.toBeNull();
+  });
+
+  it('will not let a surface be dragged down to nothing it cannot be grabbed back from', () => {
+    const { container } = renderInApp(
+      <TerminalSurface label="the terminal" resizable expanded={false} onExpandedChange={() => {}}>
+        <div>output</div>
+      </TerminalSurface>,
+    );
+    expect(container.querySelector('.resize-y')?.className).toContain('min-h-32');
+  });
+
+  it('takes the handle away once the surface already fills the window', () => {
+    const { container } = renderInApp(
+      <TerminalSurface label="the terminal" resizable expanded onExpandedChange={() => {}}>
+        <div>output</div>
+      </TerminalSurface>,
+    );
+    expect(container.querySelector('.resize-y')).toBeNull();
+  });
+})
