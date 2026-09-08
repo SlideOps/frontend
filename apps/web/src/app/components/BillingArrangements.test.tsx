@@ -1,5 +1,5 @@
 import { ApiError, TransactionActionError, type BillingArrangement } from '@slideops/api-client';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -172,7 +172,9 @@ describe('the arrangement panel on Billing', () => {
 
     // Arriving at a checkout showing a different number than the page just
     // showed, with no explanation, reads as the platform having got it wrong.
-    expect(await screen.findByText(/new payment was prepared at the current amount/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/new payment was prepared at the current amount/),
+    ).toBeInTheDocument();
     await waitFor(() => expect(sentTo).toBe('https://pay.example/repriced'));
   });
 
@@ -194,7 +196,9 @@ describe('the arrangement panel on Billing', () => {
 
     show();
 
-    expect(await screen.findByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /Complete this payment/ }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /View payment/ })).toBeInTheDocument();
     expect(completeArrangementPayment).not.toHaveBeenCalled();
   });
@@ -207,7 +211,9 @@ describe('the arrangement panel on Billing', () => {
     // The payment stays reachable whether or not it can be returned to: it is
     // still the record of what happened. Whether paying is offered alongside it
     // is a separate question, and one the server answers.
-    expect(await screen.findByRole('link', { name: /View payment so_open_payment/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: /View payment so_open_payment/ }),
+    ).toBeInTheDocument();
   });
 
   it('links nowhere when the arrangement carries no payment reference', async () => {
@@ -388,7 +394,9 @@ describe('the arrangement panel on Billing', () => {
 
   it('surfaces the backend message when the resume request itself is refused', async () => {
     listBillingArrangements.mockResolvedValue([arrangement()]);
-    completeArrangementPayment.mockRejectedValue(new ApiError(409, 'conflict', 'The gateway rejected this.'));
+    completeArrangementPayment.mockRejectedValue(
+      new ApiError(409, 'conflict', 'The gateway rejected this.'),
+    );
 
     show();
     await userEvent.click(await screen.findByRole('button', { name: /Complete this payment/ }));
@@ -428,5 +436,114 @@ describe('the arrangement panel on Billing', () => {
     await waitFor(() => expect(listBillingArrangements).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText('Not available.')).not.toBeInTheDocument();
+  });
+});
+
+describe('one arrangement opened in full', () => {
+  /** Open the details of the only arrangement on the page. */
+  async function openDetails() {
+    await userEvent.click(await screen.findByRole('button', { name: /View details/ }));
+    return screen.findByRole('dialog');
+  }
+
+  it('answers what was given, for how long, and which payment settles it', async () => {
+    const deadline = daysFromNow(12);
+    const accessEnd = daysFromNow(20);
+    listBillingArrangements.mockResolvedValue([
+      arrangement({
+        payment_deadline: deadline,
+        access_start: daysFromNow(-4),
+        access_end: accessEnd,
+        term_months: 1,
+        payment_reference: 'so_open_payment',
+      }),
+    ]);
+
+    show();
+    const dialog = await openDetails();
+
+    // The card says what is owed. These are the questions it does not answer,
+    // and each used to exist only in the email that announced the grant.
+    expect(within(dialog).getByText('Awaiting payment')).toBeInTheDocument();
+    expect(within(dialog).getByText('1 month')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(`${day(daysFromNow(-4))} to ${day(accessEnd)}`),
+    ).toBeInTheDocument();
+    // The access period and the payment deadline are separate promises, and
+    // showing one as the other is what made a grant impossible to describe.
+    expect(within(dialog).getByText(day(deadline))).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /so_open_payment/ })).toHaveAttribute(
+      'href',
+      transactionDetailPath('so_open_payment'),
+    );
+  });
+
+  it('pays from inside the details, through the same endpoint the card uses', async () => {
+    listBillingArrangements.mockResolvedValue([arrangement()]);
+    completeArrangementPayment.mockResolvedValue({
+      checkout_url: 'https://pay.example/from_details',
+      already_succeeded: false,
+      superseded: false,
+    });
+
+    show();
+    const dialog = await openDetails();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Complete this payment/ }));
+
+    // Reading the detail and acting on it must not be two journeys, and the
+    // action must not be a second implementation of paying.
+    await waitFor(() => expect(completeArrangementPayment).toHaveBeenCalledWith('arr_1'));
+    expect(startCheckout).not.toHaveBeenCalled();
+    await waitFor(() => expect(sentTo).toBe('https://pay.example/from_details'));
+  });
+
+  it('offers no way to pay a gift, and says nothing is owed', async () => {
+    listBillingArrangements.mockResolvedValue([
+      arrangement({ condition: 'free_grant', status: 'active', amount_minor: undefined }),
+    ]);
+
+    show();
+    const dialog = await openDetails();
+
+    expect(within(dialog).getByText('No charge')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Nothing is expected of you/)).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: /Complete this payment/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens a finished arrangement, which the page otherwise only names', async () => {
+    listBillingArrangements.mockResolvedValue([
+      arrangement({ status: 'completed', payment_reference: 'so_settled' }),
+    ]);
+
+    show();
+    // A settled matter is the one somebody comes back with a question about,
+    // and the earlier-arrangements line was the whole of what the page said.
+    await userEvent.click(await screen.findByRole('button', { name: /Pro plan.*Settled/ }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(within(dialog).getByText('Settled')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /so_settled/ })).toHaveAttribute(
+      'href',
+      transactionDetailPath('so_settled'),
+    );
+    expect(
+      within(dialog).queryByRole('button', { name: /Complete this payment/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('closes on Escape and gives focus back', async () => {
+    listBillingArrangements.mockResolvedValue([arrangement()]);
+
+    show();
+    const trigger = await screen.findByRole('button', { name: /View details/ });
+    await userEvent.click(trigger);
+    await screen.findByRole('dialog');
+
+    await userEvent.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 });

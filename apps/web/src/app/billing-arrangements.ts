@@ -21,8 +21,19 @@ const soonDays = 3;
 const dayMs = 24 * 60 * 60 * 1000;
 
 /** One date, written the way every other billing surface writes one. */
-function formatDay(when: Date): string {
+export function formatDay(when: Date): string {
   return when.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** One date from the wire, or null when there is nothing readable there. A
+ *  field the API omits and a field carrying a date nobody can parse are the
+ *  same answer to a screen: there is no date to show. */
+export function readDay(iso: string | undefined): string | null {
+  if (!iso) {
+    return null;
+  }
+  const when = new Date(iso);
+  return Number.isNaN(when.getTime()) ? null : formatDay(when);
 }
 
 /**
@@ -203,4 +214,121 @@ const endedShown = 3;
 /** The most recent finished arrangements, as history only. */
 export function endedArrangements(arrangements: BillingArrangement[]): BillingArrangement[] {
   return arrangements.filter((arrangement) => !isOpen(arrangement)).slice(0, endedShown);
+}
+
+/**
+ * The arrangement's own status, as a label and a tone.
+ *
+ * The summary card never needed this: it says what an arrangement is by what it
+ * offers to do about it. Opened in full, the status is one of the facts being
+ * asked for, and "awaiting_payment" is not a thing to show a person.
+ */
+export interface StatusReading {
+  label: string;
+  tone: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+}
+
+const statusReadings: Record<BillingArrangementStatus, StatusReading> = {
+  awaiting_payment: { label: 'Awaiting payment', tone: 'warning' },
+  active: { label: 'Active', tone: 'success' },
+  completed: { label: 'Settled', tone: 'success' },
+  expired: { label: 'Expired', tone: 'neutral' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+  revoked: { label: 'Withdrawn', tone: 'danger' },
+};
+
+export function statusReading(arrangement: BillingArrangement): StatusReading {
+  return statusReadings[arrangement.status] ?? { label: arrangement.status, tone: 'neutral' };
+}
+
+/**
+ * How long the amount covers, in words, or null when nobody recorded a term.
+ *
+ * An absent term is not a term of one month. Arrangements made before the term
+ * was stored carry none, and printing a month there would state a billing
+ * period that was never agreed.
+ */
+export function termReading(arrangement: BillingArrangement): string | null {
+  const months = arrangement.term_months;
+  if (typeof months !== 'number' || months < 1) {
+    return null;
+  }
+  if (months === 12) {
+    return '1 year';
+  }
+  return `${months} month${months === 1 ? '' : 's'}`;
+}
+
+/**
+ * When the access itself runs, which is deliberately not the payment deadline.
+ *
+ * Temporary access is exactly the case where the two differ: the plan may be
+ * live for a month while the money is due on Friday. A customer asking what
+ * they were actually given is asking about this one, and the summary card
+ * shows only the other.
+ */
+export interface AccessReading {
+  /** The period itself, as one line. */
+  period: string;
+  /** What that period means right now, when there is anything to say. */
+  note: string | null;
+}
+
+export function accessReading(
+  arrangement: BillingArrangement,
+  now: Date = new Date(),
+): AccessReading | null {
+  const start = readDay(arrangement.access_start);
+  const end = readDay(arrangement.access_end);
+  if (!start && !end) {
+    return null;
+  }
+  const period = start && end ? `${start} to ${end}` : (end ?? `From ${start}`);
+  if (!end) {
+    return { period, note: null };
+  }
+
+  const until = new Date(arrangement.access_end as string).getTime() - now.getTime();
+  if (until < 0) {
+    return { period, note: 'This access has ended.' };
+  }
+  // Whole days remaining, rounded up, so the last day of access reads as a day
+  // left rather than as none.
+  const days = Math.ceil(until / dayMs);
+  return { period, note: `${days} day${days === 1 ? '' : 's'} of access left.` };
+}
+
+/**
+ * What the customer should do about this, in one sentence.
+ *
+ * The card explains what the arrangement is; this answers the question that
+ * follows, which is what is now expected of them. It is written from the same
+ * facts the button is enabled from, so it can never tell somebody to pay
+ * something the panel gives them no way to pay.
+ */
+export function nextStep(arrangement: BillingArrangement): string {
+  if (!isOpen(arrangement)) {
+    return endedSummary(arrangement);
+  }
+  if (arrangement.condition === 'free_grant') {
+    return 'Nothing is expected of you. Use the plan.';
+  }
+  if (arrangement.condition === 'offline_settled') {
+    return 'This is already paid. Nothing is expected of you.';
+  }
+  if (!canComplete(arrangement)) {
+    return (
+      arrangement.unpayable_reason ??
+      'There is nothing to pay here right now. Ask whoever arranged this if you were expecting one.'
+    );
+  }
+  const deadline = deadlineReading(arrangement);
+  if (deadline?.overdue) {
+    return 'This payment is past its deadline. Completing it now settles it.';
+  }
+  const due = readDay(arrangement.payment_deadline);
+  if (deadline && due) {
+    return `Complete the payment by ${due}.`;
+  }
+  return 'Complete the payment when you are ready. No deadline was set.';
 }

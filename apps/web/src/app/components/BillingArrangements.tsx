@@ -6,9 +6,10 @@ import {
   type BillingArrangement,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
-import { ArrowUpRight, Banknote, CalendarClock, Gift } from '@slideops/icons';
+import { ArrowUpRight, Banknote, CalendarClock, Gift, Info } from '@slideops/icons';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrangementDetail } from './ArrangementDetail';
 import { transactionDetailPath } from '../billing-routes';
 import {
   amountReading,
@@ -125,15 +126,35 @@ function PaymentLink({ reference }: { reference: string }) {
   );
 }
 
+/**
+ * The way into everything the card does not say.
+ *
+ * On every arrangement, not only a payable one: what a customer was given, how
+ * long it runs and which payment settles it are as worth reading on a gift or
+ * on something already closed as on a debt. It sits beside the action rather
+ * than replacing the card's own summary, so the common case -- see the figure,
+ * pay it -- still takes no clicks at all.
+ */
+function DetailsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" onClick={onClick}>
+      <Info width={16} height={16} aria-hidden />
+      View details
+    </Button>
+  );
+}
+
 /** One live arrangement, in full, with whatever it actually allows. */
 function OpenArrangement({
   arrangement,
   completing,
   onComplete,
+  onOpenDetail,
 }: {
   arrangement: BillingArrangement;
   completing: boolean;
   onComplete: () => void;
+  onOpenDetail: () => void;
 }) {
   const deadline = deadlineReading(arrangement);
   const gift = arrangement.condition === 'free_grant';
@@ -180,6 +201,7 @@ function OpenArrangement({
               <Banknote width={16} height={16} aria-hidden />
               {completing ? 'Opening your payment' : 'Complete this payment'}
             </Button>
+            <DetailsButton onClick={onOpenDetail} />
             {/* Only when one exists. A payable arrangement need not have one:
                 the checkout for a price an Admin has since corrected is voided,
                 and the new one is made when the customer chooses to pay. */}
@@ -203,18 +225,26 @@ function OpenArrangement({
               {arrangement.unpayable_reason}
             </Text>
           ) : null}
-          <PaymentLink reference={arrangement.payment_reference} />
+          <div className="flex flex-wrap items-center gap-2">
+            <DetailsButton onClick={onOpenDetail} />
+            <PaymentLink reference={arrangement.payment_reference} />
+          </div>
         </div>
-      ) : arrangement.unpayable_reason ? (
-        <Text variant="body-sm" tone="secondary" className="mt-4">
-          {arrangement.unpayable_reason}
-        </Text>
-      ) : isOutstanding(arrangement) ? (
-        <Text variant="body-sm" tone="secondary" className="mt-4">
-          There is no payment open for this yet, so there is nothing to complete here. Ask whoever
-          arranged this to send you one.
-        </Text>
-      ) : null}
+      ) : (
+        <div className="mt-4">
+          {arrangement.unpayable_reason ? (
+            <Text variant="body-sm" tone="secondary" className="mb-2 block">
+              {arrangement.unpayable_reason}
+            </Text>
+          ) : isOutstanding(arrangement) ? (
+            <Text variant="body-sm" tone="secondary" className="mb-2 block">
+              There is no payment open for this yet, so there is nothing to complete here. Ask
+              whoever arranged this to send you one.
+            </Text>
+          ) : null}
+          <DetailsButton onClick={onOpenDetail} />
+        </div>
+      )}
     </Card>
   );
 }
@@ -225,6 +255,10 @@ export function BillingArrangements() {
   const [completing, setCompleting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  // The arrangement opened in full, held by id rather than by value so a
+  // reload while the modal is open shows the reloaded arrangement rather than
+  // a stale copy of the one that was clicked.
+  const [detailID, setDetailID] = useState<string | null>(null);
 
   const runComplete = async (arrangement: BillingArrangement) => {
     // One call, and the server decides what it means: returning to the checkout
@@ -279,6 +313,10 @@ export function BillingArrangements() {
   if (open.length === 0 && ended.length === 0) {
     return null;
   }
+  // Read back from the loaded list rather than remembered, so an arrangement
+  // that has since been settled or withdrawn closes the modal instead of
+  // showing terms that no longer hold.
+  const detail = state.data.find((arrangement) => arrangement.id === detailID) ?? null;
 
   return (
     <div>
@@ -307,6 +345,7 @@ export function BillingArrangements() {
             arrangement={arrangement}
             completing={completing === arrangement.id}
             onComplete={() => runComplete(arrangement)}
+            onOpenDetail={() => setDetailID(arrangement.id)}
           />
         ))}
       </div>
@@ -319,19 +358,43 @@ export function BillingArrangements() {
           <ul className="mt-2 flex flex-col gap-1.5">
             {ended.map((arrangement) => {
               const reading = amountReading(arrangement);
+              const summary = [
+                `${tierName(arrangement.tier)} plan`,
+                reading.kind === 'amount' ? `, ${reading.text}` : '',
+                reading.kind === 'free' ? ', at no charge' : '',
+                `. ${endedSummary(arrangement)}`,
+              ].join('');
               return (
                 <li key={arrangement.id}>
-                  <Text variant="body-sm" tone="secondary">
-                    {tierName(arrangement.tier)} plan
-                    {reading.kind === 'amount' ? `, ${reading.text}` : ''}
-                    {reading.kind === 'free' ? ', at no charge' : ''}. {endedSummary(arrangement)}
-                  </Text>
+                  {/* A settled or withdrawn arrangement is the one somebody
+                      most often comes back with a question about, and this line
+                      is the whole of what the page said about it. Opening it is
+                      the only way those answers are reachable at all. */}
+                  <button
+                    type="button"
+                    onClick={() => setDetailID(arrangement.id)}
+                    className="rounded-md text-left text-sm text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-fast ease-standard hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  >
+                    {summary}
+                  </button>
                 </li>
               );
             })}
           </ul>
         </div>
       ) : null}
+
+      <ArrangementDetail
+        open={detail !== null}
+        arrangement={detail}
+        completing={completing === detail?.id}
+        onComplete={() => {
+          if (detail) {
+            runComplete(detail);
+          }
+        }}
+        onClose={() => setDetailID(null)}
+      />
     </div>
   );
 }
