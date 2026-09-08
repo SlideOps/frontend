@@ -300,6 +300,19 @@ export function ArrangementDetail() {
     [chargeableCurrencies, baseline?.currency],
   );
 
+  // Settle on a real currency once the options are known. The select used to
+  // carry an empty choice meaning "the plan's own currency", which asked an
+  // Admin to know what a plan is priced in before they could answer, and left
+  // the field showing one thing while the state held nothing. An arrangement
+  // that already has a currency keeps it; anything else starts at the first the
+  // deployment published.
+  useEffect(() => {
+    const first = currencyOptions[0];
+    if (first) {
+      setQuoteCurrency((current) => current || first);
+    }
+  }, [currencyOptions]);
+
   /*
    * The amount, worked out rather than typed.
    *
@@ -765,7 +778,6 @@ export function ArrangementDetail() {
                     value={quoteCurrency}
                     onChange={setQuoteCurrency}
                     options={currencyOptions}
-                    allowNative
                     hint="What this deployment is able to charge in, as the server named them."
                   />
                 </div>
