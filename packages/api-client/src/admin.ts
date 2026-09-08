@@ -953,6 +953,25 @@ export interface Arrangement {
    */
   amount_minor?: number | null;
   currency?: string;
+  /**
+   * How many months the amount covers, and what the figure was worked out from.
+   *
+   * Zero means no term was recorded, which is true of every arrangement made
+   * before the backend started keeping one. That is an unknown term and never a
+   * term of zero months, so nothing may be priced or displayed from it.
+   */
+  term_months?: number;
+  /**
+   * When this arrangement last changed, which is the revision a mutation echoes
+   * back as `if_unchanged_since`.
+   *
+   * It was missing from this type while the backend had always returned it, so
+   * nothing could reach for it and the detail reader fell through to
+   * `created_at` instead. That sent the moment the arrangement was made in place
+   * of the moment it last changed, and every save after the first was correctly
+   * refused as overtaken.
+   */
+  updated_at?: string;
   condition: ArrangementCondition;
   status: ArrangementStatus;
   /** When an offline payment was actually made, set only for offline_settled. */
@@ -1424,7 +1443,21 @@ function toArrangementDetail(raw: unknown): ArrangementDetail {
     access_start: body.access_start as string | undefined,
     access_end: body.access_end as string | undefined,
     payment_deadline: (body.payment_deadline as string) ?? arrangement.payment_deadline,
-    updated_at: (body.updated_at as string) ?? arrangement.created_at ?? '',
+    // The revision, and nothing that merely looks like one.
+    //
+    // The detail endpoint calls this "revision"; the arrangement inside it
+    // calls the same instant "updated_at". This read neither, so it fell
+    // through to created_at, and every save echoed back the moment the
+    // arrangement was made instead of the moment it last changed. For any
+    // arrangement that had ever been touched those differ, so the server
+    // correctly refused every edit as overtaken, and an Admin was told to
+    // reload and try again forever.
+    //
+    // There is no fallback to another timestamp on purpose. A wrong revision is
+    // worse than none: none means last write wins, wrong means nothing can ever
+    // be saved.
+    updated_at:
+      (body.revision as string) || (arrangement.updated_at as string) || '',
     last_communication_at: body.last_communication_at as string | undefined,
     email_types: body.email_types as ArrangementEmailType[] | undefined,
   };
@@ -1444,13 +1477,26 @@ export function getArrangement(
  * A correction to an arrangement. Every field is optional and only the ones
  * present are sent, so an edit says exactly what it changed and nothing else.
  * A null clears a date the arrangement no longer has.
+ *
+ * The condition is deliberately absent. Turning a settled payment into a gift
+ * after the fact rewrites what happened rather than correcting it, and revoking,
+ * restoring and granting already exist for changing the arrangement itself.
  */
 export interface ArrangementUpdate {
   tier?: string;
   amountMinor?: number;
   currency?: string;
+  /** How many months the amount covers. Refused with `invalid_term` when negative. */
+  termMonths?: number;
   paymentDeadline?: Date | null;
+  accessStart?: Date | null;
   accessEnd?: Date | null;
+  /** Whether access lapses on its own once the deadline passes with no payment. */
+  autoExpireOnDeadline?: boolean;
+  /** The admin's own paper trail. Recorded as given and never verified. */
+  externalReference?: string;
+  /** When the customer actually paid, for a settlement dated wrongly. */
+  paidAt?: Date | null;
   notes?: string;
 }
 
@@ -1462,14 +1508,19 @@ function isoOrNull(value: Date | null): string | null {
 /**
  * Correct what was agreed. Sends only the fields that changed, plus the
  * revision the editor was working from. A 409 means another admin changed this
- * first and the caller must show what happened rather than resend.
+ * first and the caller must show what happened rather than resend. A 400
+ * carrying `invalid_term` means the term was negative.
  */
 export function updateArrangement(
   arrangementId: string,
   changes: ArrangementUpdate,
   ifUnchangedSince: string,
 ): Promise<ArrangementDetail> {
-  const body: Record<string, unknown> = { if_unchanged_since: ifUnchangedSince };
+  // Sent only when there is one. An empty revision is not a revision, and
+  // sending one would ask the server to compare against nothing.
+  const body: Record<string, unknown> = ifUnchangedSince
+    ? { if_unchanged_since: ifUnchangedSince }
+    : {};
   if (changes.tier !== undefined) {
     body.tier = changes.tier;
   }
@@ -1479,11 +1530,26 @@ export function updateArrangement(
   if (changes.currency !== undefined) {
     body.currency = changes.currency;
   }
+  if (changes.termMonths !== undefined) {
+    body.term_months = changes.termMonths;
+  }
   if (changes.paymentDeadline !== undefined) {
     body.payment_deadline = isoOrNull(changes.paymentDeadline);
   }
+  if (changes.accessStart !== undefined) {
+    body.access_start = isoOrNull(changes.accessStart);
+  }
   if (changes.accessEnd !== undefined) {
     body.access_end = isoOrNull(changes.accessEnd);
+  }
+  if (changes.autoExpireOnDeadline !== undefined) {
+    body.auto_expire_on_deadline = changes.autoExpireOnDeadline;
+  }
+  if (changes.externalReference !== undefined) {
+    body.external_reference = changes.externalReference;
+  }
+  if (changes.paidAt !== undefined) {
+    body.paid_at = isoOrNull(changes.paidAt);
   }
   if (changes.notes !== undefined) {
     body.notes = changes.notes;

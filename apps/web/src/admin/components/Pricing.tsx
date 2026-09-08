@@ -30,6 +30,15 @@ export interface TermMonthsFieldProps {
   /** The month count as typed, so a half-finished number is not rewritten. */
   value: string;
   onChange: (value: string) => void;
+  /**
+   * The smallest month count this question accepts. One where a term is being
+   * granted, since granting nothing is not a thing to ask for; zero where an
+   * existing term is being corrected, since zero is how an arrangement says it
+   * records no term at all.
+   */
+  min?: number;
+  /** Said under the box when what was typed cannot be used. */
+  error?: string;
 }
 
 /**
@@ -40,18 +49,26 @@ export interface TermMonthsFieldProps {
  * product does sell are offered as suggestions so the common ones stay one
  * keystroke away.
  */
-export function TermMonthsField({ label, hint, value, onChange }: TermMonthsFieldProps) {
+export function TermMonthsField({
+  label,
+  hint,
+  value,
+  onChange,
+  min = 1,
+  error,
+}: TermMonthsFieldProps) {
   const listId = useId();
   return (
     <div>
       <Field
         label={label}
         type="number"
-        min={1}
+        min={min}
         step={1}
         inputMode="numeric"
         list={listId}
         hint={hint ?? 'The number of months this covers.'}
+        error={error}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

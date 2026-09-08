@@ -45,8 +45,11 @@ import {
   obligationText,
   obligationTone,
   paymentReading,
+  pricesFromTerm,
   readIfSupported,
+  recordedTerm,
   staleEditorMessage,
+  termProblem,
   type ArrangementEditDraft,
 } from '../arrangements';
 import { AdminShell } from '../components/AdminShell';
@@ -253,18 +256,23 @@ export function ArrangementDetail() {
                 ? ''
                 : String(detail.amount_minor),
             currency: detail.currency ?? '',
+            // The term the arrangement recorded, so reopening one prices what it
+            // already says rather than asking the admin to restate it. A zero is
+            // an arrangement from before terms were kept: unknown, asked once,
+            // and never priced as a term of zero months.
+            termMonths: recordedTerm(detail.arrangement.term_months),
             paymentDeadline: toLocalInput(detail.payment_deadline),
+            accessStart: toLocalInput(detail.access_start),
             accessEnd: toLocalInput(detail.access_end),
+            autoExpireOnDeadline: detail.arrangement.auto_expire_on_deadline,
+            externalReference: detail.arrangement.external_reference ?? '',
+            paidAt: toLocalInput(detail.arrangement.paid_at),
             notes: detail.arrangement.notes ?? '',
           }
         : null,
     [detail],
   );
 
-  // What the amount is worked out from. An arrangement does not record the term
-  // it was agreed for, so nothing is assumed: until the admin states one there is
-  // no question to price, and opening the editor proposes no change of its own.
-  const [termMonths, setTermMonths] = useState('');
   const [quoteCurrency, setQuoteCurrency] = useState('');
 
   useEffect(() => {
@@ -272,7 +280,6 @@ export function ArrangementDetail() {
     // draft written against a state that is no longer current.
     setDraft(baseline);
     setQuoteCurrency(baseline?.currency ?? '');
-    setTermMonths('');
   }, [baseline]);
 
   const knownTiers = useMemo(
@@ -322,12 +329,15 @@ export function ArrangementDetail() {
    * pricing the customer's own checkout uses.
    */
   // A stated term is what turns the pricing inputs into a question. Without one
-  // the payment side of the form is dormant and the other fields save as before.
-  const pricingInPlay = termMonths.trim() !== '';
+  // the payment side of the form is dormant and the other fields save as before,
+  // which is how an arrangement that never recorded a term still opens.
+  const termValue = draft?.termMonths ?? '';
+  const termFault = termProblem(termValue);
+  const pricingInPlay = termFault === null && pricesFromTerm(termValue);
   const quote = useArrangementQuote({
     operatorId: detail?.operator_id ?? '',
     tier: draft?.tier ?? '',
-    termMonths: Number(termMonths),
+    termMonths: Number(termValue),
     currency: quoteCurrency,
     enabled: editing && detail !== null && pricingInPlay,
   });
@@ -355,6 +365,12 @@ export function ArrangementDetail() {
     if (!canMutate) {
       return 'This build of the API cannot change an arrangement, so there is nothing to save to.';
     }
+    // Said before anything else about the edit: a term that cannot be used is
+    // what the admin is looking at, and the backend refusing it later would be
+    // a slower way of saying the same thing.
+    if (termFault) {
+      return termFault;
+    }
     if (edit && edit.changes.length === 0) {
       return 'Nothing has been changed yet, so there is nothing to save.';
     }
@@ -368,7 +384,7 @@ export function ArrangementDetail() {
   })();
 
   const runSave = async () => {
-    if (!detail || !edit || edit.changes.length === 0) {
+    if (!detail || !edit || edit.changes.length === 0 || termFault) {
       return;
     }
     setSaving(true);
@@ -749,30 +765,43 @@ export function ArrangementDetail() {
 
               <fieldset className="mt-5 rounded-md border border-border p-4">
                 <legend className="px-1.5 text-sm font-semibold text-ink">Access</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="edit-tier" className="text-sm font-medium text-ink">
-                      Plan
-                    </label>
-                    <select
-                      id="edit-tier"
-                      className={selectClass}
-                      value={draft.tier}
-                      onChange={(event) =>
-                        setDraft({ ...draft, tier: event.target.value })
-                      }
-                    >
-                      {/* Plans come from the platform's own tier definitions, so
-                          nothing here is a name typed into the frontend. The
-                          arrangement's current plan is always among them, even
-                          if the tier list has moved on since it was agreed. */}
-                      {planOptions.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {/* Nothing here changes what kind of arrangement this is.
+                    Turning a settled payment into a gift after the fact
+                    rewrites what happened rather than correcting it, and
+                    revoke, restore and free grant already exist for changing
+                    the arrangement itself. */}
+                <div className="flex flex-col gap-2 sm:max-w-xs">
+                  <label htmlFor="edit-tier" className="text-sm font-medium text-ink">
+                    Plan
+                  </label>
+                  <select
+                    id="edit-tier"
+                    className={selectClass}
+                    value={draft.tier}
+                    onChange={(event) => setDraft({ ...draft, tier: event.target.value })}
+                  >
+                    {/* Plans come from the platform's own tier definitions, so
+                        nothing here is a name typed into the frontend. The
+                        arrangement's current plan is always among them, even
+                        if the tier list has moved on since it was agreed. */}
+                    {planOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* The two ends of the same period, side by side, because a
+                    start that lands after its end is only obvious when both are
+                    in front of you. */}
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Access starts"
+                    type="datetime-local"
+                    hint="When access under this arrangement began."
+                    value={draft.accessStart}
+                    onChange={(event) => setDraft({ ...draft, accessStart: event.target.value })}
+                  />
                   <Field
                     label="Access ends"
                     type="datetime-local"
@@ -793,9 +822,15 @@ export function ArrangementDetail() {
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <TermMonthsField
                     label="Term"
-                    hint="How many months this covers. Set it to work out what is owed."
-                    value={termMonths}
-                    onChange={setTermMonths}
+                    hint="How many months the amount covers. Clear it to record no term."
+                    // Zero is how an arrangement says it records no term, so it
+                    // is a real answer here in a way it never is when granting.
+                    min={0}
+                    error={termFault ?? undefined}
+                    value={draft.termMonths}
+                    onChange={(next) =>
+                      setDraft((current) => (current ? { ...current, termMonths: next } : current))
+                    }
                   />
                   <CurrencySelect
                     id="edit-currency"
@@ -820,6 +855,24 @@ export function ArrangementDetail() {
                     availableCurrencies={chargeableCurrencies}
                   />
                 </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="External reference"
+                    hint="Your own record of this payment, such as a bank reference or a receipt number. Recorded exactly as typed and never checked against anything."
+                    value={draft.externalReference}
+                    onChange={(event) =>
+                      setDraft({ ...draft, externalReference: event.target.value })
+                    }
+                    placeholder="bank-transfer-9931"
+                  />
+                  <Field
+                    label="Paid at"
+                    type="datetime-local"
+                    hint="When the customer actually paid, for a settlement dated wrongly."
+                    value={draft.paidAt}
+                    onChange={(event) => setDraft({ ...draft, paidAt: event.target.value })}
+                  />
+                </div>
               </fieldset>
 
               <fieldset className="mt-4 rounded-md border border-border p-4">
@@ -831,6 +884,19 @@ export function ArrangementDetail() {
                   value={draft.paymentDeadline}
                   onChange={(event) => setDraft({ ...draft, paymentDeadline: event.target.value })}
                 />
+                {/* Beside the deadline it refers to, because it is a statement
+                    about that date and reads as nothing on its own. */}
+                <label className="mt-4 flex items-start gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={draft.autoExpireOnDeadline}
+                    onChange={(event) =>
+                      setDraft({ ...draft, autoExpireOnDeadline: event.target.checked })
+                    }
+                    className="mt-0.5 h-4 w-4 rounded border-border"
+                  />
+                  Expire access on its own if the deadline passes with no payment
+                </label>
               </fieldset>
 
               <div className="mt-4 flex flex-col gap-2">
@@ -880,6 +946,7 @@ export function ArrangementDetail() {
                     saving ||
                     edit.changes.length === 0 ||
                     !canMutate ||
+                    termFault !== null ||
                     // Never a figure that was never computed. When the quote did
                     // not come back there is nothing honest to save.
                     (pricingInPlay && quote.state.status !== 'ready')

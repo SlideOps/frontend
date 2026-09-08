@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@slideops/api-client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -441,7 +441,10 @@ describe('pricing an arrangement instead of typing an amount into it', () => {
     expect(await screen.findByText('Monthly price')).toBeInTheDocument();
     // The monthly price stays in the currency the tier is written in.
     expect(screen.getByText(/49\.00/)).toBeInTheDocument();
-    expect(screen.getByText('12 months')).toBeInTheDocument();
+    // Scoped to the breakdown's own Term line, because the term the admin
+    // stated is now also named in the summary of what is about to change.
+    const term = screen.getByText('Term', { selector: 'dt' }).closest('div') as HTMLElement;
+    expect(within(term).getByText('12 months')).toBeInTheDocument();
     expect(screen.getByText('Annual discount')).toBeInTheDocument();
     expect(screen.getByText(/-.*1,200\.00/)).toBeInTheDocument();
     const tax = screen.getByText('Tax').closest('div') as HTMLElement;
@@ -540,7 +543,10 @@ describe('pricing an arrangement instead of typing an amount into it', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(api.updateArrangement).toHaveBeenCalledTimes(1));
+    // The term goes with it: this arrangement recorded none, so stating one is
+    // itself a correction, and it is what the figure was worked out from.
     expect(api.updateArrangement.mock.calls[0]![1]).toEqual({
+      termMonths: 12,
       amountMinor: 1085000,
       currency: 'USD',
     });
@@ -611,3 +617,135 @@ describe('an edit that appeared to do nothing', () => {
     expect(await screen.findByText(/nothing has been changed yet/i)).toBeInTheDocument();
   });
 })
+
+/*
+ * The term an arrangement was priced from.
+ *
+ * An arrangement now records how many months its amount covers, so reopening
+ * one prices what it already says instead of asking the admin to restate it.
+ * A zero is every arrangement agreed before the backend kept one: unknown, and
+ * never a term of zero months that could be priced or shown as a fact.
+ */
+
+/** The same arrangement, agreed for a stated nine months. */
+const detailWithTerm = {
+  ...detail,
+  arrangement: { ...detail.arrangement, term_months: 9 },
+};
+
+describe('an arrangement that remembers what its amount covers', () => {
+  it('opens with the recorded term already stated and prices it without the admin typing anything', async () => {
+    api.getArrangement.mockResolvedValue(detailWithTerm);
+    renderScreen();
+    await openEditor();
+
+    expect((screen.getByLabelText('Term') as HTMLInputElement).value).toBe('9');
+    await waitFor(() => expect(api.quoteArrangement).toHaveBeenCalledTimes(1));
+    expect(api.quoteArrangement.mock.calls[0]![1]).toMatchObject({ termMonths: 9 });
+    // Nine months at the price table, no annual discount, the same tax.
+    await expectTotal(/9,050\.00/);
+  });
+
+  it('opens an arrangement that recorded no term with the term empty, and still saves the rest', async () => {
+    renderScreen();
+    await openEditor();
+
+    expect((screen.getByLabelText('Term') as HTMLInputElement).value).toBe('');
+    await userEvent.selectOptions(screen.getByLabelText('Plan'), 'starter');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.updateArrangement).toHaveBeenCalledTimes(1));
+    expect(api.updateArrangement.mock.calls[0]![1]).toEqual({ tier: 'starter' });
+    // Nothing was priced, because nothing said what there was to price.
+    expect(api.quoteArrangement).not.toHaveBeenCalled();
+  });
+
+  it('re-quotes when the term changes, and the amount that is saved follows it', async () => {
+    api.getArrangement.mockResolvedValue(detailWithTerm);
+    renderScreen();
+    await openEditor();
+    await expectTotal(/9,050\.00/);
+
+    await userEvent.clear(screen.getByLabelText('Term'));
+    await userEvent.type(screen.getByLabelText('Term'), '12');
+    await expectTotal(/10,850\.00/);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.updateArrangement).toHaveBeenCalledTimes(1));
+    expect(api.updateArrangement.mock.calls[0]![1]).toMatchObject({
+      termMonths: 12,
+      amountMinor: 1085000,
+    });
+  });
+
+  it('prevents a negative term and says why, rather than leaving the backend to refuse it', async () => {
+    renderScreen();
+    await openEditor();
+
+    fireEvent.change(screen.getByLabelText('Term'), { target: { value: '-3' } });
+
+    const save = screen.getByRole('button', { name: 'Save changes' });
+    await waitFor(() => expect(save).toBeDisabled());
+    expect(screen.getAllByText(/cannot be negative/i).length).toBeGreaterThan(0);
+
+    await userEvent.click(save);
+    expect(api.updateArrangement).not.toHaveBeenCalled();
+  });
+});
+
+describe('everything on the record being correctable, not just the money', () => {
+  it('names the access start, the auto expire, the external reference and the paid at in the summary, and sends them', async () => {
+    renderScreen();
+    await openEditor();
+
+    fireEvent.change(screen.getByLabelText('Access starts'), {
+      target: { value: '2026-07-15T09:30' },
+    });
+    fireEvent.change(screen.getByLabelText('Paid at'), {
+      target: { value: '2026-07-16T10:00' },
+    });
+    await userEvent.type(screen.getByLabelText('External reference'), 'bank-transfer-9931');
+    await userEvent.click(screen.getByLabelText(/Expire access on its own/));
+
+    expect(screen.getByText(/About to change 4 fields/)).toBeInTheDocument();
+    expect(screen.getByText(/Access starts:/)).toBeInTheDocument();
+    expect(screen.getByText(/External reference:/)).toBeInTheDocument();
+    expect(screen.getByText(/Paid at:/)).toBeInTheDocument();
+    expect(screen.getByText(/Expire when the deadline passes: No becomes/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.updateArrangement).toHaveBeenCalledTimes(1));
+    expect(api.updateArrangement.mock.calls[0]![1]).toEqual({
+      accessStart: new Date('2026-07-15T09:30'),
+      paidAt: new Date('2026-07-16T10:00'),
+      externalReference: 'bank-transfer-9931',
+      autoExpireOnDeadline: true,
+    });
+  });
+
+  it('says the external reference is the admin own record and is checked against nothing', async () => {
+    renderScreen();
+    await openEditor();
+
+    expect(screen.getByText(/never checked against anything/i)).toBeInTheDocument();
+  });
+
+  it('does not offer what kind of arrangement this is as something to edit', async () => {
+    renderScreen();
+    await openEditor();
+
+    // Changing a settled payment into a gift after the fact rewrites what
+    // happened rather than correcting it, so the condition is not a field.
+    const form = screen.getByText('Edit this arrangement').closest('div') as HTMLElement;
+    expect(within(form).queryByLabelText(/condition/i)).toBeNull();
+    expect(within(form).queryByLabelText(/arrangement type|kind of arrangement/i)).toBeNull();
+
+    for (const control of within(form).queryAllByRole('combobox')) {
+      for (const option of Array.from((control as HTMLSelectElement).options)) {
+        expect(option.value).not.toMatch(
+          /free_grant|offline_settled|temporary_access|payment_required/,
+        );
+      }
+    }
+  });
+});
