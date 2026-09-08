@@ -16,6 +16,13 @@ export interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   confirmVariant?: ButtonVariant;
+  /**
+   * Hold the confirm control until the dialog's own requirement is met, such as
+   * a reason that has to be typed before an access can be taken away. The
+   * backend still decides; this only stops a dialog being passed through before
+   * it has been answered.
+   */
+  confirmDisabled?: boolean;
   /** Run the action. May be async; the dialog shows a working state until it settles. */
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
@@ -28,6 +35,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Cancel',
   confirmVariant = 'primary',
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -38,15 +46,39 @@ export function ConfirmDialog({
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const [working, setWorking] = useState(false);
 
+  /*
+   * Move focus into the dialog on open, and put it back on close.
+   *
+   * This runs on `open` alone. It used to depend on `onCancel` as well, and
+   * every caller passes that as an inline arrow, so any state change in the
+   * screen behind the dialog produced a new one and re-ran this: focus jumped
+   * out of whatever the person was typing and onto the confirm button, one
+   * character in. Every dialog here that asks for a reason before it will act
+   * was unusable because of it.
+   */
   useEffect(() => {
     if (!open) {
       return;
     }
     previouslyFocused.current = document.activeElement as HTMLElement | null;
-    // Move focus into the dialog on open so keyboard and screen reader users
-    // land inside it, then restore focus to the trigger on close.
+    // A dialog whose confirm is held until it has been answered cannot take
+    // focus there, so the panel itself takes it and the keyboard still starts
+    // inside the dialog rather than behind it.
     confirmRef.current?.focus();
+    if (document.activeElement !== confirmRef.current) {
+      panelRef.current?.focus();
+    }
+    return () => {
+      previouslyFocused.current?.focus?.();
+    };
+  }, [open]);
 
+  // Escape and the Tab cycle, kept in their own effect so the handler can
+  // follow a changing onCancel without disturbing focus.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -78,7 +110,6 @@ export function ConfirmDialog({
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
-      previouslyFocused.current?.focus?.();
     };
   }, [open, onCancel]);
 
@@ -107,6 +138,7 @@ export function ConfirmDialog({
       <div
         ref={panelRef}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
@@ -124,7 +156,12 @@ export function ConfirmDialog({
           <Button variant="ghost" onClick={onCancel} disabled={working}>
             {cancelLabel}
           </Button>
-          <Button ref={confirmRef} variant={confirmVariant} onClick={confirm} disabled={working}>
+          <Button
+            ref={confirmRef}
+            variant={confirmVariant}
+            onClick={confirm}
+            disabled={working || confirmDisabled}
+          >
             {working ? 'Working' : confirmLabel}
           </Button>
         </div>

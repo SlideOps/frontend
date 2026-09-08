@@ -1,5 +1,6 @@
 import { cn } from '@slideops/design-system';
 import type { ArrangementStatus, OperationStatus, OperatorStatus } from '@slideops/api-client';
+import type { ArrangementReading } from '../arrangements';
 
 /*
  * Status badges for the control plane. Every color is a semantic design token,
@@ -86,5 +87,25 @@ export function ArrangementStatusBadge({ status }: { status: ArrangementStatus }
   const tone = arrangementTone[status] ?? 'neutral';
   return (
     <span className={cn(badgeBase, toneClass[tone])}>{arrangementLabel[status] ?? status}</span>
+  );
+}
+
+const readingTone: Record<ArrangementReading['tone'], Tone> = {
+  good: 'success',
+  warning: 'warning',
+  bad: 'danger',
+  neutral: 'neutral',
+};
+
+/**
+ * One of an arrangement's three readings: whether access is live, whether the
+ * payment arrived, or what is owed. Each carries its own reason, so an admin
+ * does not have to infer why a word was chosen.
+ */
+export function ReadingBadge({ reading }: { reading: ArrangementReading }) {
+  return (
+    <span title={reading.detail} className={cn(badgeBase, toneClass[readingTone[reading.tone]])}>
+      {reading.label}
+    </span>
   );
 }

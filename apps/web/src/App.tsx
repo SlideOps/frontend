@@ -160,6 +160,9 @@ const SubscriberDetail = lazy(() =>
 const Arrangements = lazy(() =>
   import('./admin/screens/Arrangements').then((m) => ({ default: m.Arrangements })),
 );
+const ArrangementDetail = lazy(() =>
+  import('./admin/screens/ArrangementDetail').then((m) => ({ default: m.ArrangementDetail })),
+);
 const PaymentDetail = lazy(() =>
   import('./admin/screens/PaymentDetail').then((m) => ({ default: m.PaymentDetail })),
 );
@@ -276,6 +279,7 @@ export function App() {
           <Route path="subscribers/:id" element={<SubscriberDetail />} />
           <Route path="subscribers/:id/payments/:reference" element={<PaymentDetail />} />
           <Route path="arrangements" element={<Arrangements />} />
+          <Route path="arrangements/:id" element={<ArrangementDetail />} />
           <Route path="billing-communications" element={<BillingCommunications />} />
           <Route path="emergency" element={<Emergency />} />
           <Route path="feature-flags" element={<FeatureFlags />} />
