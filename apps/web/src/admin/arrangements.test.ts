@@ -150,6 +150,34 @@ describe('the three readings', () => {
     expect(obligationText(obligationOf(settled, now))).toMatch(/paid$/);
   });
 
+  it('reads a free grant as no charge rather than as a payment nobody made', () => {
+    // A gift used to sit in every list looking like a debt, because the only
+    // vocabulary available for "no payment arrived" was pending or overdue.
+    const gift = facts({
+      condition: 'free_grant',
+      status: 'active',
+      amount_minor: 0,
+      payment_deadline: undefined,
+    });
+    expect(accessReading(gift, now).label).toBe('Active');
+    expect(paymentReading(gift, now).label).toBe('No charge');
+    expect(obligationOf(gift, now).kind).toBe('free');
+    expect(obligationText(obligationOf(gift, now))).toBe('No charge');
+  });
+
+  it('keeps a free grant out of everything that chases a payment', () => {
+    const gift = facts({
+      condition: 'free_grant',
+      status: 'active',
+      amount_minor: 0,
+      payment_deadline: '2026-07-01T00:00:00Z',
+    });
+    expect(matchesLifecycleFilter(gift, 'unpaid', now)).toBe(false);
+    expect(matchesLifecycleFilter(gift, 'pending_payment', now)).toBe(false);
+    // A deadline the backend still carries never turns a gift overdue.
+    expect(paymentReading(gift, now).label).not.toBe('Overdue');
+  });
+
   it('calls a payment overdue once its deadline has passed, without touching access', () => {
     const late = facts({ payment_deadline: '2026-07-01T00:00:00Z' });
     expect(accessReading(late, now).label).toBe('Active');

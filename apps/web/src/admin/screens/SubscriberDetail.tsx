@@ -1,10 +1,13 @@
 import {
   ApiError,
   cancelArrangement,
+  createFreeGrant,
   createPaymentRequiredArrangement,
   extendArrangementDeadline,
   getSubscriber,
   grantTemporaryAccess,
+  listAdminTiers,
+  listArrangementCurrencies,
   listArrangements,
   pauseSubscriber,
   recordOfflinePayment,
@@ -15,11 +18,8 @@ import {
   verifyPayment,
   type AdminPayment,
   type Arrangement,
-  type PayCurrency,
   type PaymentProvider,
   type PaymentReconciliation,
-  type PurchasableTier,
-  type TierName,
 } from '@slideops/api-client';
 import { Button, Card, Field, Text } from '@slideops/design-system';
 import {
@@ -43,8 +43,16 @@ import { AdminShell } from '../components/AdminShell';
 import { ArrangementStatusBadge } from '../components/Badges';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
+import { CurrencySelect, QuoteBreakdown, TermMonthsField } from '../components/Pricing';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
-import { conditionDescription, conditionLabel, deadlineUrgency, isEditable } from '../arrangements';
+import {
+  amountDifferenceNote,
+  conditionDescription,
+  conditionLabel,
+  deadlineUrgency,
+  isEditable,
+} from '../arrangements';
+import { useArrangementQuote } from '../hooks/useArrangementQuote';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { formatAmount, paymentStatusLabel, paymentStatusTone, standingOf } from '../subscribers';
 
@@ -64,15 +72,6 @@ import { formatAmount, paymentStatusLabel, paymentStatusTone, standingOf } from 
 
 const selectClass =
   'h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-ink transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
-
-/** The same billing-cycle choices self-serve checkout offers, so an arrangement made
- *  here for a year or more upfront activates for that whole term, not just one month. */
-const TERM_MONTH_OPTIONS: { months: number; label: string }[] = [
-  { months: 1, label: 'Monthly (1 month)' },
-  { months: 12, label: '1 year (12 months)' },
-  { months: 24, label: '2 years (24 months)' },
-  { months: 36, label: '3 years (36 months)' },
-];
 
 const urgencyTextTone: Record<'good' | 'warning' | 'bad' | 'neutral', string> = {
   good: 'text-success',
@@ -103,6 +102,23 @@ export function SubscriberDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { state, reload } = useAsyncData((signal) => getSubscriber(id, signal), [id]);
+
+  /*
+   * What can be arranged, and what it can be charged in, both read from the
+   * server.
+   *
+   * The plans are the platform's own tier definitions rather than names written
+   * into this file, and the currencies are what this deployment is actually able
+   * to charge: every tier price is written in one currency and says nothing
+   * about what checkout can convert to.
+   */
+  const tiers = useAsyncData((signal) => listAdminTiers(signal), []);
+  const currencies = useAsyncData((signal) => listArrangementCurrencies(signal), []);
+  const knownTiers = tiers.state.status === 'ready' ? tiers.state.data : [];
+  const tierNames = knownTiers.map((tier) => tier.name);
+  // Only a tier carrying a self serve price can be sold through a real checkout.
+  const purchasableTierNames = knownTiers.filter((t) => t.purchasable).map((t) => t.name);
+  const chargeableCurrencies = currencies.state.status === 'ready' ? currencies.state.data : [];
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -253,23 +269,63 @@ export function SubscriberDetail() {
   useEffect(loadArrangements, [id]);
 
   const [recordingOffline, setRecordingOffline] = useState(false);
-  const [offlineTier, setOfflineTier] = useState<TierName>('starter');
+  const [offlineTier, setOfflineTier] = useState('');
   const [offlineAmountMinor, setOfflineAmountMinor] = useState('');
-  const [offlineCurrency, setOfflineCurrency] = useState('USD');
+  const [offlineCurrency, setOfflineCurrency] = useState('');
   const [offlineReference, setOfflineReference] = useState('');
   const [offlinePaidAt, setOfflinePaidAt] = useState('');
-  const [offlineTermMonths, setOfflineTermMonths] = useState(1);
+  const [offlineTermMonths, setOfflineTermMonths] = useState('1');
   const [offlineNotes, setOfflineNotes] = useState('');
+  // Whether the admin has stated the figure themselves. Once they have, a fresh
+  // quote never overwrites what they typed.
+  const [offlineAmountStated, setOfflineAmountStated] = useState(false);
+
+  // An empty choice follows the server's first answer, so the form is usable
+  // before the tier and currency lists arrive and never shows a blank select.
+  const offlineTierValue = offlineTier || tierNames[0] || '';
+  const offlineCurrencyValue = offlineCurrency || chargeableCurrencies[0] || '';
 
   const resetOfflineForm = () => {
-    setOfflineTier('starter');
+    setOfflineTier('');
     setOfflineAmountMinor('');
-    setOfflineCurrency('USD');
+    setOfflineCurrency('');
     setOfflineReference('');
     setOfflinePaidAt('');
-    setOfflineTermMonths(1);
+    setOfflineTermMonths('1');
     setOfflineNotes('');
+    setOfflineAmountStated(false);
   };
+
+  /*
+   * What this plan and term price at, for a payment that already happened.
+   *
+   * The quote prefills the figure so the ordinary case needs no arithmetic. It
+   * does not lock it: an offline payment records what a customer actually paid,
+   * which may be a partial payment, a negotiated figure or a refund adjustment,
+   * and that is a fact rather than a price.
+   */
+  const offlineQuote = useArrangementQuote({
+    operatorId: id,
+    tier: offlineTierValue,
+    termMonths: Number(offlineTermMonths),
+    currency: offlineCurrencyValue,
+    enabled: recordingOffline,
+  });
+  const offlineQuoteState = offlineQuote.state;
+
+  useEffect(() => {
+    if (offlineQuoteState.status === 'ready' && !offlineAmountStated) {
+      setOfflineAmountMinor(String(offlineQuoteState.quote.total_minor));
+    }
+  }, [offlineQuoteState, offlineAmountStated]);
+
+  const offlineDifference =
+    offlineQuoteState.status === 'ready' && offlineAmountMinor.trim() !== ''
+      ? amountDifferenceNote(
+          Math.trunc(Number(offlineAmountMinor)),
+          offlineQuoteState.quote,
+        )
+      : null;
 
   const runRecordOffline = async () => {
     if (!id) {
@@ -279,12 +335,12 @@ export function SubscriberDetail() {
     setActionMessage(null);
     try {
       await recordOfflinePayment(id, {
-        tier: offlineTier,
+        tier: offlineTierValue,
         amountMinor: Math.trunc(Number(offlineAmountMinor)) || 0,
-        currency: offlineCurrency,
+        currency: offlineCurrencyValue,
         reference: offlineReference,
         paidAt: offlinePaidAt ? new Date(offlinePaidAt) : undefined,
-        termMonths: offlineTermMonths,
+        termMonths: Number(offlineTermMonths) || 1,
         notes: offlineNotes,
       });
       setActionMessage('Offline payment recorded. The tier is active and a confirmation was sent.');
@@ -301,23 +357,48 @@ export function SubscriberDetail() {
   };
 
   const [grantingAccess, setGrantingAccess] = useState(false);
-  const [tempTier, setTempTier] = useState<TierName>('starter');
+  const [tempTier, setTempTier] = useState('');
   const [tempDeadline, setTempDeadline] = useState('');
   const [tempAutoExpire, setTempAutoExpire] = useState(false);
-  const [tempTermMonths, setTempTermMonths] = useState(1);
+  const [tempTermMonths, setTempTermMonths] = useState('1');
   const [tempProvider, setTempProvider] = useState<PaymentProvider>('paystack');
-  const [tempCurrency, setTempCurrency] = useState<PayCurrency>('USD');
+  const [tempCurrency, setTempCurrency] = useState('');
   const [tempNotes, setTempNotes] = useState('');
+  /*
+   * Whether this is a gift rather than a grant ahead of payment.
+   *
+   * The two are different decisions and have to stay different records. Access
+   * given on trust still expects a payment and belongs in the chasing lists;
+   * access given away expects nothing and must never appear in them, which it
+   * did for as long as a gift was recorded as an unsettled temporary grant.
+   */
+  const [tempFreeGrant, setTempFreeGrant] = useState(false);
+
+  const tempTierValue = tempTier || tierNames[0] || '';
 
   const resetTempAccessForm = () => {
-    setTempTier('starter');
+    setTempTier('');
     setTempDeadline('');
     setTempAutoExpire(false);
-    setTempTermMonths(1);
+    setTempTermMonths('1');
     setTempProvider('paystack');
-    setTempCurrency('USD');
+    setTempCurrency('');
     setTempNotes('');
+    setTempFreeGrant(false);
   };
+
+  // What this grant will oblige the customer to pay. The backend prices the
+  // payment behind the grant itself; this is the same figure, shown before the
+  // admin commits to it rather than after. A gift is quoted too, and comes back
+  // as nothing, so the screen never has to decide that for itself.
+  const tempQuote = useArrangementQuote({
+    operatorId: id,
+    tier: tempTierValue,
+    termMonths: Number(tempTermMonths),
+    currency: tempCurrency,
+    free: tempFreeGrant,
+    enabled: grantingAccess,
+  });
 
   const runGrantTempAccess = async () => {
     if (!id) {
@@ -327,13 +408,30 @@ export function SubscriberDetail() {
     setActionMessage(null);
     setCheckoutLink(null);
     try {
+      if (tempFreeGrant) {
+        // Its own endpoint, carrying no amount and no currency, because there
+        // is no charge for either to describe.
+        await createFreeGrant(id, {
+          tier: tempTierValue,
+          termMonths: Number(tempTermMonths) || 1,
+          notes: tempNotes,
+        });
+        setActionMessage(
+          'Access given at no charge. Nothing is owed and nothing will be collected.',
+        );
+        setGrantingAccess(false);
+        resetTempAccessForm();
+        loadArrangements();
+        reload();
+        return;
+      }
       const result = await grantTemporaryAccess(id, {
-        tier: tempTier,
+        tier: tempTierValue,
         paymentDeadline: tempDeadline ? new Date(tempDeadline) : undefined,
         autoExpireOnDeadline: tempAutoExpire,
-        termMonths: tempTermMonths,
+        termMonths: Number(tempTermMonths) || 1,
         provider: tempProvider,
-        currency: tempCurrency,
+        currency: tempCurrency || undefined,
         notes: tempNotes,
       });
       setActionMessage(
@@ -357,21 +455,32 @@ export function SubscriberDetail() {
   };
 
   const [creatingCheckout, setCreatingCheckout] = useState(false);
-  const [checkoutTier, setCheckoutTier] = useState<PurchasableTier>('starter');
+  const [checkoutTier, setCheckoutTier] = useState('');
   const [checkoutProvider, setCheckoutProvider] = useState<PaymentProvider>('paystack');
-  const [checkoutCurrency, setCheckoutCurrency] = useState<PayCurrency>('USD');
+  const [checkoutCurrency, setCheckoutCurrency] = useState('');
   const [checkoutDeadline, setCheckoutDeadline] = useState('');
-  const [checkoutTermMonths, setCheckoutTermMonths] = useState(1);
+  const [checkoutTermMonths, setCheckoutTermMonths] = useState('1');
   const [checkoutNotes, setCheckoutNotes] = useState('');
 
+  const checkoutTierValue = checkoutTier || purchasableTierNames[0] || '';
+
   const resetCheckoutForm = () => {
-    setCheckoutTier('starter');
+    setCheckoutTier('');
     setCheckoutProvider('paystack');
-    setCheckoutCurrency('USD');
+    setCheckoutCurrency('');
     setCheckoutDeadline('');
-    setCheckoutTermMonths(1);
+    setCheckoutTermMonths('1');
     setCheckoutNotes('');
   };
+
+  // Exactly what the customer will be asked for when they open the link.
+  const checkoutQuote = useArrangementQuote({
+    operatorId: id,
+    tier: checkoutTierValue,
+    termMonths: Number(checkoutTermMonths),
+    currency: checkoutCurrency,
+    enabled: creatingCheckout,
+  });
 
   const runCreateCheckout = async () => {
     if (!id) {
@@ -382,11 +491,11 @@ export function SubscriberDetail() {
     setCheckoutLink(null);
     try {
       const result = await createPaymentRequiredArrangement(id, {
-        tier: checkoutTier,
+        tier: checkoutTierValue,
         provider: checkoutProvider,
-        currency: checkoutCurrency,
+        currency: checkoutCurrency || undefined,
         paymentDeadline: checkoutDeadline ? new Date(checkoutDeadline) : undefined,
-        termMonths: checkoutTermMonths,
+        termMonths: Number(checkoutTermMonths) || 1,
         notes: checkoutNotes,
       });
       setActionMessage('Checkout started. The tier activates automatically once they pay.');
@@ -591,7 +700,7 @@ export function SubscriberDetail() {
             <strong className="text-ink">{reconciliation.provider_status}</strong>.{' '}
             {reconciliation.match
               ? 'These agree, nothing to recover.'
-              : 'These disagree — Recover below to correct it.'}
+              : 'These disagree. Recover below to correct it.'}
           </Text>
         </Card>
       ) : null}
@@ -775,9 +884,11 @@ export function SubscriberDetail() {
                       </TD>
                       <TD className="capitalize">{arrangement.tier}</TD>
                       <TD className="text-right tabular-nums">
-                        {arrangement.amount_minor
-                          ? formatAmount(arrangement.amount_minor, arrangement.currency)
-                          : ''}
+                        {arrangement.condition === 'free_grant'
+                          ? 'No charge'
+                          : arrangement.amount_minor
+                            ? formatAmount(arrangement.amount_minor, arrangement.currency)
+                            : ''}
                       </TD>
                       <TD>
                         <ArrangementStatusBadge status={arrangement.status} />
@@ -842,7 +953,7 @@ export function SubscriberDetail() {
               The provider is asked to confirm{' '}
               <strong className="text-ink">{recovering?.reference}</strong> fresh, right now. Only
               if it agrees the payment succeeded does this grant the tier, activate the
-              subscription, redeem any promo, and send the receipt — the same path a real webhook
+              subscription, redeem any promo, and send the receipt, the same path a real webhook
               takes. This is written to the audit trail.
             </p>
             <Field
@@ -887,7 +998,7 @@ export function SubscriberDetail() {
             <p>
               The Account moves to Free immediately, the same way a cancel would, but the current
               tier is recorded so resuming restores it exactly. Existing Nodes, Projects, and
-              Services keep running unaffected — this only holds billing and entitlements. This is
+              Services keep running unaffected: this only holds billing and entitlements. This is
               written to the audit trail.
             </p>
             <Field
@@ -943,7 +1054,7 @@ export function SubscriberDetail() {
         description={
           <div className="flex flex-col gap-3">
             <p>
-              For a payment already made outside SlideOps — an offline arrangement, a bank transfer,
+              For a payment already made outside SlideOps: an offline arrangement, a bank transfer,
               cash. Activates the tier immediately under an explicit manual payment source, never a
               fabricated online transaction, and sends a confirmation email. This is written to the
               audit trail.
@@ -952,34 +1063,61 @@ export function SubscriberDetail() {
               <span className="text-sm font-medium text-ink">Tier</span>
               <select
                 className={selectClass}
-                value={offlineTier}
-                onChange={(event) => setOfflineTier(event.target.value as TierName)}
+                value={offlineTierValue}
+                onChange={(event) => setOfflineTier(event.target.value)}
               >
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                {tierNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <Field
-                label="Amount (minor units)"
-                type="number"
-                min={1}
-                value={offlineAmountMinor}
-                onChange={(event) => setOfflineAmountMinor(event.target.value)}
-                hint={
-                  offlineAmountMinor
-                    ? `= ${formatAmount(Math.trunc(Number(offlineAmountMinor)) || 0, offlineCurrency)}`
-                    : 'e.g. 750000 for $7,500.00'
-                }
+              <TermMonthsField
+                label="Term paid for"
+                hint="How many months the payment covers."
+                value={offlineTermMonths}
+                onChange={setOfflineTermMonths}
               />
-              <Field
+              <CurrencySelect
+                id="offline-currency"
                 label="Currency"
-                value={offlineCurrency}
-                onChange={(event) => setOfflineCurrency(event.target.value.toUpperCase())}
-                maxLength={3}
+                value={offlineCurrencyValue}
+                onChange={setOfflineCurrency}
+                options={chargeableCurrencies}
               />
             </div>
+            <QuoteBreakdown
+              state={offlineQuoteState}
+              availableCurrencies={chargeableCurrencies}
+              caption="What this plan and term price at"
+            />
+            {/* The one amount that stays enterable. What a customer actually paid
+                is a fact, not a price: a partial payment, a negotiated figure or
+                a refund adjustment is a real thing to record. The quote fills it
+                in so the ordinary case needs no arithmetic, and a figure that
+                departs from it is said out loud rather than recorded quietly. */}
+            <Field
+              label="Amount actually paid (minor units)"
+              type="number"
+              min={0}
+              value={offlineAmountMinor}
+              onChange={(event) => {
+                setOfflineAmountStated(true);
+                setOfflineAmountMinor(event.target.value);
+              }}
+              hint={
+                offlineAmountMinor
+                  ? `= ${formatAmount(Math.trunc(Number(offlineAmountMinor)) || 0, offlineCurrencyValue)}`
+                  : 'Filled in from the price above. Change it if they paid something else.'
+              }
+            />
+            {offlineDifference ? (
+              <Text variant="body-sm" className="text-warning" role="status">
+                {offlineDifference}
+              </Text>
+            ) : null}
             <Field
               label="Reference"
               hint="The Admin's own paper trail: a bank reference, a receipt number."
@@ -994,20 +1132,6 @@ export function SubscriberDetail() {
               value={offlinePaidAt}
               onChange={(event) => setOfflinePaidAt(event.target.value)}
             />
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Term paid for</span>
-              <select
-                className={selectClass}
-                value={offlineTermMonths}
-                onChange={(event) => setOfflineTermMonths(Number(event.target.value))}
-              >
-                {TERM_MONTH_OPTIONS.map((option) => (
-                  <option key={option.months} value={option.months}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <Field
               label="Notes"
               value={offlineNotes}
@@ -1027,95 +1151,119 @@ export function SubscriberDetail() {
 
       <ConfirmDialog
         open={grantingAccess}
-        title="Grant temporary access?"
+        title={tempFreeGrant ? 'Give access at no charge?' : 'Grant temporary access?'}
         description={
           <div className="flex flex-col gap-3">
             <p>
-              Activates the tier immediately, ahead of payment, expected to complete by the deadline
-              below. Access is never conditioned on payment — but a real payment for what is owed is
-              also started, priced by tier and term, so the customer can complete it themselves from
-              their own Billing page. This is written to the audit trail.
+              {tempFreeGrant
+                ? 'Activates the tier immediately and asks for nothing in return. No payment is started, no deadline applies, and this never appears as something owed. This is written to the audit trail.'
+                : 'Activates the tier immediately, ahead of payment, expected to complete by the deadline below. Access is never conditioned on payment, but a real payment for what is owed is also started, priced by tier and term, so the customer can complete it themselves from their own Billing page. This is written to the audit trail.'}
             </p>
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={tempFreeGrant}
+                onChange={(event) => setTempFreeGrant(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              Give this away at no charge
+            </label>
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-ink">Tier</span>
               <select
                 className={selectClass}
-                value={tempTier}
-                onChange={(event) => setTempTier(event.target.value as TierName)}
+                value={tempTierValue}
+                onChange={(event) => setTempTier(event.target.value)}
               >
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                {tierNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </label>
-            <Field
-              label="Payment deadline"
-              hint="Optional. Leave blank to leave the deadline open ended."
-              type="date"
-              value={tempDeadline}
-              onChange={(event) => setTempDeadline(event.target.value)}
-            />
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={tempAutoExpire}
-                onChange={(event) => setTempAutoExpire(event.target.checked)}
-                className="h-4 w-4 rounded border-border"
-              />
-              Automatically expire access if the deadline passes with no payment
-            </label>
+            {/* A deadline and an expiry both describe a payment that is
+                expected. A gift expects none, so neither is asked for. */}
+            {tempFreeGrant ? null : (
+              <>
+                <Field
+                  label="Payment deadline"
+                  hint="Optional. Leave blank to leave the deadline open ended."
+                  type="date"
+                  value={tempDeadline}
+                  onChange={(event) => setTempDeadline(event.target.value)}
+                />
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={tempAutoExpire}
+                    onChange={(event) => setTempAutoExpire(event.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  Automatically expire access if the deadline passes with no payment
+                </label>
+              </>
+            )}
             <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-ink">Term to grant</span>
-                <select
-                  className={selectClass}
-                  value={tempTermMonths}
-                  onChange={(event) => setTempTermMonths(Number(event.target.value))}
-                >
-                  {TERM_MONTH_OPTIONS.map((option) => (
-                    <option key={option.months} value={option.months}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-ink">Provider</span>
-                <select
-                  className={selectClass}
-                  value={tempProvider}
-                  onChange={(event) => setTempProvider(event.target.value as PaymentProvider)}
-                >
-                  <option value="paystack">Paystack</option>
-                  <option value="flutterwave">Flutterwave</option>
-                </select>
-              </label>
+              <TermMonthsField
+                label="Term to grant"
+                hint="How many months of access this grants."
+                value={tempTermMonths}
+                onChange={setTempTermMonths}
+              />
+              {tempFreeGrant ? null : (
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-ink">Provider</span>
+                  <select
+                    className={selectClass}
+                    value={tempProvider}
+                    onChange={(event) => setTempProvider(event.target.value as PaymentProvider)}
+                  >
+                    <option value="paystack">Paystack</option>
+                    <option value="flutterwave">Flutterwave</option>
+                  </select>
+                </label>
+              )}
             </div>
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Currency</span>
-              <select
-                className={selectClass}
+            {/* Hidden rather than left showing a currency nothing is
+                denominated in: a gift has no charge for one to describe. */}
+            {tempFreeGrant ? null : (
+              <CurrencySelect
+                id="temp-currency"
+                label="Currency"
                 value={tempCurrency}
-                onChange={(event) => setTempCurrency(event.target.value as PayCurrency)}
-              >
-                <option value="USD">USD</option>
-                <option value="NGN">NGN</option>
-              </select>
-            </label>
-            <Text variant="caption" tone="secondary">
-              Used only to price the real payment behind this grant. If no provider is configured on
-              this deployment, access is still granted with nothing to resume.
-            </Text>
+                onChange={setTempCurrency}
+                options={chargeableCurrencies}
+                allowNative
+                hint="Used only to price the real payment behind this grant. If no provider is configured on this deployment, access is still granted with nothing to resume."
+              />
+            )}
+            <QuoteBreakdown
+              state={tempQuote.state}
+              availableCurrencies={chargeableCurrencies}
+              caption={
+                tempFreeGrant
+                  ? 'What this grant asks for'
+                  : 'What this grant will oblige them to pay'
+              }
+            />
             <Field
               label="Notes"
               value={tempNotes}
               onChange={(event) => setTempNotes(event.target.value)}
-              placeholder="Customer is finalizing a wire transfer, access granted in the meantime"
+              placeholder={
+                tempFreeGrant
+                  ? 'Given at no charge for the pilot, agreed with the founder'
+                  : 'Customer is finalizing a wire transfer, access granted in the meantime'
+              }
             />
           </div>
         }
-        confirmLabel="Grant access"
+        confirmLabel={tempFreeGrant ? 'Give access' : 'Grant access'}
         confirmVariant="primary"
+        // Never arranged blind: without a figure there is nothing to tell the
+        // customer they owe, and nothing an admin could defend later.
+        confirmDisabled={tempQuote.state.status === 'error' || tempTierValue === ''}
         onConfirm={runGrantTempAccess}
         onCancel={() => {
           setGrantingAccess(false);
@@ -1140,11 +1288,16 @@ export function SubscriberDetail() {
                 <span className="text-sm font-medium text-ink">Tier</span>
                 <select
                   className={selectClass}
-                  value={checkoutTier}
-                  onChange={(event) => setCheckoutTier(event.target.value as PurchasableTier)}
+                  value={checkoutTierValue}
+                  onChange={(event) => setCheckoutTier(event.target.value)}
                 >
-                  <option value="starter">Starter</option>
-                  <option value="pro">Pro</option>
+                  {/* Only the tiers carrying a self serve price, because this
+                      starts a real checkout the customer has to complete. */}
+                  {purchasableTierNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="flex flex-col gap-2">
@@ -1159,31 +1312,25 @@ export function SubscriberDetail() {
                 </select>
               </label>
             </div>
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Currency</span>
-              <select
-                className={selectClass}
-                value={checkoutCurrency}
-                onChange={(event) => setCheckoutCurrency(event.target.value as PayCurrency)}
-              >
-                <option value="USD">USD</option>
-                <option value="NGN">NGN</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Billing cycle</span>
-              <select
-                className={selectClass}
-                value={checkoutTermMonths}
-                onChange={(event) => setCheckoutTermMonths(Number(event.target.value))}
-              >
-                {TERM_MONTH_OPTIONS.map((option) => (
-                  <option key={option.months} value={option.months}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <CurrencySelect
+              id="checkout-currency"
+              label="Currency"
+              value={checkoutCurrency}
+              onChange={setCheckoutCurrency}
+              options={chargeableCurrencies}
+              allowNative
+            />
+            <TermMonthsField
+              label="Billing period"
+              hint="How many months this checkout charges for."
+              value={checkoutTermMonths}
+              onChange={setCheckoutTermMonths}
+            />
+            <QuoteBreakdown
+              state={checkoutQuote.state}
+              availableCurrencies={chargeableCurrencies}
+              caption="What the customer will be asked for"
+            />
             <Field
               label="Payment deadline"
               hint="Optional. Leave blank to leave the deadline open ended."
@@ -1201,6 +1348,9 @@ export function SubscriberDetail() {
         }
         confirmLabel="Start checkout"
         confirmVariant="primary"
+        // A checkout link that could not be priced here is a link nobody can
+        // explain, so it is not sent until the figure is known.
+        confirmDisabled={checkoutQuote.state.status === 'error' || checkoutTierValue === ''}
         onConfirm={runCreateCheckout}
         onCancel={() => {
           setCreatingCheckout(false);
@@ -1214,9 +1364,9 @@ export function SubscriberDetail() {
         description={
           <div className="flex flex-col gap-3">
             <p>
-              Calls off this arrangement. Only its own record changes — access already granted under
-              it is not automatically revoked, since undoing access is a separate, deliberate
-              decision. This is written to the audit trail.
+              Calls off this arrangement and takes back the access it granted. An arrangement that
+              never granted any, such as a checkout the customer has not completed, simply closes.
+              This is written to the audit trail.
             </p>
             <Field
               label="Reason"

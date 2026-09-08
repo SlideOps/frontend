@@ -17,6 +17,7 @@ import {
   matchesArrangementSearch,
   matchesLifecycleFilter,
   obligationOf,
+  obligationReason,
   obligationText,
   obligationTone,
   paymentReading,
@@ -54,6 +55,7 @@ const CONDITION_OPTIONS: { value: ArrangementCondition | ''; label: string }[] =
   { value: 'offline_settled', label: 'Offline payment' },
   { value: 'temporary_access', label: 'Temporary access' },
   { value: 'payment_required', label: 'Payment required' },
+  { value: 'free_grant', label: 'Free grant' },
 ];
 
 const STATUS_OPTIONS: { value: ArrangementStatus | ''; label: string }[] = [
@@ -96,9 +98,9 @@ function OwedCell({ row }: { row: ArrangementWithOperator }) {
       <Text as="span" variant="body-sm" className={`font-medium ${obligationToneClass[tone]}`}>
         {obligationText(obligation)}
       </Text>
-      {obligation.kind === 'unknown' || obligation.kind === 'none' ? (
+      {obligationReason(obligation) ? (
         <Text variant="caption" tone="secondary" className="block">
-          {obligation.reason}
+          {obligationReason(obligation)}
         </Text>
       ) : null}
     </div>

@@ -3,6 +3,7 @@ import {
   type Arrangement,
   type ArrangementCondition,
   type ArrangementDetail,
+  type ArrangementQuote,
   type ArrangementStatus,
   type ArrangementUpdate,
   type ArrangementWithOperator,
@@ -19,12 +20,14 @@ export const conditionLabel: Record<ArrangementCondition, string> = {
   offline_settled: 'Offline payment',
   temporary_access: 'Temporary access',
   payment_required: 'Payment required',
+  free_grant: 'Free grant',
 };
 
 export const conditionDescription: Record<ArrangementCondition, string> = {
   offline_settled: 'The customer already paid outside SlideOps; recorded for the trail.',
   temporary_access: 'Access granted on trust, ahead of payment, expected by the deadline.',
   payment_required: "A real checkout started on the customer's behalf, awaiting completion.",
+  free_grant: 'Given at no charge, deliberately. Nothing is owed and nothing is collected.',
 };
 
 /** How urgently a deadline reads, and why. */
@@ -235,6 +238,11 @@ export function paymentStandingOf(
   if (stated) {
     return stated;
   }
+  if (facts.condition === 'free_grant') {
+    // A gift is not a payment that has failed to arrive. Reading it as pending
+    // or overdue is what made a deliberate decision sit in every list as a debt.
+    return 'not_expected';
+  }
   if (facts.condition === 'offline_settled') {
     return 'settled';
   }
@@ -318,6 +326,13 @@ export function paymentReading(
   now: Date = new Date(),
 ): ArrangementReading {
   const standing = paymentStandingOf(facts, now);
+  if (facts.condition === 'free_grant' && standing === 'not_expected') {
+    return {
+      label: 'No charge',
+      tone: 'good',
+      detail: 'This access was given deliberately at no charge, so nothing is owed.',
+    };
+  }
   if (facts.payment_state && !paymentStateStandings[facts.payment_state]) {
     return {
       label: humanize(facts.payment_state),
@@ -338,11 +353,18 @@ export function paymentReading(
 export type Obligation =
   | { kind: 'due'; amountMinor: number; currency?: string; deadline?: string }
   | { kind: 'settled'; amountMinor: number; currency?: string }
+  /** Given away on purpose. A decision, and never rendered as a zero owed. */
+  | { kind: 'free'; reason: string }
   | { kind: 'none'; reason: string }
   | { kind: 'unknown'; reason: string };
 
 /** What this arrangement obliges the customer to pay, and by when. */
 export function obligationOf(facts: ArrangementFacts, now: Date = new Date()): Obligation {
+  if (facts.condition === 'free_grant') {
+    // Checked before any amount, so a zero the backend happens to carry can
+    // never be shown as an obligation of nothing rather than as no obligation.
+    return { kind: 'free', reason: 'This access was given at no charge, deliberately.' };
+  }
   if (facts.amount_applicable === false) {
     return { kind: 'none', reason: 'This arrangement carries no payment.' };
   }
@@ -375,6 +397,9 @@ export function obligationText(obligation: Obligation): string {
   if (obligation.kind === 'unknown') {
     return 'Amount not recorded';
   }
+  if (obligation.kind === 'free') {
+    return 'No charge';
+  }
   if (obligation.kind === 'none') {
     return 'Nothing owed';
   }
@@ -387,6 +412,18 @@ export function obligationText(obligation: Obligation): string {
     : `${money} due`;
 }
 
+/**
+ * Why an obligation reads as it does, for the kinds that are an explanation
+ * rather than a figure. A figure speaks for itself; "nothing owed" does not.
+ */
+export function obligationReason(obligation: Obligation): string | null {
+  return obligation.kind === 'unknown' ||
+    obligation.kind === 'none' ||
+    obligation.kind === 'free'
+    ? obligation.reason
+    : null;
+}
+
 /** The tone an obligation should be shown in, matching the other two readings. */
 export function obligationTone(
   obligation: Obligation,
@@ -396,7 +433,9 @@ export function obligationTone(
   if (obligation.kind === 'unknown' || obligation.kind === 'none') {
     return 'neutral';
   }
-  if (obligation.kind === 'settled') {
+  // A gift reads as good rather than neutral: it is a decision that went the
+  // customer's way, not the absence of information.
+  if (obligation.kind === 'free' || obligation.kind === 'settled') {
     return 'good';
   }
   return paymentStandingOf(facts, now) === 'overdue' ? 'bad' : 'warning';
@@ -669,3 +708,163 @@ export async function readIfSupported<T>(load: () => Promise<T>): Promise<T | nu
 /** What a section says when this deployment has not got the endpoint behind it yet. */
 export const notOnThisServerYet =
   'This server build does not have this yet. Everything else on the page is unaffected.';
+
+/*
+ * What an arrangement costs, and how that figure is said.
+ *
+ * The amount is never typed for an obligation. A customer paying for themselves
+ * chooses a plan and a billing period and the price follows from the price
+ * table, the annual discount, the exchange rate and the tax; an admin arranging
+ * the same access on their behalf gets the same figure from the same place. All
+ * of the arithmetic stays on the backend, so what follows only phrases what came
+ * back.
+ */
+
+/**
+ * The billing periods the product already sells, offered wherever a term is
+ * entered so the common ones are one keystroke away. The term itself is a plain
+ * month count, because an arrangement made by hand is not obliged to match a
+ * self serve billing period.
+ */
+export const billingPeriodMonths: number[] = [1, 12, 24, 36];
+
+/** A month count, written out. */
+export function termText(months: number): string {
+  return `${months} ${months === 1 ? 'month' : 'months'}`;
+}
+
+/** One line of a quote's breakdown. */
+export interface QuoteLine {
+  label: string;
+  value: string;
+  /** True for the line that is the figure itself, so it can be shown as such. */
+  total?: boolean;
+}
+
+/**
+ * The lines behind a quoted amount, in the order they add up.
+ *
+ * A total on its own is not enough to act on. An admin who cannot see the
+ * monthly price, the term it was multiplied by, what the annual discount took
+ * off and what tax was added has no way to check the figure or to explain it to
+ * the customer, and this is money.
+ */
+export function quoteLines(quote: ArrangementQuote): QuoteLine[] {
+  if (quote.free_grant) {
+    // A gift is priced at nothing because somebody decided so, which is a
+    // different fact from a tier that carries no price, and reads differently.
+    return [
+      { label: 'Term', value: termText(quote.term_months) },
+      { label: 'Total', value: 'Free', total: true },
+    ];
+  }
+  if (!quote.purchasable) {
+    return [
+      { label: 'Term', value: termText(quote.term_months) },
+      { label: 'Total', value: 'No charge', total: true },
+    ];
+  }
+
+  const lines: QuoteLine[] = [
+    {
+      label: 'Monthly price',
+      value: formatAmount(quote.unit_amount_minor, quote.native_currency),
+    },
+    { label: 'Term', value: termText(quote.term_months) },
+    { label: 'Subtotal', value: formatAmount(quote.subtotal_minor, quote.currency) },
+  ];
+  if (quote.annual_discount_minor > 0) {
+    lines.push({
+      label: 'Annual discount',
+      value: `-${formatAmount(quote.annual_discount_minor, quote.currency)}`,
+    });
+  }
+  lines.push({ label: 'Tax', value: formatAmount(quote.tax_minor, quote.currency) });
+  lines.push({
+    label: 'Total',
+    value: formatAmount(quote.total_minor, quote.currency),
+    total: true,
+  });
+  return lines;
+}
+
+/**
+ * How a converted quote says so.
+ *
+ * The rate is named rather than folded silently into the total, because the
+ * figure has to be explainable on the day it was quoted and a rate moves.
+ */
+export function quoteConversionNote(quote: ArrangementQuote): string | null {
+  if (quote.free_grant || !quote.fx_rate || quote.currency === quote.native_currency) {
+    return null;
+  }
+  return `Converted from ${quote.native_currency} at 1 ${quote.native_currency} = ${quote.fx_rate.toLocaleString()} ${quote.currency}, the rate at the moment this was quoted.`;
+}
+
+/**
+ * Why a gift costs nothing.
+ *
+ * Said in terms of the decision rather than the absence of a price, so it never
+ * reads as the same thing as a tier that has no price to begin with.
+ */
+export function freeGrantReason(quote: ArrangementQuote): string {
+  return `${quote.tier} is being given away at no charge. The tier is deliberately not priced for this, so there is no figure to show and none to collect.`;
+}
+
+/** Why a tier with no self serve price quotes as nothing. */
+export function noChargeReason(quote: ArrangementQuote): string {
+  return `${quote.tier} has no self serve price, so this arrangement carries no charge. That is a real arrangement, not a missing figure.`;
+}
+
+/** The backend's code for a currency this deployment cannot charge in. */
+export const unsupportedCurrencyCode = 'currency_unsupported';
+
+/** Whether a failure is the backend refusing the chosen currency. */
+export function isUnsupportedCurrencyError(error: unknown): boolean {
+  return error instanceof ApiError && error.code === unsupportedCurrencyCode;
+}
+
+/**
+ * What to say when a quote could not be worked out.
+ *
+ * A refused currency is shown as what it is, together with what this deployment
+ * will actually take, so the next choice is an informed one rather than a guess.
+ */
+export function quoteFailureText(error: ApiError, available: string[]): string {
+  if (isUnsupportedCurrencyError(error) && available.length > 0) {
+    return `${error.message} This deployment can charge in ${available.join(', ')}.`;
+  }
+  return error.message;
+}
+
+/**
+ * What to say when the amount could not be worked out at all.
+ *
+ * Falling back to a typed number here is exactly the drift this exists to
+ * remove, so nothing is saved instead.
+ */
+export const quoteUnavailableMessage =
+  'The amount could not be worked out, so this cannot be saved. What the customer is expected to pay comes from the price table, never from a figure typed here.';
+
+/**
+ * How an entered payment differs from what the price table gives, when it does.
+ *
+ * An offline payment records what a customer actually paid, which may be a
+ * partial payment, a negotiated figure, or a refund adjustment, so the amount
+ * stays enterable there. Saying plainly that it differs is what stops a typo
+ * being recorded as a fact.
+ */
+export function amountDifferenceNote(
+  enteredMinor: number,
+  quote: ArrangementQuote,
+): string | null {
+  if (!Number.isFinite(enteredMinor) || enteredMinor === quote.total_minor) {
+    return null;
+  }
+  const quoted = quote.purchasable
+    ? formatAmount(quote.total_minor, quote.currency)
+    : 'no charge';
+  const entered = formatAmount(enteredMinor, quote.currency);
+  const direction = enteredMinor > quote.total_minor ? 'more than' : 'less than';
+  return `${entered} is ${direction} the ${quoted} this plan and term price at. It is recorded exactly as entered.`;
+}
