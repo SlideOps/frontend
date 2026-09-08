@@ -512,6 +512,7 @@ export type {
   VerificationCheck,
   Verification,
   Operation,
+  OperationConnection,
   OperationStatus,
   OperationEvent,
   OperationEventType,
