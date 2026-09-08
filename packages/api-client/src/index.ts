@@ -343,6 +343,7 @@ export {
   getServiceMetrics,
   checkServiceUpdate,
   redeployService,
+  setServiceForceRecreate,
   cancelServiceDeploy,
   planComposeStack,
   deployComposeStack,

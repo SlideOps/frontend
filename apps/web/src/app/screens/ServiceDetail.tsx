@@ -11,6 +11,7 @@ import {
   redeployService,
   removeService,
   restartService,
+  setServiceForceRecreate,
   startService,
   stopService,
   type Capability,
@@ -332,6 +333,95 @@ function CapabilitiesCard({ service, onChanged }: { service: Service; onChanged:
   );
 }
 
+/**
+ * Whether this Service's containers are replaced on the next deploy.
+ *
+ * The failure this exists for: an Operator corrects an environment variable,
+ * redeploys, watches the deploy report success, and gets the identical error
+ * back. `docker compose up` reuses a container it judges unchanged, and a change
+ * to a value it reads from an env file does not reliably change that judgement,
+ * so the stack comes back up on the containers it already had and the old values
+ * go on being the running values.
+ *
+ * Off by default, because replacing a container that did not need replacing
+ * costs downtime and discards its writable layer.
+ *
+ * Shown only where it decides something. A single container Service is already
+ * removed and recreated on every deploy, so a toggle there would be a control
+ * that does nothing; that case gets a plain sentence in the same place instead,
+ * so an Operator who came looking for this finds an answer rather than a gap.
+ */
+function ForceRecreateToggle({
+  service,
+  onChanged,
+}: {
+  service: Service;
+  onChanged: (updated: Service) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (service.runtime === 'container') {
+    return (
+      <div className="mt-2 border-t border-border pt-4">
+        <Text variant="body-sm" tone="secondary">
+          This Service is a single container, and a single container is removed and recreated on
+          every deploy already, so there is nothing here to turn on.
+        </Text>
+      </div>
+    );
+  }
+
+  const change = async (next: boolean) => {
+    setSaving(true);
+    setError(null);
+    try {
+      onChanged(await setServiceForceRecreate(service.id, next));
+    } catch (cause) {
+      // The box stays where the server last confirmed it. Moving it on a refusal
+      // would show a setting that was never stored, which is the exact kind of
+      // quiet disagreement this whole control exists to end.
+      setError(
+        cause instanceof ApiError ? cause.message : 'That setting could not be saved. Try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 border-t border-border pt-4">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          checked={service.force_recreate === true}
+          disabled={saving}
+          onChange={(event) => change(event.target.checked)}
+        />
+        <span className="min-w-0">
+          <span className="text-sm font-medium text-ink">
+            Recreate containers on the next deploy
+          </span>
+          <Text variant="caption" tone="secondary" className="mt-1 block">
+            Nothing happens now. The next deploy replaces this Service&apos;s containers instead of
+            reusing them, so an edited value actually reaches the application.
+          </Text>
+          <Text variant="caption" tone="secondary" className="mt-1 block">
+            Replacing costs a moment of downtime, and anything written inside a container that is
+            not on a volume is lost.
+          </Text>
+        </span>
+      </label>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /*
  * Logs and activity, together, on their own tab.
  *
@@ -427,13 +517,24 @@ export function ServiceDetail() {
     Service,
     'cpu_limit' | 'memory_mb' | 'pids_limit'
   > | null>(null);
+  // What the recreate endpoint last answered with. Held here rather than
+  // refetching so the setting on screen is the one the server returned, and
+  // never a guess about what it accepted. Cleared with the Service being viewed.
+  const [forceRecreate, setForceRecreate] = useState<boolean | null>(null);
 
   useEffect(() => {
     setResized(null);
+    setForceRecreate(null);
   }, [id]);
 
   const baseService = state.status === 'ready' ? state.data.service : null;
-  const service = baseService && resized ? { ...baseService, ...resized } : baseService;
+  const service = baseService
+    ? {
+        ...baseService,
+        ...(resized ?? {}),
+        ...(forceRecreate === null ? {} : { force_recreate: forceRecreate }),
+      }
+    : null;
   const node = state.status === 'ready' ? state.data.node : null;
   const status = service?.status;
   // A Capability Service has no application build/CI-CD path and no single
@@ -728,6 +829,22 @@ export function ServiceDetail() {
                             <RefreshCw width={15} height={15} aria-hidden />
                             Restart
                           </Button>
+                        ) : null}
+
+                        {/* Gated like Redeploy, since it is a choice about the next
+                      deploy: an adopted workload was never built here and is
+                      never redeployed, and a Capability Service has no
+                      containers of its own to replace. A systemd unit is not a
+                      container at all, so the words would describe nothing.
+                      Unlike Redeploy it stays available during a deploy,
+                      because it changes nothing on the server by itself. */}
+                        {!isAdopted && !isCapabilityService && service.runtime !== 'systemd' ? (
+                          <ForceRecreateToggle
+                            service={service}
+                            onChanged={(updated) =>
+                              setForceRecreate(updated.force_recreate === true)
+                            }
+                          />
                         ) : null}
 
                         <div className="mt-2 border-t border-border pt-4">

@@ -8,6 +8,7 @@ import {
   purgeService,
   redeployService,
   removeService,
+  setServiceForceRecreate,
   startService,
   updateServiceEnvVar,
   updateServiceResources,
@@ -243,6 +244,50 @@ describe('services requests', () => {
     );
 
     await expect(redeployService('sv_1')).rejects.toMatchObject({ name: 'ApiError', status: 409 });
+  });
+
+  it('records that the next deploy should recreate containers and returns the stored answer', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        service: { id: 'sv_1', name: 'web', status: 'running', force_recreate: true },
+      }),
+    );
+
+    const service = await setServiceForceRecreate('sv_1', true);
+
+    expect(service.force_recreate).toBe(true);
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.method).toBe('PATCH');
+    expect(init?.credentials).toBe('include');
+    expect(JSON.parse(String(init?.body))).toEqual({ enabled: true });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/services/sv_1/force-recreate');
+  });
+
+  it('sends enabled false when the next deploy should go back to reusing containers', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        service: { id: 'sv_1', name: 'web', status: 'running', force_recreate: false },
+      }),
+    );
+
+    const service = await setServiceForceRecreate('sv_1', false);
+
+    expect(service.force_recreate).toBe(false);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ enabled: false });
+  });
+
+  it('surfaces a typed error when the recreate choice is set on a removed Service', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(409, {
+        error: { code: 'service_removed', message: 'This Service was already removed.' },
+      }),
+    );
+
+    await expect(setServiceForceRecreate('sv_1', true)).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 409,
+      code: 'service_removed',
+    });
   });
 
   it('patches resources over the same origin with cookies and unwraps the updated Service', async () => {
