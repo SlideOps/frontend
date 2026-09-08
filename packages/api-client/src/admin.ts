@@ -1369,6 +1369,33 @@ export interface ArrangementEmailType {
   type: string;
   label?: string;
   description?: string;
+  /**
+   * Whether sending this right now would be true of the arrangement.
+   *
+   * An inapplicable one is still listed, with the reason, rather than hidden.
+   * An Admin looking for a particular message should find it and be told why it
+   * is not available yet, not be shown a shorter list and left to guess.
+   */
+  applicable?: boolean;
+  reason?: string;
+}
+
+/**
+ * The messages that can be sent about one arrangement, and whether each is true
+ * of it right now.
+ *
+ * Read from its own endpoint. The detail response never carried these, so the
+ * screen had nothing to offer, no type was ever selected, and the control that
+ * sends returned immediately: pressing it did nothing at all.
+ */
+export function listArrangementEmailTypes(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementEmailType[]> {
+  return apiRequest<{ types?: ArrangementEmailType[] }>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails/types`,
+    { signal },
+  ).then((r) => r.types ?? []);
 }
 
 /** A rendered message, produced without sending anything. */

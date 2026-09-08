@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   getArrangement: vi.fn(),
   listArrangementTimeline: vi.fn(),
   listArrangementEmails: vi.fn(),
+  listArrangementEmailTypes: vi.fn(),
   listAdminTiers: vi.fn(),
   listArrangementCurrencies: vi.fn(),
   quoteArrangement: vi.fn(),
@@ -100,6 +101,15 @@ beforeEach(() => {
       action: 'arrangement.created',
       actor_email: 'admin@example.test',
       created_at: '2026-07-01T00:00:00Z',
+    },
+  ]);
+  api.listArrangementEmailTypes.mockReset().mockResolvedValue([
+    { type: 'payment_reminder', label: 'Payment reminder', applicable: true },
+    {
+      type: 'access_revoked',
+      label: 'Access revoked',
+      applicable: false,
+      reason: 'this arrangement has not ended, so telling the customer their access is gone would not be true',
     },
   ]);
   api.listArrangementEmails.mockReset().mockResolvedValue([
@@ -749,3 +759,47 @@ describe('everything on the record being correctable, not just the money', () =>
     }
   });
 });
+
+/*
+ * The message types were never published, so the screen had nothing to offer,
+ * no type was ever selected, and the control that sends returned immediately.
+ * Pressing it did nothing whatsoever.
+ */
+describe('choosing a message to send', () => {
+  it('offers the messages the server published for this arrangement', async () => {
+    renderScreen();
+
+    const chooser = (await screen.findByLabelText('Message type')) as HTMLSelectElement;
+    const offered = Array.from(chooser.options).map((option) => option.value);
+    expect(offered).toContain('payment_reminder');
+    expect(api.listArrangementEmailTypes).toHaveBeenCalled();
+  });
+
+  it('opens on one that can actually be sent, not one the server would refuse', async () => {
+    renderScreen();
+
+    const chooser = (await screen.findByLabelText('Message type')) as HTMLSelectElement;
+    expect(chooser.value).toBe('payment_reminder');
+  });
+
+  it('renders the message and then sends it when the send control is chosen', async () => {
+    renderScreen();
+    await screen.findByLabelText('Message type');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(api.previewArrangementEmail).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(await screen.findByRole('button', { name: /send this message/i }));
+    await waitFor(() => expect(api.sendArrangementEmail).toHaveBeenCalledTimes(1));
+  });
+
+  it('says why a message that would not be true cannot be sent, instead of refusing in silence', async () => {
+    renderScreen();
+    const chooser = (await screen.findByLabelText('Message type')) as HTMLSelectElement;
+
+    await userEvent.selectOptions(chooser, 'access_revoked');
+
+    expect(await screen.findByText(/has not ended/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
+  });
+})

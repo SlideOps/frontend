@@ -202,6 +202,7 @@ export {
   restoreArrangementAccess,
   listArrangementTimeline,
   listArrangementEmails,
+  listArrangementEmailTypes,
   previewArrangementEmail,
   sendArrangementEmail,
   type Overview,
