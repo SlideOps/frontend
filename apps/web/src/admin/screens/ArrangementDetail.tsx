@@ -6,6 +6,7 @@ import {
   listArrangementCurrencies,
   listArrangementEmails,
   listArrangementTimeline,
+  listArrangementEmailTypes,
   previewArrangementEmail,
   restoreArrangementAccess,
   revokeArrangementAccess,
@@ -466,7 +467,20 @@ export function ArrangementDetail() {
     }
   };
 
-  const emailTypes = useMemo(() => detail?.email_types ?? [], [detail]);
+  // Read from its own endpoint. The detail response never carried these, so the
+  // list was empty, no type was ever selected, and the control that sends
+  // returned immediately: pressing it did nothing at all.
+  const emailTypeList = useAsyncData(
+    (signal) => listArrangementEmailTypes(id, signal),
+    [id],
+  );
+  const emailTypes = useMemo(
+    () =>
+      emailTypeList.state.status === 'ready'
+        ? emailTypeList.state.data
+        : (detail?.email_types ?? []),
+    [emailTypeList.state, detail],
+  );
   const [emailType, setEmailType] = useState('');
   const [preview, setPreview] = useState<ArrangementEmailPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -474,7 +488,9 @@ export function ArrangementDetail() {
 
   useEffect(() => {
     // Follow the server's own list of message types; never invent one.
-    setEmailType(emailTypes[0]?.type ?? '');
+    // The first one that can actually be sent, so an Admin does not open on a
+    // message the server would refuse.
+    setEmailType((emailTypes.find((type) => type.applicable !== false) ?? emailTypes[0])?.type ?? '');
     setPreview(null);
   }, [emailTypes]);
 
@@ -514,6 +530,15 @@ export function ArrangementDetail() {
       setSending(false);
     }
   };
+
+  // Why the chosen message cannot be sent, when it cannot. Shown rather than
+  // left for the server to refuse after the Admin has pressed send.
+  const chosenEmailType = emailTypes.find((type) => type.type === emailType);
+  const emailBlockedReason =
+    chosenEmailType && chosenEmailType.applicable === false
+      ? (chosenEmailType.reason ??
+        'This message would not be true of the arrangement as it stands, so it cannot be sent yet.')
+      : null;
 
   const facts = detail ? factsOfDetail(detail) : null;
   const access = facts ? accessReading(facts) : null;
@@ -1044,7 +1069,11 @@ export function ArrangementDetail() {
                     >
                       {emailTypes.map((type) => (
                         <option key={type.type} value={type.type}>
-                          {type.label || type.type}
+                          {/* Listed even when it cannot be sent yet, with the
+                              reason shown below, so a message an Admin is
+                              looking for is findable rather than absent. */}
+                          {(type.label || type.type) +
+                            (type.applicable === false ? ' (not available yet)' : '')}
                         </option>
                       ))}
                     </select>
@@ -1053,7 +1082,7 @@ export function ArrangementDetail() {
                     variant="secondary"
                     size="sm"
                     onClick={runPreview}
-                    disabled={previewing || !emailType}
+                    disabled={previewing || !emailType || emailBlockedReason !== null}
                   >
                     <Eye width={14} height={14} aria-hidden />
                     {previewing ? 'Rendering' : 'Preview'}
@@ -1067,16 +1096,20 @@ export function ArrangementDetail() {
                       variant="ghost"
                       size="sm"
                       onClick={runSend}
-                      disabled={sending || !emailType}
+                      disabled={sending || !emailType || emailBlockedReason !== null}
                     >
                       <Mail width={14} height={14} aria-hidden />
                       {sending ? 'Sending' : 'Send without previewing'}
                     </Button>
                   ) : null}
                 </div>
-                {emailTypes.find((type) => type.type === emailType)?.description ? (
+                {emailBlockedReason ? (
+                  <Text variant="body-sm" tone="secondary" className="mt-2 block">
+                    {emailBlockedReason}
+                  </Text>
+                ) : chosenEmailType?.description ? (
                   <Text variant="caption" tone="secondary" className="mt-2 block">
-                    {emailTypes.find((type) => type.type === emailType)?.description}
+                    {chosenEmailType.description}
                   </Text>
                 ) : null}
 
