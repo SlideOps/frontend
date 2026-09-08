@@ -573,3 +573,41 @@ describe('an arrangement that was given away', () => {
     expect(screen.queryByText(/Overdue/)).toBeNull();
   });
 });
+
+/*
+ * The reported bug: an edit was made, Save was pressed twice, and nothing
+ * happened at all. No save, no error, no message.
+ *
+ * The currency select moved a value the form was not comparing, so changing
+ * only the currency registered as no change, Save stayed disabled, and a
+ * disabled button says nothing about why it will not do anything.
+ */
+describe('an edit that appeared to do nothing', () => {
+  it('counts a change of currency as a change, and saves it', async () => {
+    renderScreen();
+    await openEditor();
+
+    const currency = (await screen.findByLabelText('Currency')) as HTMLSelectElement;
+    const other = Array.from(currency.options)
+      .map((option) => option.value)
+      .find((value) => value && value !== currency.value);
+    expect(other).toBeTruthy();
+
+    await userEvent.selectOptions(currency, other as string);
+
+    const save = screen.getByRole('button', { name: /save changes/i });
+    expect(save).toBeEnabled();
+
+    await userEvent.click(save);
+    await waitFor(() => expect(api.updateArrangement).toHaveBeenCalledTimes(1));
+  });
+
+  it('says why it will not save, rather than refusing in silence', async () => {
+    renderScreen();
+    await openEditor();
+
+    // Nothing has been touched yet, so Save cannot do anything. It must say so.
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
+    expect(await screen.findByText(/nothing has been changed yet/i)).toBeInTheDocument();
+  });
+})
