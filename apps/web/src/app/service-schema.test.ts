@@ -181,6 +181,30 @@ describe('parseEnv', () => {
 });
 
 describe('toDeployInput', () => {
+  /**
+   * The Preflight button calls this with react-hook-form's getValues(),
+   * which reads the raw, unvalidated form state straight from the HTML
+   * inputs - never coerced by the Zod resolver the way handleSubmit's
+   * values are. A production incident: the backend's memory_mb/cpu_limit
+   * are a strict int/float, and a string there failed the request outright
+   * with a decode error rather than a validation message.
+   */
+  it('coerces numeric fields to real numbers even when given raw strings', () => {
+    const input = toDeployInput(
+      values({
+        cpu_limit: '0.5' as unknown as number,
+        memory_mb: '512' as unknown as number,
+        pids_limit: '100' as unknown as number,
+      }),
+    );
+    expect(input.cpu_limit).toBe(0.5);
+    expect(typeof input.cpu_limit).toBe('number');
+    expect(input.memory_mb).toBe(512);
+    expect(typeof input.memory_mb).toBe('number');
+    expect(input.pids_limit).toBe(100);
+    expect(typeof input.pids_limit).toBe('number');
+  });
+
   it('builds an image deploy input, dropping empty optionals', () => {
     const input = toDeployInput(values({ image: 'redis:7', ports: '6379:6379' }));
     expect(input.source).toEqual({ type: 'image', image: 'redis:7', command: undefined });

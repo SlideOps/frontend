@@ -1,0 +1,104 @@
+import { inspectNodeRoutes, type RouteDrift } from '@slideops/api-client';
+import { Section, Text } from '@slideops/design-system';
+import { AlertTriangle, Check, Network } from '@slideops/icons';
+import { ManageDomainsLink } from './DomainStatus';
+import { ErrorNote, Loading } from './Feedback';
+import { useAsyncData } from '../hooks/useAsyncData';
+
+/*
+ * What this server is routing, against what SlideOps intends. Read only.
+ *
+ * The repair used to be here too, next to the same repair on the Node's own
+ * page and the same again inside a Service's domain tab. The state is still
+ * worth having on a server's page, because "what does this box answer for" is a
+ * question about the server. Putting it back is not: that is one of four things
+ * that can be wrong with a hostname, and doing it from here means doing it
+ * without seeing the other three.
+ *
+ * The two lists mean opposite things and the screen still has to say so. A site
+ * the Operator put there themselves is theirs; SlideOps reports it and leaves
+ * it, and the summary deliberately ignores it.
+ */
+
+export function NodeRoutes({ nodeId }: { nodeId: string }) {
+  const drift = useAsyncData<RouteDrift>(() => inspectNodeRoutes(nodeId), [nodeId]);
+  const data = drift.state.status === 'ready' ? drift.state.data : undefined;
+
+  return (
+    <Section
+      title="Domain routing"
+      adornment={<Network width={16} height={16} className="text-brand" aria-hidden />}
+      description="What this server is actually serving, checked against the domains SlideOps put on it."
+      collapsible
+      summary={data?.summary}
+      action={
+        <ManageDomainsLink
+          label="Manage domains and DNS"
+          to={`/app/domains?node=${encodeURIComponent(nodeId)}`}
+        />
+      }
+    >
+      {drift.state.status === 'loading' ? <Loading /> : null}
+      {/* A server that cannot be read is not a server with no routes, and the
+          error says which it was rather than showing an empty, healthy-looking
+          panel. */}
+      {drift.state.status === 'error' ? <ErrorNote error={drift.state.error} /> : null}
+
+      {data ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {data.healthy ? (
+              <Check width={16} height={16} className="shrink-0 text-success" aria-hidden />
+            ) : (
+              <AlertTriangle width={16} height={16} className="shrink-0 text-warning" aria-hidden />
+            )}
+            <Text variant="body-sm" tone="secondary" className="min-w-0 flex-1">
+              {data.summary}
+            </Text>
+          </div>
+
+          {data.missing.length > 0 ? (
+            <div className="rounded-md border border-warning bg-subtle px-4 py-3">
+              <Text variant="body-sm" className="font-medium">
+                Missing a route on this server
+              </Text>
+              <Text variant="caption" tone="secondary" className="mt-1 block">
+                SlideOps put these here and they are gone. Something removed them: a rebuilt server,
+                a restored snapshot, or an edit by hand. They can be put back from Domains and DNS,
+                where you can see the rest of the chain at the same time.
+              </Text>
+              <ul className="mt-2 flex flex-col gap-1">
+                {data.missing.map((hostname: string) => (
+                  <li key={hostname} className="font-mono text-sm text-ink">
+                    {hostname}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {data.unmanaged.length > 0 ? (
+            <div className="rounded-md border border-border px-4 py-3">
+              <Text variant="body-sm" className="font-medium">
+                Also served here
+              </Text>
+              {/* Said plainly, because the obvious reading of "SlideOps did not
+                  set this up" is that it is a problem to clear away. */}
+              <Text variant="caption" tone="secondary" className="mt-1 block">
+                Sites on this server that SlideOps did not set up. This is not a problem and nothing
+                will touch them: they are left exactly as they are.
+              </Text>
+              <ul className="mt-2 flex flex-col gap-1">
+                {data.unmanaged.map((hostname: string) => (
+                  <li key={hostname} className="font-mono text-sm text-ink-muted">
+                    {hostname}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </Section>
+  );
+}

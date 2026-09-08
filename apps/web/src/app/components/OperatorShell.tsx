@@ -8,12 +8,14 @@ import {
   FileText,
   Fingerprint,
   FolderKanban,
+  Globe,
   KeyRound,
   LayoutDashboard,
   Layers,
   ListChecks,
   Package,
   Search,
+  Network,
   Server,
   Shield,
   ShieldCheck,
@@ -35,6 +37,8 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 export type ActiveKey =
   | 'home'
   | 'workspaces'
+  | 'networking'
+  | 'domains'
   | 'nodes'
   | 'projects'
   | 'services'
@@ -145,6 +149,25 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       icon: Users,
       active: active === 'team',
       onSelect: () => navigate('/app/team'),
+    },
+    {
+      key: 'networking',
+      group: 'Your infrastructure',
+      label: 'Network',
+      icon: Network,
+      active: active === 'networking',
+      onSelect: () => navigate('/app/networking'),
+    },
+    {
+      // Domains sit with the infrastructure rather than under a Service,
+      // because the question they answer is never about one Service: it is
+      // which of this Workspace's hostnames is not serving, and why.
+      key: 'domains',
+      group: 'Your infrastructure',
+      label: 'Domains and DNS',
+      icon: Globe,
+      active: active === 'domains',
+      onSelect: () => navigate('/app/domains'),
     },
     {
       key: 'nodes',

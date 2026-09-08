@@ -55,6 +55,7 @@ import { StorageExplorer, isStorageCapability } from '../components/StorageExplo
 import { SearchIndexManager, isSearchIndexCapability } from '../components/SearchIndexManager';
 import { RuntimeManager, isRuntimeCapability } from '../components/RuntimeManager';
 import { NetworkingManager, isNetworkingCapability } from '../components/NetworkingManager';
+import { NetworkingSection } from '../components/NetworkingSection';
 import { SecurityPosturePanel } from '../components/SecurityPosturePanel';
 import { NodeHealth } from '../components/NodeHealth';
 import { OperatorShell } from '../components/OperatorShell';
@@ -686,6 +687,17 @@ export function CapabilityDetail() {
                         nodeId={preselectedNode}
                         serviceId={preselectedService}
                       />
+                    </Section>
+                  ) : null}
+
+                  {/* A database installed on one Node and an application on
+                    another can both report healthy while the connection
+                    between them simply does not work. This is where an
+                    Operator sees what currently protects this database and
+                    opens access for another Node. */}
+                  {done && preselectedNode && isExplorableDatabase(key) ? (
+                    <Section title="Networking">
+                      <NetworkingSection capabilityKey={key} nodeId={preselectedNode} />
                     </Section>
                   ) : null}
 

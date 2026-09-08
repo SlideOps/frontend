@@ -112,3 +112,31 @@ describe('cleanParameterValues', () => {
     expect(cleaned).toEqual({ username: 'deploy', sudo: false });
   });
 });
+
+describe('a node_address parameter', () => {
+  const source = param({ key: 'source', label: 'Allow from', type: 'node_address', required: true });
+
+  const parse = (value: string) => buildParameterSchema([source]).safeParse({ source: value });
+
+  it('accepts an address picked from the list', () => {
+    expect(parse('187.7.20.156').success).toBe(true);
+  });
+
+  it('accepts an address typed for a server outside the workspace', () => {
+    expect(parse('203.0.113.4').success).toBe(true);
+    // A network rather than one machine is a legitimate answer here.
+    expect(parse('172.17.0.0/16').success).toBe(true);
+    // IPv6 is not pattern-matched away; the backend parses it properly.
+    expect(parse('2a02:4780:f:ec1f::1').success).toBe(true);
+  });
+
+  it('never lets the picker marker through as an address', () => {
+    // It means "not one of my servers", an interaction rather than a value.
+    // Submitting it would open a firewall rule to a network that cannot exist.
+    expect(parse('__manual__').success).toBe(false);
+  });
+
+  it('is still required when it is required', () => {
+    expect(parse('').success).toBe(false);
+  });
+});

@@ -516,13 +516,17 @@ export interface DeployHookToken {
  * call authenticates from; it is never shown again after this call returns.
  */
 export function rotateDeployHookToken(id: string): Promise<DeployHookToken> {
-  return apiRequest<DeployHookToken>(`/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`, {
-    method: 'POST',
-  });
+  return apiRequest<DeployHookToken>(
+    `/services/${encodeURIComponent(id)}/cicd/deploy-hook/rotate`,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 /** What caused a deploy attempt to run, for the CI/CD activity trail. */
-export type DeployEventTrigger = 'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
+export type DeployEventTrigger =
+  'push_webhook' | 'poll' | 'deploy_hook' | 'artifact_upload' | 'manual';
 
 /** What happened once that trigger fired. */
 export type DeployEventOutcome = 'redeploy_started' | 'skipped' | 'error';
@@ -581,24 +585,118 @@ export function updateServiceResources(id: string, resources: ServiceResources):
 }
 
 /**
- * Edit a deployed Service's command and environment variables.
+ * An edit to where a Service is pulled or built from. Send the whole source, not
+ * a patch: switching `type` is how a Service moves between an image and a
+ * repository, and the fields belonging to the type being left behind are cleared
+ * by the backend so a Service never describes two origins at once.
+ *
+ * `adopted` and `capability` are not editable source types. Neither was built by
+ * SlideOps, so neither can be rebuilt from a different source.
+ */
+export interface ServiceSourceEdit {
+  type: 'image' | 'repository';
+  image?: string;
+  repository_url?: string;
+  branch?: string;
+  build?: string;
+}
+
+/**
+ * Edit a deployed Service's source, published ports, command and environment
+ * variables.
  *
  * `env` **replaces** rather than merges, so send the complete set you want:
  * leaving one out is how it is removed, and a previously sealed secret you do not
- * resend is dropped for the same reason.
+ * resend is dropped for the same reason. `ports` replaces in the same way, so
+ * sending `[]` publishes nothing.
  *
- * The change is saved but **not yet live**: a container bakes its command and
- * environment in when it is created, so `redeployService` is what applies it. The
- * returned Service carries `config_changed_at` so a screen can say so.
+ * `source` and `ports` are **optional, and omitting them leaves them unchanged**.
+ * That is deliberately different from sending an empty value: a caller editing
+ * only an env var must not have to resend the source to avoid clearing it.
+ *
+ * The change is saved but **not yet live**: a container bakes all of this in when
+ * it is created, so `redeployService` is what applies it. The returned Service
+ * carries `config_changed_at` so a screen can say so.
+ *
+ * An adopted Service refuses a source or port edit with `adopted_not_buildable`:
+ * SlideOps never built it, so it cannot rebuild it either.
  */
 export function updateServiceConfiguration(
   id: string,
-  configuration: { command: string; env: ServiceEnvVar[] },
+  configuration: {
+    command: string;
+    env: ServiceEnvVar[];
+    source?: ServiceSourceEdit;
+    ports?: ServicePort[];
+  },
 ): Promise<Service> {
   return apiRequest<unknown>(`/services/${encodeURIComponent(id)}/configuration`, {
     method: 'PATCH',
     body: configuration,
   }).then((r) => unwrap<Service>(r, 'service'));
+}
+
+/**
+ * An edit to one environment variable. The variable being edited is named in the
+ * request path under the name it carries *now*, so that path is the identity of
+ * the edit and this body carries only what changes about it.
+ */
+export interface ServiceEnvVarEdit {
+  /**
+   * The name to give the variable. Omitted, or equal to the name in the path,
+   * leaves the name alone.
+   */
+  name?: string;
+  /** The new value. Ignored when `keep_value` is set. */
+  value: string;
+  /** Seal the value in the secret store. Ignored when `keep_value` is set. */
+  secret: boolean;
+  /**
+   * Rename without touching the stored value.
+   *
+   * This is the only way to rename a sealed variable. Its plaintext is not
+   * readable, so there is nothing to resend, and echoing the redaction marker
+   * back would store those words as the variable's value.
+   */
+  keep_value?: boolean;
+  /**
+   * The `config_changed_at` read when the editor was opened, echoed back verbatim.
+   * The save is refused when the configuration moved since then.
+   *
+   * Worth sending on every edit, because a save writes the whole environment: a
+   * stale one does not merely lose the field in hand, it reinstates every other
+   * variable as the stale copy remembered them.
+   */
+  if_unchanged_since?: string;
+}
+
+/**
+ * Edit one environment variable on a deployed Service -- its value, its name, or
+ * both -- leaving every other variable exactly as it is.
+ *
+ * This exists because {@link updateServiceConfiguration} replaces the whole set.
+ * Correcting a single mistyped variable through that route means the caller
+ * reassembles every other one first, and a value it cannot read back (a sealed
+ * secret) is one it cannot resend, so the safe edit was the expensive one. Here
+ * the wire carries only the variable being changed, so nothing else can be lost
+ * by omission.
+ *
+ * `key` is the variable's name as it stands right now; `edit.name` is what to
+ * rename it to.
+ *
+ * The change is saved but **not yet live**: a container bakes its environment in
+ * when it is created, so `redeployService` is what applies it. The returned
+ * Service carries `config_changed_at` so a screen can say so.
+ */
+export function updateServiceEnvVar(
+  serviceId: string,
+  key: string,
+  edit: ServiceEnvVarEdit,
+): Promise<Service> {
+  return apiRequest<unknown>(
+    `/services/${encodeURIComponent(serviceId)}/environment/${encodeURIComponent(key)}`,
+    { method: 'PATCH', body: edit },
+  ).then((r) => unwrap<Service>(r, 'service'));
 }
 
 /**
@@ -779,7 +877,10 @@ export interface ConnectCapabilityInput {
  * applies immediately. One call, not a config edit followed by a separate
  * redeploy.
  */
-export function connectCapability(serviceId: string, input: ConnectCapabilityInput): Promise<Service> {
+export function connectCapability(
+  serviceId: string,
+  input: ConnectCapabilityInput,
+): Promise<Service> {
   return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connect`, {
     method: 'POST',
     body: input,
@@ -798,10 +899,13 @@ export interface ServiceConnection {
 }
 
 /** What a Service is connected to. */
-export function getServiceConnections(serviceId: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
-  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, { signal }).then((r) =>
-    unwrap<ServiceConnection[]>(r, 'connections'),
-  );
+export function getServiceConnections(
+  serviceId: string,
+  signal?: AbortSignal,
+): Promise<ServiceConnection[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/connections`, {
+    signal,
+  }).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
 }
 
 /**
@@ -820,14 +924,82 @@ export function getCapabilityConnections(
   ).then((r) => unwrap<ServiceConnection[]>(r, 'connections'));
 }
 
+/**
+ * One rule protecting a database: what is currently allowed to reach it, and
+ * whether SlideOps configured it. Read from SlideOps' own record rather than
+ * derived live over SSH, so it still answers when the Node is briefly
+ * unreachable.
+ */
+export interface DatabaseAccessRule {
+  id: string;
+  source_kind: 'node' | 'cidr';
+  source_node_id?: string;
+  source_cidr: string;
+  topology: 'same_node' | 'cross_node';
+  firewall_backend: string;
+  to_port: number;
+  protocol: string;
+  db_side_change: string;
+  state: 'planned' | 'applied' | 'detected' | 'removed' | 'failed';
+  created_at: string;
+}
+
+/** What currently protects a database Capability on this Node. */
+export function getDatabaseAccessRules(
+  nodeId: string,
+  capabilityKey: string,
+  signal?: AbortSignal,
+): Promise<DatabaseAccessRule[]> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/access-rules`,
+    { signal },
+  ).then((r) => unwrap<DatabaseAccessRule[]>(r, 'rules'));
+}
+
 /** How a single Preflight check came out. */
 export type PreflightStatus = 'pass' | 'warn' | 'fail';
 
-/** One thing Preflight looked at. */
+/**
+ * What kind of fix a Remedy is.
+ *
+ * `run_capability` runs a Capability on a Node through the ordinary Operation
+ * lifecycle -- planned, approved, executed, verified, recorded in History.
+ * `rewrite_env` corrects one of the Service's own environment variables, which
+ * needs no Node access at all.
+ */
+export type RemedyAction = 'run_capability' | 'rewrite_env';
+
+/**
+ * The fix for a failing check.
+ *
+ * A check that explains an outage and then leaves the Operator to fix it in a
+ * terminal has moved the work, not done it. This is what turns a red row into
+ * a button: it is sent back to applyRemedy exactly as it arrived, so nothing
+ * here has to understand what a Capability is.
+ */
+export interface Remedy {
+  action: RemedyAction;
+  /** What applying this will do, in one line. Use it as the button label. */
+  title: string;
+  /** Why this is the right fix for what was observed. */
+  detail: string;
+  /** Set for run_capability: the Capability, the Node it runs on, its inputs. */
+  capability_key?: string;
+  node_id?: string;
+  node_name?: string;
+  parameters?: Record<string, string>;
+  /** Set for rewrite_env: the variable to correct and its correct value. */
+  env_key?: string;
+  env_value?: string;
+}
+
+/** One thing Preflight or Diagnose looked at, and how to fix it. */
 export interface PreflightCheck {
   name: string;
   status: PreflightStatus;
   message: string;
+  /** Absent when the check passed, or when no fix SlideOps can run would help. */
+  remedy?: Remedy;
 }
 
 /**
@@ -841,4 +1013,49 @@ export function preflightDeploy(input: DeployServiceInput): Promise<PreflightChe
   return apiRequest<unknown>('/services/preflight', { method: 'POST', body: input }).then((r) =>
     unwrap<PreflightCheck[]>(r, 'checks'),
   );
+}
+
+/**
+ * Find out why a Service that already deployed is not working.
+ *
+ * Preflight answers "would this deploy". This answers "why has this stopped",
+ * which is a different question with different causes: a container that is
+ * crash-looping (reported with its own last output), a dependency that is no
+ * longer reachable from its Node, or a hostname with nothing listening to
+ * answer it. Read only -- it never changes the Node.
+ */
+export function diagnoseService(serviceId: string, signal?: AbortSignal): Promise<PreflightCheck[]> {
+  return apiRequest<unknown>(`/services/${encodeURIComponent(serviceId)}/diagnose`, {
+    method: 'POST',
+    signal,
+  }).then((r) => unwrap<PreflightCheck[]>(r, 'checks'));
+}
+
+/**
+ * Apply the fix a check offered, and return the Operation to follow.
+ *
+ * A fix that runs a Capability returns its `operation_id`; one that only
+ * corrects the Service's own configuration needs no Operation and returns an
+ * empty string. Send the Remedy back exactly as the check handed it out.
+ */
+export function applyRemedy(serviceId: string, remedy: Remedy): Promise<string> {
+  return apiRequest<{ operation_id?: string }>(
+    `/services/${encodeURIComponent(serviceId)}/remedy`,
+    { method: 'POST', body: { remedy } },
+  ).then((r) => r.operation_id ?? '');
+}
+
+/**
+ * Apply a fix a Preflight offered, before the Service exists.
+ *
+ * A firewall dropping the traffic is worth fixing when the check finds it, not
+ * after a deploy proves it again. Only Capability fixes can be applied this
+ * way: one that rewrites a Service's own configuration has no Service to
+ * rewrite yet, and is refused.
+ */
+export function applyPreflightRemedy(remedy: Remedy, projectId: string): Promise<string> {
+  return apiRequest<{ operation_id?: string }>('/services/remedy', {
+    method: 'POST',
+    body: { remedy, project_id: projectId },
+  }).then((r) => r.operation_id ?? '');
 }

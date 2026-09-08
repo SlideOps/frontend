@@ -182,3 +182,31 @@ describe('CredentialsCard', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('CredentialsCard connection parts', () => {
+  // The production outage this exists to prevent: an application configured with
+  // the whole connection string where it expected a hostname, crash-looping on
+  // "getaddrinfo ENOTFOUND postgresql://user:password@host:5432/database".
+  //
+  // The card offered exactly one artifact, a whole URI, so an Operator wiring an
+  // application that reads DB_HOST separately had nothing else to copy.
+  it('offers the host and port on their own, not only as a connection string', async () => {
+    renderInApp(<CredentialsCard operation={postgresOperation()} dockerBridgeAddress="10.0.0.1" />);
+
+    await userEvent.click(await screen.findByText('Or copy the parts separately'));
+
+    expect(screen.getAllByText('Host').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Port').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('5432').length).toBeGreaterThan(0);
+  });
+
+  it('says plainly why a whole connection string does not belong in a host setting', async () => {
+    renderInApp(<CredentialsCard operation={postgresOperation()} dockerBridgeAddress="10.0.0.1" />);
+
+    await userEvent.click(await screen.findByText('Or copy the parts separately'));
+
+    expect(
+      screen.getAllByText(/host setting expects an address and nothing else/i).length,
+    ).toBeGreaterThan(0);
+  });
+});
