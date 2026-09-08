@@ -265,6 +265,11 @@ export {
   type InstallPluginInput,
   type UpdatePluginInput,
 } from './marketplace';
+export {
+  listBillingArrangements,
+  type BillingArrangement,
+  type BillingArrangementStatus,
+} from './arrangements';
 export { getNodeMetrics, type NodeMetrics, type NodeMetricSample } from './metrics';
 export { getSampleApp, type SampleApp } from './sample-app';
 export { getMaintenanceStatus } from './maintenance';
