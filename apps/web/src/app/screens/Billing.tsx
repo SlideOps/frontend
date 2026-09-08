@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { isAdmin, useAuthStore } from '../../store/auth';
 import { formatMoney } from '../billing-format';
+import { BillingArrangements } from '../components/BillingArrangements';
 import { BillingTabs } from '../components/BillingTabs';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
@@ -288,9 +289,18 @@ function PlanCard({
   );
 }
 
-/** The promo preview panel: the described effects and the adjusted price. */
+/**
+ * The promo panel: what the code gives, and nothing about the price.
+ *
+ * It used to state its own figures too, and they were the wrong ones to read
+ * beside a total: a code is priced against the tier's native currency and
+ * before the platform fee, so a dollar-priced code paid in Naira put a dollar
+ * saving on the page above a Naira total, with a caption asking the Operator to
+ * add the fee themselves. What is actually charged is one question with one
+ * answer, and the quote panel is where it is answered. This says what the code
+ * does; that says what it costs.
+ */
 function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
-  const discounted = preview.discounted_amount_minor < preview.original_amount_minor;
   return (
     <div className="rounded-lg border border-border bg-subtle p-4">
       <div className="flex items-center gap-2">
@@ -316,23 +326,7 @@ function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
           This code activates {tierLabel[preview.grant_tier ?? preview.tier] ?? preview.tier} free
           {preview.free_days ? ` for ${preview.free_days} days` : ''}, with no payment.
         </Text>
-      ) : (
-        <div className="mt-3 flex items-baseline gap-2">
-          {discounted ? (
-            <Text as="span" variant="body-sm" tone="secondary" className="line-through">
-              {formatMoney(preview.original_amount_minor, preview.currency)}
-            </Text>
-          ) : null}
-          <Text as="span" variant="h4">
-            {formatMoney(preview.discounted_amount_minor, preview.currency)}
-          </Text>
-          {preview.term_months > 1 ? (
-            <Text as="span" variant="body-sm" tone="secondary">
-              for {preview.term_months} months
-            </Text>
-          ) : null}
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -343,9 +337,55 @@ function PromoPreviewPanel({ preview }: { preview: PromoPreview }) {
  *  any conversion, and any savings are never a surprise at checkout. */
 function PriceQuotePanel({ quote }: { quote: Quote }) {
   const discount = quote.annual_discount_minor ?? 0;
-  const listPrice = quote.base_amount_minor + discount;
+  const promoDiscount = quote.promo_discount_minor ?? 0;
+  // Whichever saving applies is taken off the same subtotal, and only one ever
+  // does: a code replaces the automatic annual discount rather than stacking
+  // with it. Adding both back would state a list price that was never the
+  // price of anything.
+  const listPrice = quote.base_amount_minor + discount + promoDiscount;
+
+  // A code that grants the tier outright is not a cheaper purchase, it is the
+  // absence of one. Itemising a subtotal, a fee and a zero total for it would
+  // describe a transaction that is not going to happen.
+  if (quote.free_grant) {
+    return (
+      <div className="rounded-lg border border-success/40 bg-subtle p-4">
+        <div className="flex items-start gap-2">
+          <Sparkles width={15} height={15} className="mt-0.5 shrink-0 text-success" aria-hidden />
+          <div>
+            <Text variant="body-sm" className="font-medium text-success">
+              Nothing to pay
+            </Text>
+            <Text variant="caption" tone="secondary" className="mt-0.5 block">
+              This code activates the plan outright, so no payment is taken and there is no checkout
+              to go to.
+            </Text>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-border bg-subtle p-4">
+      {quote.promo_applied && promoDiscount > 0 ? (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-success/40 bg-surface px-3 py-2">
+          <TicketPercent
+            width={15}
+            height={15}
+            className="mt-0.5 shrink-0 text-success"
+            aria-hidden
+          />
+          <div>
+            <Text variant="body-sm" className="font-medium text-success">
+              You saved {formatMoney(promoDiscount, quote.currency)}
+            </Text>
+            <Text variant="caption" tone="secondary" className="mt-0.5 block">
+              Your promo code, already taken off the total below.
+            </Text>
+          </div>
+        </div>
+      ) : null}
       {quote.annual_discount_applied && discount > 0 ? (
         <div className="mb-3 flex items-start gap-2 rounded-md border border-success/40 bg-surface px-3 py-2">
           <Sparkles width={15} height={15} className="mt-0.5 shrink-0 text-success" aria-hidden />
@@ -365,7 +405,7 @@ function PriceQuotePanel({ quote }: { quote: Quote }) {
           Subtotal{quote.term_months > 1 ? ` (${quote.term_months} months)` : ''}
         </Text>
         <Text as="span" variant="body-sm">
-          {quote.annual_discount_applied && discount > 0 ? (
+          {listPrice > quote.base_amount_minor ? (
             <span className="mr-1.5 text-ink-muted line-through">
               {formatMoney(listPrice, quote.currency)}
             </span>
@@ -428,6 +468,13 @@ export function Billing() {
   const subscription = data?.subscription ?? null;
   const currentTier = subscription?.status === 'active' ? subscription.tier : 'free';
 
+  // The code that has actually been validated, which is the only one anything
+  // is priced under. Reading it off the preview rather than the input is what
+  // keeps the quoted total, the panel, and the charge to one code: editing the
+  // box clears the preview, and the price returns to the undiscounted one until
+  // the new code is validated too.
+  const appliedPromoCode = preview?.code;
+
   const clearPreview = () => {
     setPreview(null);
     setPromoError(null);
@@ -442,7 +489,16 @@ export function Billing() {
     }
     let cancelled = false;
     setQuoteError(null);
-    quoteCheckout({ tier: selectedTier, currency, term_months: termMonths })
+    quoteCheckout({
+      tier: selectedTier,
+      currency,
+      term_months: termMonths,
+      // The code that was actually applied, never whatever is currently typed
+      // in the box. A half-typed code is not a request to reprice anything, and
+      // sending one would replace a good price with a validation error on every
+      // keystroke.
+      promo_code: appliedPromoCode,
+    })
       .then((result) => {
         if (!cancelled) {
           setQuote(result);
@@ -459,7 +515,7 @@ export function Billing() {
     return () => {
       cancelled = true;
     };
-  }, [configured, admin, selectedTier, currency, termMonths]);
+  }, [configured, admin, selectedTier, currency, termMonths, appliedPromoCode]);
 
   const dismissReturnNotice = () => {
     const next = new URLSearchParams(searchParams);
@@ -489,16 +545,28 @@ export function Billing() {
   };
 
   const runUpgrade = async () => {
+    // A code sitting unvalidated in the box has not been priced into the total
+    // above, so charging under it would take a different amount than the one on
+    // screen, and charging without it would quietly drop a discount the
+    // Operator plainly meant to use. Neither is acceptable, so neither happens:
+    // the code is checked first and the total updates before anything is
+    // charged.
+    if (promoCode.trim() && !appliedPromoCode) {
+      setPromoError('Validate this code first, so the total above includes it.');
+      return;
+    }
+
     setUpgrading(true);
     setCheckoutError(null);
     setGrantNotice(null);
     try {
-      const code = promoCode.trim();
       const result = await startCheckout({
         tier: selectedTier,
         provider,
         currency,
-        promo_code: code || undefined,
+        // The code the total was quoted under, so the Operator is charged the
+        // number they just read.
+        promo_code: appliedPromoCode,
         term_months: termMonths,
       });
       if (result.granted || !result.checkout_url) {
@@ -591,6 +659,11 @@ export function Billing() {
               </Text>
             </Card>
           )}
+
+          {/* Directly under the current plan, because an unpaid arrangement is
+              the most urgent thing on this page for whoever has one, and
+              invisible to everyone who does not. */}
+          <BillingArrangements />
 
           {admin ? (
             <Card>
@@ -764,7 +837,9 @@ export function Billing() {
                           className={cn(
                             'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors duration-fast ease-standard',
                             'focus-within:ring-2 focus-within:ring-focus',
-                            active ? 'border-brand bg-brand-subtle' : 'border-border hover:bg-subtle',
+                            active
+                              ? 'border-brand bg-brand-subtle'
+                              : 'border-border hover:bg-subtle',
                           )}
                         >
                           <input
@@ -853,12 +928,6 @@ export function Billing() {
               {preview ? (
                 <div className="mt-4">
                   <PromoPreviewPanel preview={preview} />
-                  {!preview.free_grant ? (
-                    <Text variant="caption" tone="secondary" className="mt-2 block">
-                      The {quote?.fee_label ?? 'fee'} above still applies on top of this discounted
-                      amount.
-                    </Text>
-                  ) : null}
                 </div>
               ) : null}
 

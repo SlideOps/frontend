@@ -3,7 +3,8 @@ import { useTheme } from '@slideops/design-system';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { TerminalSurface } from './TerminalSurface';
 import { terminalTheme } from './terminal-theme';
 
 /*
@@ -54,6 +55,22 @@ export function OperationTerminal({ events }: OperationTerminalProps) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const writtenRef = useRef(0);
+  const [expanded, setExpanded] = useState(false);
+
+  /*
+   * Remeasuring is safe to call from anywhere and never touches the buffer.
+   *
+   * It matters that this is all expanding does here: the terminal is created
+   * once, keyed on the theme alone, so filling the window neither disposes it
+   * nor replays a single line. Everything already written stays written.
+   */
+  const refit = useCallback(() => {
+    try {
+      fitRef.current?.fit();
+    } catch {
+      // Fitting measures the element, so it throws while it is detached.
+    }
+  }, []);
 
   // Create the terminal, and recreate it when the theme changes so its colors
   // follow light and dark. The event effect below repaints all lines after.
@@ -74,28 +91,18 @@ export function OperationTerminal({ events }: OperationTerminalProps) {
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(container);
-    fit.fit();
     terminalRef.current = terminal;
     fitRef.current = fit;
     writtenRef.current = 0;
-
-    const onResize = () => {
-      try {
-        fit.fit();
-      } catch {
-        // Fitting can throw while the element is detached; ignore it.
-      }
-    };
-    window.addEventListener('resize', onResize);
+    refit();
 
     return () => {
-      window.removeEventListener('resize', onResize);
       terminal.dispose();
       terminalRef.current = null;
       fitRef.current = null;
       writtenRef.current = 0;
     };
-  }, [resolved]);
+  }, [resolved, refit]);
 
   // Write only the lines not yet written, so re-renders never repeat output.
   useEffect(() => {
@@ -110,15 +117,24 @@ export function OperationTerminal({ events }: OperationTerminalProps) {
       }
     }
     writtenRef.current = events.length;
-    fitRef.current?.fit();
-  }, [events]);
+    refit();
+  }, [events, refit]);
 
   return (
-    <div
-      ref={containerRef}
-      role="log"
-      aria-label="Live Operation output"
-      className="h-80 w-full overflow-hidden rounded-md border border-border bg-app p-2"
+    <TerminalSurface
+      label="the live Operation output"
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      // The window resize listener this used to register itself now lives in the
+      // surface, alongside the expand and drag-taller cases it never covered.
+      // Draggable for the same reason the log view is: a terminal is only as
+      // useful as the number of lines it shows, and that is the Operator's call.
+      resizable
+      onResize={refit}
+      contentRef={containerRef}
+      contentRole="log"
+      contentLabel="Live Operation output"
+      height="20rem"
     />
   );
 }

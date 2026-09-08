@@ -24,6 +24,31 @@ export type TransactionStatus =
 /** One payment, as the Operator's own Transactions page shows it. Carries
  *  nothing an Operator should not see: no internal database id, no admin
  *  recovery notes, no provider secret. */
+/**
+ * The arrangement behind a payment, as its own customer may see it.
+ *
+ * Narrower than what an Admin sees, and deliberately: the Admin's private note
+ * about a customer and their own external reference are the Admin's paper trail,
+ * not the customer's. What is here is what makes the payment make sense.
+ */
+export interface TransactionGrant {
+  arrangement_id: string;
+  /** Why this exists, so a screen can say the access came first and the payment
+   *  is owed, rather than describing every arrangement identically. */
+  condition: string;
+  status: string;
+  /** When the money is expected. For an arranged debt this is the date that
+   *  matters, and it is not when the access ends. */
+  payment_deadline?: string;
+  access_start?: string;
+  access_end?: string;
+  /** Whether there is anything left to do here, decided by the same rule the
+   *  payment endpoint enforces, so a button is never offered that the server
+   *  would refuse. */
+  payable: boolean;
+  unpayable_reason?: string;
+}
+
 export interface Transaction {
   reference: string;
   status: TransactionStatus;
@@ -45,6 +70,15 @@ export interface Transaction {
   receipt_sent_at?: string;
   created_at: string;
   cancelled_at?: string;
+  /**
+   * The arrangement this payment settles, absent for an ordinary purchase the
+   * customer started themselves.
+   *
+   * A payment somebody else set up shows an amount the customer never chose, so
+   * without this the detail page could only present a figure with no account of
+   * where it came from or what it buys.
+   */
+  grant?: TransactionGrant;
 }
 
 /** Filters a Transactions list or export accepts. Every field is optional;

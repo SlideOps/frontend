@@ -10,6 +10,10 @@ import {
   emergencyEngageMaintenance,
   emergencyReleaseIncident,
   emergencyReleaseMaintenance,
+  getArrangement,
+  previewArrangementEmail,
+  sendArrangementEmail,
+  updateArrangement,
   getOverview,
   grantEntitlement,
   listAdminOperations,
@@ -23,7 +27,9 @@ import {
   recoverPayment,
   resendPaymentReceipt,
   resetLoginRateLimit,
+  restoreArrangementAccess,
   resumeSubscriber,
+  revokeArrangementAccess,
   revokeEntitlement,
   setFeatureFlagEnabled,
   suspendOperator,
@@ -152,17 +158,15 @@ describe('admin requests', () => {
   });
 
   it('posts a receipt resend and unwraps the returned payment', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { payment: { reference: 'pay_1', status: 'success' } }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { payment: { reference: 'pay_1', status: 'success' } }));
 
     await resendPaymentReceipt('pay_1');
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('POST');
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      '/admin/payments/pay_1/resend-receipt',
-    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/payments/pay_1/resend-receipt');
   });
 
   it('posts a pause with its reason and unwraps the returned subscription', async () => {
@@ -277,9 +281,11 @@ describe('admin requests', () => {
   });
 
   it('posts an engage to the maintenance path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
+      );
 
     await emergencyEngageMaintenance();
 
@@ -289,9 +295,11 @@ describe('admin requests', () => {
   });
 
   it('posts a release to the maintenance path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
+      );
 
     await emergencyReleaseMaintenance();
 
@@ -301,9 +309,11 @@ describe('admin requests', () => {
   });
 
   it('posts an engage to the incident path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: true, executions_paused: false }),
+      );
 
     await emergencyEngageIncident();
 
@@ -313,9 +323,11 @@ describe('admin requests', () => {
   });
 
   it('posts a release to the incident path', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse(200, { controls: [], any_engaged: false, executions_paused: false }),
+      );
 
     await emergencyReleaseIncident();
 
@@ -560,7 +572,9 @@ describe('admin requests', () => {
   });
 
   it('lists webhook deliveries with no limit when none is given', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { deliveries: [] }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { deliveries: [] }));
 
     await listWebhookDeliveries();
 
@@ -571,19 +585,25 @@ describe('admin requests', () => {
   it('looks up a login rate limit by email and unwraps the array', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(200, {
-        entries: [{ subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 }],
+        entries: [
+          { subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 },
+        ],
       }),
     );
 
     const entries = await lookupLoginRateLimit('op@slideops.com');
 
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/rate-limits/login?email=op%40slideops.com');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/rate-limits/login?email=op%40slideops.com',
+    );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.attempts).toBe(3);
   });
 
   it('posts a reset with the email and returns how many were cleared', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { cleared: 2 }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { cleared: 2 }));
 
     const cleared = await resetLoginRateLimit('op@slideops.com');
 
@@ -668,6 +688,199 @@ describe('admin requests', () => {
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('DELETE');
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/admin/operators/op-1/support-notes/note-1');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/admin/operators/op-1/support-notes/note-1',
+    );
+  });
+});
+
+/*
+ * The revision an editor carries.
+ *
+ * The detail endpoint calls this "revision"; the arrangement inside it calls
+ * the same instant "updated_at". Reading neither and falling through to
+ * created_at meant every save echoed back the moment the arrangement was made
+ * rather than the moment it last changed, so the server correctly refused every
+ * edit as overtaken and an Admin was told to reload and try again, forever.
+ */
+describe('the revision an arrangement editor works from', () => {
+  const detailBody = {
+    arrangement: {
+      id: 'arr-1',
+      operator_id: 'op-1',
+      tier: 'pro',
+      amount_minor: 150000,
+      currency: 'USD',
+      condition: 'temporary_access',
+      status: 'active',
+      created_at: '2026-09-01T10:00:00Z',
+      updated_at: '2026-09-08T11:22:33.456789Z',
+      term_months: 6,
+    },
+    operator_email: 'customer@slideops.com',
+    revision: '2026-09-08T11:22:33.456789Z',
+  };
+
+  it('reads the revision the detail endpoint actually names', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detailBody));
+
+    const detail = await getArrangement('arr-1');
+
+    expect(detail.updated_at).toBe('2026-09-08T11:22:33.456789Z');
+    // The moment it was created is a different instant, and sending it as the
+    // revision is what made every save fail.
+    expect(detail.updated_at).not.toBe('2026-09-01T10:00:00Z');
+  });
+
+  it('falls back to the arrangement own updated_at, never to when it was created', async () => {
+    const withoutRevision = { ...detailBody, revision: undefined };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, withoutRevision));
+
+    const detail = await getArrangement('arr-1');
+
+    expect(detail.updated_at).toBe('2026-09-08T11:22:33.456789Z');
+  });
+
+  it('sends the revision it read back as if_unchanged_since', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, detailBody));
+
+    await updateArrangement('arr-1', { notes: 'a note' }, '2026-09-08T11:22:33.456789Z');
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const sent = JSON.parse(String((init as RequestInit).body));
+    expect(sent.if_unchanged_since).toBe('2026-09-08T11:22:33.456789Z');
+  });
+
+  it('sends no revision at all rather than an empty one', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, detailBody));
+
+    await updateArrangement('arr-1', { notes: 'a note' }, '');
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const sent = JSON.parse(String((init as RequestInit).body));
+    expect('if_unchanged_since' in sent).toBe(false);
+  });
+});
+
+/*
+ * The message these endpoints actually return.
+ *
+ * Both answer with `{ message, sent }`, and the message carries its body as
+ * body_text and body_html. The readers looked for `preview` and `email`, found
+ * neither, and cast the whole envelope, so every field was undefined. The
+ * preview rendered blank, and because the control that sends sits inside the
+ * preview, there was nothing to press either.
+ */
+describe('a customer message on an arrangement', () => {
+  const envelope = {
+    message: {
+      type: 'payment_reminder',
+      to: 'customer@slideops.com',
+      subject: 'Reminder: payment for your SlideOps pro plan',
+      body_html: '<!doctype html><p>Payment reminder</p>',
+      body_text: 'Payment reminder\n\nYour payment is due.',
+    },
+    sent: false,
+  };
+
+  it('reads the recipient, the subject and the body a preview came back with', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    const preview = await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(preview.to).toBe('customer@slideops.com');
+    expect(preview.subject).toBe('Reminder: payment for your SlideOps pro plan');
+    expect(preview.body).toContain('Your payment is due.');
+    expect(preview.type).toBe('payment_reminder');
+  });
+
+  it('shows the plain text rather than the markup the customer never sees as source', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    const preview = await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(preview.body).not.toContain('<!doctype html>');
+  });
+
+  it('reads back who a sent message went to', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { ...envelope, sent: true }));
+
+    const sent = await sendArrangementEmail('arr-1', 'payment_reminder');
+
+    expect(sent.to).toBe('customer@slideops.com');
+  });
+
+  it('asks the preview endpoint, which sends nothing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, envelope));
+
+    await previewArrangementEmail('arr-1', 'payment_reminder');
+
+    const [url] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain('/emails/preview');
+  });
+
+  it('asks the send endpoint, and names the message type it was told to send', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, { ...envelope, sent: true }));
+
+    await sendArrangementEmail('arr-1', 'access_granted');
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toMatch(/\/emails$/);
+    expect(JSON.parse(String((init as RequestInit).body)).type).toBe('access_granted');
+  });
+});
+
+/*
+ * The bodies these two send, pinned.
+ *
+ * The API rejects an unknown field outright rather than ignoring it, so a name
+ * the endpoint does not have is not a field that gets dropped: it is the whole
+ * request refused with "the request body was not valid". Both of these sent one
+ * and neither could be used at all, which is not something a test of the
+ * response shape would ever notice.
+ */
+describe('taking an arrangement back, and putting it back', () => {
+  const detail = {
+    arrangement: { id: 'arr_1', tier: 'pro', status: 'revoked', condition: 'temporary_access' },
+  };
+
+  it('revokes with the reason and the revision the screen was read at', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await revokeArrangementAccess('arr_1', 'payment never arrived', '2026-09-08T10:00:00.000000Z');
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/admin/arrangements/arr_1/revoke');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({
+      reason: 'payment never arrived',
+      if_unchanged_since: '2026-09-08T10:00:00.000000Z',
+    });
+  });
+
+  it('restores with the reason under the name the endpoint actually accepts', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await restoreArrangementAccess('arr_1', 'payment confirmed by the bank');
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    // notes, not reason: a restore creates a new arrangement and this is what
+    // it is written down against.
+    expect(JSON.parse(String(init?.body))).toEqual({ notes: 'payment confirmed by the bank' });
+  });
+
+  it('sends an empty body when a restore is given no reason', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, detail));
+
+    await restoreArrangementAccess('arr_1');
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(String(init?.body))).toEqual({});
   });
 });

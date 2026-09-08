@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BillingSubscription, Quote } from '@slideops/api-client';
+import { ApiError, type BillingSubscription, type Quote } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useAuthStore } from '../../store/auth';
 
@@ -18,6 +18,8 @@ const getSubscription = vi.fn();
 const quoteCheckout = vi.fn();
 const startCheckout = vi.fn();
 const listTransactions = vi.fn();
+const listBillingArrangements = vi.fn();
+const validatePromo = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -25,6 +27,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   quoteCheckout: (...a: unknown[]) => quoteCheckout(...a),
   startCheckout: (...a: unknown[]) => startCheckout(...a),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
+  listBillingArrangements: (...a: unknown[]) => listBillingArrangements(...a),
+  validatePromo: (...a: unknown[]) => validatePromo(...a),
 }));
 
 const { Billing } = await import('./Billing');
@@ -71,8 +75,60 @@ function show() {
 beforeEach(() => {
   getSubscription.mockReset().mockResolvedValue(subscription());
   quoteCheckout.mockReset().mockResolvedValue(quote());
-  startCheckout.mockReset().mockResolvedValue({ checkout_url: '', reference: 'ref', provider: 'paystack', granted: false });
-  listTransactions.mockReset().mockResolvedValue({ transactions: [], limit: 5, offset: 0, has_more: false });
+  startCheckout
+    .mockReset()
+    .mockResolvedValue({
+      checkout_url: '',
+      reference: 'ref',
+      provider: 'paystack',
+      granted: false,
+    });
+  listTransactions
+    .mockReset()
+    .mockResolvedValue({ transactions: [], limit: 5, offset: 0, has_more: false });
+  listBillingArrangements.mockReset().mockResolvedValue([]);
+  validatePromo.mockReset();
+});
+
+describe('Billing: access arranged for you', () => {
+  it('shows the arrangement and what is owed on the page the customer already uses', async () => {
+    listBillingArrangements.mockResolvedValue([
+      {
+        id: 'arr_1',
+        tier: 'pro',
+        condition: 'temporary_access',
+        status: 'awaiting_payment',
+        amount_minor: 150000,
+        currency: 'USD',
+        payment_deadline: new Date(Date.now() + 10 * 86400000).toISOString(),
+        payment_reference: 'so_open_payment',
+        resumable: true,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    show();
+
+    expect(await screen.findByText('Access arranged for you')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Complete this payment/ })).toBeInTheDocument();
+  });
+
+  it('shows no arrangement section when the customer has none', async () => {
+    show();
+    await waitFor(() => expect(listBillingArrangements).toHaveBeenCalled());
+
+    expect(screen.queryByText('Access arranged for you')).not.toBeInTheDocument();
+  });
+
+  it('renders the billing page as before when the arrangements endpoint fails', async () => {
+    listBillingArrangements.mockRejectedValue(new ApiError(503, 'unavailable', 'No arrangements.'));
+    show();
+
+    expect(await screen.findByText('Total charged today')).toBeInTheDocument();
+    expect(screen.getByText('Plans')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upgrade to/ })).toBeInTheDocument();
+    expect(screen.queryByText('Access arranged for you')).not.toBeInTheDocument();
+    expect(screen.queryByText('No arrangements.')).not.toBeInTheDocument();
+  });
 });
 
 describe('Billing: Recent Transactions', () => {
@@ -114,9 +170,7 @@ describe('Billing: billing cycle', () => {
     show();
 
     await waitFor(() =>
-      expect(quoteCheckout).toHaveBeenCalledWith(
-        expect.objectContaining({ term_months: 1 }),
-      ),
+      expect(quoteCheckout).toHaveBeenCalledWith(expect.objectContaining({ term_months: 1 })),
     );
   });
 
@@ -127,9 +181,7 @@ describe('Billing: billing cycle', () => {
     await userEvent.click(screen.getByRole('radio', { name: /1 year/ }));
 
     await waitFor(() =>
-      expect(quoteCheckout).toHaveBeenCalledWith(
-        expect.objectContaining({ term_months: 12 }),
-      ),
+      expect(quoteCheckout).toHaveBeenCalledWith(expect.objectContaining({ term_months: 12 })),
     );
   });
 
@@ -143,9 +195,7 @@ describe('Billing: billing cycle', () => {
     await userEvent.click(screen.getByRole('button', { name: /Upgrade to/ }));
 
     await waitFor(() =>
-      expect(startCheckout).toHaveBeenCalledWith(
-        expect.objectContaining({ term_months: 24 }),
-      ),
+      expect(startCheckout).toHaveBeenCalledWith(expect.objectContaining({ term_months: 24 })),
     );
   });
 
@@ -171,5 +221,129 @@ describe('Billing: billing cycle', () => {
     await screen.findByText('Total charged today');
 
     expect(screen.queryByText(/You saved/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Billing: a promo code and the total it is supposed to change', () => {
+  /** What the promo endpoint says about a code that takes 25% off. */
+  function preview(over: Record<string, unknown> = {}) {
+    return {
+      code: 'SAVE25',
+      tier: 'pro',
+      term_months: 1,
+      original_amount_minor: 4900,
+      discounted_amount_minor: 3675,
+      currency: 'USD',
+      descriptions: ['25% off your first payment'],
+      free_grant: false,
+      bonus_nodes: 0,
+      bonus_projects: 0,
+      bonus_seats: 0,
+      ...over,
+    };
+  }
+
+  /** Type a code and validate it, the way the screen asks. */
+  async function applyCode(code = 'SAVE25') {
+    await userEvent.type(screen.getByLabelText('Promo code'), code);
+    await userEvent.click(screen.getByRole('button', { name: 'Validate' }));
+  }
+
+  it('reprices the total under the code, rather than showing a discount above a full price', async () => {
+    // The reported bug: the code applied and read correctly, and the number
+    // the Operator was about to pay did not move.
+    validatePromo.mockResolvedValue(preview());
+    quoteCheckout.mockResolvedValueOnce(quote()).mockResolvedValue(
+      quote({
+        base_amount_minor: 3675,
+        fee_amount_minor: 368,
+        total_amount_minor: 4043,
+        promo_applied: true,
+        promo_discount_minor: 1225,
+        promo_descriptions: ['25% off your first payment'],
+      }),
+    );
+
+    show();
+    await screen.findByText('Total charged today');
+    await applyCode();
+
+    // Priced under the code that was applied, not under no code at all.
+    await waitFor(() =>
+      expect(quoteCheckout).toHaveBeenLastCalledWith(
+        expect.objectContaining({ promo_code: 'SAVE25' }),
+      ),
+    );
+    expect(await screen.findByText('$40.43')).toBeInTheDocument();
+    expect(screen.getByText('You saved $12.25')).toBeInTheDocument();
+    expect(screen.queryByText('$53.90')).not.toBeInTheDocument();
+  });
+
+  it('charges under the same code the total was quoted under', async () => {
+    validatePromo.mockResolvedValue(preview());
+    quoteCheckout.mockResolvedValue(
+      quote({ promo_applied: true, promo_discount_minor: 1225, total_amount_minor: 4043 }),
+    );
+
+    show();
+    await screen.findByText('Total charged today');
+    await applyCode();
+    await userEvent.click(screen.getByRole('button', { name: /Upgrade to/ }));
+
+    await waitFor(() =>
+      expect(startCheckout).toHaveBeenCalledWith(expect.objectContaining({ promo_code: 'SAVE25' })),
+    );
+  });
+
+  it('will not charge under a code that was never validated, nor quietly drop it', async () => {
+    show();
+    await screen.findByText('Total charged today');
+    await userEvent.type(screen.getByLabelText('Promo code'), 'MAYBE');
+    await userEvent.click(screen.getByRole('button', { name: /Upgrade to/ }));
+
+    // Charging without it loses a discount the Operator plainly meant to use;
+    // charging with it takes a different amount than the total on screen.
+    expect(startCheckout).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Validate this code first/)).toBeInTheDocument();
+  });
+
+  it('returns to the full price when the code is edited away', async () => {
+    validatePromo.mockResolvedValue(preview());
+    quoteCheckout.mockResolvedValue(quote());
+
+    show();
+    await screen.findByText('Total charged today');
+    await applyCode();
+    await waitFor(() =>
+      expect(quoteCheckout).toHaveBeenLastCalledWith(
+        expect.objectContaining({ promo_code: 'SAVE25' }),
+      ),
+    );
+
+    await userEvent.type(screen.getByLabelText('Promo code'), 'X');
+
+    await waitFor(() =>
+      expect(quoteCheckout).toHaveBeenLastCalledWith(
+        expect.objectContaining({ promo_code: undefined }),
+      ),
+    );
+  });
+
+  it('says there is nothing to pay for a code that grants the plan outright', async () => {
+    validatePromo.mockResolvedValue(
+      preview({ free_grant: true, grant_tier: 'pro', free_days: 30 }),
+    );
+    quoteCheckout
+      .mockResolvedValueOnce(quote())
+      .mockResolvedValue(quote({ promo_applied: true, free_grant: true, grant_tier: 'pro' }));
+
+    show();
+    await screen.findByText('Total charged today');
+    await applyCode();
+
+    // Itemising a subtotal, a fee and a zero total would describe a
+    // transaction that is not going to happen.
+    expect(await screen.findByText('Nothing to pay')).toBeInTheDocument();
+    expect(screen.queryByText('Total charged today')).not.toBeInTheDocument();
   });
 });

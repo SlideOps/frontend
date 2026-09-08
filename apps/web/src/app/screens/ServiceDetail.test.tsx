@@ -240,7 +240,7 @@ describe('ServiceDetail', () => {
   it.each([
     ['Live usage', 'Overview' as const],
     ['Manage', 'Browse' as const],
-    ['Command and environment', 'Settings' as const],
+    ['Deployment configuration', 'Settings' as const],
   ])('lets the Operator fold %s', async (title, tab) => {
     show();
 
@@ -356,7 +356,12 @@ describe('ServiceDetail', () => {
     await waitFor(() =>
       expect(purgeService).toHaveBeenCalledWith('svc-1', 'delete prudent-journal-backend', false),
     );
-  });
+    // Longer than the default, because this test types two long confirmations a
+    // character at a time and every keystroke re-renders the whole Service page.
+    // That cost is jsdom's, not the product's, and under a full parallel run it
+    // was enough to trip the five second default and fail a test about the
+    // delete guard for reasons that have nothing to do with the delete guard.
+  }, 20000);
 });
 
 const capabilityService = {

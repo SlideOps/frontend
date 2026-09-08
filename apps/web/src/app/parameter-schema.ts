@@ -67,6 +67,23 @@ export function parameterFieldSchema(param: CapabilityParameter): z.ZodTypeAny {
       });
     }
 
+    case 'node_address': {
+      // The value is an address or a CIDR, the same as a string, and is
+      // deliberately not pattern-matched further: the backend parses it
+      // properly and rejects what it cannot use, while a regex here would
+      // eventually turn away a valid IPv6 address nobody thought to allow.
+      //
+      // What is checked is the one value that must never be submitted: the
+      // marker the picker uses for "not one of my servers" is an interaction,
+      // not an address, and sending it would open a firewall rule to a network
+      // that does not exist.
+      const text = z.string().trim();
+      const base = param.required ? text.min(1, requiredMessage(param)) : text;
+      return base.refine((value) => !value.startsWith('__'), {
+        message: `Choose a server for ${param.label}, or enter an address.`,
+      });
+    }
+
     case 'string':
     case 'text':
     default: {

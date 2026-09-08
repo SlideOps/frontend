@@ -67,13 +67,15 @@ function PushOptIn() {
   }
 
   return (
-    <div className="mt-2 flex items-start gap-2 border-t border-border pt-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
-          <p className="text-sm font-medium text-ink">Browser notifications</p>
+    // Wrapping rather than a fixed row: on a narrow panel the copy and the
+    // control stack instead of the control being pushed past the right edge.
+    <div className="mt-2 flex shrink-0 flex-wrap items-start justify-between gap-2 border-t border-border pt-3">
+      <div className="min-w-0 flex-1 basis-40">
+        <div className="flex min-w-0 items-center gap-1">
+          <p className="min-w-0 break-words text-sm font-medium text-ink">Browser notifications</p>
           <Guidance for="notifications.push" size={14} />
         </div>
-        <p className="mt-0.5 text-xs text-ink-muted">
+        <p className="mt-0.5 break-words text-xs text-ink-muted">
           {enabled
             ? 'On. You will be notified when an Operation completes.'
             : permission === 'denied'
@@ -85,7 +87,7 @@ function PushOptIn() {
         <button
           type="button"
           onClick={disablePush}
-          className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="max-w-full shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           Turn off
         </button>
@@ -94,7 +96,7 @@ function PushOptIn() {
           type="button"
           disabled={permission === 'denied'}
           onClick={() => void requestPush()}
-          className="shrink-0 rounded-md bg-brand px-2 py-1 text-xs font-medium text-brand-fg transition-colors duration-fast ease-standard hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
+          className="max-w-full shrink-0 whitespace-nowrap rounded-md bg-brand px-2 py-1 text-xs font-medium text-brand-fg transition-colors duration-fast ease-standard hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
         >
           Turn on
         </button>
@@ -140,6 +142,9 @@ export function NotificationsBell() {
     <Popover
       label="Notifications"
       placement="bottom"
+      // The bell sits at the right of the header, so the panel hangs from its
+      // right edge and opens inward across the app.
+      align="end"
       trigger={(props) => (
         <button
           type="button"
@@ -160,17 +165,25 @@ export function NotificationsBell() {
         </button>
       )}
     >
-      <div className="w-72">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <p className="text-sm font-semibold text-ink">Notifications</p>
+      {/*
+        The panel takes the width the popover gives it rather than demanding a
+        fixed 288px it may not have: at that fixed width the content ran past
+        the padded edge of the panel on a narrow screen and the right of every
+        row, the browser-notification control included, was simply cut off. The
+        height is capped against the viewport for the same reason, so a short
+        window scrolls the list rather than hiding the end of the panel.
+      */}
+      <div className="flex max-h-[calc(100dvh_-_6rem)] w-full min-w-0 flex-col">
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <p className="min-w-0 break-words text-sm font-semibold text-ink">Notifications</p>
             <Guidance for="notifications.center" size={14} />
           </div>
           {items.length > 0 && unread > 0 ? (
             <button
               type="button"
               onClick={onMarkAllRead}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-xs font-medium text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <CheckCheck width={14} height={14} aria-hidden />
               Mark all read
@@ -179,12 +192,12 @@ export function NotificationsBell() {
         </div>
 
         {items.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-muted">
+          <p className="mt-3 break-words text-sm text-ink-muted">
             No notifications yet. Results from your Operations, and things like a workspace
             invitation, will appear here.
           </p>
         ) : (
-          <ul className="mt-2 flex max-h-80 flex-col divide-y divide-border overflow-y-auto">
+          <ul className="mt-2 flex max-h-80 min-h-0 flex-1 flex-col divide-y divide-border overflow-y-auto">
             {items.slice(0, 12).map((item) => {
               const { Icon, color } = notificationIcon(item);
               const pending = item.kind === 'action_required';
@@ -194,7 +207,7 @@ export function NotificationsBell() {
                     type="button"
                     onClick={() => openItem(item)}
                     className={cn(
-                      'flex w-full items-start gap-2 py-2 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+                      'flex w-full min-w-0 items-start gap-2 py-2 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                       item.read ? undefined : 'font-medium',
                     )}
                   >
@@ -204,12 +217,22 @@ export function NotificationsBell() {
                       className={cn('mt-0.5 shrink-0', color)}
                       aria-hidden
                     />
+                    {/*
+                      A long title, or a resource name with no spaces in it,
+                      wraps down the row instead of stretching it: the row is
+                      what sets the panel's width, so anything that refuses to
+                      wrap here pushes the whole panel off the screen. The body
+                      is held to two lines so one wordy notification cannot take
+                      the panel over.
+                    */}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-ink">{item.title}</span>
-                      <span className="mt-0.5 block truncate text-xs text-ink-muted">
+                      <span className="block break-words text-sm text-ink">{item.title}</span>
+                      {/* line-clamp brings its own block-level display, so
+                          adding "block" here would only override it away. */}
+                      <span className="mt-0.5 line-clamp-2 break-words text-xs text-ink-muted">
                         {item.body}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-2">
+                      <span className="mt-0.5 flex flex-wrap items-center gap-2">
                         <span className="text-[11px] text-ink-muted">{relativeTime(item.at)}</span>
                         {pending ? (
                           <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-warning">

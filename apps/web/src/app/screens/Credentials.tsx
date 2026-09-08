@@ -71,27 +71,32 @@ function hasStoredSecret(operation: Operation): boolean {
 }
 
 /**
- * The database engine a Capability key belongs to, or null when it is not
- * one of the five SlideOps knows how to install, manage, and control. Every
- * key for one engine (install-X, configure-X, manage-X, remove-X) shares the
- * same suffix, so this is what lets a bare install and a later manage-X
- * credential be recognised as the same engine rather than two unrelated
- * things.
+ * The service an Operation belongs to, or null when its Capability is not a
+ * network service and so has no service to group it under.
+ *
+ * Every Capability key for one service shares a family: install-clamav,
+ * configure-clamav and remove-clamav are all clamav. That is what lets a bare
+ * install and a later configure be recognised as the same service rather than
+ * two unrelated rows, and what names the install and remove steps offered
+ * beside a credential.
+ *
+ * The server says which. This used to be a list of five engine names searched
+ * for inside the key, which meant an Operator who installed ClamAV, NATS,
+ * RabbitMQ, Memcached, Meilisearch or MinIO had their credentials fall out of
+ * the grouping entirely, and the list could only ever be as current as the last
+ * person who remembered to edit it. It also could not be written correctly by
+ * hand: PostgreSQL matches on the word postgres but its Capability is
+ * install-postgresql, so the family and the word in the key are not the same
+ * string.
  */
-const ENGINE_FAMILIES = ['postgresql', 'redis', 'mariadb', 'mysql', 'mongodb'] as const;
-type EngineFamily = (typeof ENGINE_FAMILIES)[number];
-
-function engineFamilyOf(capabilityKey: string): EngineFamily | null {
-  // mariadb checked before mysql: install-mariadb would otherwise never match,
-  // since it contains no "mysql" substring, but checking mysql first would be
-  // fine too -- this order just keeps the two visually paired with their own
-  // install-mariadb / install-mysql keys above.
-  return ENGINE_FAMILIES.find((family) => capabilityKey.includes(family)) ?? null;
+function engineFamilyOf(operation: Operation): string | null {
+  const family = operation.connection?.family;
+  return family && family.length > 0 ? family : null;
 }
 
-/** Whether a Capability key is one of the five engines' own install step. */
-function isEngineInstall(capabilityKey: string): boolean {
-  return capabilityKey.startsWith('install-') && engineFamilyOf(capabilityKey) !== null;
+/** Whether an Operation is a service's own install step. */
+function isEngineInstall(operation: Operation): boolean {
+  return operation.capability_key.startsWith('install-') && engineFamilyOf(operation) !== null;
 }
 
 /** A readable Capability name from its key, in Operator language. */
@@ -219,7 +224,7 @@ function downloadText(fileName: string, text: string): void {
  */
 function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   const navigate = useNavigate();
-  const family = engineFamilyOf(context.operation.capability_key);
+  const family = engineFamilyOf(context.operation);
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -372,7 +377,7 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
  * offered since nothing here should wire across Project boundaries silently.
  */
 function ConnectSection({ context, services }: { context: CredentialContext; services: Service[] }) {
-  const family = engineFamilyOf(context.operation.capability_key);
+  const family = engineFamilyOf(context.operation);
   const nodeId = context.operation.node_id;
   const installKey = family ? `install-${family}` : '';
 
@@ -799,7 +804,7 @@ export function Credentials() {
       // credential SlideOps holds -- worse than showing a card with no
       // secret on it, which is exactly what CredentialsCard already renders
       // correctly once given a host and a recognised Capability family.
-      .filter((operation) => hasStoredSecret(operation) || isEngineInstall(operation.capability_key))
+      .filter((operation) => hasStoredSecret(operation) || isEngineInstall(operation))
       .map((operation) => {
         const node = nodeById.get(operation.node_id) ?? null;
         const project = node?.project_id ? (projectById.get(node.project_id) ?? null) : null;
@@ -848,7 +853,7 @@ export function Credentials() {
     for (const context of sorted) {
       const parameters = context.operation.parameters ?? {};
       const resource = parameters.database ?? parameters.username;
-      const family = engineFamilyOf(context.operation.capability_key);
+      const family = engineFamilyOf(context.operation);
       if (resource || hasStoredSecret(context.operation)) {
         if (family) {
           richFamilies.add(`${context.operation.node_id}:${family}`);
@@ -860,7 +865,7 @@ export function Credentials() {
     return sorted.filter((context) => {
       const parameters = context.operation.parameters ?? {};
       const resource = parameters.database ?? parameters.username;
-      const family = engineFamilyOf(context.operation.capability_key);
+      const family = engineFamilyOf(context.operation);
       const isBare = !resource && !hasStoredSecret(context.operation);
 
       if (isBare && family && richFamilies.has(`${context.operation.node_id}:${family}`)) {

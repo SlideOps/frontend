@@ -29,6 +29,10 @@ function workspaceSubtitle(isPersonal: boolean, role: string): string {
  * one they can act in, create another, or open the fuller picker. Always
  * rendered, even with only one workspace: creating a second one must always
  * be one click away, the same as Vercel's own team switcher.
+ *
+ * It belongs beside search in the top bar, where the question it answers,
+ * "which workspace am I acting in", is asked once for the whole page rather
+ * than from inside the list of places that page can go.
  */
 export function WorkspaceSwitcher() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);

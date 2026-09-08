@@ -181,6 +181,30 @@ describe('parseEnv', () => {
 });
 
 describe('toDeployInput', () => {
+  /**
+   * The Preflight button calls this with react-hook-form's getValues(),
+   * which reads the raw, unvalidated form state straight from the HTML
+   * inputs - never coerced by the Zod resolver the way handleSubmit's
+   * values are. A production incident: the backend's memory_mb/cpu_limit
+   * are a strict int/float, and a string there failed the request outright
+   * with a decode error rather than a validation message.
+   */
+  it('coerces numeric fields to real numbers even when given raw strings', () => {
+    const input = toDeployInput(
+      values({
+        cpu_limit: '0.5' as unknown as number,
+        memory_mb: '512' as unknown as number,
+        pids_limit: '100' as unknown as number,
+      }),
+    );
+    expect(input.cpu_limit).toBe(0.5);
+    expect(typeof input.cpu_limit).toBe('number');
+    expect(input.memory_mb).toBe(512);
+    expect(typeof input.memory_mb).toBe('number');
+    expect(input.pids_limit).toBe(100);
+    expect(typeof input.pids_limit).toBe('number');
+  });
+
   it('builds an image deploy input, dropping empty optionals', () => {
     const input = toDeployInput(values({ image: 'redis:7', ports: '6379:6379' }));
     expect(input.source).toEqual({ type: 'image', image: 'redis:7', command: undefined });
@@ -210,5 +234,78 @@ describe('toDeployInput', () => {
       { key: 'NODE_ENV', value: 'production', secret: false, keep: false },
     ]);
     expect(input.pids_limit).toBe(128);
+  });
+});
+
+/*
+ * Reading an env file the way env files are actually written.
+ *
+ * A deployed application failed to start with "API_KEYS is not valid JSON",
+ * because the quotes around the value had been stored as part of it: the
+ * container received the literal characters '{"k":"v"}', apostrophes included.
+ * Every env file quotes a value containing JSON or spaces, since the loaders
+ * that read those files require it, so anybody pasting from one that already
+ * worked hit this. The quotes are the file's syntax, not the customer's data.
+ */
+describe('an env file pasted from somewhere it already worked', () => {
+  it('keeps a single quoted value and drops the quotes that carried it', () => {
+    const { env } = parseEnv(`API_KEYS='{"svc":"abc","other":"def"}'`);
+    expect(env[0]?.value).toBe('{"svc":"abc","other":"def"}');
+  });
+
+  it('keeps a double quoted value and drops the quotes that carried it', () => {
+    const { env } = parseEnv('API_KEYS="{\\"svc\\":\\"abc\\"}"');
+    expect(env[0]?.value).toBe('{"svc":"abc"}');
+  });
+
+  it('leaves an unquoted value exactly as it was written', () => {
+    const { env } = parseEnv('API_KEYS={"svc":"abc"}');
+    expect(env[0]?.value).toBe('{"svc":"abc"}');
+  });
+
+  it('reads a quoted value that runs over several lines, the way a pasted blob does', () => {
+    const { env } = parseEnv(`API_KEYS='{\n  "svc": "abc"\n}'`);
+    expect(env[0]?.value).toBe('{\n  "svc": "abc"\n}');
+  });
+
+  it('says which variable opened a quote it never closed', () => {
+    const { error } = parseEnv(`API_KEYS='{"svc":"abc"`);
+    expect(error).toContain('API_KEYS');
+    expect(error).toContain('never closed');
+  });
+
+  it('skips a comment line rather than refusing the whole file', () => {
+    const { env, error } = parseEnv('# keys for the api\nAPI_KEYS={"a":"b"}');
+    expect(error).toBeUndefined();
+    expect(env).toHaveLength(1);
+  });
+
+  it('keeps a hash inside a value, because a password is allowed to contain one', () => {
+    const { env } = parseEnv('PASSWORD=p#ss word');
+    expect(env[0]?.value).toBe('p#ss word');
+  });
+
+  it('reads a line written to be sourced by a shell', () => {
+    const { env } = parseEnv('export API_KEYS={"a":"b"}');
+    expect(env[0]?.key).toBe('API_KEYS');
+    expect(env[0]?.value).toBe('{"a":"b"}');
+  });
+
+  it('turns an escape into what it stands for only inside double quotes', () => {
+    expect(parseEnv('KEY="line1\\nline2"').env[0]?.value).toBe('line1\nline2');
+    // Single quoted is literal, so a Windows path keeps its backslashes.
+    expect(parseEnv("P='C:\\path\\to'").env[0]?.value).toBe('C:\\path\\to');
+  });
+
+  it('still keeps a sealed variable with no value, rather than blanking it', () => {
+    const { env } = parseEnv('secret:API_KEYS=');
+    expect(env[0]?.secret).toBe(true);
+    expect(env[0]?.keep).toBe(true);
+  });
+
+  it('unseals nothing it was not asked to, so a quoted secret is still a secret', () => {
+    const { env } = parseEnv(`secret:API_KEYS='{"a":"b"}'`);
+    expect(env[0]?.secret).toBe(true);
+    expect(env[0]?.value).toBe('{"a":"b"}');
   });
 });

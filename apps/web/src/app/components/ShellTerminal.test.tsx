@@ -225,6 +225,55 @@ describe('ShellTerminal', () => {
     expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
   });
 
+  /*
+   * Expanding must cost the Operator nothing.
+   *
+   * A surface that remounted on the way to full screen would take the terminal's
+   * own element with it, and the session, the scrollback and whatever was half
+   * typed at the prompt would go too. Nothing about a bigger box is worth
+   * dropping a shell for, so the same socket and the same element come through.
+   */
+  it('carries the live session and its terminal element through expanding untouched', async () => {
+    const { container } = render();
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.opened).toHaveLength(1));
+    FakeSocket.last?.openIt();
+
+    const socket = FakeSocket.last;
+    const box = container.querySelector('[style*="24rem"]');
+    expect(box).not.toBeNull();
+
+    await userEvent.click(await screen.findByRole('button', { name: /fill the window/i }));
+    await screen.findByRole('button', { name: /leave full screen/i });
+
+    // No reconnect, and the element xterm was handed is still the same element:
+    // expanded it simply has no inline height, so it is found by its class here.
+    expect(FakeSocket.opened).toHaveLength(1);
+    expect(FakeSocket.last).toBe(socket);
+    expect(socket?.readyState).toBe(FakeSocket.OPEN);
+    expect(container.querySelector('.overflow-hidden.rounded-md')).toBe(box);
+
+    await userEvent.click(await screen.findByRole('button', { name: /leave full screen/i }));
+    expect(FakeSocket.opened).toHaveLength(1);
+    expect(container.querySelector('[style*="24rem"]')).toBe(box);
+  });
+
+  // Every control that was on this terminal before it was given a shared surface
+  // is still on it, and still does the same thing.
+  it('keeps opening, closing and the standalone link beside the expand control', async () => {
+    render({ standalonePath: '/app/nodes/n1/shell' });
+    await userEvent.click(screen.getByRole('button', { name: /open a shell/i }));
+    await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+    FakeSocket.last?.openIt();
+
+    expect(await screen.findByRole('button', { name: /fill the window/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /new tab/i })).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole('button', { name: /^close$/i }));
+    expect(FakeSocket.last?.readyState).toBe(3);
+    expect(await screen.findByRole('button', { name: /open again/i })).toBeInTheDocument();
+  });
+
   // A control you can enter and cannot leave by reflex is a trap.
   it('leaves the expanded view on Escape', async () => {
     render();

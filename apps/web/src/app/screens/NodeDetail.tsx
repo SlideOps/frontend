@@ -4,6 +4,7 @@ import {
   discoverNode,
   getCapabilityStates,
   getNode,
+  getSavedDiscovery,
   listCapabilities,
   type CapabilityState,
   type DiscoveryResult,
@@ -24,10 +25,11 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { DetailLayout, PageHeader, TabNav, type TabNavTab } from '@slideops/ui';
+import { DiscoveryRepairs } from '../components/DiscoveryRepairs';
 import { RunningHere } from '../components/RunningHere';
 import { ServerReadiness } from '../components/ServerReadiness';
 import { ShellTerminal } from '../components/ShellTerminal';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import {
@@ -48,6 +50,7 @@ import { CredentialRotation } from '../components/CredentialRotation';
 import { DiscoveryScan } from '../components/DiscoveryScan';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { NodeCapacity } from '../components/NodeCapacity';
+import { NodeRoutes } from '../components/NodeRoutes';
 import { NodeHealth } from '../components/NodeHealth';
 import { NodeTransferControl } from '../components/NodeTransferControl';
 import { OperatorShell } from '../components/OperatorShell';
@@ -145,6 +148,16 @@ export function NodeDetail() {
     discovery?.assessment.recommendations.map((recommendation) => recommendation.capability_key) ??
       [],
   );
+
+  // What Discovery already told this Operator to do next, filtered to what is
+  // not done yet: a completed recommendation is not a next step, it is a fact
+  // about the past. Shown as a short, prioritized strip above the full
+  // catalogue so "which of these do I actually need" is answered before the
+  // Operator has to scan or scroll at all.
+  const nextRecommendations =
+    discovery?.assessment.recommendations.filter(
+      (recommendation) => !states[recommendation.capability_key],
+    ) ?? [];
 
   // The badge that matches a Capability's state here: a completion SlideOps
   // recorded, an outcome found already in place on the server, or -- when
@@ -269,6 +282,42 @@ export function NodeDetail() {
     }
   };
 
+  // A Node this page has not itself discovered this visit shows nothing --
+  // no recommendations, no Discovery panel -- even when a real Discovery is
+  // already on record from an earlier visit or a previous Operation, since
+  // nothing here ever read it back. Loading the saved one is free: it never
+  // reconnects, only replays what was already learned. A Node that has never
+  // been discovered at all has nothing saved to load, so its first real
+  // Discovery runs on its own instead -- an Operator should never have to
+  // click Discover themselves just to see information SlideOps already had
+  // the means to show the moment the page loaded. A later Discovery is still
+  // always the Operator's own choice, via the button above.
+  useEffect(() => {
+    if (nodeResult.state.status !== 'ready' || discovering || discovery) {
+      return;
+    }
+    if (nodeResult.state.data.last_discovered_at) {
+      let active = true;
+      getSavedDiscovery(id)
+        .then((saved) => {
+          if (active && saved.found && saved.facts && saved.assessment) {
+            setDiscovery({ facts: saved.facts, assessment: saved.assessment });
+          }
+        })
+        .catch(() => {
+          // The saved read is a convenience; a failure here still leaves the
+          // Discover button as a working path to the same information.
+        });
+      return () => {
+        active = false;
+      };
+    }
+    if (canWrite) {
+      void runDiscovery();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeResult.state.status, id]);
+
   return (
     <OperatorShell active="nodes">
       <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate('/app/nodes')}>
@@ -351,6 +400,12 @@ export function NodeDetail() {
 
                   <NodeHealth nodeId={id} />
 
+                  {/* What this server is actually routing, against what SlideOps
+                      put on it. Beside health rather than under Discovery: it is
+                      a standing question about the server, not something a scan
+                      produces. */}
+                  <NodeRoutes nodeId={id} />
+
                   <Section title="Discovery" adornment={<Guidance for="node.discover" />}>
                     {discovering ? <Loading label="Reading the Node, read only" /> : null}
                     {discoverError ? (
@@ -364,6 +419,9 @@ export function NodeDetail() {
                         Assessment, and never changes anything.
                       </Text>
                     ) : null}
+                    {discovery?.repairs?.length ? (
+                      <DiscoveryRepairs repairs={discovery.repairs} />
+                    ) : null}
                     {discovery ? <DiscoveryScan result={discovery} /> : null}
                   </Section>
                 </>
@@ -375,6 +433,37 @@ export function NodeDetail() {
 
           {activeTab === 'capabilities' ? (
             <div>
+              {nextRecommendations.length > 0 ? (
+                <Section title="Do this next" className="mb-5">
+                  <div className="flex flex-col divide-y divide-border">
+                    {nextRecommendations.map((recommendation) => (
+                      <div
+                        key={recommendation.capability_key}
+                        className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <Text variant="body-sm" className="font-medium">
+                            {recommendation.title ?? recommendation.capability_key}
+                          </Text>
+                          <Text variant="caption" tone="secondary" className="block">
+                            {recommendation.reason}
+                          </Text>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            navigate(`/app/capabilities/${recommendation.capability_key}?node=${id}`)
+                          }
+                        >
+                          Start
+                          <ArrowRight width={15} height={15} aria-hidden />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              ) : null}
+
               <div className="mb-3 flex items-center gap-2">
                 <Text variant="h3">Available Capabilities</Text>
                 <Guidance for="node.capabilities" />

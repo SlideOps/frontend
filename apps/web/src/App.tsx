@@ -9,10 +9,10 @@ import { LogoLoader } from './components/LogoLoader';
 import { RequireAdmin } from './components/RequireAdmin';
 import { RequireAuth } from './components/RequireAuth';
 import { MarketingLayout } from './marketing/MarketingLayout';
+import { docsRoutes } from './marketing/docs-site';
 import {
   AudiencePage,
   CapabilitiesPage,
-  DocsPage,
   MarketingHome,
   PricingPage,
   StoryPage,
@@ -42,9 +42,7 @@ const NodeRegister = lazy(() =>
 const NodeDetail = lazy(() =>
   import('./app/screens/NodeDetail').then((m) => ({ default: m.NodeDetail })),
 );
-const SSHKeys = lazy(() =>
-  import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })),
-);
+const SSHKeys = lazy(() => import('./app/screens/SSHKeys').then((m) => ({ default: m.SSHKeys })));
 const Snippets = lazy(() =>
   import('./app/screens/Snippets').then((m) => ({ default: m.Snippets })),
 );
@@ -115,6 +113,12 @@ const TransactionDetail = lazy(() =>
   import('./app/screens/TransactionDetail').then((m) => ({ default: m.TransactionDetail })),
 );
 const Team = lazy(() => import('./app/screens/Team').then((m) => ({ default: m.Team })));
+const Networking = lazy(() =>
+  import('./app/screens/Networking').then((m) => ({ default: m.Networking })),
+);
+const OperatorDomains = lazy(() =>
+  import('./app/screens/Domains').then((m) => ({ default: m.Domains })),
+);
 
 // Admin control plane.
 const Overview = lazy(() =>
@@ -156,6 +160,9 @@ const SubscriberDetail = lazy(() =>
 const Arrangements = lazy(() =>
   import('./admin/screens/Arrangements').then((m) => ({ default: m.Arrangements })),
 );
+const ArrangementDetail = lazy(() =>
+  import('./admin/screens/ArrangementDetail').then((m) => ({ default: m.ArrangementDetail })),
+);
 const PaymentDetail = lazy(() =>
   import('./admin/screens/PaymentDetail').then((m) => ({ default: m.PaymentDetail })),
 );
@@ -175,6 +182,9 @@ const WebhookDeliveries = lazy(() =>
 );
 const RateLimits = lazy(() =>
   import('./admin/screens/RateLimits').then((m) => ({ default: m.RateLimits })),
+);
+const AdminDomains = lazy(() =>
+  import('./admin/screens/Domains').then((m) => ({ default: m.Domains })),
 );
 const EmailDeliveries = lazy(() =>
   import('./admin/screens/EmailDeliveries').then((m) => ({ default: m.EmailDeliveries })),
@@ -198,7 +208,9 @@ export function App() {
           <Route path="/story" element={<StoryPage />} />
           <Route path="/capabilities" element={<CapabilitiesPage />} />
           <Route path="/audience" element={<AudiencePage />} />
-          <Route path="/docs" element={<DocsPage />} />
+          {/* The documentation site. /docs is its index and every page lives
+              at /docs/<section>/<page>, in manifest order. */}
+          {docsRoutes()}
           <Route path="/pricing" element={<PricingPage />} />
         </Route>
 
@@ -243,6 +255,8 @@ export function App() {
           <Route path="billing/transactions/:reference" element={<TransactionDetail />} />
           <Route path="security" element={<Security />} />
           <Route path="team" element={<Team />} />
+          <Route path="networking" element={<Networking />} />
+          <Route path="domains" element={<OperatorDomains />} />
           {/* The standalone shells sit inside the authenticated area so they are
               guarded like everything else, but they render no application
               navigation: the page is one terminal and nothing more. */}
@@ -265,12 +279,14 @@ export function App() {
           <Route path="subscribers/:id" element={<SubscriberDetail />} />
           <Route path="subscribers/:id/payments/:reference" element={<PaymentDetail />} />
           <Route path="arrangements" element={<Arrangements />} />
+          <Route path="arrangements/:id" element={<ArrangementDetail />} />
           <Route path="billing-communications" element={<BillingCommunications />} />
           <Route path="emergency" element={<Emergency />} />
           <Route path="feature-flags" element={<FeatureFlags />} />
           <Route path="webhooks" element={<WebhookDeliveries />} />
           <Route path="rate-limits" element={<RateLimits />} />
           <Route path="email-deliveries" element={<EmailDeliveries />} />
+          <Route path="domains" element={<AdminDomains />} />
         </Route>
 
         {/* Anything else returns to the marketing home. */}

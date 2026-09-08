@@ -2,6 +2,7 @@ import {
   ApiError,
   listTransactions,
   resumeCheckout,
+  TransactionActionError,
   transactionSummary,
   transactionsExportCSVURL,
   type Transaction,
@@ -13,6 +14,7 @@ import { EmptyState, PageHeader } from '@slideops/ui';
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../billing-format';
+import { transactionDetailPath } from '../billing-routes';
 import { transactionsOverTimeOption } from '../charts/options';
 import { BillingTabs } from '../components/BillingTabs';
 import { LazyChart } from '../components/LazyChart';
@@ -197,7 +199,10 @@ export function Transactions() {
       window.location.href = result.checkout_url;
     } catch (error) {
       setActionError(
-        error instanceof ApiError
+        // resumeCheckout reports a refusal as a TransactionActionError, which
+        // does not extend ApiError, so matching only ApiError here threw the
+        // server's own explanation away and showed a guess in its place.
+        error instanceof ApiError || error instanceof TransactionActionError
           ? error.message
           : 'That payment could not be resumed. Open it to see more, or try again.',
       );
@@ -402,7 +407,7 @@ export function Transactions() {
                 <TransactionRow
                   key={transaction.reference}
                   transaction={transaction}
-                  onOpen={() => navigate(`/app/billing/transactions/${transaction.reference}`)}
+                  onOpen={() => navigate(transactionDetailPath(transaction.reference))}
                   onComplete={() => runComplete(transaction.reference)}
                   completing={completing === transaction.reference}
                 />

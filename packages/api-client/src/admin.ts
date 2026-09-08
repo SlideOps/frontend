@@ -1,4 +1,4 @@
-import type { PayCurrency, PaymentProvider } from './billing';
+import type { PaymentProvider } from './billing';
 import { apiBase, apiRequest, unwrap } from './http';
 import type { TierName } from './tier';
 import type { OperationStatus, OperatorRole } from './types';
@@ -409,12 +409,7 @@ export interface AdminSubscriber {
  *  Transaction status vocabulary exactly -- there is one status system, not
  *  a separate Admin one. */
 export type AdminPaymentStatus =
-  | 'pending'
-  | 'success'
-  | 'failed'
-  | 'cancelled'
-  | 'refunded'
-  | 'disputed';
+  'pending' | 'success' | 'failed' | 'cancelled' | 'refunded' | 'disputed';
 
 /** One payment attempt, successful or not. */
 export interface AdminPayment {
@@ -933,8 +928,14 @@ export function deleteSupportNote(operatorId: string, noteId: string): Promise<v
  * through the normal payment webhook, once the customer actually pays.
  */
 
-/** Why this arrangement exists, which decides how it reached its Status. */
-export type ArrangementCondition = 'offline_settled' | 'temporary_access' | 'payment_required';
+/**
+ * Why this arrangement exists, which decides how it reached its Status.
+ *
+ * `free_grant` is a deliberate gift and not a debt: access given at no charge,
+ * as a decision, distinct from access granted with a payment still pending.
+ */
+export type ArrangementCondition =
+  'offline_settled' | 'temporary_access' | 'payment_required' | 'free_grant';
 
 /** The arrangement's own lifecycle, distinct from the subscription or payment it may involve. */
 export type ArrangementStatus =
@@ -945,8 +946,32 @@ export interface Arrangement {
   id: string;
   operator_id: string;
   tier: string;
-  amount_minor: number;
+  /**
+   * What is owed, in minor units. Absent or null when the backend has not
+   * stated one, which is not the same as zero: a zero would read as "owes
+   * nothing" on every screen that shows it.
+   */
+  amount_minor?: number | null;
   currency?: string;
+  /**
+   * How many months the amount covers, and what the figure was worked out from.
+   *
+   * Zero means no term was recorded, which is true of every arrangement made
+   * before the backend started keeping one. That is an unknown term and never a
+   * term of zero months, so nothing may be priced or displayed from it.
+   */
+  term_months?: number;
+  /**
+   * When this arrangement last changed, which is the revision a mutation echoes
+   * back as `if_unchanged_since`.
+   *
+   * It was missing from this type while the backend had always returned it, so
+   * nothing could reach for it and the detail reader fell through to
+   * `created_at` instead. That sent the moment the arrangement was made in place
+   * of the moment it last changed, and every save after the first was correctly
+   * refused as overtaken.
+   */
+  updated_at?: string;
   condition: ArrangementCondition;
   status: ArrangementStatus;
   /** When an offline payment was actually made, set only for offline_settled. */
@@ -957,11 +982,41 @@ export interface Arrangement {
   auto_expire_on_deadline: boolean;
   /** The SlideOps payment reference this arrangement is tied to, when one exists. */
   payment_reference?: string;
+  /**
+   * The discount code this was arranged under, when one was applied.
+   *
+   * Kept on the record rather than only in the figure, because months later the
+   * question is not what the amount was but why it was that amount, and a total
+   * on its own cannot answer that.
+   */
+  promo_code?: string;
   /** The Admin's own paper trail for an offline payment: a bank reference, a receipt number. */
   external_reference?: string;
   notes?: string;
   created_by_operator_id: string;
   created_at: string;
+  /**
+   * The revocation record, present only once access has been taken back.
+   *
+   * The backend has always returned all three. Only revoked_at was declared
+   * here, so a screen could tell that a revocation had happened but could not
+   * say why or by whom, and none of it was shown anywhere.
+   */
+  revoked_at?: string;
+  revoked_by_operator_id?: string;
+  revocation_reason?: string;
+  /**
+   * The paid plan this grant displaced, absent when it displaced nothing.
+   *
+   * An Operator has one subscription, so a grant overwrites whatever was there.
+   * This is what revoking returns them to: what it is before revoking, what
+   * they got back after.
+   */
+  superseded_subscription?: {
+    tier: string;
+    provider?: string;
+    current_period_end?: string;
+  };
 }
 
 /** Every payment arrangement ever created for one Operator, newest first. */
@@ -972,9 +1027,27 @@ export function listArrangements(operatorId: string, signal?: AbortSignal): Prom
   ).then((r) => (Array.isArray(r) ? r : (r.arrangements ?? [])));
 }
 
-/** One arrangement on the Admin-wide list, with the Operator it belongs to. */
+/**
+ * One arrangement on the Admin-wide list, with the Operator it belongs to.
+ *
+ * The lifecycle fields are optional because the list endpoint predates them.
+ * Where the backend states access and payment itself, the list shows what it
+ * says; where it does not, the reading is derived from the condition and the
+ * status, which the list has always carried. Either way the list never has to
+ * be opened to see what an arrangement is doing.
+ */
 export interface ArrangementWithOperator extends Arrangement {
   operator_email: string;
+  /** Whether the customer currently has access. */
+  access_state?: string;
+  /** Whether the expected payment has arrived. */
+  payment_state?: string;
+  /** When access under this arrangement ends, when it is time limited. */
+  access_end?: string;
+  /** When the customer was last written to about this arrangement. */
+  last_communication_at?: string;
+  /** The revision, for an editor opened straight from the list. */
+  updated_at?: string;
 }
 
 /** Filters listAllArrangements accepts. An empty filter matches everything. */
@@ -1013,16 +1086,139 @@ export function listAllArrangements(
   });
 }
 
+/*
+ * Pricing an arrangement.
+ *
+ * A customer paying for themselves never types an amount: they choose a plan
+ * and a billing period and the figure follows from the price table, the annual
+ * discount, the exchange rate and the tax. An admin arranging the same access
+ * on the customer's behalf gets that same figure from the same place, so the
+ * CRM and the real charge cannot drift apart.
+ */
+
+/**
+ * The currencies this deployment can actually charge in.
+ *
+ * Deliberately not the currencies the tiers happen to be priced in. Every tier
+ * price is written in one currency, and checkout has always been able to charge
+ * another by converting at a live rate, so the price table answers a different
+ * question from the one an admin is asking. Naira appears here only while a
+ * live rate is available, which is why this is read rather than assumed.
+ */
+export function listArrangementCurrencies(signal?: AbortSignal): Promise<string[]> {
+  return apiRequest<{ currencies?: string[] } | string[]>('/admin/arrangements/currencies', {
+    signal,
+  }).then((r) => (Array.isArray(r) ? r : (r.currencies ?? [])));
+}
+
+/**
+ * What an arrangement would cost, worked out by the same pricing the customer's
+ * own checkout uses.
+ *
+ * The breakdown is carried in full rather than as one total because an admin who
+ * cannot see where a figure came from will not trust it, and because the figure
+ * has to be explainable on the day it was quoted: the monthly price in the
+ * tier's own currency, the term it is multiplied by, what a full year takes off,
+ * the tax, and the rate any conversion used.
+ */
+export interface ArrangementQuote {
+  tier: string;
+  term_months: number;
+  /** The currency the tier's own price is written in. */
+  native_currency: string;
+  /** One month at the tier's own price, in native_currency. */
+  unit_amount_minor: number;
+  /** What the customer would be charged in. */
+  currency: string;
+  /** Price times term, converted, before tax. */
+  subtotal_minor: number;
+  /** What a full year takes off, already converted. */
+  annual_discount_minor: number;
+  tax_minor: number;
+  /** What the customer would actually be charged. */
+  total_minor: number;
+  /** The rate the conversion used, absent when no conversion happened. */
+  fx_rate?: number;
+  /**
+   * The discount code the backend actually accepted, absent when none was
+   * applied. Echoed back rather than assumed from what was asked for, so the
+   * breakdown can only name a code the pricing really used.
+   */
+  promo_code?: string;
+  /**
+   * What that code took off, in `currency`, absent when no code was applied.
+   * Worked out by the backend like every other line here; nothing recomputes it.
+   */
+  promo_discount_minor?: number;
+  /**
+   * True when this was asked for as a gift. The tier is deliberately not priced
+   * in that case and the currency comes back empty, so the real figure is never
+   * carried alongside where it could be shown or saved by mistake.
+   */
+  free_grant: boolean;
+  /**
+   * False for a tier with no self serve price, which quotes as zero. That is a
+   * real answer and not a failure: granting such a tier at no charge is an
+   * ordinary thing for an admin to arrange.
+   */
+  purchasable: boolean;
+}
+
+/** What a quote is asked for: a plan, how long for, and what to charge in. */
+export interface ArrangementQuoteInput {
+  tier: string;
+  /** Months of access being arranged. One month when omitted. */
+  termMonths?: number;
+  /** What to charge in. Omitted means the tier's own currency. */
+  currency?: string;
+  /** Ask for this as a gift, which quotes as nothing and prices nothing. */
+  free?: boolean;
+  /** A discount code to price this under. Omitted, and no code is applied. */
+  promoCode?: string;
+}
+
+/**
+ * Quote one arrangement without creating anything. A currency this deployment
+ * cannot charge is refused with a 400 carrying `currency_unsupported`, and a
+ * discount code the backend does not recognise is refused with its own message.
+ */
+export function quoteArrangement(
+  operatorId: string,
+  input: ArrangementQuoteInput,
+  signal?: AbortSignal,
+): Promise<ArrangementQuote> {
+  return apiRequest<{ quote?: ArrangementQuote } & Partial<ArrangementQuote>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/quote`,
+    {
+      query: {
+        tier: input.tier,
+        term_months: input.termMonths,
+        currency: input.currency,
+        free: input.free ? true : undefined,
+        // An empty box is not a code. Sending one would ask the backend to
+        // price against nothing and answer with a refusal nobody asked for.
+        promo_code: input.promoCode || undefined,
+      },
+      signal,
+    },
+  ).then((r) => r.quote ?? (r as ArrangementQuote));
+}
+
 /**
  * Record a payment the customer already made outside SlideOps. Activates
  * the tier immediately under an explicit manual payment source, never a
  * fabricated online provider transaction, and sends the manual payment
  * confirmation email.
+ *
+ * Deliberately carries no discount code. This records what somebody already
+ * paid outside SlideOps, so any reduction in it was negotiated between them and
+ * whoever took the money; applying a code here would claim SlideOps priced a
+ * payment it never took.
  */
 export function recordOfflinePayment(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     amountMinor: number;
     currency: string;
     reference: string;
@@ -1062,12 +1258,14 @@ export function recordOfflinePayment(
 export function grantTemporaryAccess(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     paymentDeadline?: Date;
     autoExpireOnDeadline?: boolean;
     termMonths?: number;
     provider?: PaymentProvider;
-    currency?: PayCurrency;
+    currency?: string;
+    /** A discount code to price the payment behind this grant under. */
+    promoCode?: string;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -1082,12 +1280,40 @@ export function grantTemporaryAccess(
       term_months: input.termMonths ?? 1,
       provider: input.provider,
       currency: input.currency,
+      // Left out entirely when no code was given, so a grant with no discount
+      // says nothing about discounts rather than saying "none" in a field.
+      promo_code: input.promoCode || undefined,
       notes: input.notes ?? '',
     },
   }).then((r) => ({
     arrangement: r.arrangement as Arrangement,
     checkout_url: r.checkout_url ?? '',
   }));
+}
+
+/**
+ * Give a tier away at no charge, as a deliberate decision.
+ *
+ * Distinct from temporary access, which grants ahead of a payment that is still
+ * expected. Nothing is owed here and nothing is ever collected, which is why the
+ * body carries no amount and no currency: there is no charge to denominate, and
+ * a figure sent here could only ever be shown as a debt that does not exist.
+ */
+export function createFreeGrant(
+  operatorId: string,
+  input: { tier: string; termMonths?: number; notes?: string },
+): Promise<Arrangement> {
+  return apiRequest<{ arrangement?: Arrangement } & Partial<Arrangement>>(
+    `/admin/operators/${encodeURIComponent(operatorId)}/arrangements/free-grant`,
+    {
+      method: 'POST',
+      body: {
+        tier: input.tier,
+        term_months: input.termMonths ?? 1,
+        notes: input.notes ?? '',
+      },
+    },
+  ).then((r) => r.arrangement ?? (r as Arrangement));
 }
 
 /** The result of starting a payment-required arrangement: the arrangement plus the real checkout link. */
@@ -1107,11 +1333,13 @@ export interface PaymentRequiredArrangement {
 export function createPaymentRequiredArrangement(
   operatorId: string,
   input: {
-    tier: TierName;
+    tier: string;
     provider: PaymentProvider;
-    currency?: PayCurrency;
+    currency?: string;
     paymentDeadline?: Date;
     termMonths?: number;
+    /** A discount code to price this checkout under. */
+    promoCode?: string;
     notes?: string;
   },
 ): Promise<PaymentRequiredArrangement> {
@@ -1125,6 +1353,8 @@ export function createPaymentRequiredArrangement(
       currency: input.currency,
       payment_deadline: input.paymentDeadline ? input.paymentDeadline.toISOString() : undefined,
       term_months: input.termMonths ?? 1,
+      // Left out entirely when no code was given, for the same reason as above.
+      promo_code: input.promoCode || undefined,
       notes: input.notes ?? '',
     },
   }).then((r) => ({
@@ -1155,4 +1385,432 @@ export function extendArrangementDeadline(arrangementId: string, newDeadline: Da
     `/admin/arrangements/${encodeURIComponent(arrangementId)}/extend-deadline`,
     { method: 'POST', body: { new_deadline: newDeadline.toISOString() } },
   );
+}
+
+/*
+ * The arrangement lifecycle: everything that happens to an arrangement after
+ * it is created.
+ *
+ * Creating one is already covered above. What was missing was the rest of the
+ * customer relationship: reading one arrangement on its own, correcting what
+ * was agreed, taking access back, putting it back, writing to the customer,
+ * and seeing what was already done to it and by whom.
+ *
+ * Two rules hold across every mutation here.
+ *
+ * The revision, `if_unchanged_since`, is the `updated_at` the caller last read,
+ * echoed back. The backend refuses with 409 when the arrangement moved in the
+ * meantime, which is the only way a second admin's correction does not get
+ * silently overwritten by a form that was opened before it.
+ *
+ * The states are carried as plain strings rather than a union. The backend owns
+ * that vocabulary and can add to it; a union here would make this client reject
+ * a value the server legitimately sends, which is a worse failure than showing
+ * an unfamiliar word.
+ */
+
+/** How the customer was last written to under an arrangement. */
+export interface ArrangementEmail {
+  id: string;
+  /** The message type the backend knows it by. */
+  type: string;
+  /** The address it went to. */
+  to: string;
+  subject?: string;
+  /** Whether the send succeeded, in the backend's own words. */
+  outcome: string;
+  detail?: string;
+  sent_at: string;
+  /** Which admin sent it, when the backend records that. */
+  sent_by_email?: string;
+}
+
+/** A message type this arrangement can be sent, as the backend names it. */
+export interface ArrangementEmailType {
+  type: string;
+  label?: string;
+  description?: string;
+  /**
+   * Whether sending this right now would be true of the arrangement.
+   *
+   * An inapplicable one is still listed, with the reason, rather than hidden.
+   * An Admin looking for a particular message should find it and be told why it
+   * is not available yet, not be shown a shorter list and left to guess.
+   */
+  applicable?: boolean;
+  reason?: string;
+}
+
+/**
+ * The messages that can be sent about one arrangement, and whether each is true
+ * of it right now.
+ *
+ * Read from its own endpoint. The detail response never carried these, so the
+ * screen had nothing to offer, no type was ever selected, and the control that
+ * sends returned immediately: pressing it did nothing at all.
+ */
+export function listArrangementEmailTypes(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementEmailType[]> {
+  return apiRequest<{ types?: ArrangementEmailType[] }>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails/types`,
+    { signal },
+  ).then((r) => r.types ?? []);
+}
+
+/** A rendered message, produced without sending anything. */
+export interface ArrangementEmailPreview {
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+}
+
+/**
+ * One arrangement read on its own.
+ *
+ * Access, payment, and what is owed are three separate fields because they are
+ * three separate questions. An arrangement whose access is active, whose payment
+ * has not arrived, and which owes a named sum by a named date is not in a
+ * contradictory state; it is the ordinary state of temporary access, and
+ * collapsing the three into one status is what loses that.
+ */
+export interface ArrangementDetail {
+  arrangement: Arrangement;
+  operator_id: string;
+  operator_email: string;
+  /** Whether the customer currently has access. */
+  access_state: string;
+  /** Whether the expected payment has arrived. */
+  payment_state: string;
+  /** What is owed, in minor units. Absent when the backend has not stated one. */
+  amount_minor?: number | null;
+  currency?: string;
+  /** False when this arrangement carries no payment obligation at all. */
+  amount_applicable?: boolean;
+  /** When access under this arrangement began. */
+  access_start?: string;
+  /** When access under this arrangement ends, when it is time limited. */
+  access_end?: string;
+  payment_deadline?: string;
+  /** The revision to echo back as if_unchanged_since on the next mutation. */
+  updated_at: string;
+  /** When the customer was last written to about this arrangement. */
+  last_communication_at?: string;
+  /** The message types this arrangement can be sent, named by the backend. */
+  email_types?: ArrangementEmailType[];
+}
+
+/**
+ * Read whatever shape the detail arrives in.
+ *
+ * The backend may send the arrangement nested under `arrangement` alongside the
+ * lifecycle fields, or send one flat object. Both are accepted, the same way the
+ * create calls above accept either, so this client does not break on an envelope
+ * decision made after it shipped.
+ */
+function toArrangementDetail(raw: unknown): ArrangementDetail {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  const nested = body.arrangement as Arrangement | undefined;
+  const arrangement = nested ?? (body as unknown as Arrangement);
+  const amount = body.amount_minor as number | null | undefined;
+
+  return {
+    arrangement,
+    operator_id: (body.operator_id as string) ?? arrangement.operator_id ?? '',
+    operator_email: (body.operator_email as string) ?? '',
+    access_state: (body.access_state as string) ?? '',
+    payment_state: (body.payment_state as string) ?? '',
+    // The amount is read from the envelope first and from the arrangement only
+    // as a fallback, and an absent one stays absent: turning "not stated" into
+    // a zero here would put "owes nothing" on a screen the backend never said it.
+    amount_minor: amount === undefined ? arrangement.amount_minor : amount,
+    currency: (body.currency as string) ?? arrangement.currency,
+    amount_applicable: body.amount_applicable as boolean | undefined,
+    access_start: body.access_start as string | undefined,
+    access_end: body.access_end as string | undefined,
+    payment_deadline: (body.payment_deadline as string) ?? arrangement.payment_deadline,
+    // The revision, and nothing that merely looks like one.
+    //
+    // The detail endpoint calls this "revision"; the arrangement inside it
+    // calls the same instant "updated_at". This read neither, so it fell
+    // through to created_at, and every save echoed back the moment the
+    // arrangement was made instead of the moment it last changed. For any
+    // arrangement that had ever been touched those differ, so the server
+    // correctly refused every edit as overtaken, and an Admin was told to
+    // reload and try again forever.
+    //
+    // There is no fallback to another timestamp on purpose. A wrong revision is
+    // worse than none: none means last write wins, wrong means nothing can ever
+    // be saved.
+    updated_at: (body.revision as string) || (arrangement.updated_at as string) || '',
+    last_communication_at: body.last_communication_at as string | undefined,
+    email_types: body.email_types as ArrangementEmailType[] | undefined,
+  };
+}
+
+/** One arrangement, with the access, payment, and obligation readings behind it. */
+export function getArrangement(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}`, {
+    signal,
+  }).then(toArrangementDetail);
+}
+
+/**
+ * A correction to an arrangement. Every field is optional and only the ones
+ * present are sent, so an edit says exactly what it changed and nothing else.
+ * A null clears a date the arrangement no longer has.
+ *
+ * The condition is deliberately absent. Turning a settled payment into a gift
+ * after the fact rewrites what happened rather than correcting it, and revoking,
+ * restoring and granting already exist for changing the arrangement itself.
+ */
+export interface ArrangementUpdate {
+  tier?: string;
+  amountMinor?: number;
+  currency?: string;
+  /** How many months the amount covers. Refused with `invalid_term` when negative. */
+  termMonths?: number;
+  paymentDeadline?: Date | null;
+  accessStart?: Date | null;
+  accessEnd?: Date | null;
+  /** Whether access lapses on its own once the deadline passes with no payment. */
+  autoExpireOnDeadline?: boolean;
+  /** The admin's own paper trail. Recorded as given and never verified. */
+  externalReference?: string;
+  /** When the customer actually paid, for a settlement dated wrongly. */
+  paidAt?: Date | null;
+  notes?: string;
+}
+
+/** Serialize a date field for the wire, keeping an explicit null as a clear. */
+function isoOrNull(value: Date | null): string | null {
+  return value === null ? null : value.toISOString();
+}
+
+/**
+ * Correct what was agreed. Sends only the fields that changed, plus the
+ * revision the editor was working from. A 409 means another admin changed this
+ * first and the caller must show what happened rather than resend. A 400
+ * carrying `invalid_term` means the term was negative.
+ */
+export function updateArrangement(
+  arrangementId: string,
+  changes: ArrangementUpdate,
+  ifUnchangedSince: string,
+): Promise<ArrangementDetail> {
+  // Sent only when there is one. An empty revision is not a revision, and
+  // sending one would ask the server to compare against nothing.
+  const body: Record<string, unknown> = ifUnchangedSince
+    ? { if_unchanged_since: ifUnchangedSince }
+    : {};
+  if (changes.tier !== undefined) {
+    body.tier = changes.tier;
+  }
+  if (changes.amountMinor !== undefined) {
+    body.amount_minor = changes.amountMinor;
+  }
+  if (changes.currency !== undefined) {
+    body.currency = changes.currency;
+  }
+  if (changes.termMonths !== undefined) {
+    body.term_months = changes.termMonths;
+  }
+  if (changes.paymentDeadline !== undefined) {
+    body.payment_deadline = isoOrNull(changes.paymentDeadline);
+  }
+  if (changes.accessStart !== undefined) {
+    body.access_start = isoOrNull(changes.accessStart);
+  }
+  if (changes.accessEnd !== undefined) {
+    body.access_end = isoOrNull(changes.accessEnd);
+  }
+  if (changes.autoExpireOnDeadline !== undefined) {
+    body.auto_expire_on_deadline = changes.autoExpireOnDeadline;
+  }
+  if (changes.externalReference !== undefined) {
+    body.external_reference = changes.externalReference;
+  }
+  if (changes.paidAt !== undefined) {
+    body.paid_at = isoOrNull(changes.paidAt);
+  }
+  if (changes.notes !== undefined) {
+    body.notes = changes.notes;
+  }
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}`, {
+    method: 'PATCH',
+    body,
+  }).then(toArrangementDetail);
+}
+
+/**
+ * Take back the access this arrangement granted. Distinct from cancelling the
+ * arrangement, which calls off the agreement and leaves granted access alone;
+ * this is the deliberate withdrawal of what the customer currently has, so it
+ * demands a reason and carries the revision.
+ */
+export function revokeArrangementAccess(
+  arrangementId: string,
+  reason: string,
+  ifUnchangedSince: string,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/revoke`, {
+    method: 'POST',
+    body: { reason, if_unchanged_since: ifUnchangedSince },
+  }).then(toArrangementDetail);
+}
+
+/**
+ * Put back access that was revoked or that lapsed.
+ *
+ * The reason is sent as the restored arrangement's notes, which is the field
+ * the endpoint has and what "recorded with the restore" means: a restore
+ * creates a new arrangement, and this is what it is written down against. It
+ * used to be sent under a name the endpoint does not accept, which the API
+ * rejects outright rather than ignoring, so giving a reason was the one way to
+ * make a restore fail.
+ */
+export function restoreArrangementAccess(
+  arrangementId: string,
+  reason?: string,
+): Promise<ArrangementDetail> {
+  return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/restore`, {
+    method: 'POST',
+    body: reason ? { notes: reason } : {},
+  }).then(toArrangementDetail);
+}
+
+/** One audited thing that happened to an arrangement. */
+export interface ArrangementTimelineEntry {
+  id: string;
+  /** What happened, as the backend names it. */
+  action: string;
+  actor_email?: string;
+  actor_operator_id?: string;
+  detail?: string;
+  created_at: string;
+}
+
+/** Everything that has happened to one arrangement, newest first. */
+export function listArrangementTimeline(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementTimelineEntry[]> {
+  return apiRequest<{ entries?: ArrangementTimelineEntry[] } | ArrangementTimelineEntry[]>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/timeline`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.entries ?? [])));
+}
+
+/** Every message sent to the customer about one arrangement, newest first. */
+export function listArrangementEmails(
+  arrangementId: string,
+  signal?: AbortSignal,
+): Promise<ArrangementEmail[]> {
+  return apiRequest<{ emails?: ArrangementEmail[] } | ArrangementEmail[]>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails`,
+    { signal },
+  ).then((r) => (Array.isArray(r) ? r : (r.emails ?? [])));
+}
+
+/**
+ * Render a message without sending it. Nothing about the arrangement changes
+ * and the customer is not written to, which is the whole point of being able
+ * to read it first.
+ */
+
+/**
+ * The message envelope, as the endpoints actually return it.
+ *
+ * Both of these answer with `{ message, sent }`, and the message carries its
+ * body as `body_text` and `body_html`. The readers below looked for `preview`
+ * and `email`, found neither, and cast the whole envelope, so every field they
+ * went on to read was undefined: no recipient, no subject, no body. The preview
+ * rendered blank, and because the control that actually sends sits inside the
+ * preview, there was nothing to press either.
+ *
+ * The plain text is what a preview shows. It is what the customer reads when
+ * their client will not render HTML, and it is the version that can be shown in
+ * a page without the message's own styling escaping into it.
+ */
+interface ArrangementMessageEnvelope {
+  message?: {
+    type?: string;
+    to?: string;
+    subject?: string;
+    body_text?: string;
+    body_html?: string;
+  };
+  sent?: boolean;
+}
+
+function readArrangementMessage(body: ArrangementMessageEnvelope): ArrangementEmailPreview {
+  const message = body.message ?? {};
+  return {
+    type: message.type ?? '',
+    to: message.to ?? '',
+    subject: message.subject ?? '',
+    body: message.body_text ?? message.body_html ?? '',
+  };
+}
+
+export function previewArrangementEmail(
+  arrangementId: string,
+  type: string,
+): Promise<ArrangementEmailPreview> {
+  return apiRequest<ArrangementMessageEnvelope>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails/preview`,
+    { method: 'POST', body: { type } },
+  ).then(readArrangementMessage);
+}
+
+/**
+ * Send the message. This is a communication and nothing else: no tier moves,
+ * no access changes, no payment is recorded.
+ */
+export function sendArrangementEmail(
+  arrangementId: string,
+  type: string,
+): Promise<ArrangementEmailPreview> {
+  return apiRequest<ArrangementMessageEnvelope>(
+    `/admin/arrangements/${encodeURIComponent(arrangementId)}/emails`,
+    { method: 'POST', body: { type } },
+  ).then(readArrangementMessage);
+}
+
+/**
+ * One hostname on the platform with the whole chain behind it.
+ *
+ * The four states are separate because they fail separately, and the question an
+ * admin has is which of them broke: a domain whose DNS is verified and whose
+ * certificate is missing is a different problem from one that never resolved.
+ */
+export interface AdminDomain {
+  hostname: string;
+  workspace_id: string;
+  project_id?: string;
+  service_id: string;
+  node_id?: string;
+  state: string;
+  state_detail: string;
+  dns_observed?: string;
+  tls_state: string;
+  serving: boolean;
+  target_port: number;
+  ingress_kind: string;
+  dns_mode: string;
+  last_error?: string;
+  dns_checked_at?: string;
+  last_verified_at?: string;
+  tls_expires_at?: string;
+  created_at: string;
+}
+
+/** Every domain on the platform, newest first. Admin only, and read only. */
+export function listAdminDomains(): Promise<AdminDomain[]> {
+  return apiRequest<{ domains: AdminDomain[] }>('/admin/domains').then((r) => r.domains ?? []);
 }
