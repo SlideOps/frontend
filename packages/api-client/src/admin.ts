@@ -1522,8 +1522,7 @@ function toArrangementDetail(raw: unknown): ArrangementDetail {
     // There is no fallback to another timestamp on purpose. A wrong revision is
     // worse than none: none means last write wins, wrong means nothing can ever
     // be saved.
-    updated_at:
-      (body.revision as string) || (arrangement.updated_at as string) || '',
+    updated_at: (body.revision as string) || (arrangement.updated_at as string) || '',
     last_communication_at: body.last_communication_at as string | undefined,
     email_types: body.email_types as ArrangementEmailType[] | undefined,
   };
@@ -1643,14 +1642,23 @@ export function revokeArrangementAccess(
   }).then(toArrangementDetail);
 }
 
-/** Put back access that was revoked or that lapsed. */
+/**
+ * Put back access that was revoked or that lapsed.
+ *
+ * The reason is sent as the restored arrangement's notes, which is the field
+ * the endpoint has and what "recorded with the restore" means: a restore
+ * creates a new arrangement, and this is what it is written down against. It
+ * used to be sent under a name the endpoint does not accept, which the API
+ * rejects outright rather than ignoring, so giving a reason was the one way to
+ * make a restore fail.
+ */
 export function restoreArrangementAccess(
   arrangementId: string,
   reason?: string,
 ): Promise<ArrangementDetail> {
   return apiRequest<unknown>(`/admin/arrangements/${encodeURIComponent(arrangementId)}/restore`, {
     method: 'POST',
-    body: reason ? { reason } : {},
+    body: reason ? { notes: reason } : {},
   }).then(toArrangementDetail);
 }
 
