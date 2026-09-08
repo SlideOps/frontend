@@ -43,7 +43,12 @@ import { AdminShell } from '../components/AdminShell';
 import { ArrangementStatusBadge } from '../components/Badges';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorNote, Loading } from '../components/Feedback';
-import { CurrencySelect, QuoteBreakdown, TermMonthsField } from '../components/Pricing';
+import {
+  CurrencySelect,
+  PromoCodeField,
+  QuoteBreakdown,
+  TermMonthsField,
+} from '../components/Pricing';
 import { TBody, TD, TH, THead, TR, Table } from '../components/Table';
 import {
   amountDifferenceNote,
@@ -368,6 +373,8 @@ export function SubscriberDetail() {
   const [tempTermMonths, setTempTermMonths] = useState('1');
   const [tempProvider, setTempProvider] = useState<PaymentProvider>('paystack');
   const [tempCurrency, setTempCurrency] = useState('');
+  /** A discount code to price this grant under, when the admin has one. */
+  const [tempPromoCode, setTempPromoCode] = useState('');
   const [tempNotes, setTempNotes] = useState('');
   /*
    * Whether this is a gift rather than a grant ahead of payment.
@@ -388,6 +395,7 @@ export function SubscriberDetail() {
     setTempTermMonths('1');
     setTempProvider('paystack');
     setTempCurrency('');
+    setTempPromoCode('');
     setTempNotes('');
     setTempFreeGrant(false);
   };
@@ -402,6 +410,7 @@ export function SubscriberDetail() {
     termMonths: Number(tempTermMonths),
     currency: tempCurrency,
     free: tempFreeGrant,
+    promoCode: tempPromoCode,
     enabled: grantingAccess,
   });
 
@@ -437,6 +446,9 @@ export function SubscriberDetail() {
         termMonths: Number(tempTermMonths) || 1,
         provider: tempProvider,
         currency: tempCurrency || undefined,
+        // The same code the figure above was quoted under, so the payment the
+        // backend raises is the one the admin was just shown.
+        promoCode: tempPromoCode.trim() || undefined,
         notes: tempNotes,
       });
       setActionMessage(
@@ -481,6 +493,8 @@ export function SubscriberDetail() {
   }, [chargeableCurrencies]);
   const [checkoutDeadline, setCheckoutDeadline] = useState('');
   const [checkoutTermMonths, setCheckoutTermMonths] = useState('1');
+  /** A discount code to price this checkout under, when the admin has one. */
+  const [checkoutPromoCode, setCheckoutPromoCode] = useState('');
   const [checkoutNotes, setCheckoutNotes] = useState('');
 
   const checkoutTierValue = checkoutTier || purchasableTierNames[0] || '';
@@ -491,6 +505,7 @@ export function SubscriberDetail() {
     setCheckoutCurrency('');
     setCheckoutDeadline('');
     setCheckoutTermMonths('1');
+    setCheckoutPromoCode('');
     setCheckoutNotes('');
   };
 
@@ -500,6 +515,7 @@ export function SubscriberDetail() {
     tier: checkoutTierValue,
     termMonths: Number(checkoutTermMonths),
     currency: checkoutCurrency,
+    promoCode: checkoutPromoCode,
     enabled: creatingCheckout,
   });
 
@@ -517,6 +533,9 @@ export function SubscriberDetail() {
         currency: checkoutCurrency || undefined,
         paymentDeadline: checkoutDeadline ? new Date(checkoutDeadline) : undefined,
         termMonths: Number(checkoutTermMonths) || 1,
+        // The same code the figure above was quoted under, so the link the
+        // customer opens asks for exactly what the admin was shown.
+        promoCode: checkoutPromoCode.trim() || undefined,
         notes: checkoutNotes,
       });
       setActionMessage('Checkout started. The tier activates automatically once they pay.');
@@ -1258,9 +1277,21 @@ export function SubscriberDetail() {
                 hint="Used only to price the real payment behind this grant. If no provider is configured on this deployment, access is still granted with nothing to resume."
               />
             )}
+            {/* A gift has no charge for a code to come off, so the box is not
+                offered rather than offered and ignored. */}
+            {tempFreeGrant ? null : (
+              <PromoCodeField
+                id="temp-promo-code"
+                value={tempPromoCode}
+                onChange={setTempPromoCode}
+                state={tempQuote.state}
+                hint="Optional. Applied by the price table, and shown in the breakdown below before you grant."
+              />
+            )}
             <QuoteBreakdown
               state={tempQuote.state}
               availableCurrencies={chargeableCurrencies}
+              promoCode={tempFreeGrant ? undefined : tempPromoCode}
               caption={
                 tempFreeGrant
                   ? 'What this grant asks for'
@@ -1345,9 +1376,17 @@ export function SubscriberDetail() {
               value={checkoutTermMonths}
               onChange={setCheckoutTermMonths}
             />
+            <PromoCodeField
+              id="checkout-promo-code"
+              value={checkoutPromoCode}
+              onChange={setCheckoutPromoCode}
+              state={checkoutQuote.state}
+              hint="Optional. Applied by the price table, and shown in the breakdown below before the link goes out."
+            />
             <QuoteBreakdown
               state={checkoutQuote.state}
               availableCurrencies={chargeableCurrencies}
+              promoCode={checkoutPromoCode}
               caption="What the customer will be asked for"
             />
             <Field

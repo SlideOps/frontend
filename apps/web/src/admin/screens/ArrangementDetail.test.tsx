@@ -803,3 +803,56 @@ describe('choosing a message to send', () => {
     expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
   });
 })
+
+/*
+ * The code behind the figure.
+ *
+ * Months after a grant is made the question is not what the amount was but why
+ * it was that amount. A total on its own cannot answer that, so the code the
+ * arrangement was priced under is kept on the record and shown back.
+ */
+describe('the discount an arrangement was granted under', () => {
+  it('shows the code on the arrangement when one was applied', async () => {
+    api.getArrangement.mockResolvedValue({
+      ...detail,
+      arrangement: { ...detail.arrangement, promo_code: 'SAVE20' },
+    });
+    renderScreen();
+
+    expect(await screen.findByText('Discount code')).toBeInTheDocument();
+    expect(screen.getByText('SAVE20')).toBeInTheDocument();
+  });
+
+  it('shows no discount code row at all when the arrangement carries none', async () => {
+    renderScreen();
+    await screen.findByRole('heading', { name: 'chidi@example.test' });
+
+    // Absent rather than shown as "none": a row on every arrangement ever made
+    // would answer a question nobody asked and bury the ones that do carry one.
+    expect(screen.queryByText('Discount code')).toBeNull();
+  });
+
+  it('prices a re-quote under the code the arrangement already carries', async () => {
+    api.getArrangement.mockResolvedValue({
+      ...detail,
+      arrangement: { ...detail.arrangement, promo_code: 'SAVE20' },
+    });
+    renderScreen();
+    await priceFor('12', 'USD');
+
+    // Without this the editor would re-quote at full price and quietly save the
+    // customer a larger debt than the one they agreed to.
+    await waitFor(() =>
+      expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBe('SAVE20'),
+    );
+    expect(screen.getByLabelText('Discount code')).toHaveValue('SAVE20');
+  });
+
+  it('sends no code from the editor when the arrangement was priced without one', async () => {
+    renderScreen();
+    await priceFor('12', 'USD');
+
+    await waitFor(() => expect(api.quoteArrangement).toHaveBeenCalled());
+    expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBeUndefined();
+  });
+});

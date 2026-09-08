@@ -1,3 +1,4 @@
+import { ApiError } from '@slideops/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -54,6 +55,12 @@ const arrangement = {
   created_at: '2026-07-01T00:00:00Z',
 };
 
+/** The only discount code the stand-in backend below knows about. */
+const knownCode = 'SAVE20';
+
+/** What that code takes off, worked out by the backend and never by a screen. */
+const codeDiscountMinor = 250000;
+
 /**
  * A quote the way the backend gives one. Every tier here is priced in USD, so a
  * Naira figure can only come from a conversion the backend did.
@@ -63,6 +70,7 @@ function quoteFor(input: {
   termMonths?: number;
   currency?: string;
   free?: boolean;
+  promoCode?: string;
 }) {
   const months = input.termMonths ?? 1;
   if (input.free) {
@@ -83,20 +91,26 @@ function quoteFor(input: {
     };
   }
   const charged = input.currency || 'USD';
-  const total = 1250000 * months;
+  const subtotal = 1250000 * months;
+  // The backend is the only thing that decides whether a code applies and what
+  // it is worth, so the stand-in decides it here and the screen only renders it.
+  const applied = input.promoCode === knownCode;
+  const off = applied ? codeDiscountMinor : 0;
   return {
     tier: input.tier,
     term_months: months,
     native_currency: 'USD',
     unit_amount_minor: 4900,
     currency: charged,
-    subtotal_minor: total,
+    subtotal_minor: subtotal,
     annual_discount_minor: 0,
     tax_minor: 0,
-    total_minor: total,
+    total_minor: subtotal - off,
     fx_rate: charged === 'USD' ? undefined : 1600,
     purchasable: true,
     free_grant: false,
+    promo_code: applied ? input.promoCode : undefined,
+    promo_discount_minor: applied ? off : undefined,
   };
 }
 
@@ -342,5 +356,121 @@ describe('giving access at no charge', () => {
     expect(within(row).getByText('No charge')).toBeInTheDocument();
     expect(within(row).queryByText(/due/i)).toBeNull();
     expect(within(row).queryByText(/0\.00/)).toBeNull();
+  });
+});
+
+/*
+ * A discount applied to a grant.
+ *
+ * The code is one more input to the quote, exactly like the plan and the term.
+ * Nothing here works out what a code is worth: the backend prices it and the
+ * screen shows the answer, which is the only way the figure the admin approves
+ * and the figure the customer is charged can be the same figure.
+ */
+describe('granting access under a discount code', () => {
+  it('sends a code typed on a temporary access grant to the quote and to the grant itself', async () => {
+    renderScreen();
+    const dialog = await openDialog('Grant temporary access');
+
+    await userEvent.type(within(dialog).getByLabelText('Discount code'), knownCode);
+
+    await waitFor(() =>
+      expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBe(knownCode),
+    );
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Grant access' }));
+
+    await waitFor(() => expect(api.grantTemporaryAccess).toHaveBeenCalledTimes(1));
+    expect(api.grantTemporaryAccess.mock.calls[0]![1].promoCode).toBe(knownCode);
+  });
+
+  it('sends a code typed on a payment required checkout to the quote and to the request itself', async () => {
+    renderScreen();
+    const dialog = await openDialog('Start a checkout');
+
+    await userEvent.type(within(dialog).getByLabelText('Discount code'), knownCode);
+
+    await waitFor(() =>
+      expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBe(knownCode),
+    );
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Start checkout' }));
+
+    await waitFor(() => expect(api.createPaymentRequiredArrangement).toHaveBeenCalledTimes(1));
+    expect(api.createPaymentRequiredArrangement.mock.calls[0]![1].promoCode).toBe(knownCode);
+  });
+
+  it('names the discount by its code in the breakdown and says what it took off', async () => {
+    renderScreen();
+    const dialog = await openDialog('Grant temporary access');
+
+    await userEvent.type(within(dialog).getByLabelText('Discount code'), knownCode);
+
+    // The line is named after the code the backend said it applied, and carries
+    // the figure the backend worked out rather than one recomputed here.
+    expect(await within(dialog).findByText(`Discount ${knownCode}`)).toBeInTheDocument();
+    const line = within(dialog).getByText(`Discount ${knownCode}`).parentElement as HTMLElement;
+    expect(within(line).getByText(/^-/)).toBeInTheDocument();
+    expect(within(line).getByText(/2,500\.00/)).toBeInTheDocument();
+  });
+
+  it('sends no code and shows nothing about a discount when the box is left empty', async () => {
+    renderScreen();
+    const dialog = await openDialog('Grant temporary access');
+
+    await waitFor(() => expect(api.quoteArrangement).toHaveBeenCalled());
+    expect(api.quoteArrangement.mock.calls.at(-1)![1].promoCode).toBeUndefined();
+    // Read off the breakdown's own labels, so the "Discount code" box above it
+    // cannot be mistaken for a discount line that was never drawn.
+    const labels = Array.from(dialog.querySelectorAll('dt')).map((term) => term.textContent);
+    expect(labels.some((label) => label?.startsWith('Discount'))).toBe(false);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Grant access' }));
+
+    await waitFor(() => expect(api.grantTemporaryAccess).toHaveBeenCalledTimes(1));
+    expect(api.grantTemporaryAccess.mock.calls[0]![1].promoCode).toBeUndefined();
+  });
+
+  it('shows the backend words beside the box and refuses to grant, when a code is not recognised', async () => {
+    api.quoteArrangement.mockImplementation((_operatorId, input) =>
+      input.promoCode === knownCode || input.promoCode === undefined
+        ? Promise.resolve(quoteFor(input))
+        : Promise.reject(
+            new ApiError(400, 'promo_code_unknown', 'That discount code does not exist.'),
+          ),
+    );
+    renderScreen();
+    const dialog = await openDialog('Grant temporary access');
+
+    await userEvent.type(within(dialog).getByLabelText('Discount code'), 'NOPE');
+
+    // Said against the box that caused it, in the backend's own words, and said
+    // once: the breakdown does not repeat the same sentence underneath.
+    const box = within(dialog).getByLabelText('Discount code');
+    await waitFor(() => expect(box).toBeInvalid());
+    expect(box).toHaveAccessibleDescription(
+      expect.stringContaining('That discount code does not exist.'),
+    );
+    expect(within(dialog).getAllByText('That discount code does not exist.')).toHaveLength(1);
+    // Nothing may be granted on a figure that was never worked out.
+    expect(within(dialog).getByRole('button', { name: 'Grant access' })).toBeDisabled();
+    expect(api.grantTemporaryAccess).not.toHaveBeenCalled();
+  });
+
+  it('offers no discount code when recording a payment made outside SlideOps', async () => {
+    renderScreen();
+    const dialog = await openDialog('Record offline payment');
+
+    // A reduction on a payment somebody already made was negotiated with
+    // whoever took the money, so there is no code for SlideOps to apply.
+    expect(within(dialog).queryByLabelText('Discount code')).toBeNull();
+  });
+
+  it('offers no discount code on a gift, which has no charge to take one off', async () => {
+    renderScreen();
+    const dialog = await openDialog('Grant temporary access');
+    await userEvent.click(within(dialog).getByLabelText('Give this away at no charge'));
+
+    expect(within(dialog).queryByLabelText('Discount code')).toBeNull();
   });
 });

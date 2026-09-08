@@ -6,8 +6,10 @@ import {
   type BillingArrangement,
 } from '@slideops/api-client';
 import { Button, Card, Text, cn } from '@slideops/design-system';
-import { Banknote, CalendarClock, Gift } from '@slideops/icons';
+import { ArrowUpRight, Banknote, CalendarClock, Gift } from '@slideops/icons';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { transactionDetailPath } from '../billing-routes';
 import {
   amountReading,
   canComplete,
@@ -31,8 +33,10 @@ import { useAsyncData } from '../hooks/useAsyncData';
  * product to see what for. The only control in front of them started a fresh
  * checkout, which would have raised a second charge beside the payment already
  * waiting for the same debt. This panel answers what they were given, what is
- * owed, by when, and what to do, and the one action it offers returns them to
- * that existing payment through the same resume path Transactions uses.
+ * owed, by when, and what to do, and everything it offers leads to that one
+ * existing payment: resuming it through the same path Transactions uses, and
+ * opening it at the same detail page Transactions opens. Neither ever starts a
+ * second payment.
  *
  * It is an addition to Billing and never a dependency of it: if the
  * arrangements endpoint is unavailable the panel renders nothing at all and
@@ -100,6 +104,27 @@ function AmountLine({ arrangement }: { arrangement: BillingArrangement }) {
   );
 }
 
+/**
+ * The way through to the payment itself.
+ *
+ * The panel used to print the reference and stop there, which named a payment
+ * the Operator then had to go and find in Transactions by hand. This is the
+ * same destination that list opens, reached from the arrangement that raised
+ * it. It is an addition to completing, never a replacement: this one shows the
+ * payment, the button beside it picks the payment back up.
+ */
+function PaymentLink({ reference }: { reference: string }) {
+  return (
+    <Link
+      to={transactionDetailPath(reference)}
+      className="inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-medium text-brand underline transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <ArrowUpRight width={16} height={16} aria-hidden />
+      View payment {reference}
+    </Link>
+  );
+}
+
 /** One live arrangement, in full, with whatever it actually allows. */
 function OpenArrangement({
   arrangement,
@@ -150,19 +175,26 @@ function OpenArrangement({
 
       {completable ? (
         <div className="mt-4">
-          <Button onClick={onComplete} disabled={completing}>
-            <Banknote width={16} height={16} aria-hidden />
-            {completing ? 'Opening your payment' : 'Complete this payment'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={onComplete} disabled={completing}>
+              <Banknote width={16} height={16} aria-hidden />
+              {completing ? 'Opening your payment' : 'Complete this payment'}
+            </Button>
+            {/* Non null: completable is only ever true with a reference. */}
+            <PaymentLink reference={arrangement.payment_reference!} />
+          </div>
           <Text variant="body-sm" tone="secondary" className="mt-2">
-            This takes you back to the payment already open for this arrangement. It does not start
-            a new one, and you will not be charged twice.
+            Completing takes you back to the payment already open for this arrangement. It does not
+            start a new one, and you will not be charged twice. Viewing it opens the payment in
+            full, where you can see everything about it and complete it from there.
           </Text>
-          {arrangement.payment_reference ? (
-            <Text variant="body-sm" tone="secondary" className="mt-1">
-              Payment {arrangement.payment_reference}
-            </Text>
-          ) : null}
+        </div>
+      ) : arrangement.payment_reference ? (
+        // Not resumable, or nothing left to settle, but the payment still
+        // exists and is still the answer to what happened, so it is still
+        // reachable. Only the resuming is withheld.
+        <div className="mt-4">
+          <PaymentLink reference={arrangement.payment_reference} />
         </div>
       ) : isOutstanding(arrangement) ? (
         <Text variant="body-sm" tone="secondary" className="mt-4">
