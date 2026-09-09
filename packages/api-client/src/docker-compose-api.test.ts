@@ -39,12 +39,17 @@ function jsonResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-function lastRequest(fetchMock: ReturnType<typeof vi.spyOn>): {
+// Typed against the shape this needs rather than against vi.spyOn's return,
+// which carries fetch's own overloads and does not match the generic spy type.
+function lastRequest(fetchMock: { mock: { calls: unknown[][] } }): {
   url: URL;
   init: RequestInit;
 } {
-  const call = fetchMock.mock.calls.at(-1) as [URL, RequestInit];
-  return { url: call[0], init: call[1] };
+  const call = fetchMock.mock.calls.at(-1);
+  if (!call) {
+    throw new Error('fetch was never called, so there is no request to read');
+  }
+  return { url: call[0] as URL, init: (call[1] ?? {}) as RequestInit };
 }
 
 afterEach(() => {
@@ -170,7 +175,10 @@ describe('editing the Compose file', () => {
       jsonResponse(200, {
         validation: {
           valid: false,
-          errors: [{ line: 7, message: 'mapping values are not allowed here' }, { message: 'service web names an undeclared network' }],
+          errors: [
+            { line: 7, message: 'mapping values are not allowed here' },
+            { message: 'service web names an undeclared network' },
+          ],
         },
       }),
     );
