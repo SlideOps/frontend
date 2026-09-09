@@ -328,7 +328,11 @@ export function filterContainers(
     ) {
       return false;
     }
-    if (filter.health && filter.health.length > 0 && !filter.health.includes(container.health)) {
+    if (
+      filter.health &&
+      filter.health.length > 0 &&
+      !filter.health.includes(container.health ?? 'none')
+    ) {
       return false;
     }
     if (filter.composeProject && container.compose_project !== filter.composeProject) {
@@ -436,6 +440,9 @@ const stateRank: Record<DockerContainerState, number> = {
   paused: 3,
   created: 4,
   running: 5,
+  // Mid-teardown, so it is on its way out rather than in trouble. It sorts with
+  // the states nobody needs to look at.
+  removing: 6,
 };
 
 /**
@@ -550,7 +557,13 @@ export function summarise(containers: DockerContainer[]): ContainerSummary {
   for (const container of containers) {
     byState[container.state] += 1;
     byOwnership[container.ownership] += 1;
-    byHealth[container.health] += 1;
+    // A verdict outside the four Docker documents counts as uncounted rather
+    // than as a NaN in the tally: an unfamiliar string must not turn the whole
+    // summary into "NaN unhealthy".
+    const health = container.health ?? 'none';
+    if (CONTAINER_HEALTHS.includes(health)) {
+      byHealth[health] += 1;
+    }
   }
 
   return { total: containers.length, byState, byOwnership, byHealth };
@@ -727,10 +740,10 @@ export function attentionItems(
 export function reclaimableBytes(overview: DockerOverview): number {
   const disk = overview.disk;
   return (
-    disk.images_reclaimable_bytes +
-    disk.containers_reclaimable_bytes +
-    disk.volumes_reclaimable_bytes +
-    disk.build_cache_reclaimable_bytes
+    disk.images.bytes_reclaimable +
+    disk.containers.bytes_reclaimable +
+    disk.volumes.bytes_reclaimable +
+    disk.build_cache.bytes_reclaimable
   );
 }
 

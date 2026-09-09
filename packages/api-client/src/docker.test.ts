@@ -77,14 +77,25 @@ describe('reading the state of Docker on a Node', () => {
             compose_projects: 1,
           },
           disk: {
-            images_bytes: 4_000_000_000,
-            images_reclaimable_bytes: 1_500_000_000,
-            containers_bytes: 200_000_000,
-            containers_reclaimable_bytes: 10_000_000,
-            volumes_bytes: 900_000_000,
-            volumes_reclaimable_bytes: 0,
-            build_cache_bytes: 300_000_000,
-            build_cache_reclaimable_bytes: 300_000_000,
+            images: {
+              count: 0,
+              active: 0,
+              bytes_total: 4_000_000_000,
+              bytes_reclaimable: 1_500_000_000,
+            },
+            containers: {
+              count: 0,
+              active: 0,
+              bytes_total: 200_000_000,
+              bytes_reclaimable: 10_000_000,
+            },
+            volumes: { count: 0, active: 0, bytes_total: 900_000_000, bytes_reclaimable: 0 },
+            build_cache: {
+              count: 0,
+              active: 0,
+              bytes_total: 300_000_000,
+              bytes_reclaimable: 300_000_000,
+            },
           },
         },
       }),
@@ -95,7 +106,7 @@ describe('reading the state of Docker on a Node', () => {
     expect(overview.daemon.available).toBe(true);
     expect(overview.daemon.warnings).toEqual(['No swap limit support']);
     expect(overview.counts.running).toBe(3);
-    expect(overview.disk.build_cache_reclaimable_bytes).toBe(300_000_000);
+    expect(overview.disk.build_cache.bytes_reclaimable).toBe(300_000_000);
 
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.method).toBe('GET');

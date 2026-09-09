@@ -52,6 +52,31 @@ function lastRequest(fetchMock: { mock: { calls: unknown[][] } }): {
   return { url: call[0] as URL, init: (call[1] ?? {}) as RequestInit };
 }
 
+/**
+ * The body an apply answers with: the diff it carried out and the stack it left
+ * behind, which is what the endpoint actually sends.
+ */
+function applyResult() {
+  return {
+    project: 'shop',
+    path: '/srv/shop/compose.yaml',
+    command: 'docker compose up -d',
+    diff: {
+      services_added: null,
+      services_removed: null,
+      services_changed: null,
+      recreated: ['shop-web-1'],
+      networks_added: null,
+      networks_removed: null,
+      volumes_added: null,
+      volumes_removed: null,
+      affects_data: false,
+      warnings: null,
+    },
+    state: { name: 'shop', ownership: 'external', config_readable: true },
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -159,7 +184,9 @@ describe('editing the Compose file', () => {
   it('sends the proposed file in the body and never in the query string', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(200, { validation: { valid: true, errors: [] } }));
+      .mockResolvedValue(
+        jsonResponse(200, { validation: { valid: true, issues: [], checked_on_node: true } }),
+      );
     const content = 'services:\n  db:\n    environment:\n      POSTGRES_PASSWORD: hunter2\n';
 
     await validateDockerComposeFile('node-1', 'shop', content);
@@ -175,7 +202,8 @@ describe('editing the Compose file', () => {
       jsonResponse(200, {
         validation: {
           valid: false,
-          errors: [
+          checked_on_node: true,
+          issues: [
             { line: 7, message: 'mapping values are not allowed here' },
             { message: 'service web names an undeclared network' },
           ],
@@ -186,33 +214,41 @@ describe('editing the Compose file', () => {
     const validation = await validateDockerComposeFile('node-1', 'shop', 'services:');
 
     expect(validation.valid).toBe(false);
-    expect(validation.errors).toHaveLength(2);
-    expect(validation.errors[1]?.line).toBeUndefined();
+    expect(validation.issues).toHaveLength(2);
+    expect(validation.issues[1]?.line).toBeUndefined();
   });
 
   it('returns the diff of what applying would change', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(200, {
         diff: {
-          containers_recreated: ['shop-web-1'],
-          images_changed: ['nginx:1.27'],
+          services_added: null,
+          services_removed: null,
+          services_changed: null,
+          recreated: ['shop-web-1'],
           networks_added: [],
           networks_removed: [],
           volumes_added: ['shop_cache'],
-          volumes_removed: ['shop_pgdata'],
+          volumes_removed: [{ name: 'shop_pgdata', exists_on_node: true }],
+          affects_data: true,
+          warnings: null,
         },
       }),
     );
 
     const diff = await diffDockerComposeFile('node-1', 'shop', 'services:');
 
-    expect(diff.volumes_removed).toEqual(['shop_pgdata']);
+    expect(diff.volumes_removed).toEqual([{ name: 'shop_pgdata', exists_on_node: true }]);
+    expect(diff.affects_data).toBe(true);
+    // Lists the server left out arrive as null and must reach a screen as lists.
+    expect(diff.services_added).toEqual([]);
+    expect(diff.warnings).toEqual([]);
   });
 
   it('applies without a data-loss flag when the Operator was not asked for one', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(200, { project: { name: 'shop', services: [] } }));
+      .mockResolvedValue(jsonResponse(200, { result: applyResult() }));
 
     await applyDockerComposeFile('node-1', 'shop', { content: 'services:' });
 
@@ -222,7 +258,7 @@ describe('editing the Compose file', () => {
   it('carries the data-loss confirmation through when one was given', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse(200, { project: { name: 'shop', services: [] } }));
+      .mockResolvedValue(jsonResponse(200, { result: applyResult() }));
 
     await applyDockerComposeFile('node-1', 'shop', {
       content: 'services:',

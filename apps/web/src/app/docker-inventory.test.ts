@@ -90,14 +90,10 @@ function overview(over: Partial<DockerOverview> = {}): DockerOverview {
       compose_projects: 0,
     },
     disk: {
-      images_bytes: 0,
-      images_reclaimable_bytes: 0,
-      containers_bytes: 0,
-      containers_reclaimable_bytes: 0,
-      volumes_bytes: 0,
-      volumes_reclaimable_bytes: 0,
-      build_cache_bytes: 0,
-      build_cache_reclaimable_bytes: 0,
+      images: { count: 0, active: 0, bytes_total: 0, bytes_reclaimable: 0 },
+      containers: { count: 0, active: 0, bytes_total: 0, bytes_reclaimable: 0 },
+      volumes: { count: 0, active: 0, bytes_total: 0, bytes_reclaimable: 0 },
+      build_cache: { count: 0, active: 0, bytes_total: 0, bytes_reclaimable: 0 },
     },
     ...over,
   };
@@ -536,7 +532,12 @@ describe('what is worth an Operator attention, and what is not', () => {
     const under = overview({
       disk: {
         ...overview().disk,
-        images_reclaimable_bytes: RECLAIMABLE_DISK_WARNING_BYTES - 1,
+        images: {
+          count: 0,
+          active: 0,
+          bytes_total: 0,
+          bytes_reclaimable: RECLAIMABLE_DISK_WARNING_BYTES - 1,
+        },
       },
     });
     expect(attentionItems([], [], under)).toEqual([]);
@@ -544,8 +545,18 @@ describe('what is worth an Operator attention, and what is not', () => {
     const over = overview({
       disk: {
         ...overview().disk,
-        images_reclaimable_bytes: RECLAIMABLE_DISK_WARNING_BYTES / 2,
-        build_cache_reclaimable_bytes: RECLAIMABLE_DISK_WARNING_BYTES / 2,
+        images: {
+          count: 0,
+          active: 0,
+          bytes_total: 0,
+          bytes_reclaimable: RECLAIMABLE_DISK_WARNING_BYTES / 2,
+        },
+        build_cache: {
+          count: 0,
+          active: 0,
+          bytes_total: 0,
+          bytes_reclaimable: RECLAIMABLE_DISK_WARNING_BYTES / 2,
+        },
       },
     });
     const items = attentionItems([], [], over);

@@ -151,7 +151,7 @@ function inspect(over: Partial<DockerInspect> = {}): DockerInspect {
       pids_limit: 0,
     },
     networking: {
-      networks: [{ name: 'bridge', ip_address: '172.17.0.4' }],
+      networks: [{ name: 'bridge', ip_address: '172.17.0.4', aliases: [] }],
       ports: [{ container_port: 80, protocol: 'tcp', host_port: 8080 }],
       dns: [],
       hostname: 'f0f0f0f0f0f0',

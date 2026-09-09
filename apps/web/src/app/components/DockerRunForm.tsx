@@ -2,7 +2,7 @@ import {
   ApiError,
   createDockerContainer,
   refusalExplanation,
-  type DockerContainer,
+  type DockerCreatedContainer,
   type DockerRunRequest,
 } from '@slideops/api-client';
 import { Button, Field, Text } from '@slideops/design-system';
@@ -98,7 +98,7 @@ export function DockerRunForm({
    * between a copy and a surprise.
    */
   notCopied?: string[];
-  onCreated?: (container: DockerContainer) => void;
+  onCreated?: (container: DockerCreatedContainer) => void;
 }) {
   const canWrite = useCanWrite();
 
@@ -237,13 +237,20 @@ export function DockerRunForm({
     setCreated(null);
     try {
       const container = await createDockerContainer(nodeId, buildRequest());
-      setCreated(container.name);
+      // The endpoint reports the name it gave the container, and leaves it out
+      // when the runtime named it. The short id identifies it either way.
+      setCreated(container.name ?? container.id);
       onCreated?.(container);
     } catch (caught) {
       // A refusal is the product working, not a fault, so it is explained in
       // the same words the Operator would use rather than shown as a code.
       const refusal = refusalExplanation(caught);
-      setError(refusal ?? (caught instanceof ApiError ? caught.message : 'That container could not be created. Try again.'));
+      setError(
+        refusal ??
+          (caught instanceof ApiError
+            ? caught.message
+            : 'That container could not be created. Try again.'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -316,7 +323,11 @@ export function DockerRunForm({
               inputMode="numeric"
               value={row.hostPort}
               onChange={(event) =>
-                setPorts(ports.map((port, at) => (at === index ? { ...port, hostPort: event.target.value } : port)))
+                setPorts(
+                  ports.map((port, at) =>
+                    at === index ? { ...port, hostPort: event.target.value } : port,
+                  ),
+                )
               }
             />
             <input
@@ -338,7 +349,11 @@ export function DockerRunForm({
               aria-label={`Protocol ${index + 1}`}
               value={row.protocol}
               onChange={(event) =>
-                setPorts(ports.map((port, at) => (at === index ? { ...port, protocol: event.target.value } : port)))
+                setPorts(
+                  ports.map((port, at) =>
+                    at === index ? { ...port, protocol: event.target.value } : port,
+                  ),
+                )
               }
             >
               <option value="tcp">TCP</option>
@@ -366,7 +381,11 @@ export function DockerRunForm({
               placeholder="POSTGRES_PASSWORD"
               value={row.key}
               onChange={(event) =>
-                setEnv(env.map((entry, at) => (at === index ? { ...entry, key: event.target.value } : entry)))
+                setEnv(
+                  env.map((entry, at) =>
+                    at === index ? { ...entry, key: event.target.value } : entry,
+                  ),
+                )
               }
             />
             <input
@@ -376,14 +395,20 @@ export function DockerRunForm({
               autoComplete="off"
               value={row.value}
               onChange={(event) =>
-                setEnv(env.map((entry, at) => (at === index ? { ...entry, value: event.target.value } : entry)))
+                setEnv(
+                  env.map((entry, at) =>
+                    at === index ? { ...entry, value: event.target.value } : entry,
+                  ),
+                )
               }
             />
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              aria-label={revealed.has(index) ? `Hide value ${index + 1}` : `Show value ${index + 1}`}
+              aria-label={
+                revealed.has(index) ? `Hide value ${index + 1}` : `Show value ${index + 1}`
+              }
               onClick={() =>
                 setRevealed((current) => {
                   const next = new Set(current);
@@ -461,8 +486,16 @@ export function DockerRunForm({
       />
 
       {socketRow !== -1 ? (
-        <div role="alert" className="flex items-start gap-3 rounded-md border border-danger bg-surface px-4 py-3">
-          <AlertTriangle width={18} height={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-md border border-danger bg-surface px-4 py-3"
+        >
+          <AlertTriangle
+            width={18}
+            height={18}
+            className="mt-0.5 shrink-0 text-danger"
+            aria-hidden
+          />
           <div>
             <Text variant="body-sm" className="font-medium">
               SlideOps will not mount the Docker socket

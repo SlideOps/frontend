@@ -29,12 +29,16 @@ import {
 
 function diff(overrides: Partial<DockerComposeDiff> = {}): DockerComposeDiff {
   return {
-    containers_recreated: [],
-    images_changed: [],
+    services_added: [],
+    services_removed: [],
+    services_changed: [],
+    recreated: [],
     networks_added: [],
     networks_removed: [],
     volumes_added: [],
     volumes_removed: [],
+    affects_data: false,
+    warnings: [],
     ...overrides,
   };
 }
@@ -199,12 +203,20 @@ describe('the dependency graph', () => {
 describe('summarising a Compose diff', () => {
   it('keeps removed volumes out of the ordinary groups', () => {
     const summary = summariseComposeDiff(
-      diff({ volumes_removed: ['shop_pgdata'], images_changed: ['nginx:1.27'] }),
+      diff({
+        volumes_removed: [{ name: 'shop_pgdata', exists_on_node: true }],
+        affects_data: true,
+        services_changed: [
+          { name: 'web', recreated: true, changes: [{ field: 'image', from: 'a', to: 'b' }] },
+        ],
+      }),
     );
 
     expect(summary.destroysData).toBe(true);
     expect(summary.volumesRemoved).toEqual(['shop_pgdata']);
-    expect(summary.groups.map((group) => group.key)).toEqual(['images_changed']);
+    expect(summary.groups.map((group) => group.key)).toEqual(['services_changed']);
+    // The row names the fields that moved, not just the service.
+    expect(summary.groups[0]?.entries).toEqual(['web: image']);
     expect(summary.changeCount).toBe(2);
   });
 
@@ -233,7 +245,10 @@ describe('the gate in front of Apply', () => {
   });
 
   it('blocks a diff that removes a volume until the data loss is confirmed', () => {
-    const removing = diff({ volumes_removed: ['shop_pgdata'] });
+    const removing = diff({
+      volumes_removed: [{ name: 'shop_pgdata', exists_on_node: true }],
+      affects_data: true,
+    });
 
     const blocked = composeApplyGate({
       diff: removing,
@@ -253,7 +268,7 @@ describe('the gate in front of Apply', () => {
 
   it('lets a diff that removes no volume through without any confirmation', () => {
     const gate = composeApplyGate({
-      diff: diff({ containers_recreated: ['shop-web-1'] }),
+      diff: diff({ recreated: ['shop-web-1'] }),
       dataLossConfirmed: false,
       canWrite: true,
     });
@@ -294,7 +309,9 @@ describe('reporting a bulk run', () => {
   });
 
   it('says when nothing at all worked', () => {
-    const report = summariseBulkOutcomes('remove', [{ name: 'web', ok: false, message: 'refused' }]);
+    const report = summariseBulkOutcomes('remove', [
+      { name: 'web', ok: false, message: 'refused' },
+    ]);
 
     expect(report.allSucceeded).toBe(false);
     expect(report.headline).toContain('None of the 1 container');
@@ -359,7 +376,11 @@ describe('exporting a container', () => {
         ],
         cpuLimitCores: 1.5,
         memoryLimitMb: 512,
-        healthcheck: { test: ['CMD-SHELL', 'curl -f localhost/health'], interval_seconds: 30, retries: 3 },
+        healthcheck: {
+          test: ['CMD-SHELL', 'curl -f localhost/health'],
+          interval_seconds: 30,
+          retries: 3,
+        },
       }),
     );
 
@@ -395,9 +416,7 @@ describe('exporting a container', () => {
   });
 
   it('exposes rather than publishes a port with no host binding', () => {
-    const command = runCommand(
-      source({ ports: [{ container_port: 5432, protocol: 'tcp' }] }),
-    );
+    const command = runCommand(source({ ports: [{ container_port: 5432, protocol: 'tcp' }] }));
 
     expect(command).toContain('--expose 5432');
     expect(command).not.toContain('-p ');
@@ -444,7 +463,7 @@ describe('cloning a container', () => {
       pids_limit: 0,
     },
     networking: {
-      networks: [{ name: 'shop_default', ip_address: '172.18.0.3' }],
+      networks: [{ name: 'shop_default', ip_address: '172.18.0.3', aliases: [] }],
       ports: [{ host_port: 8080, container_port: 80, protocol: 'tcp' }],
       dns: ['1.1.1.1'],
       hostname: 'shop-web',

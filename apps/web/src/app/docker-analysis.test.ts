@@ -124,7 +124,13 @@ describe('rankByCpu', () => {
     const ranking = rankByCpu(containers, stats);
 
     expect(ranking.top).toHaveLength(RANKING_TOP_N);
-    expect(ranking.top.map((entry) => entry.container.name)).toEqual(['c0', 'c1', 'c2', 'c3', 'c4']);
+    expect(ranking.top.map((entry) => entry.container.name)).toEqual([
+      'c0',
+      'c1',
+      'c2',
+      'c3',
+      'c4',
+    ]);
   });
 
   it('matches a sample keyed by the short id as well as the full one', () => {
@@ -140,10 +146,7 @@ describe('rankByMemory', () => {
       container({ name: 'small-limit', full_id: 'f-1', memory_limit_mb: 128 }),
       container({ name: 'no-limit', full_id: 'f-2' }),
     ];
-    const stats = [
-      stat('f-1', { memory_used_mb: 120 }),
-      stat('f-2', { memory_used_mb: 4096 }),
-    ];
+    const stats = [stat('f-1', { memory_used_mb: 120 }), stat('f-2', { memory_used_mb: 4096 })];
 
     const ranking = rankByMemory(containers, stats);
 
@@ -289,14 +292,10 @@ describe('capacitySummary', () => {
         compose_projects: 0,
       },
       disk: {
-        images_bytes: 1000,
-        images_reclaimable_bytes: 400,
-        containers_bytes: 100,
-        containers_reclaimable_bytes: 10,
-        volumes_bytes: 20,
-        volumes_reclaimable_bytes: 5,
-        build_cache_bytes: 3,
-        build_cache_reclaimable_bytes: 3,
+        images: { count: 0, active: 0, bytes_total: 1000, bytes_reclaimable: 400 },
+        containers: { count: 0, active: 0, bytes_total: 100, bytes_reclaimable: 10 },
+        volumes: { count: 0, active: 0, bytes_total: 20, bytes_reclaimable: 5 },
+        build_cache: { count: 0, active: 0, bytes_total: 3, bytes_reclaimable: 3 },
       },
     } as DockerOverview;
 
@@ -485,16 +484,27 @@ describe('relationshipsFor', () => {
 
 describe('crashEvidence', () => {
   const full: DockerCrashAnalysis = {
+    container_ref: 'shop-web-1',
+    found: true,
+    running: false,
     restart_count: 12,
     last_restart_at: '2026-02-01T10:00:00Z',
     previous_state: 'running',
     exit_code: 137,
+    exit_code_known: true,
     oom_killed: true,
-    health_status: 'unhealthy',
-    crash_loop: true,
+    health: 'unhealthy',
+    restart_loop: true,
+    deaths_in_window: 6,
     crash_loop_window_seconds: 300,
-    restarts_in_window: 6,
-    observations: [{ code: 'oom_killed', detail: 'The kernel killed this container.' }],
+    events_read: true,
+    events_found: 6,
+    event_window_seconds: 300,
+    observations: [
+      { kind: 'oom_killed', summary: 'The kernel killed this container.', evidence: [] },
+    ],
+    logs: { container_ref: 'shop-web-1', command: 'docker logs shop-web-1' },
+    analyzed_at: '2026-02-01T10:05:00Z',
   };
 
   it('arranges every dimension the backend reported', () => {
@@ -517,10 +527,22 @@ describe('crashEvidence', () => {
 
   it('omits a dimension with no evidence rather than calling it unknown', () => {
     const sparse: DockerCrashAnalysis = {
+      container_ref: 'shop-web-1',
+      found: true,
+      running: true,
       restart_count: 2,
+      exit_code: 0,
+      exit_code_known: false,
       oom_killed: false,
-      crash_loop: false,
+      restart_loop: false,
+      deaths_in_window: 0,
+      crash_loop_window_seconds: 0,
+      events_read: true,
+      events_found: 0,
+      event_window_seconds: 300,
       observations: [],
+      logs: { container_ref: 'shop-web-1', command: 'docker logs shop-web-1' },
+      analyzed_at: '2026-02-01T10:05:00Z',
     };
 
     const items = crashEvidence(sparse);
@@ -528,7 +550,10 @@ describe('crashEvidence', () => {
 
     expect(keys).toEqual(['restarts']);
     // Not "Exit code: unknown", not "Healthcheck: none", not "OOM: no".
-    const rendered = items.map((item) => `${item.label} ${item.value}`).join(' ').toLowerCase();
+    const rendered = items
+      .map((item) => `${item.label} ${item.value}`)
+      .join(' ')
+      .toLowerCase();
     expect(rendered).not.toContain('unknown');
     expect(rendered).not.toContain('none');
   });
@@ -539,7 +564,7 @@ describe('crashEvidence', () => {
   });
 
   it('reads a clean exit as a clean exit', () => {
-    const items = crashEvidence({ ...full, exit_code: 0, oom_killed: false, crash_loop: false });
+    const items = crashEvidence({ ...full, exit_code: 0, oom_killed: false, restart_loop: false });
     expect(items.find((item) => item.key === 'exit_code')?.tone).toBe('neutral');
   });
 
@@ -551,8 +576,8 @@ describe('crashEvidence', () => {
   it('says what it measured when the window figures are missing', () => {
     const items = crashEvidence({
       ...full,
-      crash_loop_window_seconds: undefined,
-      restarts_in_window: undefined,
+      crash_loop_window_seconds: 0,
+      deaths_in_window: 0,
     });
     const loop = items.find((item) => item.key === 'crash_loop');
     expect(loop?.value).toBe('Docker restarted this container repeatedly.');

@@ -619,6 +619,7 @@ export {
   type DockerInspectStorage,
   type DockerInspectRuntime,
   type DockerInspect,
+  type DockerDiskCategory,
 } from './docker';
 
 export {
@@ -678,6 +679,11 @@ export {
   type DockerComposeValidationError,
   type DockerComposeValidation,
   type DockerComposeDiff,
+  type DockerComposeServiceChange,
+  type DockerComposeServiceFieldChange,
+  type DockerComposeVolumeChange,
+  type DockerComposeApplied,
+  type DockerCreatedContainer,
   type DockerRunPort,
   type DockerRunVolume,
   type DockerRunRequest,

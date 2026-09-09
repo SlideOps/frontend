@@ -1,6 +1,8 @@
+import type { Narrowed } from './contract';
+import type * as wire from './docker-generated';
 import { ApiError } from './errors';
 import { apiRequest, unwrap } from './http';
-import type { DockerContainer, DockerHealthcheck, DockerOwnership, DockerPort } from './docker';
+import type { DockerHealthcheck, DockerOwnership, DockerPort } from './docker';
 
 /*
  * Compose stacks on one Node, the Compose file behind them, and creating a
@@ -24,6 +26,18 @@ import type { DockerContainer, DockerHealthcheck, DockerOwnership, DockerPort } 
  *
  * Field names mirror the backend contract exactly, snake_case included.
  */
+
+/**
+ * A list, whatever the server sent.
+ *
+ * Go marshals a nil slice as null, so every list in every payload here can
+ * arrive as null, and a component mapping over null takes the page down. Same
+ * reasoning as the identically named helper in docker.ts: settle it once at the
+ * boundary rather than at each place that renders.
+ */
+function list<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
 
 /* ------------------------------------------------------------------ *
  * Compose projects
@@ -58,16 +72,10 @@ export type DockerComposeStatus = 'running' | 'partial' | 'stopped' | 'unknown';
  * state word hides that, so the number running is reported beside the number
  * there are. Docker's own state and health words are carried through unchanged.
  */
-export interface DockerComposeServiceSummary {
-  name: string;
-  /** How many containers this service has. More than one when it is scaled. */
-  containers: number;
-  running: number;
-  state: string;
-  health?: string;
-  image?: string;
-  ports: DockerPort[];
-}
+export type DockerComposeServiceSummary = Narrowed<
+  wire.ComposeProjectService,
+  { ports: DockerPort[] }
+>;
 
 /**
  * One Compose stack on the Node, whoever brought it up.
@@ -81,24 +89,17 @@ export interface DockerComposeServiceSummary {
  * from a directory that has since moved. A screen says "not known" rather than
  * inventing a path.
  */
-export interface DockerComposeProject {
-  name: string;
-  ownership: DockerOwnership;
-  /** Compose's own summary, such as "running(3)". Carried through verbatim. */
-  status?: string;
-  config_files: string[];
-  working_dir?: string;
-  /** Whether SlideOps would read the first config file back to the Operator. */
-  config_readable: boolean;
-  containers: number;
-  running: number;
-  services: DockerComposeServiceSummary[];
-  images: string[];
-  networks: string[];
-  volumes: string[];
-  /** How the stack was found: compose itself, or the container labels. */
-  found_by: string;
-}
+export type DockerComposeProject = Narrowed<
+  wire.ComposeProject,
+  {
+    ownership: DockerOwnership;
+    config_files: string[];
+    services: DockerComposeServiceSummary[];
+    images: string[];
+    networks: string[];
+    volumes: string[];
+  }
+>;
 
 /**
  * Make a project safe to render.
@@ -107,10 +108,10 @@ export interface DockerComposeProject {
  * null, and a component mapping over null stops rendering the page. Doing it
  * here means a screen can read every list without asking whether it is one.
  */
-function safeProject(project: DockerComposeProject): DockerComposeProject {
-  const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+function safeProject(project: wire.ComposeProject): DockerComposeProject {
   return {
     ...project,
+    ownership: project.ownership as DockerOwnership,
     config_files: list(project.config_files),
     images: list(project.images),
     networks: list(project.networks),
@@ -129,7 +130,7 @@ export function listDockerComposeProjects(
 ): Promise<DockerComposeProject[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/compose`, {
     signal,
-  }).then((r) => (unwrap<DockerComposeProject[]>(r, 'projects') ?? []).map(safeProject));
+  }).then((r) => list(unwrap<wire.ComposeProject[]>(r, 'projects')).map(safeProject));
 }
 
 /**
@@ -147,7 +148,7 @@ export function getDockerComposeProject(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}`,
     { signal },
-  ).then((r) => safeProject(unwrap<DockerComposeProject>(r, 'project')));
+  ).then((r) => safeProject(unwrap<wire.ComposeProject>(r, 'project')));
 }
 
 /* ------------------------------------------------------------------ *
@@ -230,10 +231,7 @@ export function downDockerComposeProject(
  * ------------------------------------------------------------------ */
 
 /** A stack's Compose file as it stands on the Node, and where it was read from. */
-export interface DockerComposeFile {
-  content: string;
-  path: string;
-}
+export type DockerComposeFile = wire.ComposeFileContent;
 
 /**
  * One problem with a proposed Compose file.
@@ -243,16 +241,13 @@ export interface DockerComposeFile {
  * screen must render those just as prominently: a problem with no line number
  * is not a smaller problem.
  */
-export interface DockerComposeValidationError {
-  line?: number;
-  message: string;
-}
+export type DockerComposeValidationError = wire.ComposeFileIssue;
 
 /** Whether a proposed Compose file is usable, and what is wrong if it is not. */
-export interface DockerComposeValidation {
-  valid: boolean;
-  errors: DockerComposeValidationError[];
-}
+export type DockerComposeValidation = Narrowed<
+  wire.ComposeValidation,
+  { issues: DockerComposeValidationError[] }
+>;
 
 /**
  * What applying a proposed file would change on the Node.
@@ -266,14 +261,37 @@ export interface DockerComposeValidation {
  * `summariseComposeDiff` in the web app pulls it out of the group list rather
  * than trusting each screen to remember.
  */
-export interface DockerComposeDiff {
-  containers_recreated: string[];
-  images_changed: string[];
-  networks_added: string[];
-  networks_removed: string[];
-  volumes_added: string[];
-  volumes_removed: string[];
-}
+export type DockerComposeServiceFieldChange = wire.ComposeFieldChange;
+
+/** One service the proposed file changes, and whether it has to be recreated. */
+export type DockerComposeServiceChange = Narrowed<
+  wire.ComposeServiceChange,
+  { changes: DockerComposeServiceFieldChange[] }
+>;
+
+/**
+ * One volume the proposed file no longer declares.
+ *
+ * `exists_on_node` is the part that matters. A volume the file drops that was
+ * never created holds nothing; one that exists holds whatever was written to
+ * it, and removing it is the irreversible half of applying an edit.
+ */
+export type DockerComposeVolumeChange = wire.ComposeVolumeChange;
+
+export type DockerComposeDiff = Narrowed<
+  wire.ComposeDiff,
+  {
+    services_added: string[];
+    services_removed: string[];
+    services_changed: DockerComposeServiceChange[];
+    recreated: string[];
+    networks_added: string[];
+    networks_removed: string[];
+    volumes_added: string[];
+    volumes_removed: DockerComposeVolumeChange[];
+    warnings: string[];
+  }
+>;
 
 /** Read the stack's Compose file. Reads only, and changes nothing. */
 export function getDockerComposeFile(
@@ -281,10 +299,10 @@ export function getDockerComposeFile(
   project: string,
   signal?: AbortSignal,
 ): Promise<DockerComposeFile> {
-  return apiRequest<DockerComposeFile>(
+  return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/file`,
     { signal },
-  );
+  ).then((r) => unwrap<DockerComposeFile>(r, 'file'));
 }
 
 /**
@@ -302,7 +320,10 @@ export function validateDockerComposeFile(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/validate`,
     { method: 'POST', body: { content } },
-  ).then((r) => unwrap<DockerComposeValidation>(r, 'validation'));
+  ).then((r) => {
+    const validation = unwrap<wire.ComposeValidation>(r, 'validation');
+    return { ...validation, issues: list(validation?.issues) };
+  });
 }
 
 /** Ask the Node what applying a proposed file would change. Changes nothing. */
@@ -314,8 +335,39 @@ export function diffDockerComposeFile(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/diff`,
     { method: 'POST', body: { content } },
-  ).then((r) => unwrap<DockerComposeDiff>(r, 'diff'));
+  ).then((r) => safeDiff(unwrap<wire.ComposeDiff>(r, 'diff')));
 }
+
+/** One diff, with every list guaranteed present. */
+function safeDiff(diff: wire.ComposeDiff): DockerComposeDiff {
+  return {
+    ...diff,
+    services_added: list(diff?.services_added),
+    services_removed: list(diff?.services_removed),
+    services_changed: list(diff?.services_changed).map((service) => ({
+      ...service,
+      changes: list(service.changes),
+    })),
+    recreated: list(diff?.recreated),
+    networks_added: list(diff?.networks_added),
+    networks_removed: list(diff?.networks_removed),
+    volumes_added: list(diff?.volumes_added),
+    volumes_removed: list(diff?.volumes_removed),
+    warnings: list(diff?.warnings),
+  };
+}
+
+/**
+ * What an apply actually did.
+ *
+ * The whole result rather than the resulting stack: the diff it carried out and
+ * the backup it left are the two things an Operator needs after the fact, and
+ * the stack alone cannot say what changed to get there or what to put back.
+ */
+export type DockerComposeApplied = Narrowed<
+  wire.ComposeApplyResult,
+  { diff: DockerComposeDiff; state: DockerComposeProject }
+>;
 
 /**
  * Write the file and bring the stack to match it.
@@ -329,11 +381,14 @@ export function applyDockerComposeFile(
   nodeId: string,
   project: string,
   input: { content: string; confirm_data_loss?: boolean },
-): Promise<DockerComposeProject> {
+): Promise<DockerComposeApplied> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/apply`,
     { method: 'POST', body: input },
-  ).then((r) => safeProject(unwrap<DockerComposeProject>(r, 'project')));
+  ).then((r) => {
+    const result = unwrap<wire.ComposeApplyResult>(r, 'result');
+    return { ...result, diff: safeDiff(result.diff), state: safeProject(result.state) };
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -404,14 +459,24 @@ export interface DockerRunRequest {
  * `env` holds database passwords and API keys, and a URL is written to every
  * access log on the way.
  */
+/**
+ * What creating a container answered with.
+ *
+ * Deliberately not a full container. The endpoint reports what it created and
+ * what the runtime printed doing it; the container's state a moment later is a
+ * separate question, and the screen asks it by re-reading the Node rather than
+ * by trusting a snapshot taken before the process had started.
+ */
+export type DockerCreatedContainer = wire.CreatedContainer;
+
 export function createDockerContainer(
   nodeId: string,
   request: DockerRunRequest,
-): Promise<DockerContainer> {
+): Promise<DockerCreatedContainer> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/containers`, {
     method: 'POST',
     body: request,
-  }).then((r) => unwrap<DockerContainer>(r, 'container'));
+  }).then((r) => unwrap<DockerCreatedContainer>(r, 'container'));
 }
 
 /* ------------------------------------------------------------------ *
@@ -494,12 +559,7 @@ export function refusalExplanation(error: unknown): string | null {
 }
 
 /** One declared dependency: `from` waits for `to`. */
-export interface DockerComposeDependencyEdge {
-  from: string;
-  to: string;
-  /** Compose's condition, such as service_healthy. Absent when plain. */
-  condition?: string;
-}
+export type DockerComposeDependencyEdge = wire.DependencyEdge;
 
 /**
  * What the stack file says starts before what.
@@ -509,15 +569,18 @@ export interface DockerComposeDependencyEdge {
  * broken stack actually needs. It comes from its own endpoint because a running
  * container carries no record of the depends_on that started it.
  */
-export interface DockerComposeGraph {
-  services: string[];
-  edges: DockerComposeDependencyEdge[];
-  order: string[];
-  /** A dependency loop, when the file declares one. Empty otherwise. */
-  cycle: string[];
-  /** Dependencies naming a service the file does not define. */
-  missing: string[];
-}
+export type DockerComposeGraph = Narrowed<
+  wire.DependencyGraph,
+  {
+    services: string[];
+    edges: DockerComposeDependencyEdge[];
+    order: string[];
+    /** A dependency loop, when the file declares one. Empty otherwise. */
+    cycle: string[];
+    /** Dependencies naming a service the file does not define. */
+    missing: string[];
+  }
+>;
 
 /** Read the dependency graph the stack file declares. */
 export function getDockerComposeGraph(
@@ -529,8 +592,7 @@ export function getDockerComposeGraph(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/graph`,
     { signal },
   ).then((r) => {
-    const graph = unwrap<DockerComposeGraph>(r, 'graph');
-    const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+    const graph = unwrap<wire.DependencyGraph>(r, 'graph');
     return {
       services: list(graph?.services),
       edges: list(graph?.edges),
