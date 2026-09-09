@@ -34,6 +34,8 @@ import {
 import { DockerContainerInspect } from '../components/DockerContainerInspect';
 import { DockerContainerLogs } from '../components/DockerContainerLogs';
 import { DockerContainerNetworks } from '../components/DockerContainerNetworks';
+import { DockerExportPanel } from '../components/DockerExportPanel';
+import { DockerRelationships } from '../components/DockerRelationships';
 import { DockerContainerOverview } from '../components/DockerContainerOverview';
 import { DockerContainerStats } from '../components/DockerContainerStats';
 import { DockerContainerStorage } from '../components/DockerContainerStorage';
@@ -357,9 +359,7 @@ function ContainerPage({ nodeId, nodeName, containerRef, tab }: ContainerPagePro
         />
       ) : null}
 
-      {tab === 'stats' ? (
-        <DockerContainerStats stat={stat} containerName={container.name} />
-      ) : null}
+      {tab === 'stats' ? <DockerContainerStats stat={stat} containerName={container.name} /> : null}
 
       {needsInspect ? (
         <>
@@ -370,10 +370,15 @@ function ContainerPage({ nodeId, nodeName, containerRef, tab }: ContainerPagePro
           {inspect.state.status === 'ready' && inspect.state.data ? (
             <>
               {tab === 'inspect' ? (
-                <DockerContainerInspect
-                  inspect={inspect.state.data}
-                  containerName={container.name}
-                />
+                <div className="flex flex-col gap-6">
+                  <DockerContainerInspect
+                    inspect={inspect.state.data}
+                    containerName={container.name}
+                  />
+                  {/* Built from the same inspect, so an export can never
+                      describe a container differently from the page above it. */}
+                  <DockerExportPanel inspect={inspect.state.data} />
+                </div>
               ) : null}
               {tab === 'mounts' ? (
                 <DockerContainerStorage
@@ -383,11 +388,21 @@ function ContainerPage({ nodeId, nodeName, containerRef, tab }: ContainerPagePro
                 />
               ) : null}
               {tab === 'networks' ? (
-                <DockerContainerNetworks
-                  inspect={inspect.state.data}
-                  containerName={container.name}
-                  nodeName={nodeName}
-                />
+                <div className="flex flex-col gap-6">
+                  <DockerContainerNetworks
+                    inspect={inspect.state.data}
+                    containerName={container.name}
+                    nodeName={nodeName}
+                  />
+                  {/* Only the containers are passed, so the panel reports the
+                      volume and network lists as unread rather than answering
+                      "nothing uses this" from records nobody fetched. */}
+                  <DockerRelationships
+                    nodeId={nodeId}
+                    target={{ kind: 'container', name: container.name }}
+                    inventory={{ containers: [container] }}
+                  />
+                </div>
               ) : null}
             </>
           ) : null}
@@ -452,7 +467,9 @@ export function DockerContainerDetail() {
           </Button>
         }
         tabs={
-          node ? <TabNav tabs={CONTAINER_TABS} active={activeTab} onSelect={setActiveTab} /> : undefined
+          node ? (
+            <TabNav tabs={CONTAINER_TABS} active={activeTab} onSelect={setActiveTab} />
+          ) : undefined
         }
       />
 
@@ -465,7 +482,9 @@ export function DockerContainerDetail() {
         />
       ) : null}
 
-      {nodeId && nodeResult.state.status === 'loading' ? <Loading label="Loading the server" /> : null}
+      {nodeId && nodeResult.state.status === 'loading' ? (
+        <Loading label="Loading the server" />
+      ) : null}
       {nodeId && nodeResult.state.status === 'error' ? (
         <ErrorNote error={nodeResult.state.error} />
       ) : null}

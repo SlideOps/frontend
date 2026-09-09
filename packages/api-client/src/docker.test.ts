@@ -527,3 +527,72 @@ describe('inspecting one container', () => {
     expect(Object.keys(inspect.configuration)).not.toContain('environment');
   });
 });
+
+/*
+ * A nil slice from Go arrives as JSON null, and a screen that reads .length on
+ * one does not render an empty section, it throws and takes the page with it.
+ * That is the blank Docker page, and these are the shapes that caused it.
+ */
+describe('a server that answers with nulls instead of empty lists', () => {
+  it('gives a container usable arrays whatever the daemon reported', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        containers: [
+          {
+            full_id: 'abc123def456',
+            id: 'abc123def456',
+            name: 'lonely',
+            image: 'nginx:latest',
+            state: 'running',
+            status_text: 'Up 2 hours',
+            health: 'none',
+            created_at: '2026-01-01T00:00:00Z',
+            restart_count: 0,
+            restart_policy: 'no',
+            ports: null,
+            networks: null,
+            labels: null,
+            ownership: 'external',
+            mount_count: 0,
+          },
+        ],
+      }),
+    );
+
+    const [container] = await listDockerContainers('nd_1');
+
+    expect(container?.ports).toEqual([]);
+    expect(container?.networks).toEqual([]);
+    expect(container?.labels).toEqual({});
+    // The assertion that matters: rendering must not throw.
+    expect(() => container!.ports.length).not.toThrow();
+  });
+
+  it('gives an empty list when the whole collection is null', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { containers: null }));
+
+    await expect(listDockerContainers('nd_1')).resolves.toEqual([]);
+  });
+
+  it('gives volumes and networks their container lists back', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        volumes: [
+          {
+            name: 'data',
+            driver: 'local',
+            mountpoint: '/v',
+            in_use: false,
+            containers: null,
+            labels: null,
+          },
+        ],
+      }),
+    );
+
+    const [volume] = await listDockerVolumes('nd_1');
+
+    expect(volume?.containers).toEqual([]);
+    expect(volume?.labels).toEqual({});
+  });
+});

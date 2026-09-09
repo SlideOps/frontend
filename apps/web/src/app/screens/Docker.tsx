@@ -4,6 +4,7 @@ import {
   isDockerNotEnabled,
   listDockerContainers,
   listDockerStats,
+  getSavedDiscovery,
   listNodes,
   type DockerContainer,
   type DockerContainerState,
@@ -35,7 +36,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import { DockerContainerCard } from '../components/DockerContainerCard';
+import { DockerBulkActions } from '../components/DockerBulkActions';
 import { DockerOverviewPanel } from '../components/DockerOverviewPanel';
+import { DockerCapacityPanel } from '../components/DockerCapacityPanel';
+import { DockerRankings } from '../components/DockerRankings';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { Refreshing } from '../components/Refreshing';
@@ -201,10 +205,13 @@ function ContainersTab({
   nodeId,
   containers,
   stats,
+  onChanged,
 }: {
   nodeId: string;
   containers: DockerContainer[];
   stats: DockerStats[];
+  /** Re-read after a bulk run: the list is stale the moment anything acts. */
+  onChanged: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [state, setState] = useState<'' | DockerContainerState>('');
@@ -229,6 +236,21 @@ function ContainersTab({
 
   const index = useMemo(() => indexStats(stats), [stats]);
 
+  // Selection is held by full id rather than by container, so a reload that
+  // replaces every object keeps the selection instead of silently emptying it.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selected = shown.filter((container) => selectedIds.has(container.full_id));
+
+  const toggleSelected = (fullId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(fullId)) {
+        next.add(fullId);
+      }
+      return next;
+    });
+  };
+
   const clear = () => {
     setQuery('');
     setState('');
@@ -248,6 +270,13 @@ function ContainersTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <DockerBulkActions
+        nodeId={nodeId}
+        selected={selected}
+        onDone={onChanged}
+        onClearSelection={() => setSelectedIds(new Set())}
+      />
+
       <Toolbar
         actions={
           <Text variant="body-sm" tone="secondary">
@@ -328,12 +357,22 @@ function ContainersTab({
       ) : (
         <div className="grid gap-3 2xl:grid-cols-2">
           {shown.map((container) => (
-            <DockerContainerCard
-              key={container.full_id}
-              container={container}
-              stat={statFor(container, index)}
-              nodeId={nodeId}
-            />
+            <div key={container.full_id} className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                aria-label={`Select ${container.name}`}
+                checked={selectedIds.has(container.full_id)}
+                onChange={() => toggleSelected(container.full_id)}
+                className="mt-6 h-4 w-4 shrink-0 rounded border-border text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              />
+              <div className="min-w-0 flex-1">
+                <DockerContainerCard
+                  container={container}
+                  stat={statFor(container, index)}
+                  nodeId={nodeId}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -363,6 +402,10 @@ function DockerOnNode({ node, tab }: { node: Node; tab: string }) {
   const overview = useAsyncData((signal) => getDockerOverview(node.id, signal), [node.id]);
   const containers = useAsyncData((signal) => listDockerContainers(node.id, signal), [node.id]);
   const stats = useAsyncData((signal) => listDockerStats(node.id, signal), [node.id]);
+  // Read rather than discovered: the capacity panel needs the Node's own cores,
+  // memory and disk, and the last saved Discovery already has them. Asking the
+  // server again would open an SSH connection to draw a bar.
+  const discovery = useAsyncData((signal) => getSavedDiscovery(node.id, signal), [node.id]);
 
   // Only the two tabs that show live numbers are worth a repeated pass over
   // the Node. Images, volumes and networks change when somebody changes them,
@@ -465,15 +508,35 @@ function DockerOnNode({ node, tab }: { node: Node; tab: string }) {
       {loading ? <Loading label={`Reading Docker on ${node.name}, read only`} /> : null}
 
       {tab === 'containers' && containers.state.status === 'ready' ? (
-        <ContainersTab nodeId={node.id} containers={containerList} stats={statList} />
+        <ContainersTab
+          nodeId={node.id}
+          containers={containerList}
+          stats={statList}
+          onChanged={() => {
+            void containers.reload();
+            void stats.reload();
+          }}
+        />
       ) : null}
 
       {tab === 'overview' && overview.state.status === 'ready' ? (
-        <DockerOverviewPanel
-          overview={overview.state.data}
-          containers={containerList}
-          stats={statList}
-        />
+        <div className="flex flex-col gap-6">
+          <DockerOverviewPanel
+            overview={overview.state.data}
+            containers={containerList}
+            stats={statList}
+          />
+          {/* Both read the containers and samples already on this page rather
+              than fetching again, so they cannot disagree with the panel above
+              about what is running. */}
+          <DockerCapacityPanel
+            containers={containerList}
+            stats={statList}
+            overview={overview.state.data}
+            facts={discovery.state.status === 'ready' ? discovery.state.data.facts : null}
+          />
+          <DockerRankings nodeId={node.id} containers={containerList} stats={statList} />
+        </div>
       ) : null}
     </div>
   );

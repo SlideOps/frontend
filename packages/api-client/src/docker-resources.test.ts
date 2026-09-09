@@ -104,8 +104,8 @@ describe('images', () => {
     expect(bodyOf(fetchMock)).toEqual({ reference: 'internal/web:blue' });
   });
 
-  it('reads an image inspect through the envelope, whatever keys it carries', async () => {
-    okFetch({ inspect: { Id: 'sha256:abc', Os: 'linux', RepoTags: ['nginx:latest'] } });
+  it('reads an image inspect from under the image key the endpoint uses', async () => {
+    okFetch({ image: { Id: 'sha256:abc', Os: 'linux', RepoTags: ['nginx:latest'] } });
 
     const inspect = await inspectDockerImage('nd_1', 'sha256:abc');
 
@@ -144,7 +144,7 @@ describe('volumes', () => {
   });
 
   it('reads a volume inspect', async () => {
-    okFetch({ inspect: { Name: 'app-data', Scope: 'local' } });
+    okFetch({ volume: { Name: 'app-data', Scope: 'local' } });
 
     expect(await inspectDockerVolume('nd_1', 'app-data')).toEqual({
       Name: 'app-data',
@@ -201,18 +201,26 @@ describe('networks', () => {
 
 describe('cleanup', () => {
   it('reads the preview through its envelope', async () => {
+    // The endpoint answers with plans keyed by slug. The client turns them
+    // into the categories a screen renders, which is where the human label
+    // comes from: the server never sends one.
     const fetchMock = okFetch({
-      preview: {
-        categories: [
-          { key: 'stopped_containers', label: 'Stopped containers', count: 7, reclaimable_bytes: 1_200_000_000 },
-          { key: 'unused_volumes', label: 'Unused volumes', count: 2, reclaimable_bytes: 400_000_000 },
-        ],
-      },
+      plans: [
+        {
+          kind: 'stopped-containers',
+          item_count: 7,
+          targets: ['old-api'],
+          reclaimable_bytes: 1_200_000_000,
+        },
+        { kind: 'unused-volumes', item_count: 2, targets: null, reclaimable_bytes: 400_000_000 },
+      ],
     });
 
     const preview = await previewDockerCleanup('nd_1');
 
     expect(preview.categories).toHaveLength(2);
+    expect(preview.categories[0]?.key).toBe('stopped-containers');
+    expect(preview.categories[0]?.label).toBe('Stopped containers');
     expect(preview.categories[0]?.count).toBe(7);
     expect(initOf(fetchMock)?.method).toBe('GET');
   });
@@ -247,7 +255,11 @@ describe('cleanup', () => {
 describe('telling a refusal from a failure', () => {
   it('recognises each refusal by its code and not by its status', () => {
     const inUse = new ApiError(409, DOCKER_IN_USE_CODE, 'Still used by web and api.');
-    const protectedNetwork = new ApiError(409, DOCKER_PROTECTED_NETWORK_CODE, 'bridge is built in.');
+    const protectedNetwork = new ApiError(
+      409,
+      DOCKER_PROTECTED_NETWORK_CODE,
+      'bridge is built in.',
+    );
     const consent = new ApiError(400, DOCKER_CONFIRMATION_REQUIRED_CODE, 'This would remove data.');
     const otherConflict = new ApiError(409, 'node_busy', 'An Operation is already running.');
 
@@ -274,9 +286,13 @@ describe('telling a refusal from a failure', () => {
   });
 
   it('returns no containers rather than guessing when the refusal named none', () => {
-    expect(dockerInUseContainers(new ApiError(409, DOCKER_IN_USE_CODE, 'Still in use.'))).toEqual([]);
+    expect(dockerInUseContainers(new ApiError(409, DOCKER_IN_USE_CODE, 'Still in use.'))).toEqual(
+      [],
+    );
     expect(
-      dockerInUseContainers(new ApiError(409, DOCKER_IN_USE_CODE, 'Still in use.', { containers: 'web' })),
+      dockerInUseContainers(
+        new ApiError(409, DOCKER_IN_USE_CODE, 'Still in use.', { containers: 'web' }),
+      ),
     ).toEqual([]);
     expect(dockerInUseContainers(new ApiError(500, 'unknown_error', 'Broke.'))).toEqual([]);
   });
