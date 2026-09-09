@@ -58,6 +58,7 @@ const stateTone: Record<DockerContainerState, Tone> = {
   created: 'neutral',
   exited: 'neutral',
   dead: 'danger',
+  removing: 'warning',
 };
 
 const stateLabel: Record<DockerContainerState, string> = {
@@ -67,6 +68,7 @@ const stateLabel: Record<DockerContainerState, string> = {
   created: 'Created',
   exited: 'Exited',
   dead: 'Dead',
+  removing: 'Removing',
 };
 
 /** The Docker state Docker itself reports, in the tone it deserves. */
@@ -99,7 +101,14 @@ const healthLabel: Record<DockerHealth, string> = {
  * row of badges reads as a verdict and "the image declares no healthcheck" is
  * the absence of one. Nobody is checking, which is not the same as passing.
  */
-export function DockerHealthBadge({ health }: { health: DockerHealth }) {
+/**
+ * The healthcheck verdict, or the absence of one.
+ *
+ * The field is left out entirely when the image declares no healthcheck, which
+ * is the same thing `none` says, so the two are folded together here rather
+ * than at every call site. Nobody is checking, and that is worth showing.
+ */
+export function DockerHealthBadge({ health = 'none' }: { health?: DockerHealth }) {
   if (health === 'none') {
     return (
       <span className="text-xs text-ink-muted" title="This image declares no healthcheck.">
@@ -107,7 +116,9 @@ export function DockerHealthBadge({ health }: { health: DockerHealth }) {
       </span>
     );
   }
-  return <span className={cn(badgeBase, toneClass[healthTone[health]])}>{healthLabel[health]}</span>;
+  return (
+    <span className={cn(badgeBase, toneClass[healthTone[health]])}>{healthLabel[health]}</span>
+  );
 }
 
 /**
@@ -260,9 +271,7 @@ function Usage({ container, stat }: { container: DockerContainer; stat?: DockerS
             <Text variant="caption" tone="secondary">
               Memory
             </Text>
-            <span className="text-sm font-medium text-ink">
-              {megabytes(stat.memory_used_mb)}
-            </span>
+            <span className="text-sm font-medium text-ink">{megabytes(stat.memory_used_mb)}</span>
           </div>
           <Text variant="caption" tone="secondary" className="mt-1.5 block">
             No memory limit set
@@ -341,7 +350,10 @@ export function DockerContainerCard({ container, stat, now, nodeId }: DockerCont
               <ArrowUpRight width={12} height={12} aria-hidden />
             </Link>
           ) : null}
-          <span className="mt-1 block truncate font-mono text-xs text-ink-muted" title={container.image}>
+          <span
+            className="mt-1 block truncate font-mono text-xs text-ink-muted"
+            title={container.image}
+          >
             {container.image}
           </span>
         </div>
@@ -354,10 +366,7 @@ export function DockerContainerCard({ container, stat, now, nodeId }: DockerCont
       <Usage container={container} stat={stat} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Fact
-          label="Uptime"
-          value={uptime === null ? 'Not running' : formatUptime(uptime)}
-        />
+        <Fact label="Uptime" value={uptime === null ? 'Not running' : formatUptime(uptime)} />
         <Fact label="Short id" value={container.id} />
         <Fact label="Compose" value={compose} />
         {/* Zero restarts is the ordinary case and says nothing, so it is left

@@ -164,7 +164,7 @@ export function DockerCrashPanel({
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        {analysis.crash_loop ? (
+        {analysis.restart_loop ? (
           <AlertTriangle width={18} height={18} className="text-danger" aria-hidden />
         ) : null}
         <Text variant="h4">What Docker recorded about {name}</Text>
@@ -188,13 +188,22 @@ export function DockerCrashPanel({
         <ul className="rounded-md border border-border bg-surface">
           {analysis.observations.map((observation) => (
             <li
-              key={observation.code}
+              key={`${observation.kind}-${observation.summary}`}
               className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-border px-3 py-2 first:border-t-0"
             >
               <span className="shrink-0 rounded-md bg-subtle px-1.5 py-0.5 font-mono text-xs text-ink-muted">
-                {observation.code}
+                {observation.kind}
               </span>
-              <span className="min-w-0 flex-1 text-sm text-ink">{observation.detail}</span>
+              <span className="min-w-0 flex-1 text-sm text-ink">
+                {observation.summary}
+                {/* The lines the server read to reach this, verbatim. An
+                    observation without its evidence is an assertion. */}
+                {observation.evidence.length > 0 ? (
+                  <span className="mt-1 block font-mono text-xs text-ink-muted">
+                    {observation.evidence.join(' · ')}
+                  </span>
+                ) : null}
+              </span>
             </li>
           ))}
         </ul>

@@ -106,7 +106,10 @@ function ComposeFileForm({
   const [confirmOpen, setConfirmOpen] = useState(false);
   // Both results are stored with the text they were computed from. Anything
   // else lets a stale answer describe text that is no longer on screen.
-  const [validated, setValidated] = useState<{ content: string; result: DockerComposeValidation } | null>(null);
+  const [validated, setValidated] = useState<{
+    content: string;
+    result: DockerComposeValidation;
+  } | null>(null);
   const [diffed, setDiffed] = useState<{ content: string; result: DockerComposeDiff } | null>(null);
   // Ticked against one specific diff. Editing the file clears the diff, which
   // clears this with it, so a confirmation can never outlive what it agreed to.
@@ -209,10 +212,20 @@ function ComposeFileForm({
 
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void validate()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy !== null}
+            onClick={() => void validate()}
+          >
             {busy === 'validate' ? 'Checking' : 'Validate'}
           </Button>
-          <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void runDiff()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy !== null}
+            onClick={() => void runDiff()}
+          >
             <GitBranch width={14} height={14} aria-hidden />
             {busy === 'diff' ? 'Comparing' : 'Diff'}
           </Button>
@@ -304,10 +317,10 @@ function ValidationResult({ validation }: { validation: DockerComposeValidation 
   return (
     <div role="alert" className="rounded-md border border-danger bg-surface px-4 py-3">
       <Text variant="body-sm" className="font-medium">
-        This file has {validation.errors.length} problems
+        This file has {validation.issues.length} problems
       </Text>
       <ul className="mt-1 flex flex-col gap-1">
-        {validation.errors.map((problem, index) => (
+        {validation.issues.map((problem, index) => (
           <li key={`${problem.line ?? 'file'}-${index}`}>
             <Text variant="body-sm" tone="secondary">
               {problem.line !== undefined ? `Line ${problem.line}: ` : 'This file: '}

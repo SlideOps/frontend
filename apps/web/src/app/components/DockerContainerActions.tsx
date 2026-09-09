@@ -54,6 +54,9 @@ const ACTIONS_FOR_STATE: Record<DockerContainerState, DockerContainerAction[]> =
   restarting: ['stop', 'kill'],
   exited: ['start', 'restart'],
   dead: [],
+  // Docker is already tearing this one down. Anything sent to it now races the
+  // removal and answers with a container that no longer exists.
+  removing: [],
 };
 
 interface ActionPresentation {
@@ -112,8 +115,8 @@ export function DockerContainerActions({
     return (
       <Text variant="body-sm" tone="secondary">
         Starting, stopping and removing containers changes what runs on this server, so it needs
-        write access in this workspace. Your role here is Viewer, which reads everything and
-        changes nothing.
+        write access in this workspace. Your role here is Viewer, which reads everything and changes
+        nothing.
       </Text>
     );
   }
@@ -141,7 +144,10 @@ export function DockerContainerActions({
     setRunning('remove');
     setFailure(null);
     try {
-      await removeDockerContainer(nodeId, container.full_id, { force, remove_volumes: removeVolumes });
+      await removeDockerContainer(nodeId, container.full_id, {
+        force,
+        remove_volumes: removeVolumes,
+      });
       setConfirming(null);
       onRemoved();
     } catch (error) {

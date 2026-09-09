@@ -1,3 +1,5 @@
+import type { Narrowed } from './contract';
+import type * as wire from './docker-generated';
 import { apiRequest, unwrap } from './http';
 import { websocketUrl, type StreamHandle } from './stream';
 
@@ -41,16 +43,13 @@ import { websocketUrl, type StreamHandle } from './stream';
  * image reference, a Compose label. It is a free-form map because Docker's own
  * is, and it differs per action.
  */
-export interface DockerEvent {
-  type: string;
-  action: string;
-  /** The id of the thing the event is about: a container, image, volume, network. */
-  actor_id: string;
-  /** The name Docker attached to that actor. May be empty for an actor with none. */
-  actor_name: string;
-  attributes: Record<string, string>;
-  at: string;
-}
+export type DockerEvent = Narrowed<
+  wire.Event,
+  {
+    /** Guaranteed a map by the stream decoder, whatever the daemon sent. */
+    attributes: Record<string, string>;
+  }
+>;
 
 /**
  * One frame off the event websocket.
@@ -61,7 +60,7 @@ export interface DockerEvent {
  * refusal forever.
  */
 export type DockerEventFrame =
-  { kind: 'event'; event: DockerEvent } | { kind: 'error'; message: string };
+  { kind: 'event'; event: wire.Event } | { kind: 'error'; message: string };
 
 /**
  * The connection as a screen reports it.
@@ -98,10 +97,14 @@ const EVENT_STREAM_DEFAULT_MAX_BACKOFF_MS = 15000;
 
 /** The websocket carrying everything the daemon on this Node reports doing. */
 /** Observations are a list, whatever a nil slice marshalled to. */
-function normaliseAnalysis(analysis: DockerCrashAnalysis): DockerCrashAnalysis {
+function normaliseAnalysis(analysis: wire.CrashAnalysis): DockerCrashAnalysis {
+  const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
   return {
     ...analysis,
-    observations: Array.isArray(analysis.observations) ? analysis.observations : [],
+    observations: list(analysis?.observations).map((observation) => ({
+      ...observation,
+      evidence: list(observation.evidence),
+    })),
   };
 }
 
@@ -154,7 +157,11 @@ export function openDockerEventStream(options: DockerEventStreamOptions): Stream
         return;
       }
       if (frame.kind === 'event' && frame.event) {
-        options.onEvent(frame.event);
+        // Go omits an empty attribute map entirely, so an event with nothing
+        // attached arrives with no field at all. Settling it here means a panel
+        // reading Object.entries on it renders an empty row rather than
+        // throwing and taking the event log down mid-incident.
+        options.onEvent({ ...frame.event, attributes: frame.event.attributes ?? {} });
         return;
       }
       if (frame.kind === 'error') {
@@ -215,10 +222,7 @@ export function openDockerEventStream(options: DockerEventStreamOptions): Stream
  * here: an observation is evidence somebody gathered, and paraphrasing
  * evidence in the browser is how a report acquires claims nobody made.
  */
-export interface DockerCrashObservation {
-  code: string;
-  detail: string;
-}
+export type DockerCrashObservation = Narrowed<wire.Observation, { evidence: string[] }>;
 
 /**
  * What Docker recorded about a container that keeps stopping.
@@ -234,23 +238,10 @@ export interface DockerCrashObservation {
  * Operator's, and a tool that names a root cause it cannot know is wrong in
  * exactly the moment somebody is trusting it most.
  */
-export interface DockerCrashAnalysis {
-  restart_count: number;
-  last_restart_at?: string;
-  /** What the container was doing before the state it is in now. */
-  previous_state?: string;
-  exit_code?: number;
-  /** True only when Docker itself recorded an OOM kill. */
-  oom_killed: boolean;
-  health_status?: string;
-  /** Whether the backend judged the restarts to be a loop rather than churn. */
-  crash_loop: boolean;
-  /** The window the loop was measured over, when one was measured. */
-  crash_loop_window_seconds?: number;
-  /** How many restarts fell inside that window. */
-  restarts_in_window?: number;
-  observations: DockerCrashObservation[];
-}
+export type DockerCrashAnalysis = Narrowed<
+  wire.CrashAnalysis,
+  { observations: DockerCrashObservation[] }
+>;
 
 /**
  * Read the restart evidence for one container.
@@ -267,7 +258,7 @@ export function getDockerCrashAnalysis(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/analysis`,
     { signal },
-  ).then((r) => normaliseAnalysis(unwrap<DockerCrashAnalysis>(r, 'analysis')));
+  ).then((r) => normaliseAnalysis(unwrap<wire.CrashAnalysis>(r, 'analysis')));
 }
 
 /* ------------------------------------------------------------------ *
@@ -295,14 +286,7 @@ export const DOCKER_METRICS_RANGES: readonly DockerMetricsRange[] = [
  * ceiling at sampling time, which for a container with no limit of its own is
  * the whole machine's memory and is not evidence that a limit was set.
  */
-export interface DockerContainerMetricSample {
-  sampled_at: string;
-  cpu_percent: number;
-  memory_used_mb: number;
-  memory_limit_mb: number;
-  net_rx_bytes: number;
-  net_tx_bytes: number;
-}
+export type DockerContainerMetricSample = wire.MetricSample;
 
 /**
  * Read the recent samples for one container.
@@ -320,5 +304,9 @@ export function listDockerContainerMetrics(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/metrics?range=${range}`,
     { signal },
-  ).then((r) => unwrap<DockerContainerMetricSample[]>(r, 'samples'));
+  ).then((r) => {
+    const samples = unwrap<DockerContainerMetricSample[]>(r, 'samples');
+    // A container with no samples in the window is an empty chart, not a crash.
+    return Array.isArray(samples) ? samples : [];
+  });
 }

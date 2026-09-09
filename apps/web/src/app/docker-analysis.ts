@@ -281,13 +281,14 @@ export function nodeCapacityFromFacts(facts: Facts | null | undefined): NodeCapa
   const disk =
     root ??
     (disks.length > 0
-      ? disks.reduce((largest, next) => ((next.size_kb ?? 0) > (largest.size_kb ?? 0) ? next : largest))
+      ? disks.reduce((largest, next) =>
+          (next.size_kb ?? 0) > (largest.size_kb ?? 0) ? next : largest,
+        )
       : undefined);
 
   return {
     cores: typeof facts.cpu?.cores === 'number' ? facts.cpu.cores : null,
-    memoryMb:
-      typeof facts.memory?.total_kb === 'number' ? facts.memory.total_kb / KB_PER_MB : null,
+    memoryMb: typeof facts.memory?.total_kb === 'number' ? facts.memory.total_kb / KB_PER_MB : null,
     diskTotalBytes: typeof disk?.size_kb === 'number' ? disk.size_kb * BYTES_PER_KB : null,
     diskUsedBytes: typeof disk?.used_kb === 'number' ? disk.used_kb * BYTES_PER_KB : null,
     diskMount: disk ? (disk.mount_point ?? disk.mount ?? null) : null,
@@ -450,12 +451,15 @@ function diskCapacity(node: NodeCapacity, overview?: DockerOverview | null): Dis
     // Docker's own accounting, the same four accounts behind `docker system df`.
     // Added up, never estimated.
     dockerBytes:
-      disk.images_bytes + disk.containers_bytes + disk.volumes_bytes + disk.build_cache_bytes,
+      disk.images.bytes_total +
+      disk.containers.bytes_total +
+      disk.volumes.bytes_total +
+      disk.build_cache.bytes_total,
     reclaimableBytes:
-      disk.images_reclaimable_bytes +
-      disk.containers_reclaimable_bytes +
-      disk.volumes_reclaimable_bytes +
-      disk.build_cache_reclaimable_bytes,
+      disk.images.bytes_reclaimable +
+      disk.containers.bytes_reclaimable +
+      disk.volumes.bytes_reclaimable +
+      disk.build_cache.bytes_reclaimable,
     totalBytes: node.diskTotalBytes,
     usedBytes: node.diskUsedBytes,
     mount: node.diskMount,
@@ -588,7 +592,9 @@ function containerRelationships(
     return base;
   }
 
-  const uses: RelatedResource[] = [{ kind: 'image', name: container.image, detail: 'Runs this image' }];
+  const uses: RelatedResource[] = [
+    { kind: 'image', name: container.image, detail: 'Runs this image' },
+  ];
   for (const network of container.networks) {
     uses.push({ kind: 'network', name: network, detail: 'Attached' });
   }
@@ -640,14 +646,17 @@ function volumeRelationships(
   return {
     ...base,
     found: true,
-    usedBy: volume.containers.map((reference) => resolveContainer(reference, inventory, 'Mounts this volume')),
-    notes: volume.in_use && volume.containers.length === 0
-      ? [
-          // Docker can hold a volume in use without naming what holds it, which
-          // is worth saying rather than reporting the volume as free.
-          'Docker reports this volume as in use but named no container holding it.',
-        ]
-      : [],
+    usedBy: volume.containers.map((reference) =>
+      resolveContainer(reference, inventory, 'Mounts this volume'),
+    ),
+    notes:
+      volume.in_use && volume.containers.length === 0
+        ? [
+            // Docker can hold a volume in use without naming what holds it, which
+            // is worth saying rather than reporting the volume as free.
+            'Docker reports this volume as in use but named no container holding it.',
+          ]
+        : [],
   };
 }
 
@@ -806,7 +815,11 @@ export function crashEvidence(analysis: DockerCrashAnalysis): CrashEvidenceItem[
     });
   }
 
-  if (typeof analysis.exit_code === 'number') {
+  // The server always sends a number and says separately whether it means
+  // anything. A container that has not finished a run reports 0, which is the
+  // same number a clean exit reports, so the flag is the only thing that tells
+  // "it exited cleanly" from "it has not exited".
+  if (analysis.exit_code_known) {
     items.push({
       key: 'exit_code',
       label: 'Exit code',
@@ -826,25 +839,39 @@ export function crashEvidence(analysis: DockerCrashAnalysis): CrashEvidenceItem[
     });
   }
 
-  if (analysis.health_status) {
+  if (analysis.health) {
     items.push({
       key: 'health_status',
       label: 'Healthcheck',
-      value: analysis.health_status,
-      tone: analysis.health_status === 'unhealthy' ? 'danger' : 'neutral',
+      value: analysis.health,
+      tone: analysis.health === 'unhealthy' ? 'danger' : 'neutral',
     });
   }
 
-  if (analysis.crash_loop) {
-    const restarts = analysis.restarts_in_window;
+  // The server reads the daemon's event history to decide this, and says when
+  // it could not. "No loop" and "nobody looked" are different answers, and the
+  // second one must not be rendered as the first on a page somebody is reading
+  // to decide whether a container is stable.
+  if (!analysis.events_read) {
+    items.push({
+      key: 'events_unread',
+      label: 'Restart pattern',
+      value: "Docker's event history could not be read, so nothing was measured.",
+      tone: 'neutral',
+    });
+  } else if (analysis.restart_loop) {
+    const restarts = analysis.deaths_in_window;
     const window = analysis.crash_loop_window_seconds;
     items.push({
       key: 'crash_loop',
       label: 'Restart pattern',
       // The figures are the evidence. Without them the item still says what
       // the backend judged, and says nothing it did not measure.
+      // Both figures come over as plain numbers, so nothing was measured is
+      // spelled 0 rather than absent. Saying "0 restarts in 0 seconds" would be
+      // a measurement nobody took.
       value:
-        typeof restarts === 'number' && typeof window === 'number'
+        restarts > 0 && window > 0
           ? `${restarts} ${restarts === 1 ? 'restart' : 'restarts'} in ${windowText(window)}`
           : 'Docker restarted this container repeatedly.',
       tone: 'danger',

@@ -11,7 +11,15 @@ import {
 } from '@slideops/api-client';
 import { Button, Field, Text } from '@slideops/design-system';
 import { Download, HardDrive, ScanSearch, Tag, Trash2 } from '@slideops/icons';
-import { DataGrid, Drawer, EmptyState, SearchBar, Toolbar, type DataGridColumn, type DataGridRow } from '@slideops/ui';
+import {
+  DataGrid,
+  Drawer,
+  EmptyState,
+  SearchBar,
+  Toolbar,
+  type DataGridColumn,
+  type DataGridRow,
+} from '@slideops/ui';
 import { useState } from 'react';
 import { useCanWrite } from '../../store/workspace';
 import { formatBytes } from '../docker-inventory';
@@ -74,7 +82,9 @@ function RefusalNote({ error, subject }: { error: ApiError; subject: string }) {
   return (
     <div role="alert" className="rounded-md border border-border bg-subtle px-4 py-3">
       <Text variant="body-sm" className="font-medium">
-        {refused ? `${subject} is still in use, so nothing was removed` : `${subject} was not changed`}
+        {refused
+          ? `${subject} is still in use, so nothing was removed`
+          : `${subject} was not changed`}
       </Text>
       <Text variant="body-sm" tone="secondary" className="mt-0.5">
         {error.message}
@@ -325,7 +335,7 @@ export function DockerImagesPanel({ nodeId }: { nodeId: string }) {
     sortValues: {
       reference: imageReference(image).toLowerCase(),
       size: image.size_bytes,
-      age: Date.parse(image.created_at) || 0,
+      age: image.created_at ? Date.parse(image.created_at) || 0 : 0,
     },
     cells: {
       reference: (
@@ -352,7 +362,9 @@ export function DockerImagesPanel({ nodeId }: { nodeId: string }) {
           ) : (
             <span className={`${badge} bg-subtle text-ink-muted`}>Unused</span>
           )}
-          {image.dangling ? <span className={`${badge} bg-subtle text-warning`}>Dangling</span> : null}
+          {image.dangling ? (
+            <span className={`${badge} bg-subtle text-warning`}>Dangling</span>
+          ) : null}
         </span>
       ),
       actions: (
@@ -514,9 +526,9 @@ export function DockerImagesPanel({ nodeId }: { nodeId: string }) {
               </span>
               {removing.in_use ? (
                 <span className="text-warning">
-                  {removing.containers} {removing.containers === 1 ? 'container is' : 'containers are'}{' '}
-                  using this image. Docker will refuse to remove it while that is true, and will say
-                  which.
+                  {removing.containers}{' '}
+                  {removing.containers === 1 ? 'container is' : 'containers are'} using this image.
+                  Docker will refuse to remove it while that is true, and will say which.
                 </span>
               ) : null}
               <label className="flex items-start gap-2">

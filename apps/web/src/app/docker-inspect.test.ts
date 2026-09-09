@@ -49,7 +49,7 @@ function inspect(over: InspectOverrides = {}): DockerInspect {
       ...over.resources,
     },
     networking: {
-      networks: [{ name: 'shop_default', ip_address: '172.19.0.2' }],
+      networks: [{ name: 'shop_default', ip_address: '172.19.0.2', aliases: [] }],
       ports: [],
       dns: [],
       hostname: 'shop-web',
@@ -213,7 +213,7 @@ describe('networking', () => {
     const sections = inspectSections(
       inspect({
         networking: {
-          networks: [{ name: 'shop_default', ip_address: '172.19.0.2' }],
+          networks: [{ name: 'shop_default', ip_address: '172.19.0.2', aliases: [] }],
           ports: [
             { host_ip: '0.0.0.0', host_port: 8080, container_port: 80, protocol: 'tcp' },
             { container_port: 5432, protocol: 'tcp' },

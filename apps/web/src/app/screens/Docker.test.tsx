@@ -132,14 +132,15 @@ function overview(over: Partial<DockerOverview> = {}): DockerOverview {
       compose_projects: 1,
     },
     disk: {
-      images_bytes: 2_000_000_000,
-      images_reclaimable_bytes: 500_000_000,
-      containers_bytes: 10_000_000,
-      containers_reclaimable_bytes: 0,
-      volumes_bytes: 1_000_000_000,
-      volumes_reclaimable_bytes: 0,
-      build_cache_bytes: 300_000_000,
-      build_cache_reclaimable_bytes: 300_000_000,
+      images: { count: 0, active: 0, bytes_total: 2_000_000_000, bytes_reclaimable: 500_000_000 },
+      containers: { count: 0, active: 0, bytes_total: 10_000_000, bytes_reclaimable: 0 },
+      volumes: { count: 0, active: 0, bytes_total: 1_000_000_000, bytes_reclaimable: 0 },
+      build_cache: {
+        count: 0,
+        active: 0,
+        bytes_total: 300_000_000,
+        bytes_reclaimable: 300_000_000,
+      },
     },
     ...over,
   };

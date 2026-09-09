@@ -1,3 +1,5 @@
+import type { Narrowed } from './contract';
+import type * as wire from './docker-generated';
 import { ApiError } from './errors';
 import { apiRequest, unwrap } from './http';
 
@@ -32,7 +34,7 @@ export type DockerOwnership = 'slideops' | 'external' | 'unknown';
 
 /** The lifecycle state Docker itself reports for a container. */
 export type DockerContainerState =
-  'running' | 'exited' | 'paused' | 'restarting' | 'dead' | 'created';
+  'running' | 'exited' | 'paused' | 'restarting' | 'removing' | 'dead' | 'created';
 
 /**
  * The healthcheck verdict.
@@ -48,47 +50,46 @@ export type DockerHealth = 'healthy' | 'unhealthy' | 'starting' | 'none';
  * Docker but not published to the Node, which is the common case for a database
  * behind a Compose network and must not read as "not reachable".
  */
-export interface DockerPort {
-  host_ip?: string;
-  host_port?: number;
-  container_port: number;
-  protocol: string;
-}
+export type DockerPort = Narrowed<
+  wire.PortMapping,
+  {
+    /**
+     * Absent when the port is exposed inside Docker but not published to the
+     * Node. The server sends 0 there, which is not a port number; the seam
+     * below turns it back into "there isn't one" so a screen cannot print it.
+     */
+    host_port?: number;
+  }
+>;
 
 /** One container on the Node, as the daemon describes it. */
-export interface DockerContainer {
-  /** The full 64 character id, which is what other Docker records refer to. */
-  full_id: string;
-  /** The short id Docker prints, kept because it is what an Operator recognises. */
-  id: string;
-  name: string;
-  image: string;
-  image_id: string;
-  state: DockerContainerState;
-  /** Docker's own status line, such as "Up 3 hours (healthy)". */
-  status_text: string;
-  health: DockerHealth;
-  created_at: string;
-  /** When the current run began. Absent for a container that never started. */
-  started_at?: string;
-  restart_count: number;
-  /** The code the last run exited with. Absent while the container is running. */
-  exit_code?: number;
-  restart_policy: string;
-  ports: DockerPort[];
-  compose_project?: string;
-  compose_service?: string;
-  ownership: DockerOwnership;
-  /** The Service this container belongs to, when SlideOps deployed it. */
-  service_id?: string;
-  /** The CPU ceiling in cores. Absent when the Operator set no limit. */
-  cpu_limit_cores?: number;
-  /** The memory ceiling in whole MB. Absent when the Operator set no limit. */
-  memory_limit_mb?: number;
-  networks: string[];
-  mount_count: number;
-  labels: Record<string, string>;
-}
+export type DockerContainer = Narrowed<
+  wire.Container,
+  {
+    state: DockerContainerState;
+    /** Absent when the image declares no healthcheck at all. */
+    health?: DockerHealth;
+    ownership: DockerOwnership;
+    /** Guaranteed a list by the normaliser below, whatever the server sent. */
+    ports: DockerPort[];
+    networks: string[];
+    labels: Record<string, string>;
+    /**
+     * The code the last run ended with, absent until a run has ended.
+     *
+     * Docker reports 0 for a container that is still going, which is the same
+     * number a clean exit reports, so the field is only carried through for the
+     * states where a run has actually finished. Otherwise a healthy container
+     * reads as one that exited successfully and stopped, which is the opposite
+     * of what it is doing.
+     */
+    exit_code?: number;
+    /** The CPU ceiling in cores. Absent when the Operator set no limit. */
+    cpu_limit_cores?: number;
+    /** The memory ceiling in whole MB. Absent when the Operator set no limit. */
+    memory_limit_mb?: number;
+  }
+>;
 
 /**
  * A live sample for one container, keyed by its full id.
@@ -98,96 +99,42 @@ export interface DockerContainer {
  * and let the numbers arrive after. It also means a container with no sample is
  * visibly a container with no sample, rather than one silently showing zero.
  */
-export interface DockerStats {
-  container_id: string;
-  cpu_percent: number;
-  memory_used_mb: number;
-  /**
-   * What Docker reports as the memory ceiling for this sample. Where the
-   * container has no limit of its own, the daemon reports the whole machine's
-   * memory here, so this is not evidence that a limit was set.
-   */
-  memory_limit_mb: number;
-  net_rx_bytes: number;
-  net_tx_bytes: number;
-  block_read_bytes: number;
-  block_write_bytes: number;
-  pids: number;
-}
+export type DockerStats = wire.Stats;
 
 /** One image on the Node. `containers` counts the containers using it. */
-export interface DockerImage {
-  id: string;
-  repository: string;
-  tag: string;
-  created_at: string;
-  size_bytes: number;
-  /** An image left with no repository or tag, usually by a rebuild. */
-  dangling: boolean;
-  in_use: boolean;
-  containers: number;
-}
+export type DockerImage = wire.Image;
 
 /** One volume on the Node. `containers` names what has it mounted. */
-export interface DockerVolume {
-  name: string;
-  driver: string;
-  mountpoint: string;
-  created_at?: string;
-  /** Absent unless the daemon was asked for disk usage, which is slow. */
-  size_bytes?: number;
-  in_use: boolean;
-  containers: string[];
-  labels: Record<string, string>;
-}
+export type DockerVolume = Narrowed<
+  wire.Volume,
+  {
+    containers: string[];
+    labels: Record<string, string>;
+    /**
+     * Absent unless the daemon volunteered a size, which it only does when it
+     * was asked for disk usage. The server marks that with -1 rather than 0,
+     * because a volume holding nothing and a volume nobody measured are
+     * different answers.
+     */
+    size_bytes?: number;
+  }
+>;
 
 /** One Docker network on the Node. `containers` names what is attached. */
-export interface DockerNetwork {
-  id: string;
-  name: string;
-  driver: string;
-  scope: string;
-  subnet?: string;
-  gateway?: string;
-  /** An internal network has no route out to the Node's own network. */
-  internal: boolean;
-  containers: string[];
-  labels: Record<string, string>;
-}
+export type DockerNetwork = Narrowed<
+  wire.Network,
+  { containers: string[]; labels: Record<string, string> }
+>;
 
 /**
  * The daemon itself. Everything but `available` and `warnings` is absent when
  * the daemon could not be reached, so a screen reads `available` first and asks
  * nothing else of this object until it is true.
  */
-export interface DockerDaemon {
-  available: boolean;
-  version?: string;
-  api_version?: string;
-  storage_driver?: string;
-  cgroup_driver?: string;
-  kernel?: string;
-  architecture?: string;
-  /** Docker's own warnings about how it is configured, in its own words. */
-  warnings: string[];
-}
+export type DockerDaemon = Narrowed<wire.Daemon, { warnings: string[] }>;
 
 /** The tallies behind the overview, counted on the Node rather than in the UI. */
-export interface DockerCounts {
-  containers: number;
-  running: number;
-  stopped: number;
-  paused: number;
-  restarting: number;
-  unhealthy: number;
-  exited: number;
-  dead: number;
-  created: number;
-  images: number;
-  volumes: number;
-  networks: number;
-  compose_projects: number;
-}
+export type DockerCounts = wire.Counts;
 
 /**
  * What Docker is holding on disk, and how much of it could be released.
@@ -195,23 +142,16 @@ export interface DockerCounts {
  * The reclaimable figures are Docker's own, from the same accounting that backs
  * `docker system df`. They are reported, never estimated here.
  */
-export interface DockerDiskUsage {
-  images_bytes: number;
-  images_reclaimable_bytes: number;
-  containers_bytes: number;
-  containers_reclaimable_bytes: number;
-  volumes_bytes: number;
-  volumes_reclaimable_bytes: number;
-  build_cache_bytes: number;
-  build_cache_reclaimable_bytes: number;
-}
+/**
+ * One line of the accounting: how many objects of a kind there are, how many
+ * are still in use, and how much of the total could be released.
+ */
+export type DockerDiskCategory = wire.DiskCategory;
+
+export type DockerDiskUsage = wire.DiskUsage;
 
 /** One read that answers "what is the state of Docker on this Node". */
-export interface DockerOverview {
-  daemon: DockerDaemon;
-  counts: DockerCounts;
-  disk: DockerDiskUsage;
-}
+export type DockerOverview = Narrowed<wire.Overview, { daemon: DockerDaemon }>;
 
 /**
  * The error code the backend returns when Docker is not installed or its daemon
@@ -248,20 +188,17 @@ export function isDockerUnavailable(error: unknown): boolean {
  * to build the attention list then reads undefined, which is not an empty
  * warnings section, it is a page that stops rendering.
  */
-function safeOverview(overview: DockerOverview): DockerOverview {
+function safeOverview(overview: wire.Overview): DockerOverview {
   return {
     ...overview,
-    daemon: {
-      ...overview.daemon,
-      warnings: Array.isArray(overview.daemon?.warnings) ? overview.daemon.warnings : [],
-    },
+    daemon: { ...overview.daemon, warnings: list(overview.daemon?.warnings) },
   };
 }
 
 export function getDockerOverview(nodeId: string, signal?: AbortSignal): Promise<DockerOverview> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/overview`, {
     signal,
-  }).then((r) => safeOverview(unwrap<DockerOverview>(r, 'overview')));
+  }).then((r) => safeOverview(unwrap<wire.Overview>(r, 'overview')));
 }
 
 /** Every container on the Node, whoever created it. Reads only. */
@@ -282,6 +219,36 @@ export function getDockerOverview(nodeId: string, signal?: AbortSignal): Promise
  * place the guarantee belongs. Arrays are arrays and records are records from
  * here on, whatever the server sent.
  */
+/**
+ * A number the server sends unconditionally, using one value to mean "there
+ * isn't one".
+ *
+ * Go has no absent int, so a limit nobody set arrives as 0 and a size nobody
+ * measured arrives as -1. Both are sent every time, so a screen checking for
+ * the field being missing never finds it missing, and prints the sentinel: an
+ * unlimited container reads as capped at zero cores, an unmeasured volume as
+ * holding -1 bytes. This is where the sentinel becomes the absence it stands
+ * for, once, rather than at every place that formats a number.
+ */
+function reported(value: number, absent: number): number | undefined {
+  return value === absent ? undefined : value;
+}
+
+/** The size a volume reports when the daemon never measured it. */
+const SIZE_UNKNOWN = -1;
+
+/**
+ * The states in which a container has a finished run behind it.
+ *
+ * `restarting` counts: the previous run did end, and its code is the only
+ * evidence a screen has for why the container keeps coming back.
+ */
+const STATES_WITH_AN_ENDED_RUN: readonly DockerContainerState[] = ['exited', 'dead', 'restarting'];
+
+function safePort(port: wire.PortMapping): DockerPort {
+  return { ...port, host_port: reported(port.host_port, 0) };
+}
+
 function list<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
@@ -290,22 +257,78 @@ function record(value: Record<string, string> | null | undefined): Record<string
   return value && typeof value === 'object' ? value : {};
 }
 
-/** One container, with every list and map guaranteed present. */
-function safeContainer(container: DockerContainer): DockerContainer {
+/**
+ * One container, with every list and map guaranteed present.
+ *
+ * The argument is the generated wire type and the result is the app's, which is
+ * the whole shape of this layer: the only functions allowed to hand out a
+ * `DockerContainer` are the ones that have made its guarantees true.
+ */
+function safeContainer(container: wire.Container): DockerContainer {
+  const state = container.state as DockerContainerState;
   return {
     ...container,
-    ports: list(container.ports),
+    state,
+    health: container.health as DockerHealth | undefined,
+    ownership: container.ownership as DockerOwnership,
+    ports: list(container.ports).map(safePort),
     networks: list(container.networks),
     labels: record(container.labels),
+    exit_code: STATES_WITH_AN_ENDED_RUN.includes(state) ? container.exit_code : undefined,
+    cpu_limit_cores: reported(container.cpu_limit_cores, 0),
+    memory_limit_mb: reported(container.memory_limit_mb, 0),
   };
 }
 
-function safeVolume(volume: DockerVolume): DockerVolume {
-  return { ...volume, containers: list(volume.containers), labels: record(volume.labels) };
+function safeVolume(volume: wire.Volume): DockerVolume {
+  return {
+    ...volume,
+    containers: list(volume.containers),
+    labels: record(volume.labels),
+    size_bytes: reported(volume.size_bytes, SIZE_UNKNOWN),
+  };
 }
 
-function safeNetwork(network: DockerNetwork): DockerNetwork {
+function safeNetwork(network: wire.Network): DockerNetwork {
   return { ...network, containers: list(network.containers), labels: record(network.labels) };
+}
+
+/**
+ * One inspect, with every list guaranteed present.
+ *
+ * This is the read that broke most often, and always the same way: a container
+ * with no entrypoint, no aliases on its network, or no mounts arrives with
+ * those fields as null, and a detail panel that walks them renders nothing at
+ * all rather than an empty section. Every list in the payload is settled here
+ * so no panel has to remember which of them the daemon leaves empty.
+ */
+function safeInspect(inspect: wire.Inspect): DockerInspect {
+  return {
+    ...inspect,
+    general: { ...inspect.general, ownership: inspect.general.ownership as DockerOwnership },
+    configuration: {
+      ...inspect.configuration,
+      command: list(inspect.configuration.command),
+      entrypoint: list(inspect.configuration.entrypoint),
+      labels: record(inspect.configuration.labels),
+    },
+    networking: {
+      ...inspect.networking,
+      networks: list(inspect.networking.networks).map((network) => ({
+        ...network,
+        aliases: list(network.aliases),
+      })),
+      ports: list(inspect.networking.ports).map(safePort),
+      dns: list(inspect.networking.dns),
+    },
+    storage: { ...inspect.storage, mounts: list(inspect.storage.mounts) },
+    runtime: {
+      ...inspect.runtime,
+      healthcheck: inspect.runtime.healthcheck
+        ? { ...inspect.runtime.healthcheck, test: list(inspect.runtime.healthcheck.test) }
+        : undefined,
+    },
+  };
 }
 
 export function listDockerContainers(
@@ -314,7 +337,7 @@ export function listDockerContainers(
 ): Promise<DockerContainer[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/containers`, {
     signal,
-  }).then((r) => list(unwrap<DockerContainer[]>(r, 'containers')).map(safeContainer));
+  }).then((r) => list(unwrap<wire.Container[]>(r, 'containers')).map(safeContainer));
 }
 
 /**
@@ -324,14 +347,14 @@ export function listDockerContainers(
  */
 export function listDockerStats(nodeId: string, signal?: AbortSignal): Promise<DockerStats[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/stats`, { signal }).then(
-    (r) => list(unwrap<DockerStats[]>(r, 'stats')),
+    (r) => list(unwrap<wire.Stats[]>(r, 'stats')),
   );
 }
 
 /** Every image on the Node, including the dangling ones a rebuild left behind. */
 export function listDockerImages(nodeId: string, signal?: AbortSignal): Promise<DockerImage[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/images`, { signal }).then(
-    (r) => list(unwrap<DockerImage[]>(r, 'images')),
+    (r) => list(unwrap<wire.Image[]>(r, 'images')),
   );
 }
 
@@ -339,14 +362,14 @@ export function listDockerImages(nodeId: string, signal?: AbortSignal): Promise<
 export function listDockerVolumes(nodeId: string, signal?: AbortSignal): Promise<DockerVolume[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/volumes`, {
     signal,
-  }).then((r) => list(unwrap<DockerVolume[]>(r, 'volumes')).map(safeVolume));
+  }).then((r) => list(unwrap<wire.Volume[]>(r, 'volumes')).map(safeVolume));
 }
 
 /** Every Docker network on the Node, and what is attached to each. */
 export function listDockerNetworks(nodeId: string, signal?: AbortSignal): Promise<DockerNetwork[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/networks`, {
     signal,
-  }).then((r) => list(unwrap<DockerNetwork[]>(r, 'networks')).map(safeNetwork));
+  }).then((r) => list(unwrap<wire.Network[]>(r, 'networks')).map(safeNetwork));
 }
 
 /**
@@ -370,20 +393,7 @@ export function isDockerNotEnabled(error: unknown): boolean {
  * ------------------------------------------------------------------ */
 
 /** What the container is and when it came to exist. */
-export interface DockerInspectGeneral {
-  full_id: string;
-  id: string;
-  name: string;
-  created_at?: string;
-  state: string;
-  /** Docker's own status line, such as "Up 3 hours (healthy)". */
-  status_text?: string;
-  platform?: string;
-  runtime?: string;
-  storage_driver?: string;
-  ownership: DockerOwnership;
-  service_id?: string;
-}
+export type DockerInspectGeneral = Narrowed<wire.InspectGeneral, { ownership: DockerOwnership }>;
 
 /**
  * What the container was configured to run.
@@ -395,96 +405,49 @@ export interface DockerInspectGeneral {
  *
  * There is deliberately no environment here. See the note on the endpoint.
  */
-export interface DockerInspectConfiguration {
-  image: string;
-  image_id?: string;
-  command: string[];
-  entrypoint: string[];
-  working_dir?: string;
-  user?: string;
-  labels?: Record<string, string>;
-  compose_project?: string;
-  compose_service?: string;
-}
+export type DockerInspectConfiguration = Narrowed<
+  wire.InspectConfiguration,
+  { command: string[]; entrypoint: string[]; labels: Record<string, string> }
+>;
 
-export interface DockerInspectResources {
-  cpu_limit_cores: number;
-  cpu_shares: number;
-  cpuset_cpus?: string;
-  memory_limit_mb: number;
-  memory_reservation_mb: number;
-  pids_limit: number;
-}
+export type DockerInspectResources = wire.InspectResources;
 
 /** One network the container is attached to, with its address on that network. */
-export interface DockerInspectNetwork {
-  name: string;
-  ip_address?: string;
-  gateway?: string;
-  mac_address?: string;
-  aliases?: string[];
-}
+export type DockerInspectNetwork = Narrowed<wire.InspectNetwork, { aliases: string[] }>;
 
-export interface DockerInspectNetworking {
-  hostname?: string;
-  networks: DockerInspectNetwork[];
-  ports: DockerPort[];
-  dns: string[];
-}
+export type DockerInspectNetworking = Narrowed<
+  wire.InspectNetworking,
+  { networks: DockerInspectNetwork[]; ports: DockerPort[]; dns: string[] }
+>;
 
 /** One mount, whether a named volume or a path from the host. */
-export interface DockerMount {
-  type: string;
-  name?: string;
-  source?: string;
-  destination: string;
-  read_only: boolean;
-  driver?: string;
-}
+export type DockerMount = wire.InspectMount;
 
-export interface DockerInspectStorage {
-  mounts: DockerMount[];
-}
+export type DockerInspectStorage = Narrowed<wire.InspectStorage, { mounts: DockerMount[] }>;
 
 /** The healthcheck the image declares, if it declares one. */
-export interface DockerHealthcheck {
-  test?: string[];
-  interval_seconds?: number;
-  timeout_seconds?: number;
-  start_period_seconds?: number;
-  retries?: number;
-}
+export type DockerHealthcheck = Narrowed<wire.InspectHealthcheck, { test: string[] }>;
 
 /** The last time the healthcheck ran. */
-export interface DockerHealthResult {
-  exit_code: number;
-  started_at?: string;
-  ended_at?: string;
-}
+export type DockerHealthResult = wire.InspectHealthResult;
 
-export interface DockerInspectRuntime {
-  restart_policy: string;
-  restart_max_retries: number;
-  restart_count: number;
-  health?: string;
-  health_failing_streak: number;
-  healthcheck?: DockerHealthcheck;
-  last_health_result?: DockerHealthResult;
-  oom_killed: boolean;
-  pid: number;
-  exit_code: number;
-  started_at?: string;
-  finished_at?: string;
-}
+export type DockerInspectRuntime = Narrowed<
+  wire.InspectRuntime,
+  {
+    healthcheck?: DockerHealthcheck;
+  }
+>;
 
-export interface DockerInspect {
-  general: DockerInspectGeneral;
-  configuration: DockerInspectConfiguration;
-  resources: DockerInspectResources;
-  networking: DockerInspectNetworking;
-  storage: DockerInspectStorage;
-  runtime: DockerInspectRuntime;
-}
+export type DockerInspect = Narrowed<
+  wire.Inspect,
+  {
+    general: DockerInspectGeneral;
+    configuration: DockerInspectConfiguration;
+    networking: DockerInspectNetworking;
+    storage: DockerInspectStorage;
+    runtime: DockerInspectRuntime;
+  }
+>;
 
 /**
  * Everything about one container. Reads only, however much detail it returns.
@@ -502,7 +465,7 @@ export function inspectDockerContainer(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/inspect`,
     { signal },
-  ).then((r) => unwrap<DockerInspect>(r, 'inspect'));
+  ).then((r) => safeInspect(unwrap<wire.Inspect>(r, 'inspect')));
 }
 
 /* ------------------------------------------------------------------ *
@@ -541,7 +504,7 @@ export function runDockerContainerAction(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/${action}`,
     { method: 'POST' },
-  ).then((r) => unwrap<DockerContainer>(r, 'container'));
+  ).then((r) => safeContainer(unwrap<wire.Container>(r, 'container')));
 }
 
 /** Start a stopped container. */

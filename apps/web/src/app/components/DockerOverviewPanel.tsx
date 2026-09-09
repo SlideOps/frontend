@@ -80,17 +80,24 @@ function AttentionRow({ item }: { item: AttentionItem }) {
 function DiskUsage({ overview }: { overview: DockerOverview }) {
   const disk = overview.disk;
   const total =
-    disk.images_bytes + disk.containers_bytes + disk.volumes_bytes + disk.build_cache_bytes;
+    disk.images.bytes_total +
+    disk.containers.bytes_total +
+    disk.volumes.bytes_total +
+    disk.build_cache.bytes_total;
   const reclaimable = reclaimableBytes(overview);
 
   const accounts = [
-    { label: 'Images', bytes: disk.images_bytes, free: disk.images_reclaimable_bytes },
-    { label: 'Containers', bytes: disk.containers_bytes, free: disk.containers_reclaimable_bytes },
-    { label: 'Volumes', bytes: disk.volumes_bytes, free: disk.volumes_reclaimable_bytes },
+    { label: 'Images', bytes: disk.images.bytes_total, free: disk.images.bytes_reclaimable },
+    {
+      label: 'Containers',
+      bytes: disk.containers.bytes_total,
+      free: disk.containers.bytes_reclaimable,
+    },
+    { label: 'Volumes', bytes: disk.volumes.bytes_total, free: disk.volumes.bytes_reclaimable },
     {
       label: 'Build cache',
-      bytes: disk.build_cache_bytes,
-      free: disk.build_cache_reclaimable_bytes,
+      bytes: disk.build_cache.bytes_total,
+      free: disk.build_cache.bytes_reclaimable,
     },
   ];
 
@@ -182,7 +189,12 @@ export function DockerOverviewPanel({ overview, containers, stats }: DockerOverv
           <StatTile bordered icon={HardDrive} label="Images" value={counts.images} />
           <StatTile bordered icon={Database} label="Volumes" value={counts.volumes} />
           <StatTile bordered icon={Network} label="Networks" value={counts.networks} />
-          <StatTile bordered icon={Boxes} label="Compose projects" value={counts.compose_projects} />
+          <StatTile
+            bordered
+            icon={Boxes}
+            label="Compose projects"
+            value={counts.compose_projects}
+          />
         </div>
       </Section>
 

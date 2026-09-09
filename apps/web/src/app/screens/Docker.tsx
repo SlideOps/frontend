@@ -120,6 +120,7 @@ const STATE_LABELS: Record<DockerContainerState, string> = {
   created: 'Created',
   exited: 'Exited',
   dead: 'Dead',
+  removing: 'Removing',
 };
 
 const OWNERSHIP_LABELS: Record<DockerOwnership, string> = {

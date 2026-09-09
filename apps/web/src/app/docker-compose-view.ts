@@ -240,8 +240,10 @@ export function formatDependencyChain(chain: string[]): string {
 /** One band of a Compose diff, all of whose entries mean the same thing. */
 export interface ComposeDiffGroup {
   key:
-    | 'containers_recreated'
-    | 'images_changed'
+    | 'services_added'
+    | 'services_removed'
+    | 'services_changed'
+    | 'recreated'
     | 'networks_added'
     | 'networks_removed'
     | 'volumes_added';
@@ -278,41 +280,65 @@ export interface ComposeDiffSummary {
 
 const DIFF_GROUPS: {
   key: ComposeDiffGroup['key'];
-  field: keyof DockerComposeDiff;
   heading: string;
   description: string;
+  /** The entries this band shows, in the words a screen puts on the row. */
+  entries: (diff: DockerComposeDiff) => string[];
 }[] = [
   {
-    key: 'containers_recreated',
-    field: 'containers_recreated',
+    key: 'services_added',
+    heading: 'Services added',
+    description: 'These services do not exist yet and will be started for the first time.',
+    entries: (diff) => diff.services_added,
+  },
+  {
+    key: 'services_removed',
+    heading: 'Services removed',
+    description:
+      'These services go away. Their containers are removed; anything they wrote to a named volume stays where it is.',
+    entries: (diff) => diff.services_removed,
+  },
+  {
+    key: 'services_changed',
+    heading: 'Services changed',
+    // The server says which fields moved and to what, so the row says it too.
+    // "web changed" and "web changed image from nginx:1.25 to nginx:1.27" are
+    // the difference between reading a diff and being told there was one.
+    description: 'These services are configured differently than they are now.',
+    entries: (diff) =>
+      diff.services_changed.map((service) => {
+        const fields = service.changes.map((change) => change.field);
+        if (fields.length === 0) {
+          return service.name;
+        }
+        return `${service.name}: ${fields.join(', ')}`;
+      }),
+  },
+  {
+    key: 'recreated',
     heading: 'Containers recreated',
     description:
       'These are replaced with new containers. Anything written inside them, outside a volume, is lost, and each one is briefly unavailable while it restarts.',
-  },
-  {
-    key: 'images_changed',
-    field: 'images_changed',
-    heading: 'Images changed',
-    description: 'These services will run a different image than they do now.',
+    entries: (diff) => diff.recreated,
   },
   {
     key: 'networks_added',
-    field: 'networks_added',
     heading: 'Networks added',
     description: 'New networks are created for this stack.',
+    entries: (diff) => diff.networks_added,
   },
   {
     key: 'networks_removed',
-    field: 'networks_removed',
     heading: 'Networks removed',
     description:
       'These networks go away. Nothing stored is lost, and putting them back in the file recreates them.',
+    entries: (diff) => diff.networks_removed,
   },
   {
     key: 'volumes_added',
-    field: 'volumes_added',
     heading: 'Volumes added',
     description: 'New, empty volumes are created for this stack.',
+    entries: (diff) => diff.volumes_added,
   },
 ];
 
@@ -320,23 +346,27 @@ const DIFF_GROUPS: {
 export function summariseComposeDiff(diff: DockerComposeDiff): ComposeDiffSummary {
   const groups: ComposeDiffGroup[] = [];
   for (const group of DIFF_GROUPS) {
-    const entries = diff[group.field] ?? [];
+    const entries = group.entries(diff);
     if (entries.length > 0) {
       groups.push({
         key: group.key,
         heading: group.heading,
         description: group.description,
-        entries: [...entries],
+        entries,
       });
     }
   }
-  const volumesRemoved = [...(diff.volumes_removed ?? [])];
+  const volumesRemoved = diff.volumes_removed.map((volume) => volume.name);
   const changeCount =
     groups.reduce((total, group) => total + group.entries.length, 0) + volumesRemoved.length;
 
   return {
     empty: changeCount === 0,
-    destroysData: volumesRemoved.length > 0,
+    // The server decides this, not the length of a list here. It knows which of
+    // the volumes the file drops actually exist on the Node with something in
+    // them, which is the difference between an edit that tidies a declaration
+    // and one that deletes a database.
+    destroysData: diff.affects_data || volumesRemoved.length > 0,
     volumesRemoved,
     groups,
     changeCount,
@@ -813,7 +843,8 @@ export function cloneRequestFromInspect(inspect: DockerInspect): CloneResult {
     cpu_limit_cores: inspect.resources.cpu_limit_cores,
     memory_limit_mb: inspect.resources.memory_limit_mb,
     network: (inspect.networking.networks ?? [])[0]?.name,
-    dns: (inspect.networking.dns ?? []).length > 0 ? [...(inspect.networking.dns ?? [])] : undefined,
+    dns:
+      (inspect.networking.dns ?? []).length > 0 ? [...(inspect.networking.dns ?? [])] : undefined,
     labels:
       Object.keys(inspect.configuration.labels ?? {}).length > 0
         ? { ...inspect.configuration.labels }
