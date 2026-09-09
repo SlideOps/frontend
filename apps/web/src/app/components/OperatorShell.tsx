@@ -42,6 +42,7 @@ export type ActiveKey =
   | 'networking'
   | 'domains'
   | 'nodes'
+  | 'docker'
   | 'projects'
   | 'services'
   | 'terminal'
@@ -169,6 +170,10 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       label: 'Infrastructure',
       items: [
         item('nodes', 'Servers', Server, '/app/nodes'),
+        // Docker sits with the servers it runs on rather than with Services,
+        // because the question it answers is about one machine's daemon, not
+        // about anything SlideOps deployed.
+        item('docker', 'Docker', Container, '/app/docker'),
         item('capabilities', 'Capabilities', Layers, '/app/capabilities'),
         item('networking', 'Network', Network, '/app/networking'),
         item('terminal', 'Terminal', TerminalIcon, '/app/terminal'),
