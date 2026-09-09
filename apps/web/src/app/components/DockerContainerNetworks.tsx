@@ -47,27 +47,45 @@ export function DockerContainerNetworks({
           <Text variant="h4">Networks</Text>
         </div>
 
-        {networking.networks.length === 0 ? (
+        {(networking.networks ?? []).length === 0 ? (
           <Text variant="body-sm" tone="secondary">
             {containerName} is on no Docker network. Nothing reaches it over the network, and it
             reaches nothing.
           </Text>
         ) : (
           <ul className="rounded-md border border-border">
-            {networking.networks.map((network) => {
-              const address = networking.ip_addresses[network];
+            {(networking.networks ?? []).map((network) => {
+              // The address belongs to the network entry itself: a container on
+              // two networks has an address on each, and one map keyed by name
+              // could not have carried both cleanly.
+              const address = network.ip_address;
               return (
                 <li
-                  key={network}
+                  key={network.name}
                   className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border px-4 py-3 first:border-t-0"
                 >
-                  <span className="text-sm font-medium text-ink">{network}</span>
+                  <span className="min-w-0">
+                    <span className="text-sm font-medium text-ink">{network.name}</span>
+                    {network.gateway ? (
+                      <span className="ml-2 font-mono text-xs text-ink-muted">
+                        gateway {network.gateway}
+                      </span>
+                    ) : null}
+                    {(network.aliases ?? []).length > 0 ? (
+                      <span className="ml-2 font-mono text-xs text-ink-muted">
+                        also {(network.aliases ?? []).join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="flex items-center gap-1 font-mono text-xs text-ink-muted">
                     {/* An address the daemon did not report is a dash. A blank
                         cell reads as an address of nothing. */}
                     {address ? address : '--'}
                     {address ? (
-                      <CopyButton value={address} label={`the address of ${containerName} on ${network}`} />
+                      <CopyButton
+                        value={address}
+                        label={`the address of ${containerName} on ${network.name}`}
+                      />
                     ) : null}
                   </span>
                 </li>

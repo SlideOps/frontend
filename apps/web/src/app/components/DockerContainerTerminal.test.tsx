@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event';
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderInApp } from '../../test/render';
@@ -20,7 +21,11 @@ vi.mock('@xterm/xterm', () => ({
     onResize() {}
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit() {}
+  },
+}));
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 const { DockerContainerTerminal } = await import('./DockerContainerTerminal');
@@ -59,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('DockerContainerTerminal', () => {
-  it('says the shell is inside the container and reached over the server\'s SSH connection', () => {
+  it("says the shell is inside the container and reached over the server's SSH connection", () => {
     show();
 
     expect(
@@ -97,10 +102,27 @@ describe('DockerContainerTerminal', () => {
     expect(screen.queryByRole('button', { name: 'Open a shell' })).toBeNull();
   });
 
-  it('withholds the shell on a container that is not running, and says why', () => {
+  it('offers the server shell first when the container is not running', async () => {
     show(false);
 
+    // A container in a restart loop is exactly the one that cannot be attached
+    // to, and exactly the one somebody needs to investigate. Refusing and
+    // stopping there sends them to a terminal outside SlideOps.
+    expect(screen.getByText(/not inside any container/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open a shell' })).toBeEnabled();
+
+    // Switching to the container scope still explains why that one cannot open.
+    await userEvent.click(screen.getByRole('button', { name: /Inside / }));
     expect(screen.getByRole('button', { name: 'Open a shell' })).toBeDisabled();
     expect(screen.getByText(/no processes to attach a shell to/)).toBeInTheDocument();
+  });
+
+  it('lets a running container be investigated from the server too', async () => {
+    show(true);
+
+    await userEvent.click(screen.getByRole('button', { name: /On / }));
+
+    expect(screen.getByText(/not inside any container/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open a shell' })).toBeEnabled();
   });
 });

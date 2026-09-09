@@ -1,7 +1,7 @@
-import { dockerContainerShellUrl } from '@slideops/api-client';
-import { Card, Text } from '@slideops/design-system';
-import { Info } from '@slideops/icons';
-import { useCallback } from 'react';
+import { dockerContainerShellUrl, nodeShellUrl } from '@slideops/api-client';
+import { Button, Card, Text } from '@slideops/design-system';
+import { Container as ContainerIcon, Info, Server } from '@slideops/icons';
+import { useCallback, useState } from 'react';
 import { useCanWrite } from '../../store/workspace';
 import { ShellTerminal } from './ShellTerminal';
 
@@ -48,6 +48,24 @@ export function DockerContainerTerminal({
   const canWrite = useCanWrite();
 
   // Stable, because useShellSession takes it as a dependency of open().
+  /*
+   * Two scopes, because the container is not always the place to look.
+   *
+   * A container in a restart loop is exactly the one that cannot be attached
+   * to: by the time a shell would open, the process it would have attached to
+   * is gone again. Offering only the container shell means the Operator is
+   * refused precisely when they most need to look, and has to leave SlideOps
+   * for a terminal to run the docker logs and docker inspect that would tell
+   * them why. The server shell is the same connection this page already uses,
+   * so it is nothing new to trust; it is simply the other end of it.
+   */
+  const [scope, setScope] = useState<'container' | 'server'>(running ? 'container' : 'server');
+
+  const serverUrlFor = useCallback(
+    (cols: number, rows: number) => nodeShellUrl(nodeId, cols, rows),
+    [nodeId],
+  );
+
   const urlFor = useCallback(
     (cols: number, rows: number) => dockerContainerShellUrl(nodeId, containerRef, cols, rows),
     [nodeId, containerRef],
@@ -84,16 +102,57 @@ export function DockerContainerTerminal({
         </div>
       </div>
 
-      <ShellTerminal
-        urlFor={urlFor}
-        scopeLabel={`Shell inside ${containerName}`}
-        scopeDetail={`Commands run inside ${containerName} on ${nodeName}, over the SSH connection SlideOps already has to that server.`}
-        unavailableReason={
-          running
-            ? undefined
-            : `${containerName} is not running, so there are no processes to attach a shell to. Start it first.`
-        }
-      />
+      <div
+        role="group"
+        aria-label="Where the shell opens"
+        className="flex flex-wrap items-center gap-2"
+      >
+        {[
+          { key: 'container' as const, label: `Inside ${containerName}` },
+          { key: 'server' as const, label: `On ${nodeName}` },
+        ].map((option) => (
+          <Button
+            key={option.key}
+            size="sm"
+            variant={scope === option.key ? 'secondary' : 'ghost'}
+            onClick={() => setScope(option.key)}
+          >
+            {option.key === 'container' ? (
+              <ContainerIcon width={15} height={15} aria-hidden />
+            ) : (
+              <Server width={15} height={15} aria-hidden />
+            )}
+            {option.label}
+          </Button>
+        ))}
+      </div>
+
+      {scope === 'container' && !running ? (
+        <Text variant="body-sm" tone="secondary">
+          {containerName} is not running, so there is no process to attach to. Open a shell on{' '}
+          {nodeName} instead and it can tell you why: its logs, its exit code, and its last
+          configuration are all still on the server.
+        </Text>
+      ) : null}
+
+      {scope === 'container' ? (
+        <ShellTerminal
+          urlFor={urlFor}
+          scopeLabel={`Shell inside ${containerName}`}
+          scopeDetail={`Commands run inside ${containerName} on ${nodeName}, over the SSH connection SlideOps already has to that server.`}
+          unavailableReason={
+            running
+              ? undefined
+              : `${containerName} is not running, so there are no processes to attach a shell to. Open a shell on ${nodeName} instead, or start it first.`
+          }
+        />
+      ) : (
+        <ShellTerminal
+          urlFor={serverUrlFor}
+          scopeLabel={`Shell on ${nodeName}`}
+          scopeDetail={`Commands run on ${nodeName} itself, not inside any container. This is the same server shell the Node page opens, and it is what can answer why a container will not stay up: docker logs ${containerName}, docker inspect ${containerName}.`}
+        />
+      )}
     </div>
   );
 }

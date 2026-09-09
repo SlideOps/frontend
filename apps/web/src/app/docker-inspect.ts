@@ -85,18 +85,29 @@ function generalRows(inspect: DockerInspect): InspectRow[] {
     // Docker's own status line, verbatim. It says things the structured fields
     // do not ("Exited (137) 2 hours ago"), and rewording it would put words in
     // the daemon's mouth.
-    ['Status', text(general.status)],
+    ['Status', text(general.status_text)],
     ['Platform', text(general.platform)],
     ['Runtime', text(general.runtime)],
   ]);
+}
+
+/** One argument list as a readable command line, empty when there is none. */
+function commandLine(argv: string[] | undefined): string {
+  return (argv ?? [])
+    .filter((part) => part !== '')
+    .map((part) => (/[\s"']/.test(part) ? JSON.stringify(part) : part))
+    .join(' ');
 }
 
 function configurationRows(inspect: DockerInspect): InspectRow[] {
   const configuration = inspect.configuration;
   return rows([
     ['Image', text(configuration.image)],
-    ['Entrypoint', text(configuration.entrypoint)],
-    ['Command', text(configuration.command)],
+    // Both are argument lists. Joined for a row, and quoted where an argument
+    // carries a space, because "sh -c echo hello world" and the list it came
+    // from are not the same command.
+    ['Entrypoint', text(commandLine(configuration.entrypoint))],
+    ['Command', text(commandLine(configuration.command))],
     ['Working directory', text(configuration.working_dir)],
     // An empty user means the image's own default, which is root far more often
     // than anybody intends. Saying so is worth a row; guessing is not, so this
@@ -115,7 +126,7 @@ function configurationRows(inspect: DockerInspect): InspectRow[] {
  * key so the same container always renders the same way.
  */
 function labelRows(inspect: DockerInspect): InspectRow[] {
-  return Object.entries(inspect.configuration.labels)
+  return Object.entries(inspect.configuration.labels ?? {})
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => ({ label: key, value }))
     .filter((row) => row.value.trim() !== '');
@@ -125,7 +136,6 @@ function resourceRows(inspect: DockerInspect): InspectRow[] {
   const resources = inspect.resources;
   return rows([
     ['CPU limit', cores(resources.cpu_limit_cores)],
-    ['CPU reservation', cores(resources.cpu_reservation_cores)],
     // A relative weight against every other container on the Node, not a
     // ceiling, so it is left as the bare number Docker uses rather than dressed
     // up in units it does not have.
@@ -138,15 +148,20 @@ function resourceRows(inspect: DockerInspect): InspectRow[] {
 
 function networkingRows(inspect: DockerInspect): InspectRow[] {
   const networking = inspect.networking;
-  const addresses = Object.entries(networking.ip_addresses)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .filter(([, address]) => address.trim() !== '')
-    .map(([network, address]): InspectRow => ({ label: `Address on ${network}`, value: address }));
+  // An address belongs to the network entry it was assigned on, because a
+  // container attached to two networks has an address on each.
+  const addresses = (networking.networks ?? [])
+    .filter((network) => (network.ip_address ?? '').trim() !== '')
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((network): InspectRow => ({
+      label: `Address on ${network.name}`,
+      value: network.ip_address ?? '',
+    }));
 
   return [
     ...rows([
       ['Hostname', text(networking.hostname)],
-      ['Networks', list(networking.networks)],
+      ['Networks', list((networking.networks ?? []).map((network) => network.name))],
     ]),
     ...addresses,
     ...networking.ports.map(portRow),
@@ -186,7 +201,7 @@ function storageRows(inspect: DockerInspect): InspectRow[] {
  * that vanishes on restart are three very different promises about the data.
  */
 function mountRow(mount: DockerMount): InspectRow {
-  const origin = mount.name?.trim() || mount.source.trim();
+  const origin = mount.name?.trim() || (mount.source ?? '').trim();
   const kind = capitalised(mount.type) || 'Mount';
   const access = mount.read_only ? 'read-only' : 'read-write';
   const value = origin ? `${kind} ${origin}, ${access}` : `${kind}, ${access}`;
@@ -212,8 +227,13 @@ function runtimeRows(inspect: DockerInspect): InspectRow[] {
     ['Healthcheck', health ? healthCommand(health) : null],
     ['Check interval', health ? seconds(health.interval_seconds) : null],
     ['Check retries', health ? positive(health.retries) : null],
-    ['Last check', health ? text(health.last_status) : null],
-    ['Last check output', health ? text(health.last_output?.trim()) : null],
+    // The verdict is the runtime's, not the check's: the check is what the
+    // image declares and the verdict is what Docker made of it last.
+    ['Last check', text(runtime.health)],
+    [
+      'Failing runs in a row',
+      runtime.health_failing_streak > 0 ? String(runtime.health_failing_streak) : null,
+    ],
   ]);
 }
 
@@ -243,7 +263,11 @@ export function healthSummary(inspect: DockerInspect): string | null {
   const cadence = health.interval_seconds
     ? ` It runs every ${seconds(health.interval_seconds)}.`
     : '';
-  const status = health.last_status?.trim().toLowerCase();
+  // The verdict lives on the runtime rather than on the check: the check is
+  // what the image declares, the verdict is what Docker most recently made of
+  // it, and only the second one can be absent while the first exists.
+  const reported = inspect.runtime.health;
+  const status = typeof reported === 'string' ? reported.trim().toLowerCase() : '';
 
   if (!status) {
     return `The image defines a healthcheck, and Docker has not reported a result yet.${cadence}`;
@@ -259,7 +283,7 @@ export function healthSummary(inspect: DockerInspect): string | null {
   }
   // An answer nobody here anticipated is quoted rather than translated, so a
   // status Docker adds later reaches the Operator instead of being swallowed.
-  return `The image defines a healthcheck, and Docker's last run of it reported "${health.last_status?.trim() ?? ''}".${cadence}`;
+  return `The image defines a healthcheck, and Docker's last run of it reported "${typeof reported === 'string' ? reported.trim() : ''}".${cadence}`;
 }
 
 /**
@@ -271,7 +295,7 @@ export function healthSummary(inspect: DockerInspect): string | null {
  * healthcheck.
  */
 function definesHealthcheck(health: DockerHealthcheck): boolean {
-  const meaningful = health.test.filter((part) => part.trim() !== '');
+  const meaningful = (health.test ?? []).filter((part) => part.trim() !== '');
   if (meaningful.length === 0) {
     return false;
   }
@@ -289,7 +313,7 @@ function healthCommand(health: DockerHealthcheck): string | null {
   if (!definesHealthcheck(health)) {
     return null;
   }
-  const parts = health.test.filter((part) => part.trim() !== '');
+  const parts = (health.test ?? []).filter((part) => part.trim() !== '');
   const head = parts[0]?.toUpperCase();
   const command = head === 'CMD' || head === 'CMD-SHELL' ? parts.slice(1) : parts;
   return text(command.join(' '));

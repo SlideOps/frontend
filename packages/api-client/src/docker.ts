@@ -369,120 +369,114 @@ export function isDockerNotEnabled(error: unknown): boolean {
  * Inspecting one container
  * ------------------------------------------------------------------ */
 
-/**
- * One filesystem the container has attached, however it was attached.
- *
- * `name` is the Docker volume's name and is present only for a volume mount; a
- * bind mount has a path on the Node and no name, and a tmpfs has neither. The
- * distinction matters because a named volume survives the container being
- * removed and a tmpfs does not, which is the difference between a database that
- * still exists tomorrow and one that does not.
- */
-export interface DockerMount {
-  type: string;
-  source: string;
-  destination: string;
-  read_only: boolean;
-  name?: string;
-}
-
-/**
- * The healthcheck the image declares, and what came of it last.
- *
- * `test` is Docker's own array form, dispatch token included ("CMD-SHELL", then
- * the command). `last_status` is absent when the check has never produced a
- * verdict, which is a real state and not a synonym for unhealthy: a container
- * inside its start period has been checked by nobody yet.
- */
-export interface DockerHealthcheck {
-  test: string[];
-  interval_seconds?: number;
-  retries?: number;
-  last_status?: string;
-  last_output?: string;
-}
-
 /** What the container is and when it came to exist. */
 export interface DockerInspectGeneral {
+  full_id: string;
   id: string;
   name: string;
-  created_at: string;
+  created_at?: string;
   state: string;
-  status: string;
-  platform: string;
-  runtime: string;
+  /** Docker's own status line, such as "Up 3 hours (healthy)". */
+  status_text?: string;
+  platform?: string;
+  runtime?: string;
+  storage_driver?: string;
+  ownership: DockerOwnership;
+  service_id?: string;
 }
 
 /**
- * How the container was configured to run.
+ * What the container was configured to run.
  *
- * There is deliberately no environment here, and there must never be one. A
- * container's environment is where database passwords, API keys and signing
- * secrets live, and an inspect panel is a screen that gets left open, screen
- * shared and pasted into a support thread. SlideOps does not carry those values
- * to the browser at all, so no screen can leak what it was never given.
+ * command and entrypoint are lists, not strings, because that is what Docker
+ * stores and what an argument containing a space means. Joining them for
+ * display is the screen's business; carrying them joined would lose which
+ * argument was which.
+ *
+ * There is deliberately no environment here. See the note on the endpoint.
  */
 export interface DockerInspectConfiguration {
   image: string;
-  command: string;
-  entrypoint: string;
-  working_dir: string;
-  user: string;
-  labels: Record<string, string>;
+  image_id?: string;
+  command: string[];
+  entrypoint: string[];
+  working_dir?: string;
+  user?: string;
+  labels?: Record<string, string>;
+  compose_project?: string;
+  compose_service?: string;
 }
 
-/**
- * The ceilings and floors set on the container. Every field is optional because
- * every one of them is optional in Docker: an absent limit means the Operator
- * set none, and the container may use whatever the Node has.
- */
 export interface DockerInspectResources {
-  cpu_limit_cores?: number;
-  cpu_reservation_cores?: number;
-  cpu_shares?: number;
-  memory_limit_mb?: number;
-  memory_reservation_mb?: number;
-  pids_limit?: number;
+  cpu_limit_cores: number;
+  cpu_shares: number;
+  cpuset_cpus?: string;
+  memory_limit_mb: number;
+  memory_reservation_mb: number;
+  pids_limit: number;
 }
 
-/** What the container is attached to, and what can reach it. */
+/** One network the container is attached to, with its address on that network. */
+export interface DockerInspectNetwork {
+  name: string;
+  ip_address?: string;
+  gateway?: string;
+  mac_address?: string;
+  aliases?: string[];
+}
+
 export interface DockerInspectNetworking {
-  networks: string[];
-  /** The container's address on each network it joined, keyed by network name. */
-  ip_addresses: Record<string, string>;
+  hostname?: string;
+  networks: DockerInspectNetwork[];
   ports: DockerPort[];
   dns: string[];
-  hostname: string;
 }
 
-/** What the container has mounted. */
+/** One mount, whether a named volume or a path from the host. */
+export interface DockerMount {
+  type: string;
+  name?: string;
+  source?: string;
+  destination: string;
+  read_only: boolean;
+  driver?: string;
+}
+
 export interface DockerInspectStorage {
   mounts: DockerMount[];
 }
 
-/**
- * How the container has behaved while running. `pid` and `exit_code` are
- * mutually exclusive in practice: a running container has a process id and has
- * not exited, and an exited one has a code and no process.
- */
-export interface DockerInspectRuntime {
-  restart_policy: string;
-  restart_count: number;
-  healthcheck?: DockerHealthcheck;
-  oom_killed: boolean;
-  pid?: number;
-  exit_code?: number;
+/** The healthcheck the image declares, if it declares one. */
+export interface DockerHealthcheck {
+  test?: string[];
+  interval_seconds?: number;
+  timeout_seconds?: number;
+  start_period_seconds?: number;
+  retries?: number;
 }
 
-/**
- * Everything the daemon knows about one container, grouped the way it is read
- * rather than the way Docker nests it.
- *
- * `docker inspect` returns a deep tree in which the same fact appears in two
- * places and half the keys are historical. The backend flattens it into these
- * six sections so the client never has to know which of `HostConfig`,
- * `Config` or `State` a given field happens to live under this year.
- */
+/** The last time the healthcheck ran. */
+export interface DockerHealthResult {
+  exit_code: number;
+  started_at?: string;
+  ended_at?: string;
+}
+
+export interface DockerInspectRuntime {
+  restart_policy: string;
+  restart_max_retries: number;
+  restart_count: number;
+  health?: string;
+  health_failing_streak: number;
+  healthcheck?: DockerHealthcheck;
+  last_health_result?: DockerHealthResult;
+  oom_killed: boolean;
+  pid: number;
+  exit_code: number;
+  started_at?: string;
+  finished_at?: string;
+}
+
 export interface DockerInspect {
   general: DockerInspectGeneral;
   configuration: DockerInspectConfiguration;

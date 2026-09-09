@@ -239,7 +239,12 @@ export function formatDependencyChain(chain: string[]): string {
 
 /** One band of a Compose diff, all of whose entries mean the same thing. */
 export interface ComposeDiffGroup {
-  key: 'containers_recreated' | 'images_changed' | 'networks_added' | 'networks_removed' | 'volumes_added';
+  key:
+    | 'containers_recreated'
+    | 'images_changed'
+    | 'networks_added'
+    | 'networks_removed'
+    | 'volumes_added';
   heading: string;
   /** What this band costs, in the Operator's terms rather than Docker's. */
   description: string;
@@ -530,6 +535,21 @@ export interface ExportOptions {
 }
 
 /** Build an export source from an inspect, plus any environment held locally. */
+/**
+ * Join an argument list into one command line, or nothing when there is none.
+ *
+ * An argument carrying a space is quoted, because a command line that lost that
+ * distinction would not run: ["sh","-c","echo hello world"] is one argument to
+ * -c, and unquoted it becomes three.
+ */
+function joinArguments(argv: string[] | undefined): string | undefined {
+  const parts = (argv ?? []).filter((part) => part !== '');
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return parts.map((part) => (/[\s"']/.test(part) ? JSON.stringify(part) : part)).join(' ');
+}
+
 export function exportSourceFromInspect(
   inspect: DockerInspect,
   env: Record<string, string> = {},
@@ -539,17 +559,20 @@ export function exportSourceFromInspect(
     // no command wants it.
     name: inspect.general.name.replace(/^\//, ''),
     image: inspect.configuration.image,
-    command: blankToUndefined(inspect.configuration.command),
-    entrypoint: blankToUndefined(inspect.configuration.entrypoint),
+    // Docker stores both as argument lists, which is the only form that says
+    // which argument was which. They are joined for a command line here, and an
+    // empty list means the image's own default rather than an empty command.
+    command: joinArguments(inspect.configuration.command),
+    entrypoint: joinArguments(inspect.configuration.entrypoint),
     workingDir: blankToUndefined(inspect.configuration.working_dir),
     user: blankToUndefined(inspect.configuration.user),
     restartPolicy: normalizeRestartPolicy(inspect.runtime.restart_policy),
-    ports: inspect.networking.ports,
+    ports: inspect.networking.ports ?? [],
     env,
-    mounts: inspect.storage.mounts,
-    networks: inspect.networking.networks,
-    dns: inspect.networking.dns,
-    labels: inspect.configuration.labels,
+    mounts: inspect.storage.mounts ?? [],
+    networks: (inspect.networking.networks ?? []).map((network) => network.name),
+    dns: inspect.networking.dns ?? [],
+    labels: inspect.configuration.labels ?? {},
     cpuLimitCores: inspect.resources.cpu_limit_cores,
     memoryLimitMb: inspect.resources.memory_limit_mb,
     healthcheck: inspect.runtime.healthcheck,
@@ -620,8 +643,8 @@ export function runCommand(source: ExportSource, options: ExportOptions = {}): s
     lines.push(`--entrypoint ${shellQuote(source.entrypoint)}`);
   }
   const health = source.healthcheck;
-  if (health && health.test.length > 0) {
-    lines.push(`--health-cmd ${shellQuote(healthCommand(health.test))}`);
+  if (health && (health.test ?? []).length > 0) {
+    lines.push(`--health-cmd ${shellQuote(healthCommand(health.test ?? []))}`);
     if (health.interval_seconds !== undefined) {
       lines.push(`--health-interval ${health.interval_seconds}s`);
     }
@@ -656,7 +679,11 @@ export function composeServiceSnippet(source: ExportSource, options: ExportOptio
   const redacting = !includeSecrets && envKeys.length > 0;
   const serviceName = source.name || 'service';
 
-  const lines: string[] = ['services:', `  ${serviceName}:`, `    image: ${yamlScalar(source.image)}`];
+  const lines: string[] = [
+    'services:',
+    `  ${serviceName}:`,
+    `    image: ${yamlScalar(source.image)}`,
+  ];
   if (source.name) {
     lines.push(`    container_name: ${yamlScalar(source.name)}`);
   }
@@ -722,9 +749,9 @@ export function composeServiceSnippet(source: ExportSource, options: ExportOptio
     lines.push(`    mem_limit: ${yamlScalar(`${source.memoryLimitMb}m`)}`);
   }
   const health = source.healthcheck;
-  if (health && health.test.length > 0) {
+  if (health && (health.test ?? []).length > 0) {
     lines.push('    healthcheck:');
-    lines.push(`      test: [${health.test.map((part) => yamlScalar(part)).join(', ')}]`);
+    lines.push(`      test: [${(health.test ?? []).map((part) => yamlScalar(part)).join(', ')}]`);
     if (health.interval_seconds !== undefined) {
       lines.push(`      interval: ${health.interval_seconds}s`);
     }
@@ -779,20 +806,21 @@ export function cloneRequestFromInspect(inspect: DockerInspect): CloneResult {
       protocol: port.protocol,
     })),
     restart_policy: normalizeRestartPolicy(inspect.runtime.restart_policy),
-    command: blankToUndefined(inspect.configuration.command),
-    entrypoint: blankToUndefined(inspect.configuration.entrypoint),
+    command: joinArguments(inspect.configuration.command),
+    entrypoint: joinArguments(inspect.configuration.entrypoint),
     working_dir: blankToUndefined(inspect.configuration.working_dir),
     user: blankToUndefined(inspect.configuration.user),
     cpu_limit_cores: inspect.resources.cpu_limit_cores,
     memory_limit_mb: inspect.resources.memory_limit_mb,
-    network: inspect.networking.networks[0],
-    dns: inspect.networking.dns.length > 0 ? [...inspect.networking.dns] : undefined,
-    labels: Object.keys(inspect.configuration.labels).length > 0
-      ? { ...inspect.configuration.labels }
-      : undefined,
+    network: (inspect.networking.networks ?? [])[0]?.name,
+    dns: (inspect.networking.dns ?? []).length > 0 ? [...(inspect.networking.dns ?? [])] : undefined,
+    labels:
+      Object.keys(inspect.configuration.labels ?? {}).length > 0
+        ? { ...inspect.configuration.labels }
+        : undefined,
     healthcheck: inspect.runtime.healthcheck
       ? {
-          test: [...inspect.runtime.healthcheck.test],
+          test: [...(inspect.runtime.healthcheck.test ?? [])],
           interval_seconds: inspect.runtime.healthcheck.interval_seconds,
           retries: inspect.runtime.healthcheck.retries,
         }
