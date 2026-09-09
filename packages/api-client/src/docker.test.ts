@@ -2,13 +2,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './errors';
 import {
   DOCKER_UNAVAILABLE_CODE,
+  MANAGED_BY_SERVICE_CODE,
   getDockerOverview,
+  inspectDockerContainer,
   isDockerUnavailable,
+  isManagedByService,
+  killDockerContainer,
   listDockerContainers,
   listDockerImages,
   listDockerNetworks,
   listDockerStats,
   listDockerVolumes,
+  managedByServiceId,
+  pauseDockerContainer,
+  removeDockerContainer,
+  restartDockerContainer,
+  runDockerContainerAction,
+  startDockerContainer,
+  stopDockerContainer,
+  unpauseDockerContainer,
+  type DockerContainerAction,
 } from './docker';
 
 /*
@@ -272,5 +285,245 @@ describe('telling an absent daemon apart from a failure', () => {
     expect(isDockerUnavailable(null)).toBe(false);
     expect(isDockerUnavailable(new Error('docker_unavailable'))).toBe(false);
     expect(isDockerUnavailable({ code: 'docker_unavailable' })).toBe(false);
+  });
+});
+
+/*
+ * Acting on one container.
+ *
+ * Three things matter. The action reaches the container it names, whatever
+ * characters are in the name. The response is the container as the daemon left
+ * it, not the state the caller assumed the action would produce. And a removal
+ * refused because a Service owns the container is distinguishable from a
+ * removal that failed, because those two lead an Operator to different places.
+ */
+
+/** A container as the lifecycle endpoints return it, past the envelope. */
+function containerBody(state: string, overrides: Record<string, unknown> = {}) {
+  return {
+    container: {
+      full_id: 'a'.repeat(64),
+      id: 'aaaaaaaaaaaa',
+      name: 'shop-web',
+      image: 'ghcr.io/acme/shop:1.4',
+      image_id: 'sha256:abc',
+      state,
+      status_text: `Up 1 second`,
+      health: 'starting',
+      created_at: '2026-09-01T10:00:00Z',
+      restart_count: 0,
+      restart_policy: 'unless-stopped',
+      ports: [],
+      ownership: 'external',
+      networks: ['bridge'],
+      mount_count: 0,
+      labels: {},
+      ...overrides,
+    },
+  };
+}
+
+describe('the container lifecycle', () => {
+  const calls: Array<[DockerContainerAction, (n: string, r: string) => Promise<unknown>]> = [
+    ['start', startDockerContainer],
+    ['stop', stopDockerContainer],
+    ['restart', restartDockerContainer],
+    ['pause', pauseDockerContainer],
+    ['unpause', unpauseDockerContainer],
+    ['kill', killDockerContainer],
+  ];
+
+  it.each(calls)('posts %s to the container it names', async (action, call) => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, containerBody('running')));
+
+    const container = await call('nd_1', 'shop-web');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      `/api/v1/nodes/nd_1/docker/containers/shop-web/${action}`,
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST');
+    expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe('include');
+    expect(container).toMatchObject({ name: 'shop-web', state: 'running' });
+  });
+
+  it('drives the same six actions from one value', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, containerBody('paused')));
+
+    await runDockerContainerAction('nd_1', 'shop-web', 'pause');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/docker/containers/shop-web/pause');
+  });
+
+  it('reports the state the daemon left, not the one the action implies', async () => {
+    // A stop on a container an "always" policy brings straight back leaves it
+    // restarting. A screen that assumed "stopped" would show a container that
+    // is visibly running as stopped until the next poll.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, containerBody('restarting', { restart_policy: 'always' })),
+    );
+
+    const container = await stopDockerContainer('nd_1', 'shop-web');
+
+    expect(container.state).toBe('restarting');
+  });
+
+  it('encodes a container reference that is not URL safe', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse(200, containerBody('running')));
+
+    // Whoever created the container chose its name, so it is encoded rather
+    // than trusted to be a single path segment.
+    await startDockerContainer('nd/1', 'shop/web');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/api/v1/nodes/nd%2F1/docker/containers/shop%2Fweb/start',
+    );
+  });
+
+  it('removes a container with both choices stated outright', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(204, undefined));
+
+    await removeDockerContainer('nd_1', 'shop-web', { force: true, remove_volumes: false });
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/api/v1/nodes/nd_1/docker/containers/shop-web',
+    );
+    expect(init?.method).toBe('DELETE');
+    expect(JSON.parse(String(init?.body))).toEqual({ force: true, remove_volumes: false });
+  });
+
+  it('resolves a removal with nothing, because the container is gone', async () => {
+    // The backend answers with the container's last state. Handing that back
+    // would invite a panel to keep rendering something that no longer exists.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, containerBody('exited')));
+
+    await expect(
+      removeDockerContainer('nd_1', 'shop-web', { force: false, remove_volumes: true }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('a container a Service owns', () => {
+  it('recognises the refusal and reads the Service off it', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(409, {
+        error: {
+          code: MANAGED_BY_SERVICE_CODE,
+          message: 'A Service manages this container.',
+          details: { service_id: 'sv_7' },
+        },
+      }),
+    );
+
+    const error = await removeDockerContainer('nd_1', 'shop-web', {
+      force: false,
+      remove_volumes: false,
+    }).catch((thrown: unknown) => thrown);
+
+    expect(isManagedByService(error)).toBe(true);
+    expect(managedByServiceId(error)).toBe('sv_7');
+  });
+
+  it('still recognises the refusal when no Service id came with it', () => {
+    // The sentence "a Service manages this container" is true either way. Only
+    // the link to follow is missing, and a made up id would be worse than none.
+    const bare = new ApiError(409, MANAGED_BY_SERVICE_CODE, 'A Service manages this container.');
+
+    expect(isManagedByService(bare)).toBe(true);
+    expect(managedByServiceId(bare)).toBeNull();
+  });
+
+  it('reads an id sent as a bare string', () => {
+    const error = new ApiError(409, MANAGED_BY_SERVICE_CODE, 'Managed.', 'sv_9');
+
+    expect(managedByServiceId(error)).toBe('sv_9');
+  });
+
+  it('does not read every conflict, or every error, as a managed container', () => {
+    expect(isManagedByService(new ApiError(409, 'docker_unavailable', 'No daemon.'))).toBe(false);
+    expect(isManagedByService(new Error('managed_by_service'))).toBe(false);
+    expect(isManagedByService(null)).toBe(false);
+    expect(managedByServiceId({ details: { service_id: 'sv_7' } })).toBeNull();
+  });
+});
+
+describe('inspecting one container', () => {
+  it('reads the inspect sections whole and unwraps the envelope', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        inspect: {
+          general: {
+            id: 'a'.repeat(64),
+            name: '/shop-web',
+            created_at: '2026-09-01T10:00:00Z',
+            state: 'running',
+            status: 'Up 3 hours (healthy)',
+            platform: 'linux',
+            runtime: 'runc',
+          },
+          configuration: {
+            image: 'ghcr.io/acme/shop:1.4',
+            command: 'node server.js',
+            entrypoint: '/docker-entrypoint.sh',
+            working_dir: '/app',
+            user: 'node',
+            labels: { 'com.docker.compose.project': 'shop' },
+          },
+          resources: { cpu_limit_cores: 1.5, memory_limit_mb: 512 },
+          networking: {
+            networks: ['shop_default'],
+            ip_addresses: { shop_default: '172.19.0.2' },
+            ports: [{ host_ip: '0.0.0.0', host_port: 8080, container_port: 80, protocol: 'tcp' }],
+            dns: ['1.1.1.1'],
+            hostname: 'shop-web',
+          },
+          storage: {
+            mounts: [
+              {
+                type: 'volume',
+                source: '/var/lib/docker/volumes/shop_data/_data',
+                destination: '/data',
+                read_only: false,
+                name: 'shop_data',
+              },
+            ],
+          },
+          runtime: {
+            restart_policy: 'unless-stopped',
+            restart_count: 2,
+            healthcheck: {
+              test: ['CMD-SHELL', 'curl -f http://localhost/health'],
+              interval_seconds: 30,
+              retries: 3,
+              last_status: 'healthy',
+            },
+            oom_killed: false,
+            pid: 4211,
+          },
+        },
+      }),
+    );
+
+    const inspect = await inspectDockerContainer('nd_1', 'shop-web');
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/api/v1/nodes/nd_1/docker/containers/shop-web/inspect',
+    );
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('GET');
+    expect(inspect.general.status).toBe('Up 3 hours (healthy)');
+    expect(inspect.resources.cpu_limit_cores).toBe(1.5);
+    expect(inspect.networking.ip_addresses.shop_default).toBe('172.19.0.2');
+    expect(inspect.storage.mounts[0]?.name).toBe('shop_data');
+    expect(inspect.runtime.healthcheck?.retries).toBe(3);
+    // A resource nobody limited is absent, not zero, all the way through.
+    expect(inspect.resources.pids_limit).toBeUndefined();
+    // The environment is not on the wire and must never appear there.
+    expect(Object.keys(inspect.configuration)).not.toContain('environment');
   });
 });
