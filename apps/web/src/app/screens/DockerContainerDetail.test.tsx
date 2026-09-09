@@ -2,12 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  DockerContainer,
-  DockerInspect,
-  DockerStats,
-  Node,
-} from '@slideops/api-client';
+import type { DockerContainer, DockerInspect, DockerStats, Node } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
@@ -41,7 +36,11 @@ vi.mock('@xterm/xterm', () => ({
     onResize() {}
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit() {}
+  },
+}));
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 const getNode = vi.fn();
@@ -126,26 +125,33 @@ function stat(over: Partial<DockerStats> = {}): DockerStats {
 function inspect(over: Partial<DockerInspect> = {}): DockerInspect {
   return {
     general: {
-      id: FULL_ID,
+      full_id: FULL_ID,
+      id: FULL_ID.slice(0, 12),
       name: '/api',
       created_at: '2026-09-08T09:00:00Z',
       state: 'running',
-      status: 'Up 3 hours',
+      status_text: 'Up 3 hours',
       platform: 'linux',
       runtime: 'runc',
+      ownership: 'slideops',
     },
     configuration: {
       image: 'ghcr.io/acme/api:1.4.0',
-      command: 'node server.js',
-      entrypoint: '',
+      command: ['node', 'server.js'],
+      entrypoint: [],
       working_dir: '/app',
       user: '',
       labels: {},
     },
-    resources: {},
+    resources: {
+      cpu_limit_cores: 0,
+      cpu_shares: 0,
+      memory_limit_mb: 0,
+      memory_reservation_mb: 0,
+      pids_limit: 0,
+    },
     networking: {
-      networks: ['bridge'],
-      ip_addresses: { bridge: '172.17.0.4' },
+      networks: [{ name: 'bridge', ip_address: '172.17.0.4' }],
       ports: [{ container_port: 80, protocol: 'tcp', host_port: 8080 }],
       dns: [],
       hostname: 'f0f0f0f0f0f0',
@@ -161,7 +167,15 @@ function inspect(over: Partial<DockerInspect> = {}): DockerInspect {
         },
       ],
     },
-    runtime: { restart_policy: 'unless-stopped', restart_count: 0, oom_killed: false, pid: 4242 },
+    runtime: {
+      restart_policy: 'unless-stopped',
+      restart_max_retries: 0,
+      restart_count: 0,
+      health_failing_streak: 0,
+      oom_killed: false,
+      pid: 4242,
+      exit_code: 0,
+    },
     ...over,
   };
 }
@@ -274,8 +288,12 @@ describe('DockerContainerDetail', () => {
   it('says plainly that the chart holds only what it watched', async () => {
     show(`/app/docker/containers/${FULL_ID}?node=n1&tab=stats`);
 
-    expect(await screen.findByText(/SlideOps keeps no history of container usage/)).toBeInTheDocument();
-    expect(screen.getByText(/no last-hour view because there is no last hour to show/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/SlideOps keeps no history of container usage/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no last-hour view because there is no last hour to show/),
+    ).toBeInTheDocument();
   });
 
   it('reads the mounts as what survives removal', async () => {

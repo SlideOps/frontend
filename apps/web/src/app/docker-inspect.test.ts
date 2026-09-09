@@ -12,31 +12,44 @@ import { healthSummary, inspectSections, type InspectSection } from './docker-in
  * looks perfectly fine in a screenshot.
  */
 
-function inspect(over: Partial<DockerInspect> = {}): DockerInspect {
+/** Overrides are section by section, and partial within a section. */
+type InspectOverrides = {
+  [K in keyof DockerInspect]?: Partial<DockerInspect[K]>;
+};
+
+function inspect(over: InspectOverrides = {}): DockerInspect {
   return {
     general: {
       id: 'a'.repeat(64),
       name: '/shop-web',
       created_at: '2026-09-01T10:00:00Z',
       state: 'running',
-      status: 'Up 3 hours (healthy)',
+      full_id: 'a'.repeat(64),
+      status_text: 'Up 3 hours (healthy)',
+      ownership: 'external' as const,
       platform: 'linux/amd64',
       runtime: 'runc',
       ...over.general,
     },
     configuration: {
       image: 'ghcr.io/acme/shop:1.4',
-      command: 'node server.js',
-      entrypoint: '/docker-entrypoint.sh',
+      command: ['node', 'server.js'],
+      entrypoint: ['/docker-entrypoint.sh'],
       working_dir: '/app',
       user: 'node',
       labels: {},
       ...over.configuration,
     },
-    resources: { ...over.resources },
+    resources: {
+      cpu_limit_cores: 0,
+      cpu_shares: 0,
+      memory_limit_mb: 0,
+      memory_reservation_mb: 0,
+      pids_limit: 0,
+      ...over.resources,
+    },
     networking: {
-      networks: ['shop_default'],
-      ip_addresses: {},
+      networks: [{ name: 'shop_default', ip_address: '172.19.0.2' }],
       ports: [],
       dns: [],
       hostname: 'shop-web',
@@ -45,7 +58,11 @@ function inspect(over: Partial<DockerInspect> = {}): DockerInspect {
     storage: { mounts: [], ...over.storage },
     runtime: {
       restart_policy: 'unless-stopped',
+      restart_max_retries: 0,
       restart_count: 0,
+      health_failing_streak: 0,
+      pid: 0,
+      exit_code: 0,
       oom_killed: false,
       ...over.runtime,
     },
@@ -70,8 +87,8 @@ describe('the shape of the panel', () => {
       inspect({
         configuration: {
           image: 'ghcr.io/acme/shop:1.4',
-          command: 'node server.js',
-          entrypoint: '',
+          command: ['node', 'server.js'],
+          entrypoint: [],
           working_dir: '/app',
           user: '',
           labels: { owner: 'platform' },
@@ -118,8 +135,8 @@ describe('the shape of the panel', () => {
       inspect({
         configuration: {
           image: 'nginx:1.27',
-          command: '',
-          entrypoint: '',
+          command: [],
+          entrypoint: [],
           working_dir: '',
           user: '   ',
           labels: {},
@@ -165,7 +182,6 @@ describe('resources', () => {
       inspect({
         resources: {
           cpu_limit_cores: 1.5,
-          cpu_reservation_cores: 1,
           cpu_shares: 1024,
           memory_limit_mb: 2048,
           memory_reservation_mb: 512,
@@ -175,7 +191,6 @@ describe('resources', () => {
     );
 
     expect(value(sections, 'resources', 'CPU limit')).toBe('1.5 cores');
-    expect(value(sections, 'resources', 'CPU reservation')).toBe('1 core');
     expect(value(sections, 'resources', 'CPU shares')).toBe('1024');
     expect(value(sections, 'resources', 'Memory limit')).toBe('2.0 GB');
     expect(value(sections, 'resources', 'Memory reservation')).toBe('512.0 MB');
@@ -198,8 +213,7 @@ describe('networking', () => {
     const sections = inspectSections(
       inspect({
         networking: {
-          networks: ['shop_default'],
-          ip_addresses: { shop_default: '172.19.0.2' },
+          networks: [{ name: 'shop_default', ip_address: '172.19.0.2' }],
           ports: [
             { host_ip: '0.0.0.0', host_port: 8080, container_port: 80, protocol: 'tcp' },
             { container_port: 5432, protocol: 'tcp' },
@@ -283,12 +297,11 @@ describe('runtime', () => {
       inspect({
         runtime: {
           ...inspect().runtime,
+          health: 'healthy',
           healthcheck: {
             test: ['CMD-SHELL', 'curl -f http://localhost/health'],
             interval_seconds: 90,
             retries: 3,
-            last_status: 'healthy',
-            last_output: '  OK  ',
           },
         },
       }),
@@ -300,16 +313,16 @@ describe('runtime', () => {
     expect(value(sections, 'runtime', 'Check interval')).toBe('1m 30s');
     expect(value(sections, 'runtime', 'Check retries')).toBe('3');
     expect(value(sections, 'runtime', 'Last check')).toBe('healthy');
-    expect(value(sections, 'runtime', 'Last check output')).toBe('OK');
   });
 });
 
 describe('healthSummary', () => {
-  function withHealthcheck(over: Partial<DockerHealthcheck> = {}): DockerInspect {
+  function withHealthcheck(over: Partial<DockerHealthcheck> = {}, health?: string): DockerInspect {
     const base = inspect();
     return inspect({
       runtime: {
         ...base.runtime,
+        health,
         healthcheck: { test: ['CMD', 'curl', '-f', 'http://localhost/'], ...over },
       },
     });
@@ -335,15 +348,13 @@ describe('healthSummary', () => {
   });
 
   it('reports the verdict Docker did give', () => {
-    expect(healthSummary(withHealthcheck({ last_status: 'healthy' }))).toContain('passed');
-    expect(healthSummary(withHealthcheck({ last_status: 'unhealthy' }))).toContain('failed');
-    expect(healthSummary(withHealthcheck({ last_status: 'starting' }))).toContain(
-      'start-up grace period',
-    );
+    expect(healthSummary(withHealthcheck({}, 'healthy'))).toContain('passed');
+    expect(healthSummary(withHealthcheck({}, 'unhealthy'))).toContain('failed');
+    expect(healthSummary(withHealthcheck({}, 'starting'))).toContain('start-up grace period');
   });
 
   it('quotes a verdict nobody here anticipated instead of swallowing it', () => {
-    expect(healthSummary(withHealthcheck({ last_status: 'degraded' }))).toContain('"degraded"');
+    expect(healthSummary(withHealthcheck({}, 'degraded'))).toContain('"degraded"');
   });
 });
 
@@ -356,8 +367,8 @@ describe('what must never reach the screen', () => {
       inspect({
         configuration: {
           image: 'postgres:16',
-          command: 'postgres',
-          entrypoint: 'docker-entrypoint.sh',
+          command: ['postgres'],
+          entrypoint: ['docker-entrypoint.sh'],
           working_dir: '/',
           user: 'postgres',
           labels: { owner: 'platform' },
@@ -378,7 +389,8 @@ describe('what must never reach the screen', () => {
           restart_policy: 'always',
           restart_count: 3,
           oom_killed: true,
-          healthcheck: { test: ['CMD', 'true'], last_status: 'unhealthy', interval_seconds: 10 },
+          health: 'unhealthy',
+          healthcheck: { test: ['CMD', 'true'], interval_seconds: 10 },
         },
       }),
     );
@@ -396,7 +408,8 @@ describe('what must never reach the screen', () => {
             restart_policy: 'always',
             restart_count: 0,
             oom_killed: false,
-            healthcheck: { test: ['CMD', 'true'], last_status: 'unhealthy' },
+            healthcheck: { test: ['CMD', 'true'] },
+            health: 'unhealthy',
           },
         }),
       ) ?? '',

@@ -139,7 +139,7 @@ export function DockerRunForm({
     Object.entries(initial?.labels ?? {}).map(([key, value]) => ({ key, value })),
   );
   const [healthCommand, setHealthCommand] = useState(
-    initial?.healthcheck ? initial.healthcheck.test.slice(1).join(' ') : '',
+    initial?.healthcheck ? (initial.healthcheck.test ?? []).slice(1).join(' ') : '',
   );
   const [healthInterval, setHealthInterval] = useState(
     initial?.healthcheck?.interval_seconds ? String(initial.healthcheck.interval_seconds) : '',

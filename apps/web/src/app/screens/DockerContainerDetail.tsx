@@ -42,7 +42,7 @@ import { DockerContainerStorage } from '../components/DockerContainerStorage';
 import { DockerContainerTerminal } from '../components/DockerContainerTerminal';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import { Refreshing } from '../components/Refreshing';
+import { FloatingRefreshIndicator } from '../components/FloatingRefreshIndicator';
 import { formatUptime, indexStats, statFor, uptimeSeconds } from '../docker-inventory';
 import { useAsyncData } from '../hooks/useAsyncData';
 
@@ -267,7 +267,10 @@ function ContainerPage({ nodeId, nodeName, containerRef, tab }: ContainerPagePro
 
   return (
     <div className="flex flex-col gap-6">
-      <Refreshing show={containers.refreshing || stats.refreshing} label="Reading the daemon" />
+      <FloatingRefreshIndicator
+        show={containers.refreshing || stats.refreshing}
+        label="Reading the daemon"
+      />
 
       <Card className="flex flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-4">

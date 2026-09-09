@@ -42,7 +42,7 @@ import { DockerCapacityPanel } from '../components/DockerCapacityPanel';
 import { DockerRankings } from '../components/DockerRankings';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
-import { Refreshing } from '../components/Refreshing';
+import { FloatingRefreshIndicator } from '../components/FloatingRefreshIndicator';
 import { useAsyncData } from '../hooks/useAsyncData';
 import {
   CONTAINER_HEALTHS,
@@ -499,7 +499,10 @@ function DockerOnNode({ node, tab }: { node: Node; tab: string }) {
     <div className="flex flex-col gap-4">
       {/* Rendered only while a refresh is actually in flight, so an idle page
           carries no empty row where an indicator would be. */}
-      <Refreshing show={containers.refreshing || stats.refreshing} label="Reading the daemon" />
+      <FloatingRefreshIndicator
+        show={containers.refreshing || stats.refreshing}
+        label="Reading the daemon"
+      />
 
       {/* One panel, not one per failed read. When the daemon is unreachable
           every read fails with the same cause, and stacking three identical

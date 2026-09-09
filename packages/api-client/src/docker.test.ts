@@ -463,22 +463,21 @@ describe('inspecting one container', () => {
             name: '/shop-web',
             created_at: '2026-09-01T10:00:00Z',
             state: 'running',
-            status: 'Up 3 hours (healthy)',
+            status_text: 'Up 3 hours (healthy)',
             platform: 'linux',
             runtime: 'runc',
           },
           configuration: {
             image: 'ghcr.io/acme/shop:1.4',
-            command: 'node server.js',
-            entrypoint: '/docker-entrypoint.sh',
+            command: ['node', 'server.js'],
+            entrypoint: ['/docker-entrypoint.sh'],
             working_dir: '/app',
             user: 'node',
             labels: { 'com.docker.compose.project': 'shop' },
           },
           resources: { cpu_limit_cores: 1.5, memory_limit_mb: 512 },
           networking: {
-            networks: ['shop_default'],
-            ip_addresses: { shop_default: '172.19.0.2' },
+            networks: [{ name: 'shop_default', ip_address: '172.19.0.2', gateway: '172.19.0.1' }],
             ports: [{ host_ip: '0.0.0.0', host_port: 8080, container_port: 80, protocol: 'tcp' }],
             dns: ['1.1.1.1'],
             hostname: 'shop-web',
@@ -516,9 +515,9 @@ describe('inspecting one container', () => {
       '/api/v1/nodes/nd_1/docker/containers/shop-web/inspect',
     );
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('GET');
-    expect(inspect.general.status).toBe('Up 3 hours (healthy)');
+    expect(inspect.general.status_text).toBe('Up 3 hours (healthy)');
     expect(inspect.resources.cpu_limit_cores).toBe(1.5);
-    expect(inspect.networking.ip_addresses.shop_default).toBe('172.19.0.2');
+    expect(inspect.networking.networks[0]?.ip_address).toBe('172.19.0.2');
     expect(inspect.storage.mounts[0]?.name).toBe('shop_data');
     expect(inspect.runtime.healthcheck?.retries).toBe(3);
     // A resource nobody limited is absent, not zero, all the way through.

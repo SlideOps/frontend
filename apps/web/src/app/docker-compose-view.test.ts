@@ -56,26 +56,42 @@ function source(overrides: Partial<ExportSource> = {}): ExportSource {
 function inspect(overrides: Partial<DockerInspect> = {}): DockerInspect {
   return {
     general: {
+      full_id: 'abc123def456',
       id: 'abc123',
       name: '/shop-web',
       created_at: '2026-01-01T00:00:00Z',
       state: 'running',
-      status: 'Up 3 hours',
+      status_text: 'Up 3 hours',
       platform: 'linux',
       runtime: 'runc',
+      ownership: 'external',
     },
     configuration: {
       image: 'nginx:1.27',
-      command: '',
-      entrypoint: '',
+      command: [],
+      entrypoint: [],
       working_dir: '',
       user: '',
       labels: {},
     },
-    resources: {},
-    networking: { networks: [], ip_addresses: {}, ports: [], dns: [], hostname: 'shop-web' },
+    resources: {
+      cpu_limit_cores: 0,
+      cpu_shares: 0,
+      memory_limit_mb: 0,
+      memory_reservation_mb: 0,
+      pids_limit: 0,
+    },
+    networking: { networks: [], ports: [], dns: [], hostname: 'shop-web' },
     storage: { mounts: [] },
-    runtime: { restart_policy: 'no', restart_count: 0, oom_killed: false },
+    runtime: {
+      restart_policy: 'no',
+      restart_max_retries: 0,
+      restart_count: 0,
+      health_failing_streak: 0,
+      oom_killed: false,
+      pid: 0,
+      exit_code: 0,
+    },
     ...overrides,
   };
 }
@@ -391,7 +407,11 @@ describe('exporting a container', () => {
     const exported = exportSourceFromInspect(
       inspect({
         general: { ...inspect().general, name: '/shop-web' },
-        runtime: { restart_policy: 'unless-stopped', restart_count: 2, oom_killed: false },
+        runtime: {
+          ...inspect().runtime,
+          restart_policy: 'unless-stopped',
+          restart_count: 2,
+        },
       }),
     );
 
@@ -410,16 +430,21 @@ describe('cloning a container', () => {
   const original = inspect({
     configuration: {
       image: 'nginx:1.27',
-      command: 'nginx -g "daemon off;"',
-      entrypoint: '',
+      command: ['nginx', '-g', 'daemon off;'],
+      entrypoint: [],
       working_dir: '/app',
       user: '1000:1000',
       labels: { team: 'platform' },
     },
-    resources: { cpu_limit_cores: 1, memory_limit_mb: 256 },
+    resources: {
+      cpu_limit_cores: 1,
+      cpu_shares: 0,
+      memory_limit_mb: 256,
+      memory_reservation_mb: 0,
+      pids_limit: 0,
+    },
     networking: {
-      networks: ['shop_default'],
-      ip_addresses: { shop_default: '172.18.0.3' },
+      networks: [{ name: 'shop_default', ip_address: '172.18.0.3' }],
       ports: [{ host_port: 8080, container_port: 80, protocol: 'tcp' }],
       dns: ['1.1.1.1'],
       hostname: 'shop-web',
@@ -435,7 +460,13 @@ describe('cloning a container', () => {
         },
       ],
     },
-    runtime: { restart_policy: 'unless-stopped', restart_count: 7, oom_killed: true, exit_code: 137 },
+    runtime: {
+      ...inspect().runtime,
+      restart_policy: 'unless-stopped',
+      restart_count: 7,
+      oom_killed: true,
+      exit_code: 137,
+    },
   });
 
   it('copies configuration and nothing that would collide or leak', () => {
