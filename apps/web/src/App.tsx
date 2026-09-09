@@ -59,6 +59,9 @@ const Terminal = lazy(() =>
   import('./app/screens/Terminal').then((m) => ({ default: m.Terminal })),
 );
 const Docker = lazy(() => import('./app/screens/Docker').then((m) => ({ default: m.Docker })));
+const DockerContainerDetail = lazy(() =>
+  import('./app/screens/DockerContainerDetail').then((m) => ({ default: m.DockerContainerDetail })),
+);
 const ServiceDeploy = lazy(() =>
   import('./app/screens/ServiceDeploy').then((m) => ({ default: m.ServiceDeploy })),
 );
@@ -239,6 +242,10 @@ export function App() {
           <Route path="services/:id" element={<ServiceDetail />} />
           <Route path="terminal" element={<Terminal />} />
           <Route path="docker" element={<Docker />} />
+          {/* The container is in the path and its Node in the query string,
+              because a container id only identifies anything next to the
+              daemon that issued it. */}
+          <Route path="docker/containers/:ref" element={<DockerContainerDetail />} />
           <Route path="capabilities" element={<Capabilities />} />
           <Route path="capabilities/matrix" element={<CapabilityMatrix />} />
           <Route path="capabilities/:key" element={<CapabilityDetail />} />

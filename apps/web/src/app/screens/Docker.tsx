@@ -326,9 +326,11 @@ function NetworksTab({ nodeId }: { nodeId: string }) {
 
 /** The search, filter and sort controls, and the containers they narrow. */
 function ContainersTab({
+  nodeId,
   containers,
   stats,
 }: {
+  nodeId: string;
   containers: DockerContainer[];
   stats: DockerStats[];
 }) {
@@ -458,6 +460,7 @@ function ContainersTab({
               key={container.full_id}
               container={container}
               stat={statFor(container, index)}
+              nodeId={nodeId}
             />
           ))}
         </div>
@@ -581,7 +584,7 @@ function DockerOnNode({ node, tab }: { node: Node; tab: string }) {
       {loading ? <Loading label={`Reading Docker on ${node.name}, read only`} /> : null}
 
       {tab === 'containers' && containers.state.status === 'ready' ? (
-        <ContainersTab containers={containerList} stats={statList} />
+        <ContainersTab nodeId={node.id} containers={containerList} stats={statList} />
       ) : null}
 
       {tab === 'overview' && overview.state.status === 'ready' ? (
