@@ -3,10 +3,7 @@ import {
   isDockerUnavailable,
   isDockerNotEnabled,
   listDockerContainers,
-  listDockerImages,
-  listDockerNetworks,
   listDockerStats,
-  listDockerVolumes,
   listNodes,
   type DockerContainer,
   type DockerContainerState,
@@ -18,14 +15,23 @@ import {
 import { Button, Text } from '@slideops/design-system';
 import {
   Container as ContainerIcon,
+  Activity,
   Database,
   Gauge,
   HardDrive,
+  Layers,
   Network,
+  Trash2,
   Server,
 } from '@slideops/icons';
 import { EmptyState, PageHeader, SearchBar, TabNav, Toolbar, type TabNavTab } from '@slideops/ui';
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DockerImagesPanel } from '../components/DockerImagesPanel';
+import { DockerVolumesPanel } from '../components/DockerVolumesPanel';
+import { DockerNetworksPanel } from '../components/DockerNetworksPanel';
+import { DockerCleanupPanel } from '../components/DockerCleanupPanel';
+import { DockerEventsPanel } from '../components/DockerEventsPanel';
+import { DockerComposeWorkspace } from '../components/DockerComposeWorkspace';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
 import { DockerContainerCard } from '../components/DockerContainerCard';
@@ -39,7 +45,6 @@ import {
   CONTAINER_OWNERSHIPS,
   CONTAINER_STATES,
   filterContainers,
-  formatBytes,
   indexStats,
   searchContainers,
   sortContainers,
@@ -72,9 +77,12 @@ import {
 const DOCKER_TABS: TabNavTab[] = [
   { key: 'overview', label: 'Overview', icon: Gauge },
   { key: 'containers', label: 'Containers', icon: ContainerIcon },
+  { key: 'compose', label: 'Compose', icon: Layers },
   { key: 'images', label: 'Images', icon: HardDrive },
   { key: 'volumes', label: 'Volumes', icon: Database },
   { key: 'networks', label: 'Networks', icon: Network },
+  { key: 'events', label: 'Events', icon: Activity },
+  { key: 'cleanup', label: 'Cleanup', icon: Trash2 },
 ];
 const DEFAULT_DOCKER_TAB = 'overview';
 
@@ -186,142 +194,6 @@ function useRefreshEvery(active: boolean, onTick: () => void) {
       }
     };
   }, [active]);
-}
-
-/** A calm row in one of the flat inventory lists. */
-function InventoryRow({
-  title,
-  subtitle,
-  facts,
-  note,
-}: {
-  title: string;
-  subtitle?: string;
-  facts: string[];
-  note?: string;
-}) {
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border px-4 py-3 first:border-t-0">
-      <div className="min-w-0">
-        <span className="block truncate text-sm font-medium text-ink" title={title}>
-          {title}
-        </span>
-        {subtitle ? (
-          <span className="block truncate font-mono text-xs text-ink-muted" title={subtitle}>
-            {subtitle}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
-        {facts.map((fact) => (
-          <span key={fact}>{fact}</span>
-        ))}
-        {note ? <span className="text-ink">{note}</span> : null}
-      </div>
-    </li>
-  );
-}
-
-/** The shared frame for the three inventory tabs: load, fail, or list. */
-function InventoryList<T>({
-  result,
-  emptyLabel,
-  row,
-  keyOf,
-}: {
-  result: ReturnType<typeof useAsyncData<T[]>>;
-  emptyLabel: string;
-  row: (item: T) => ReactNode;
-  keyOf: (item: T) => string;
-}) {
-  if (result.state.status === 'loading') {
-    return <Loading />;
-  }
-  if (result.state.status === 'error') {
-    return <ErrorNote error={result.state.error} />;
-  }
-  if (result.state.data.length === 0) {
-    return (
-      <Text variant="body-sm" tone="secondary">
-        {emptyLabel}
-      </Text>
-    );
-  }
-  return (
-    <ul className="rounded-md border border-border bg-surface">
-      {result.state.data.map((item) => (
-        <Fragment key={keyOf(item)}>{row(item)}</Fragment>
-      ))}
-    </ul>
-  );
-}
-
-function ImagesTab({ nodeId }: { nodeId: string }) {
-  const result = useAsyncData((signal) => listDockerImages(nodeId, signal), [nodeId]);
-  return (
-    <InventoryList
-      result={result}
-      emptyLabel="Docker is holding no images on this server."
-      keyOf={(image) => image.id}
-      row={(image) => (
-        <InventoryRow
-          title={image.repository ? `${image.repository}:${image.tag}` : image.id}
-          subtitle={image.id}
-          facts={[
-            formatBytes(image.size_bytes),
-            `${image.containers} ${image.containers === 1 ? 'container' : 'containers'}`,
-          ]}
-          note={image.dangling ? 'Dangling' : image.in_use ? undefined : 'Unused'}
-        />
-      )}
-    />
-  );
-}
-
-function VolumesTab({ nodeId }: { nodeId: string }) {
-  const result = useAsyncData((signal) => listDockerVolumes(nodeId, signal), [nodeId]);
-  return (
-    <InventoryList
-      result={result}
-      emptyLabel="Docker is holding no volumes on this server."
-      keyOf={(volume) => volume.name}
-      row={(volume) => (
-        <InventoryRow
-          title={volume.name}
-          subtitle={volume.mountpoint}
-          facts={[
-            volume.driver,
-            // Absent size is absent, not zero: the daemon reports it only when
-            // it was asked for disk usage, which is a slow question.
-            typeof volume.size_bytes === 'number'
-              ? formatBytes(volume.size_bytes)
-              : 'Size not read',
-            `${volume.containers.length} mounted by`,
-          ]}
-          note={volume.in_use ? undefined : 'Unused'}
-        />
-      )}
-    />
-  );
-}
-
-function NetworksTab({ nodeId }: { nodeId: string }) {
-  const result = useAsyncData((signal) => listDockerNetworks(nodeId, signal), [nodeId]);
-  return (
-    <InventoryList
-      result={result}
-      emptyLabel="This server has no Docker networks."
-      keyOf={(network) => network.id}
-      row={(network) => (
-        <InventoryRow
-          title={network.name}
-          subtitle={network.subnet}
-          facts={[network.driver, network.scope, `${network.containers.length} attached`]}
-          note={network.internal ? 'Internal' : undefined}
-        />
-      )}
-    />
-  );
 }
 
 /** The search, filter and sort controls, and the containers they narrow. */
@@ -549,13 +421,22 @@ function DockerOnNode({ node, tab }: { node: Node; tab: string }) {
   }
 
   if (tab === 'images') {
-    return <ImagesTab nodeId={node.id} />;
+    return <DockerImagesPanel nodeId={node.id} />;
   }
   if (tab === 'volumes') {
-    return <VolumesTab nodeId={node.id} />;
+    return <DockerVolumesPanel nodeId={node.id} />;
   }
   if (tab === 'networks') {
-    return <NetworksTab nodeId={node.id} />;
+    return <DockerNetworksPanel nodeId={node.id} />;
+  }
+  if (tab === 'compose') {
+    return <DockerComposeWorkspace nodeId={node.id} />;
+  }
+  if (tab === 'events') {
+    return <DockerEventsPanel nodeId={node.id} />;
+  }
+  if (tab === 'cleanup') {
+    return <DockerCleanupPanel nodeId={node.id} />;
   }
 
   const failure = overview.state.error ?? containers.state.error ?? null;

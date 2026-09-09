@@ -87,7 +87,7 @@ describe('rankByCpu', () => {
     const ranking = rankByCpu(containers, stats);
 
     expect(ranking.top.map((entry) => entry.container.name)).toEqual(['busy', 'middling', 'idle']);
-    expect(ranking.top[0].cpuPercent).toBe(190);
+    expect(ranking.top[0]!.cpuPercent).toBe(190);
     expect(ranking.excluded).toBe(0);
   });
 
@@ -149,10 +149,10 @@ describe('rankByMemory', () => {
 
     // The unlimited container is holding 4 GB. Ranking on percent of limit
     // would have put the 120 MB one on top at 94%.
-    expect(ranking.top[0].container.name).toBe('no-limit');
-    expect(ranking.top[0].limitMb).toBeNull();
-    expect(ranking.top[0].percentOfLimit).toBeNull();
-    expect(ranking.top[1].percentOfLimit).toBeCloseTo(93.75);
+    expect(ranking.top[0]!.container.name).toBe('no-limit');
+    expect(ranking.top[0]!.limitMb).toBeNull();
+    expect(ranking.top[0]!.percentOfLimit).toBeNull();
+    expect(ranking.top[1]!.percentOfLimit).toBeCloseTo(93.75);
   });
 
   it('excludes an unsampled container rather than reading it as empty', () => {
@@ -184,7 +184,7 @@ describe('rankByRestarts', () => {
 
   it('needs no stats at all', () => {
     const ranking = rankByRestarts([container({ name: 'gone', state: 'dead', restart_count: 7 })]);
-    expect(ranking.top[0].restarts).toBe(7);
+    expect(ranking.top[0]!.restarts).toBe(7);
   });
 });
 
@@ -465,15 +465,15 @@ describe('relationshipsFor', () => {
 
   it('keeps a container a volume names but this server did not list', () => {
     const orphaned: DockerVolume[] = [
-      { ...volumes[0], name: 'ghost_data', containers: ['long-gone'] },
+      { ...volumes[0]!, name: 'ghost_data', containers: ['long-gone'] },
     ];
     const relationships = relationshipsFor(
       { kind: 'volume', name: 'ghost_data' },
       { containers: [api], volumes: orphaned },
     );
 
-    expect(relationships.usedBy[0].name).toBe('long-gone');
-    expect(relationships.usedBy[0].detail).toMatch(/not in this server's container list/);
+    expect(relationships.usedBy[0]!.name).toBe('long-gone');
+    expect(relationships.usedBy[0]!.detail).toMatch(/not in this server's container list/);
   });
 
   it('reports a resource the inventory does not hold as not found', () => {
