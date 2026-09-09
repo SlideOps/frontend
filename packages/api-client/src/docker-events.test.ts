@@ -121,7 +121,7 @@ describe('openDockerEventStream', () => {
 
     expect(events.map((event) => event.action)).toEqual(['die', 'start']);
     // Docker's own words, carried through untouched.
-    expect(events[0].attributes.exitCode).toBe('137');
+    expect(events[0]!.attributes.exitCode).toBe('137');
   });
 
   it('reports connected only once the socket is open', () => {
@@ -204,7 +204,7 @@ describe('the diagnostic reads', () => {
 
     expect(analysis.restart_count).toBe(9);
     expect(analysis.observations).toHaveLength(1);
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(String(url)).toContain('/nodes/node-1/docker/containers/api/analysis');
     expect((init as RequestInit | undefined)?.method ?? 'GET').toBe('GET');
   });
@@ -216,7 +216,7 @@ describe('the diagnostic reads', () => {
 
     await listDockerContainerMetrics('node-1', 'stack/web', '1h');
 
-    expect(String(fetchMock.mock.calls[0][0])).toContain(
+    expect(String(fetchMock.mock.calls[0]![0])).toContain(
       '/nodes/node-1/docker/containers/stack%2Fweb/metrics?range=1h',
     );
   });
@@ -239,6 +239,6 @@ describe('the diagnostic reads', () => {
 
     const samples = await listDockerContainerMetrics('node-1', 'api', '5m');
     expect(samples).toHaveLength(1);
-    expect(samples[0].cpu_percent).toBe(12.5);
+    expect(samples[0]!.cpu_percent).toBe(12.5);
   });
 });
