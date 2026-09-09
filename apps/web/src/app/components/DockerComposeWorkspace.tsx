@@ -87,9 +87,19 @@ const SAFE_ACTIONS: {
 }[] = [
   { action: 'up', label: 'Up', icon: Play, hint: 'Create anything missing and start the stack.' },
   { action: 'start', label: 'Start', icon: Play, hint: 'Start the containers that already exist.' },
-  { action: 'stop', label: 'Stop', icon: Square, hint: 'Stop the containers, leaving them in place.' },
+  {
+    action: 'stop',
+    label: 'Stop',
+    icon: Square,
+    hint: 'Stop the containers, leaving them in place.',
+  },
   { action: 'restart', label: 'Restart', icon: RotateCcw, hint: 'Stop and start every service.' },
-  { action: 'pull', label: 'Pull', icon: Download, hint: 'Fetch newer images without changing what is running.' },
+  {
+    action: 'pull',
+    label: 'Pull',
+    icon: Download,
+    hint: 'Fetch newer images without changing what is running.',
+  },
   {
     action: 'rebuild',
     label: 'Rebuild',
@@ -193,7 +203,7 @@ function ComposeProjectCard({
         </Text>
       </span>
       <Text variant="caption" tone="secondary">
-        {project.services.length} services, {project.container_count} containers
+        {(project.services ?? []).length} services, {project.container_count} containers
       </Text>
       <Text variant="caption" tone="secondary">
         {OWNERSHIP_LABELS[project.ownership] ?? OWNERSHIP_LABELS.unknown}
@@ -286,7 +296,7 @@ function ComposeProjectDetail({
         <div className="min-w-0">
           <Text variant="h3">{detail.name}</Text>
           <Text variant="body-sm" tone="secondary" className="mt-1">
-            {statusLabel(detail.status)}, {detail.services.length} services,{' '}
+            {statusLabel(detail.status)}, {(detail.services ?? []).length} services,{' '}
             {detail.container_count} containers.{' '}
             {OWNERSHIP_LABELS[detail.ownership] ?? OWNERSHIP_LABELS.unknown}.
           </Text>
@@ -357,10 +367,14 @@ function ComposeProjectDetail({
         adornment={<FileText width={16} height={16} className="text-brand" aria-hidden />}
         collapsible
       >
-        <DockerComposeEditor nodeId={nodeId} project={project} onApplied={() => {
-          reload();
-          onChanged();
-        }} />
+        <DockerComposeEditor
+          nodeId={nodeId}
+          project={project}
+          onApplied={() => {
+            reload();
+            onChanged();
+          }}
+        />
       </Section>
 
       <ConfirmDialog
@@ -387,15 +401,13 @@ function ComposeProjectDetail({
                 className="mt-0.5 h-4 w-4 shrink-0 rounded border-border text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               />
               <span className="flex flex-col gap-1">
-                <span className="font-medium text-ink">
-                  Also delete this stack&apos;s volumes
-                </span>
+                <span className="font-medium text-ink">Also delete this stack&apos;s volumes</span>
                 <span className="text-ink-muted">
                   This destroys everything the stack has stored: databases, uploads, anything
                   written to a volume. It cannot be undone, and bringing the stack back up will not
                   return it. Leave this off unless you are certain.
-                  {detail.volumes.length > 0
-                    ? ` ${detail.volumes.length} volumes would be deleted: ${detail.volumes.join(', ')}.`
+                  {(detail.volumes ?? []).length > 0
+                    ? ` ${(detail.volumes ?? []).length} volumes would be deleted: ${(detail.volumes ?? []).join(', ')}.`
                     : ''}
                 </span>
               </span>
@@ -408,7 +420,7 @@ function ComposeProjectDetail({
 }
 
 function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
-  if (detail.services.length === 0) {
+  if ((detail.services ?? []).length === 0) {
     return (
       <Text variant="body-sm" tone="secondary">
         This stack declares no services.
@@ -422,7 +434,7 @@ function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
       adornment={<Boxes width={16} height={16} className="text-brand" aria-hidden />}
     >
       <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-        {detail.services.map((service) => (
+        {(detail.services ?? []).map((service) => (
           <li key={service.name} className="flex flex-col gap-1 px-3 py-2.5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <Text variant="body-sm" className="font-medium">
@@ -472,7 +484,10 @@ function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
  */
 function ComposeDependencies({ detail }: { detail: DockerComposeProjectDetail }) {
   const graph = dependencyGraph(
-    detail.services.map((service) => ({ name: service.name, depends_on: service.depends_on })),
+    (detail.services ?? []).map((service) => ({
+      name: service.name,
+      depends_on: service.depends_on,
+    })),
   );
 
   if (graph.cycle === null && graph.chains.length === 0 && graph.missing.length === 0) {
@@ -491,7 +506,12 @@ function ComposeDependencies({ detail }: { detail: DockerComposeProjectDetail })
             role="alert"
             className="flex items-start gap-3 rounded-md border border-danger bg-surface px-4 py-3"
           >
-            <AlertTriangle width={18} height={18} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+            <AlertTriangle
+              width={18}
+              height={18}
+              className="mt-0.5 shrink-0 text-danger"
+              aria-hidden
+            />
             <div>
               <Text variant="body-sm" className="font-medium">
                 These services depend on each other in a circle

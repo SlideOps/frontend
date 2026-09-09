@@ -247,13 +247,56 @@ export function getDockerOverview(nodeId: string, signal?: AbortSignal): Promise
 }
 
 /** Every container on the Node, whoever created it. Reads only. */
+
+/*
+ * Making the wire safe to render.
+ *
+ * Go marshals a nil slice as JSON null, not as an empty array, and a nil slice
+ * is the ordinary result of a query that found nothing: a container with no
+ * published ports, a network with nothing attached, a stack discovered from
+ * labels with no images recorded. A screen reading `.length` on one of those
+ * does not draw an empty section, it throws, and React unmounts the tree, which
+ * is a blank page and a console error rather than an empty list.
+ *
+ * Guarding at every call site was tried and is the wrong shape: it has to be
+ * remembered forever, by everyone, in a component nobody has written yet. This
+ * is the one place the wire is turned into values the app renders, so it is the
+ * place the guarantee belongs. Arrays are arrays and records are records from
+ * here on, whatever the server sent.
+ */
+function list<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function record(value: Record<string, string> | null | undefined): Record<string, string> {
+  return value && typeof value === 'object' ? value : {};
+}
+
+/** One container, with every list and map guaranteed present. */
+function safeContainer(container: DockerContainer): DockerContainer {
+  return {
+    ...container,
+    ports: list(container.ports),
+    networks: list(container.networks),
+    labels: record(container.labels),
+  };
+}
+
+function safeVolume(volume: DockerVolume): DockerVolume {
+  return { ...volume, containers: list(volume.containers), labels: record(volume.labels) };
+}
+
+function safeNetwork(network: DockerNetwork): DockerNetwork {
+  return { ...network, containers: list(network.containers), labels: record(network.labels) };
+}
+
 export function listDockerContainers(
   nodeId: string,
   signal?: AbortSignal,
 ): Promise<DockerContainer[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/containers`, {
     signal,
-  }).then((r) => unwrap<DockerContainer[]>(r, 'containers'));
+  }).then((r) => list(unwrap<DockerContainer[]>(r, 'containers')).map(safeContainer));
 }
 
 /**
@@ -263,14 +306,14 @@ export function listDockerContainers(
  */
 export function listDockerStats(nodeId: string, signal?: AbortSignal): Promise<DockerStats[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/stats`, { signal }).then(
-    (r) => unwrap<DockerStats[]>(r, 'stats'),
+    (r) => list(unwrap<DockerStats[]>(r, 'stats')),
   );
 }
 
 /** Every image on the Node, including the dangling ones a rebuild left behind. */
 export function listDockerImages(nodeId: string, signal?: AbortSignal): Promise<DockerImage[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/images`, { signal }).then(
-    (r) => unwrap<DockerImage[]>(r, 'images'),
+    (r) => list(unwrap<DockerImage[]>(r, 'images')),
   );
 }
 
@@ -278,14 +321,14 @@ export function listDockerImages(nodeId: string, signal?: AbortSignal): Promise<
 export function listDockerVolumes(nodeId: string, signal?: AbortSignal): Promise<DockerVolume[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/volumes`, {
     signal,
-  }).then((r) => unwrap<DockerVolume[]>(r, 'volumes'));
+  }).then((r) => list(unwrap<DockerVolume[]>(r, 'volumes')).map(safeVolume));
 }
 
 /** Every Docker network on the Node, and what is attached to each. */
 export function listDockerNetworks(nodeId: string, signal?: AbortSignal): Promise<DockerNetwork[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/networks`, {
     signal,
-  }).then((r) => unwrap<DockerNetwork[]>(r, 'networks'));
+  }).then((r) => list(unwrap<DockerNetwork[]>(r, 'networks')).map(safeNetwork));
 }
 
 /**

@@ -61,8 +61,7 @@ export interface DockerEvent {
  * refusal forever.
  */
 export type DockerEventFrame =
-  | { kind: 'event'; event: DockerEvent }
-  | { kind: 'error'; message: string };
+  { kind: 'event'; event: DockerEvent } | { kind: 'error'; message: string };
 
 /**
  * The connection as a screen reports it.
@@ -98,6 +97,14 @@ const EVENT_STREAM_INITIAL_BACKOFF_MS = 500;
 const EVENT_STREAM_DEFAULT_MAX_BACKOFF_MS = 15000;
 
 /** The websocket carrying everything the daemon on this Node reports doing. */
+/** Observations are a list, whatever a nil slice marshalled to. */
+function normaliseAnalysis(analysis: DockerCrashAnalysis): DockerCrashAnalysis {
+  return {
+    ...analysis,
+    observations: Array.isArray(analysis.observations) ? analysis.observations : [],
+  };
+}
+
 export function dockerEventStreamUrl(nodeId: string): string {
   return websocketUrl(`/nodes/${encodeURIComponent(nodeId)}/docker/events/stream`);
 }
@@ -260,7 +267,7 @@ export function getDockerCrashAnalysis(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(ref)}/analysis`,
     { signal },
-  ).then((r) => unwrap<DockerCrashAnalysis>(r, 'analysis'));
+  ).then((r) => normaliseAnalysis(unwrap<DockerCrashAnalysis>(r, 'analysis')));
 }
 
 /* ------------------------------------------------------------------ *

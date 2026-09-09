@@ -151,11 +151,7 @@ export function pullDockerImage(
  * is a decision the Operator makes explicitly and has no default here. Removing
  * an image a running container needs is refused whatever this says.
  */
-export function removeDockerImage(
-  nodeId: string,
-  imageId: string,
-  force: boolean,
-): Promise<void> {
+export function removeDockerImage(nodeId: string, imageId: string, force: boolean): Promise<void> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/images/${encodeURIComponent(imageId)}`,
     { method: 'DELETE', body: { force } },
@@ -169,11 +165,7 @@ export function removeDockerImage(
  * is one image. This is the one operation on this surface that destroys
  * nothing, which is why it is not behind a confirmation anywhere.
  */
-export function tagDockerImage(
-  nodeId: string,
-  imageId: string,
-  reference: string,
-): Promise<void> {
+export function tagDockerImage(nodeId: string, imageId: string, reference: string): Promise<void> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/images/${encodeURIComponent(imageId)}/tag`,
     { method: 'POST', body: { reference } },
@@ -189,7 +181,7 @@ export function inspectDockerImage(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/images/${encodeURIComponent(imageId)}/inspect`,
     { signal },
-  ).then((r) => unwrap<DockerResourceInspect>(r, 'inspect'));
+  ).then((r) => unwrap<DockerResourceInspect>(r, 'image'));
 }
 
 /* ------------------------------------------------------------------ *
@@ -229,11 +221,7 @@ export function createDockerVolume(
  *
  * Resolves empty. A removed volume has no state left to describe.
  */
-export function removeDockerVolume(
-  nodeId: string,
-  name: string,
-  force: boolean,
-): Promise<void> {
+export function removeDockerVolume(nodeId: string, name: string, force: boolean): Promise<void> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/volumes/${encodeURIComponent(name)}`,
     { method: 'DELETE', body: { force } },
@@ -249,7 +237,7 @@ export function inspectDockerVolume(
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/volumes/${encodeURIComponent(name)}/inspect`,
     { signal },
-  ).then((r) => unwrap<DockerResourceInspect>(r, 'inspect'));
+  ).then((r) => unwrap<DockerResourceInspect>(r, 'volume'));
 }
 
 /* ------------------------------------------------------------------ *
@@ -362,13 +350,59 @@ export interface DockerCleanupPreview {
  * Read what could be released. Changes nothing: this is the read that lets a
  * screen say what each button would do before anybody presses one.
  */
+/** One reclaim as the endpoint reports it, before it is given a human label. */
+interface DockerCleanupPlan {
+  kind: string;
+  item_count: number;
+  /** The objects it would remove, where they can be named. */
+  targets?: string[] | null;
+  reclaimable_bytes: number;
+}
+
+/**
+ * What each reclaim is called, in words.
+ *
+ * The endpoint names a reclaim by its slug because that is what the POST takes
+ * back. A screen needs a sentence, and inventing one from the slug would give
+ * "Unused volumes" and "Build cache" the same weight when only one of them
+ * destroys data.
+ */
+const CLEANUP_LABELS: Record<string, string> = {
+  'build-cache': 'Build cache',
+  'stopped-containers': 'Stopped containers',
+  'dangling-images': 'Dangling images',
+  'unused-images': 'Unused images',
+  'unused-volumes': 'Unused volumes',
+};
+
+/**
+ * Read what could be released. Changes nothing: this is the read that lets a
+ * screen say what each button would do before anybody presses one.
+ *
+ * The endpoint answers with plans keyed by slug, and this is the one place that
+ * turns them into the categories a screen renders. Doing it here rather than in
+ * the panel keeps the wire shape in the module that owns the wire, and means a
+ * plan the server adds later appears with its slug as its own label instead of
+ * disappearing.
+ */
 export function previewDockerCleanup(
   nodeId: string,
   signal?: AbortSignal,
 ): Promise<DockerCleanupPreview> {
-  return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/cleanup/preview`, {
-    signal,
-  }).then((r) => unwrap<DockerCleanupPreview>(r, 'preview'));
+  return apiRequest<{ plans?: DockerCleanupPlan[] | null }>(
+    `/nodes/${encodeURIComponent(nodeId)}/docker/cleanup/preview`,
+    { signal },
+  ).then((response) => ({
+    // A server that reports no plans at all is an empty list, never a crash:
+    // Go marshals an empty slice as null, and a screen mapping over null is a
+    // blank page.
+    categories: (response.plans ?? []).map((plan) => ({
+      key: plan.kind,
+      label: CLEANUP_LABELS[plan.kind] ?? plan.kind,
+      count: plan.item_count,
+      reclaimable_bytes: plan.reclaimable_bytes,
+    })),
+  }));
 }
 
 /** What a cleanup actually released. */
@@ -417,7 +451,14 @@ export function runDockerCleanup(
  */
 function readCleanupResult(body: unknown): DockerCleanupResult {
   if (body && typeof body === 'object') {
-    const value = (body as Record<string, unknown>).reclaimed_bytes;
+    // The endpoint answers under `cleanup`; older builds answered bare, and
+    // both are read rather than assuming one.
+    const envelope = (body as Record<string, unknown>).cleanup;
+    const source = (envelope && typeof envelope === 'object' ? envelope : body) as Record<
+      string,
+      unknown
+    >;
+    const value = source.reclaimed_bytes;
     if (typeof value === 'number' && Number.isFinite(value)) {
       return { reclaimed_bytes: value };
     }
