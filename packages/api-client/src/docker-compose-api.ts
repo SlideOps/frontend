@@ -1,6 +1,6 @@
 import { ApiError } from './errors';
 import { apiRequest, unwrap } from './http';
-import type { DockerContainer, DockerHealthcheck, DockerOwnership } from './docker';
+import type { DockerContainer, DockerHealthcheck, DockerOwnership, DockerPort } from './docker';
 
 /*
  * Compose stacks on one Node, the Compose file behind them, and creating a
@@ -51,55 +51,75 @@ export type DockerComposeStatus = 'running' | 'partial' | 'stopped' | 'unknown';
  * disk, which is ordinary for a stack brought up from a directory that has
  * since moved. A screen must say "not known" rather than inventing a path.
  */
+/**
+ * One service of a stack, assembled from the containers carrying its label.
+ *
+ * The counts are the point. A scaled service has several containers and one
+ * state word hides that, so the number running is reported beside the number
+ * there are. Docker's own state and health words are carried through unchanged.
+ */
+export interface DockerComposeServiceSummary {
+  name: string;
+  /** How many containers this service has. More than one when it is scaled. */
+  containers: number;
+  running: number;
+  state: string;
+  health?: string;
+  image?: string;
+  ports: DockerPort[];
+}
+
+/**
+ * One Compose stack on the Node, whoever brought it up.
+ *
+ * The list and the detail answer with the same shape on purpose. They differ in
+ * how much of it is filled in, not in what the fields mean, so a screen that
+ * opens a project does not have to re-learn the type it was already showing.
+ *
+ * `config_files` is empty rather than absent when nothing on the Node records
+ * where the stack was built from, which is ordinary for a project brought up
+ * from a directory that has since moved. A screen says "not known" rather than
+ * inventing a path.
+ */
 export interface DockerComposeProject {
   name: string;
-  services: string[];
-  container_count: number;
-  status: DockerComposeStatus;
+  ownership: DockerOwnership;
+  /** Compose's own summary, such as "running(3)". Carried through verbatim. */
+  status?: string;
+  config_files: string[];
+  working_dir?: string;
+  /** Whether SlideOps would read the first config file back to the Operator. */
+  config_readable: boolean;
+  containers: number;
+  running: number;
+  services: DockerComposeServiceSummary[];
   images: string[];
   networks: string[];
   volumes: string[];
-  config_path?: string;
-  ownership: DockerOwnership;
+  /** How the stack was found: compose itself, or the container labels. */
+  found_by: string;
 }
 
 /**
- * One service inside a stack, resolved to what is actually running for it.
+ * Make a project safe to render.
  *
- * `depends_on` is the service's own declaration from the Compose file, not an
- * observation: it is what the file says should start first, which is what an
- * Operator reading a broken stack needs. It names services, so an entry naming
- * a service this project does not define is possible and must be reported
- * rather than quietly dropped.
+ * Same reasoning as the container lists: a nil slice from the server arrives as
+ * null, and a component mapping over null stops rendering the page. Doing it
+ * here means a screen can read every list without asking whether it is one.
  */
-export interface DockerComposeServiceDetail {
-  name: string;
-  /** The image the file declares. Absent for a service built from a Dockerfile. */
-  image?: string;
-  depends_on: string[];
-  /** The containers Docker has for this service, however many replicas. */
-  containers: DockerContainer[];
-}
-
-/**
- * One Compose stack in full.
- *
- * A separate type from {@link DockerComposeProject} rather than an extension of
- * it, because `services` genuinely means something different here: names in the
- * list, resolved services with their containers in the detail. Making one type
- * cover both would mean a field that is sometimes strings and sometimes objects,
- * which every reader would then have to narrow before using.
- */
-export interface DockerComposeProjectDetail {
-  name: string;
-  status: DockerComposeStatus;
-  container_count: number;
-  services: DockerComposeServiceDetail[];
-  images: string[];
-  networks: string[];
-  volumes: string[];
-  config_path?: string;
-  ownership: DockerOwnership;
+function safeProject(project: DockerComposeProject): DockerComposeProject {
+  const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+  return {
+    ...project,
+    config_files: list(project.config_files),
+    images: list(project.images),
+    networks: list(project.networks),
+    volumes: list(project.volumes),
+    services: list(project.services).map((service) => ({
+      ...service,
+      ports: list(service.ports),
+    })),
+  };
 }
 
 /** Every Compose stack on the Node, whoever brought it up. Reads only. */
@@ -109,7 +129,7 @@ export function listDockerComposeProjects(
 ): Promise<DockerComposeProject[]> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/compose`, {
     signal,
-  }).then((r) => unwrap<DockerComposeProject[]>(r, 'projects'));
+  }).then((r) => (unwrap<DockerComposeProject[]>(r, 'projects') ?? []).map(safeProject));
 }
 
 /**
@@ -123,11 +143,11 @@ export function getDockerComposeProject(
   nodeId: string,
   project: string,
   signal?: AbortSignal,
-): Promise<DockerComposeProjectDetail> {
+): Promise<DockerComposeProject> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}`,
     { signal },
-  ).then((r) => unwrap<DockerComposeProjectDetail>(r, 'project'));
+  ).then((r) => safeProject(unwrap<DockerComposeProject>(r, 'project')));
 }
 
 /* ------------------------------------------------------------------ *
@@ -309,11 +329,11 @@ export function applyDockerComposeFile(
   nodeId: string,
   project: string,
   input: { content: string; confirm_data_loss?: boolean },
-): Promise<DockerComposeProjectDetail> {
+): Promise<DockerComposeProject> {
   return apiRequest<unknown>(
     `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/apply`,
     { method: 'POST', body: input },
-  ).then((r) => unwrap<DockerComposeProjectDetail>(r, 'project'));
+  ).then((r) => safeProject(unwrap<DockerComposeProject>(r, 'project')));
 }
 
 /* ------------------------------------------------------------------ *
@@ -471,4 +491,52 @@ export function refusalExplanation(error: unknown): string | null {
     default:
       return null;
   }
+}
+
+/** One declared dependency: `from` waits for `to`. */
+export interface DockerComposeDependencyEdge {
+  from: string;
+  to: string;
+  /** Compose's condition, such as service_healthy. Absent when plain. */
+  condition?: string;
+}
+
+/**
+ * What the stack file says starts before what.
+ *
+ * This is a declaration, not an observation: it is read from the Compose file
+ * rather than from what is running, which is what an Operator staring at a
+ * broken stack actually needs. It comes from its own endpoint because a running
+ * container carries no record of the depends_on that started it.
+ */
+export interface DockerComposeGraph {
+  services: string[];
+  edges: DockerComposeDependencyEdge[];
+  order: string[];
+  /** A dependency loop, when the file declares one. Empty otherwise. */
+  cycle: string[];
+  /** Dependencies naming a service the file does not define. */
+  missing: string[];
+}
+
+/** Read the dependency graph the stack file declares. */
+export function getDockerComposeGraph(
+  nodeId: string,
+  project: string,
+  signal?: AbortSignal,
+): Promise<DockerComposeGraph> {
+  return apiRequest<unknown>(
+    `/nodes/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/graph`,
+    { signal },
+  ).then((r) => {
+    const graph = unwrap<DockerComposeGraph>(r, 'graph');
+    const list = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+    return {
+      services: list(graph?.services),
+      edges: list(graph?.edges),
+      order: list(graph?.order),
+      cycle: list(graph?.cycle),
+      missing: list(graph?.missing),
+    };
+  });
 }

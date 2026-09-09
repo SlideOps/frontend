@@ -596,3 +596,27 @@ describe('a server that answers with nulls instead of empty lists', () => {
     expect(volume?.labels).toEqual({});
   });
 });
+
+/*
+ * The overview crash. A daemon with nothing to complain about omits its
+ * warnings entirely, which is the healthy case and so the common one, and the
+ * attention list iterates that field to build itself.
+ */
+describe('an overview from a daemon with nothing to complain about', () => {
+  it('still gives the warning list, so the attention list can be built', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(200, {
+        overview: {
+          daemon: { available: true, version: '27.1.1' },
+          counts: { containers: 3, running: 2 },
+          disk: {},
+        },
+      }),
+    );
+
+    const overview = await getDockerOverview('nd_1');
+
+    expect(overview.daemon.warnings).toEqual([]);
+    expect(() => overview.daemon.warnings.entries()).not.toThrow();
+  });
+});

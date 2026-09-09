@@ -2,13 +2,12 @@ import {
   ApiError,
   downDockerComposeProject,
   getDockerComposeProject,
+  getDockerComposeGraph,
   listDockerComposeProjects,
   refusalExplanation,
   runDockerComposeAction,
   type DockerComposeAction,
   type DockerComposeProject,
-  type DockerComposeProjectDetail,
-  type DockerComposeStatus,
   type DockerOwnership,
 } from '@slideops/api-client';
 import { Button, Card, Section, Text } from '@slideops/design-system';
@@ -53,14 +52,14 @@ import { ErrorNote, Loading } from './Feedback';
  * own the query string.
  */
 
-const STATUS_LABELS: Record<DockerComposeStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   running: 'Running',
   partial: 'Partly up',
   stopped: 'Stopped',
   unknown: 'Unknown',
 };
 
-const STATUS_TONES: Record<DockerComposeStatus, string> = {
+const STATUS_TONES: Record<string, string> = {
   running: 'text-success',
   partial: 'text-warning',
   stopped: 'text-ink-muted',
@@ -108,8 +107,20 @@ const SAFE_ACTIONS: {
   },
 ];
 
-function statusLabel(status: DockerComposeStatus): string {
-  return STATUS_LABELS[status] ?? 'Unknown';
+function statusLabel(status: string | undefined): string {
+  if (!status) {
+    return 'Status not reported';
+  }
+  return STATUS_LABELS[status] ?? status;
+}
+
+/** The tone for compose's own status word, matched on its leading verb. */
+function statusTone(status: string | undefined): string {
+  if (!status) {
+    return 'text-ink-muted';
+  }
+  const head = status.split('(')[0] ?? '';
+  return STATUS_TONES[head] ?? 'text-ink-muted';
 }
 
 /** Read a failure the way the Operator needs it: a refusal, or a plain error. */
@@ -198,12 +209,12 @@ function ComposeProjectCard({
         <Text variant="body" className="truncate font-medium">
           {project.name}
         </Text>
-        <Text variant="caption" className={STATUS_TONES[project.status] ?? 'text-ink-muted'}>
+        <Text variant="caption" className={statusTone(project.status)}>
           {statusLabel(project.status)}
         </Text>
       </span>
       <Text variant="caption" tone="secondary">
-        {(project.services ?? []).length} services, {project.container_count} containers
+        {(project.services ?? []).length} services, {project.containers} containers
       </Text>
       <Text variant="caption" tone="secondary">
         {OWNERSHIP_LABELS[project.ownership] ?? OWNERSHIP_LABELS.unknown}
@@ -297,11 +308,13 @@ function ComposeProjectDetail({
           <Text variant="h3">{detail.name}</Text>
           <Text variant="body-sm" tone="secondary" className="mt-1">
             {statusLabel(detail.status)}, {(detail.services ?? []).length} services,{' '}
-            {detail.container_count} containers.{' '}
+            {detail.containers} containers.{' '}
             {OWNERSHIP_LABELS[detail.ownership] ?? OWNERSHIP_LABELS.unknown}.
           </Text>
           <Text variant="caption" tone="secondary" className="mt-1 font-mono">
-            {detail.config_path ? detail.config_path : 'Config path not known for this stack'}
+            {(detail.config_files ?? []).length > 0
+              ? (detail.config_files ?? []).join(', ')
+              : 'Config path not known for this stack'}
           </Text>
         </div>
         {refreshing || listRefreshing ? (
@@ -358,7 +371,7 @@ function ComposeProjectDetail({
       ) : null}
 
       <ComposeServices detail={detail} />
-      <ComposeDependencies detail={detail} />
+      <ComposeDependencies nodeId={nodeId} detail={detail} />
       <ComposeResources detail={detail} />
 
       <Section
@@ -419,7 +432,7 @@ function ComposeProjectDetail({
   );
 }
 
-function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
+function ComposeServices({ detail }: { detail: DockerComposeProject }) {
   if ((detail.services ?? []).length === 0) {
     return (
       <Text variant="body-sm" tone="secondary">
@@ -444,29 +457,34 @@ function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
                 {service.image ?? 'built from a Dockerfile'}
               </Text>
             </div>
-            {service.containers.length === 0 ? (
+            <div className="flex flex-wrap items-baseline gap-3">
               <Text variant="caption" tone="secondary">
-                No container running for this service.
+                {service.containers === 0
+                  ? 'No container for this service'
+                  : `${service.running} of ${service.containers} running`}
               </Text>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {service.containers.map((container) => (
-                  <li key={container.full_id} className="flex flex-wrap items-baseline gap-2">
-                    <Text variant="caption" className="font-mono">
-                      {container.name}
-                    </Text>
-                    <Text variant="caption" tone="secondary">
-                      {container.status_text}
-                    </Text>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {service.depends_on.length > 0 ? (
-              <Text variant="caption" tone="secondary">
-                Waits for {service.depends_on.join(', ')}
-              </Text>
-            ) : null}
+              {service.state ? (
+                <Text variant="caption" tone="secondary">
+                  {service.state}
+                </Text>
+              ) : null}
+              {service.health ? (
+                <Text variant="caption" tone="secondary">
+                  {service.health}
+                </Text>
+              ) : null}
+              {(service.ports ?? []).length > 0 ? (
+                <Text variant="caption" tone="secondary" className="font-mono">
+                  {(service.ports ?? [])
+                    .map((port) =>
+                      port.host_port
+                        ? `${port.host_port}:${port.container_port}`
+                        : `${port.container_port}`,
+                    )
+                    .join(' ')}
+                </Text>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
@@ -482,11 +500,24 @@ function ComposeServices({ detail }: { detail: DockerComposeProjectDetail }) {
  * ask "what has to come up first". A drawn graph would need a layout library to
  * say the same thing less legibly.
  */
-function ComposeDependencies({ detail }: { detail: DockerComposeProjectDetail }) {
+function ComposeDependencies({ nodeId, detail }: { nodeId: string; detail: DockerComposeProject }) {
+  // depends_on is a declaration in the stack file, and a running container
+  // carries no record of the one that started it, so this is read from the file
+  // through its own endpoint rather than derived from what is running.
+  const declared = useAsyncData(
+    (signal) => getDockerComposeGraph(nodeId, detail.name, signal),
+    [nodeId, detail.name],
+  );
+
+  const read = declared.state.status === 'ready' ? declared.state.data : null;
+  if (!read) {
+    return null;
+  }
+
   const graph = dependencyGraph(
-    (detail.services ?? []).map((service) => ({
-      name: service.name,
-      depends_on: service.depends_on,
+    read.services.map((name) => ({
+      name,
+      depends_on: read.edges.filter((edge) => edge.from === name).map((edge) => edge.to),
     })),
   );
 
@@ -565,7 +596,7 @@ function ComposeDependencies({ detail }: { detail: DockerComposeProjectDetail })
   );
 }
 
-function ComposeResources({ detail }: { detail: DockerComposeProjectDetail }) {
+function ComposeResources({ detail }: { detail: DockerComposeProject }) {
   const bands: { label: string; icon: typeof Database; values: string[] }[] = [
     { label: 'Images', icon: Layers, values: detail.images },
     { label: 'Networks', icon: Network, values: detail.networks },

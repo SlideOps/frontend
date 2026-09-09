@@ -240,10 +240,28 @@ export function isDockerUnavailable(error: unknown): boolean {
 }
 
 /** The state of Docker on one Node: the daemon, the tallies, and the disk. */
+/**
+ * The overview, with the daemon's warning list guaranteed present.
+ *
+ * The field is omitted entirely when the daemon has nothing to complain about,
+ * which is the healthy case and therefore the common one. Code that iterates it
+ * to build the attention list then reads undefined, which is not an empty
+ * warnings section, it is a page that stops rendering.
+ */
+function safeOverview(overview: DockerOverview): DockerOverview {
+  return {
+    ...overview,
+    daemon: {
+      ...overview.daemon,
+      warnings: Array.isArray(overview.daemon?.warnings) ? overview.daemon.warnings : [],
+    },
+  };
+}
+
 export function getDockerOverview(nodeId: string, signal?: AbortSignal): Promise<DockerOverview> {
   return apiRequest<unknown>(`/nodes/${encodeURIComponent(nodeId)}/docker/overview`, {
     signal,
-  }).then((r) => unwrap<DockerOverview>(r, 'overview'));
+  }).then((r) => safeOverview(unwrap<DockerOverview>(r, 'overview')));
 }
 
 /** Every container on the Node, whoever created it. Reads only. */
