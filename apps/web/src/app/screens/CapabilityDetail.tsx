@@ -8,6 +8,7 @@ import {
   listOperations,
   runCapabilityAction,
   type Capability,
+  type CapabilityParameter,
   type CapabilityState,
   type Node,
   type Operation,
@@ -28,7 +29,7 @@ import {
 } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { DetailLayout, EmptyState } from '@slideops/ui';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   completedHint,
@@ -482,6 +483,27 @@ export function CapabilityDetail() {
   // Service actually uses; every other manager already ignores an unrecognized
   // Service scope on the backend, so passing it along here is always safe.
   const preselectedService = searchParams.get('service') ?? undefined;
+  // Any other query parameter whose name matches one this Capability declares
+  // is used to prefill that field.
+  //
+  // General rather than a special case for the one link that needed it: a page
+  // that sends an Operator to a Capability usually knows something the form is
+  // about to ask for, and the alternative is a growing list of named props.
+  // The declared parameters are the allowlist, so an unrecognized query
+  // parameter prefills nothing.
+  const prefillFromQuery = useCallback(
+    (parameters: readonly CapabilityParameter[]) => {
+      const prefill: Record<string, string> = {};
+      for (const parameter of parameters) {
+        const value = searchParams.get(parameter.key);
+        if (value !== null && value !== '') {
+          prefill[parameter.key] = value;
+        }
+      }
+      return prefill;
+    },
+    [searchParams],
+  );
 
   const capabilityResult = useAsyncData<Capability>((signal) => getCapability(key, signal), [key]);
   const nodesResult = useAsyncData<Node[]>((signal) => listNodes(signal), []);
@@ -838,6 +860,9 @@ export function CapabilityDetail() {
                   <StartOperation
                     capability={capabilityResult.state.data}
                     nodes={nodes}
+                    initialParameters={prefillFromQuery(
+                      capabilityResult.state.data.parameters ?? [],
+                    )}
                     initialNodeId={preselectedNode}
                     initialProjectId={preselectedProject}
                     alreadyDone={Boolean(done) && !isDetected(done)}

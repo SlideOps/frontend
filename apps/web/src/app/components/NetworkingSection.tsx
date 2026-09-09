@@ -1,4 +1,8 @@
-import { getDatabaseAccessRules, type ApiError, type DatabaseAccessRule } from '@slideops/api-client';
+import {
+  getDatabaseAccessRules,
+  type ApiError,
+  type DatabaseAccessRule,
+} from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
 import { ShieldCheck } from '@slideops/icons';
 import { useCallback, useEffect, useState } from 'react';
@@ -17,12 +21,24 @@ import { ErrorNote, Loading } from './Feedback';
  * SSH, so it still answers when the Node is briefly unreachable.
  *
  * "Configure Access" links to configure-database-access's own Capability
- * page with this Node preselected -- the same Plan, Approve, Execute flow
- * every other Capability already uses, rather than a second launch form
- * duplicated here.
+ * page with this Node and THIS DATABASE preselected -- the same Plan,
+ * Approve, Execute flow every other Capability already uses, rather than a
+ * second launch form duplicated here.
+ *
+ * Carrying the database is what makes the link mean "configure access for
+ * this one". It used to carry only the Node, leaving the backend to work out
+ * which of the databases on that server was meant, and on a server running
+ * more than one that guess was wrong: opening Redis and pressing the button
+ * configured PostgreSQL.
  */
 
-export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: string; nodeId: string }) {
+export function NetworkingSection({
+  capabilityKey,
+  nodeId,
+}: {
+  capabilityKey: string;
+  nodeId: string;
+}) {
   const navigate = useNavigate();
   const [rules, setRules] = useState<DatabaseAccessRule[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -68,7 +84,17 @@ export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: st
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => navigate(`/app/capabilities/configure-database-access?node=${encodeURIComponent(nodeId)}`)}
+          onClick={() =>
+            navigate(
+              // The database being configured travels with the link. Without
+              // it the backend has to work out which database on this server
+              // the Operator meant, and a server running both PostgreSQL and
+              // Redis is exactly where that guess used to come out wrong: it
+              // configured PostgreSQL for an Operator who had opened Redis.
+              `/app/capabilities/configure-database-access?node=${encodeURIComponent(nodeId)}` +
+                `&database_capability=${encodeURIComponent(capabilityKey)}`,
+            )
+          }
         >
           Configure access
         </Button>
@@ -82,9 +108,9 @@ export function NetworkingSection({ capabilityKey, nodeId }: { capabilityKey: st
           <ShieldCheck width={18} height={18} className="text-ink-muted" aria-hidden />
           <Text variant="body-sm" tone="secondary">
             No access rules yet. If this database is only reached from the same Node, none are
-            needed. Reaching it from another Node needs one -- use Configure Access above, once
-            for each other server that needs to connect. Each run creates its own independent
-            rule, so you can add or remove one server later without affecting any other.
+            needed. Reaching it from another Node needs one -- use Configure Access above, once for
+            each other server that needs to connect. Each run creates its own independent rule, so
+            you can add or remove one server later without affecting any other.
           </Text>
         </div>
       ) : null}

@@ -34,6 +34,7 @@ export function StartOperation({
   nodes,
   initialNodeId,
   initialProjectId,
+  initialParameters,
   alreadyDone,
   currentVersion,
 }: {
@@ -46,6 +47,16 @@ export function StartOperation({
    * undefined and no project_id is sent.
    */
   initialProjectId?: string;
+  /**
+   * Values to prefill the form with, keyed by parameter. They are the caller's
+   * answer to something the form is about to ask, and the Operator can still
+   * change any of them before starting the Operation.
+   *
+   * configure-database-access is why this exists: the Networking section knows
+   * which database the Operator is looking at, and the backend must be told
+   * rather than left to work it out from what is installed on the server.
+   */
+  initialParameters?: Record<string, string>;
   /**
    * Whether this Capability has already run here. Every Capability in the
    * catalog is written to be safe to re-run -- an install re-pins a chosen
@@ -91,7 +102,7 @@ export function StartOperation({
     formState: { errors },
   } = useForm<Record<string, unknown>>({
     resolver: zodResolver(schema),
-    defaultValues: defaultParameterValues(parameters),
+    defaultValues: { ...defaultParameterValues(parameters), ...initialParameters },
   });
 
   if (nodes.length === 0) {
