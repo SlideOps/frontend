@@ -146,3 +146,95 @@ export function transactionsOverTimeOption(
     ],
   };
 }
+
+/**
+ * One sample of a container's live usage, taken at a moment SlideOps knows.
+ *
+ * `at` is when the reading was taken by the screen holding these, not a
+ * timestamp the daemon supplied: Docker's stats call answers with a reading and
+ * no clock, so the only honest time to put on the axis is the one at which the
+ * question was asked.
+ */
+export interface ContainerUsageSample {
+  at: string;
+  cpu_percent: number;
+  memory_used_mb: number;
+}
+
+/**
+ * A sample clock down to the second.
+ *
+ * Container samples arrive seconds apart, so the hour-and-minute label the Node
+ * health chart uses would put the same text on a dozen consecutive points and
+ * make a five minute window unreadable.
+ */
+function clockTime(at: string): string {
+  const date = new Date(at);
+  return Number.isNaN(date.getTime())
+    ? at
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+/**
+ * One container's CPU and memory across the samples a screen has collected.
+ *
+ * Two axes, because the two series are in different units and sharing one would
+ * flatten whichever number happens to be smaller into the floor. CPU is a
+ * percentage as Docker reports it, which runs past 100 on a container using more
+ * than one core, so the axis is deliberately not capped at 100: clamping it
+ * would hide exactly the case worth seeing.
+ *
+ * Gaps are gaps. A poll that failed contributes no sample at all rather than a
+ * zero, and the line simply has no point there.
+ */
+export function containerUsageOption(
+  palette: ChartPalette,
+  samples: ContainerUsageSample[],
+): EChartsOption {
+  return {
+    grid: { top: 28, right: 52, bottom: 28, left: 48 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: palette.raised,
+      borderColor: palette.border,
+      borderWidth: 1,
+      textStyle: { color: palette.text, fontSize: 12 },
+    },
+    legend: {
+      top: 0,
+      textStyle: { color: palette.textMuted, fontSize: 11 },
+      icon: 'circle',
+    },
+    xAxis: {
+      type: 'category',
+      data: samples.map((sample) => clockTime(sample.at)),
+      boundaryGap: false,
+      ...axisStyle(palette),
+    },
+    yAxis: [
+      { type: 'value', name: 'CPU %', min: 0, ...axisStyle(palette) },
+      { type: 'value', name: 'MB', min: 0, ...axisStyle(palette) },
+    ],
+    series: [
+      {
+        type: 'line',
+        name: 'CPU',
+        smooth: true,
+        showSymbol: false,
+        data: samples.map((sample) => sample.cpu_percent),
+        lineStyle: { color: palette.brand, width: 2 },
+        itemStyle: { color: palette.brand },
+      },
+      {
+        type: 'line',
+        name: 'Memory',
+        yAxisIndex: 1,
+        smooth: true,
+        showSymbol: false,
+        data: samples.map((sample) => sample.memory_used_mb),
+        lineStyle: { color: palette.info, width: 2 },
+        itemStyle: { color: palette.info },
+      },
+    ],
+  };
+}

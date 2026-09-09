@@ -99,7 +99,7 @@ const healthLabel: Record<DockerHealth, string> = {
  * row of badges reads as a verdict and "the image declares no healthcheck" is
  * the absence of one. Nobody is checking, which is not the same as passing.
  */
-function DockerHealthBadge({ health }: { health: DockerHealth }) {
+export function DockerHealthBadge({ health }: { health: DockerHealth }) {
   if (health === 'none') {
     return (
       <span className="text-xs text-ink-muted" title="This image declares no healthcheck.">
@@ -118,7 +118,7 @@ function DockerHealthBadge({ health }: { health: DockerHealth }) {
  * for everything else. An External container belongs to the Operator or to
  * another tool, and this page shows it without claiming it.
  */
-function OwnershipBadge({ ownership }: { ownership: DockerContainer['ownership'] }) {
+export function DockerOwnershipBadge({ ownership }: { ownership: DockerContainer['ownership'] }) {
   if (ownership === 'slideops') {
     return (
       <span
@@ -279,18 +279,33 @@ export interface DockerContainerCardProps {
   stat?: DockerStats;
   /** The clock uptime is measured against, so a test can state what "now" was. */
   now?: Date;
+  /**
+   * The Node whose daemon holds this container.
+   *
+   * Optional because the detail page it unlocks is addressed by Node and
+   * container together: without a Node there is no honest link to build, and a
+   * card rendered somewhere that does not know its Node shows the name as plain
+   * text rather than as a link that would land nowhere.
+   */
+  nodeId?: string;
 }
 
 /**
  * One container on the Node.
  *
- * There are no start, stop or restart controls here, because there are no
- * endpoints behind them yet. A button that cannot do the thing it names is
- * worse than no button on an infrastructure page: it is a promise about
- * somebody's production server. Copying an id or a name is the one action this
- * card can honestly offer, so it is the only one it does.
+ * There are still no lifecycle controls here. Start, stop and remove live on
+ * the container's own page, behind the confirmations and the write-access gate
+ * that belong with them; a grid of cards is the wrong place to put a control
+ * that kills a process, because the card next to the one being aimed at looks
+ * exactly the same.
+ *
+ * The name is the way through to that page. When a Service also owns the
+ * container, that gets its own labelled link rather than being folded into the
+ * name: "open this container" and "open the Service that manages it" are two
+ * different destinations, and one link that silently means the second is how an
+ * Operator ends up somewhere they did not choose.
  */
-export function DockerContainerCard({ container, stat, now }: DockerContainerCardProps) {
+export function DockerContainerCard({ container, stat, now, nodeId }: DockerContainerCardProps) {
   const uptime = uptimeSeconds(container, now ?? new Date());
   const compose =
     container.compose_project && container.compose_service
@@ -302,9 +317,9 @@ export function DockerContainerCard({ container, stat, now }: DockerContainerCar
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            {container.service_id ? (
+            {nodeId ? (
               <Link
-                to={`/app/services/${container.service_id}`}
+                to={`/app/docker/containers/${encodeURIComponent(container.full_id)}?node=${encodeURIComponent(nodeId)}`}
                 className="inline-flex items-center gap-1 rounded-md text-base font-semibold text-ink hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {container.name}
@@ -315,8 +330,17 @@ export function DockerContainerCard({ container, stat, now }: DockerContainerCar
             )}
             <DockerStateBadge state={container.state} />
             <DockerHealthBadge health={container.health} />
-            <OwnershipBadge ownership={container.ownership} />
+            <DockerOwnershipBadge ownership={container.ownership} />
           </div>
+          {container.service_id ? (
+            <Link
+              to={`/app/services/${container.service_id}`}
+              className="mt-1 inline-flex items-center gap-1 rounded-md text-xs font-medium text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              Open the Service that manages it
+              <ArrowUpRight width={12} height={12} aria-hidden />
+            </Link>
+          ) : null}
           <span className="mt-1 block truncate font-mono text-xs text-ink-muted" title={container.image}>
             {container.image}
           </span>
