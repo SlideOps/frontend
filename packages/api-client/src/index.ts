@@ -680,3 +680,18 @@ export {
   type DockerRunVolume,
   type DockerRunRequest,
 } from './docker-compose-api';
+export {
+  openDockerEventStream,
+  dockerEventStreamUrl,
+  getDockerCrashAnalysis,
+  listDockerContainerMetrics,
+  DOCKER_METRICS_RANGES,
+  type DockerEvent,
+  type DockerEventFrame,
+  type DockerEventConnectionState,
+  type DockerEventStreamOptions,
+  type DockerCrashAnalysis,
+  type DockerCrashObservation,
+  type DockerMetricsRange,
+  type DockerContainerMetricSample,
+} from './docker-events';
