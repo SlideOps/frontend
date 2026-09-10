@@ -45,6 +45,16 @@ export interface Domain {
   /** The port the application listens on inside its container. The public
    *  always reaches it on 443. */
   target_port: number;
+  /** How the proxy speaks to the Service behind it. Almost always http: TLS is
+   *  terminated at the ingress and the hop to the workload is private. */
+  target_scheme: 'http' | 'https';
+  /** What the route on the server was last written with. Absent when this
+   *  hostname has never been put live. */
+  provisioned_port?: number;
+  /** The record has been corrected and the server has not caught up: it is
+   *  routing to `provisioned_port` while the record now asks for
+   *  `target_port`. Putting the domain live again settles it. */
+  needs_reapply: boolean;
   state: DomainState;
   /** What the state means, in the Operator's own terms. */
   state_detail: string;
@@ -118,6 +128,33 @@ export function removeDomain(id: string): Promise<void> {
   return apiRequest<void>(`/domains/${encodeURIComponent(id)}`, { method: 'DELETE' }).then(
     () => undefined,
   );
+}
+
+/** One hostname, with everything recorded about it. */
+export function getDomain(id: string): Promise<Domain> {
+  return apiRequest<{ domain: Domain }>(`/domains/${encodeURIComponent(id)}`).then((r) => r.domain);
+}
+
+/**
+ * Correct where a hostname points inside its Service.
+ *
+ * The hostname itself cannot be changed: a different hostname is a different
+ * hostname, with its own DNS record and its own certificate, so it is claimed
+ * and released rather than renamed.
+ *
+ * Nothing on the server changes here. The route is rewritten by putting the
+ * domain live again, and until then the domain comes back with `needs_reapply`
+ * set, so what the server is routing and what the record now asks for are both
+ * visible rather than one quietly standing in for the other.
+ */
+export function updateDomain(
+  id: string,
+  target: { port: number; scheme?: 'http' | 'https' },
+): Promise<Domain> {
+  return apiRequest<{ domain: Domain }>(`/domains/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: target,
+  }).then((r) => r.domain);
 }
 
 /** Every hostname in the Workspace. */

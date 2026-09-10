@@ -425,12 +425,30 @@ function DomainCard({
           <Text variant="caption" tone="secondary" className="mt-0.5 block">
             {domain.state_detail}
           </Text>
+          {/* A correction that has not been applied is the one thing on this row
+              that a state word cannot say, because the hostname really is
+              serving: it is serving the old port. */}
+          {domain.needs_reapply ? (
+            <Text variant="caption" className="mt-0.5 block text-warning">
+              Still routing to port {domain.provisioned_port}. Open it to apply the change.
+            </Text>
+          ) : null}
         </div>
-        {canWrite ? (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onRemove}>
-            Remove
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The way into everything a row has no space for, and the only place
+              the port can be corrected without giving up the hostname. */}
+          <Link
+            to={`/app/domains/${domain.id}`}
+            className="text-sm font-medium text-brand hover:underline"
+          >
+            Open
+          </Link>
+          {canWrite ? (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={onRemove}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-x-8 gap-y-3">

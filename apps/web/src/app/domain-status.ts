@@ -208,6 +208,18 @@ export function remediationFor(domain: Domain): Remediation | null {
         'SlideOps looks the hostname up for real and records what answered. Nothing on any server changes.',
     };
   }
+  // A corrected target beats everything else that provisioning would fix,
+  // because until it is applied the server is routing to somewhere the record
+  // no longer names. Provisioning is what rewrites the route, so the action is
+  // the same; putting this first is what makes the copy say the right reason.
+  if (domain.needs_reapply) {
+    return {
+      kind: 'provision',
+      label: 'Apply the change',
+      explanation:
+        'This server is still routing to the old port. Applying rewrites the route for this hostname only, using the port now recorded. The DNS record and the certificate are untouched.',
+    };
+  }
   if (domain.tls_state === 'failed') {
     return {
       kind: 'provision',
