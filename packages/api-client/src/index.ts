@@ -550,6 +550,8 @@ export {
   inspectNodeRoutes,
   listServiceDomains,
   listWorkspaceDomains,
+  getDomain,
+  updateDomain,
   provisionDomain,
   removeDomain,
   repairNodeRoutes,
