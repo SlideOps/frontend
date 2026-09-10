@@ -357,6 +357,42 @@ describe('Credentials: capability actions', () => {
    * An Operator read it as "delete this database", pressed it, and SlideOps
    * uninstalled the engine out from under three production applications.
    */
+  it('offers deleting only this database, and says the rest keep running', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
+
+    // The button the Operator was reaching for when they pressed the one that
+    // uninstalled the engine.
+    await userEvent.click(await screen.findByRole('button', { name: /delete only app_db/i }));
+    await waitFor(() =>
+      expect(createOperation).toHaveBeenCalledWith({
+        node_id: 'n-1',
+        project_id: undefined,
+        capability_key: 'drop-postgresql-database',
+        parameters: { database: 'app_db' },
+      }),
+    );
+  });
+
+  it('leaves a dropped database off the active credential list', async () => {
+    listOperations.mockResolvedValue([
+      op({ id: 'gone', resource_deleted: true }),
+      op({ id: 'live' }),
+    ]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+
+    // One card, not two: a database that no longer exists has no host to reach
+    // and no account that authenticates.
+    expect(await screen.findAllByText('Manage postgresql')).toHaveLength(1);
+  });
+
   it('says the buttons act on the engine, not on this database', async () => {
     listOperations.mockResolvedValue([op({})]);
     listNodes.mockResolvedValue([node()]);
@@ -366,9 +402,8 @@ describe('Credentials: capability actions', () => {
     await userEvent.click(await screen.findByText('Manage postgresql'));
 
     expect(
-      await screen.findByText(/act on the postgresql engine on this server/i),
+      await screen.findByText(/every application with a database on it shares/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/not limited to this database/i)).toBeInTheDocument();
   });
 
   it('shows who else is on the engine when the backend refuses, and does not call it a failure', async () => {

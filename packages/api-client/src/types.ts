@@ -308,6 +308,16 @@ export interface Operation {
    * answer rather than a gap: an installed runtime has nothing to connect to.
    */
   connection?: OperationConnection | null;
+  /**
+   * This Operation created a database that has since been dropped.
+   *
+   * A credential in SlideOps is a completed "Create <engine> database and
+   * user" Operation, so without this the Credentials page had no way to tell a
+   * working database from one that no longer exists and went on listing a
+   * deleted application's credentials as live. Derived on the server from the
+   * Operation record, not stored, so there is only one answer to be had.
+   */
+  resource_deleted?: boolean;
 }
 
 /**
