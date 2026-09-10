@@ -1,3 +1,4 @@
+import { ApiError } from './errors';
 import { apiRequest } from './http';
 
 /** Whether a Capability's outcome is already in place on a Node, and how it got there. */
@@ -117,11 +118,46 @@ export function controlCapability(
   nodeId: string,
   capabilityKey: string,
   action: CapabilityControlAction,
+  confirmSharedImpact = false,
 ): Promise<void> {
   return apiRequest<void>(
     `/nodes/${encodeURIComponent(nodeId)}/capabilities/${encodeURIComponent(capabilityKey)}/control`,
-    { method: 'POST', body: { action } },
+    { method: 'POST', body: { action, confirm_shared_impact: confirmSharedImpact } },
   );
+}
+
+/** One application's database inside an engine that several of them share. */
+export interface EngineDependant {
+  database: string;
+  username: string;
+  operation_id: string;
+  project_id: string;
+}
+
+/**
+ * The code the backend answers with when an engine-wide action would reach
+ * applications the Operator did not name.
+ *
+ * It exists as its own code because "you cannot do this yet" and "you can do
+ * this if you accept the consequences" need different screens, and a client
+ * must not have to match on prose to tell them apart.
+ */
+export const SHARED_ENGINE_CODE = 'shared_engine_impact';
+
+/**
+ * The databases an engine-wide action would have reached, when the backend
+ * refused it, or null when this error is something else.
+ *
+ * Reading them from the refusal rather than fetching them separately is what
+ * lets the warning name every affected application at the moment the Operator
+ * asked, rather than as of whenever a list was last loaded.
+ */
+export function sharedEngineDependants(error: unknown): EngineDependant[] | null {
+  if (!(error instanceof ApiError) || error.code !== SHARED_ENGINE_CODE) {
+    return null;
+  }
+  const dependants = (error.details as { dependants?: EngineDependant[] } | undefined)?.dependants;
+  return Array.isArray(dependants) ? dependants : [];
 }
 
 /*

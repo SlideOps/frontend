@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { renderInApp } from '../../test/render';
-import type { Node, Operation, Service } from '@slideops/api-client';
+import { ApiError, type Node, type Operation, type Service } from '@slideops/api-client';
 
 /*
  * Re-running the same Capability on the same Node for the same database
@@ -227,7 +227,10 @@ describe('Credentials: Node connections', () => {
     listOperations.mockResolvedValue([]);
     listNodes.mockResolvedValue([node()]);
     listProjects.mockResolvedValue([]);
-    revealNodeCredential.mockResolvedValue({ auth_kind: 'password', secret: 'super-secret-password' });
+    revealNodeCredential.mockResolvedValue({
+      auth_kind: 'password',
+      secret: 'super-secret-password',
+    });
 
     show();
     await userEvent.click(await screen.findByText('db-server'));
@@ -300,17 +303,22 @@ describe('Credentials: bare installs with no secret', () => {
   it.each([
     ['clamav', 'install-clamav', 'Install clamav', '3310'],
     ['nats', 'install-nats', 'Install nats', '4222'],
-  ])('shows a bare install of %s, which no list of five engines contained', async (_family, capabilityKey, label, port) => {
-    listOperations.mockResolvedValue([op({ id: `op-${capabilityKey}`, capability_key: capabilityKey, parameters: {} })]);
-    listNodes.mockResolvedValue([node()]);
-    listProjects.mockResolvedValue([]);
+  ])(
+    'shows a bare install of %s, which no list of five engines contained',
+    async (_family, capabilityKey, label, port) => {
+      listOperations.mockResolvedValue([
+        op({ id: `op-${capabilityKey}`, capability_key: capabilityKey, parameters: {} }),
+      ]);
+      listNodes.mockResolvedValue([node()]);
+      listProjects.mockResolvedValue([]);
 
-    show();
+      show();
 
-    expect(await screen.findByText(label)).toBeInTheDocument();
-    await userEvent.click(screen.getByText(label));
-    expect((await screen.findAllByText(port)).length).toBeGreaterThan(0);
-  });
+      expect(await screen.findByText(label)).toBeInTheDocument();
+      await userEvent.click(screen.getByText(label));
+      expect((await screen.findAllByText(port)).length).toBeGreaterThan(0);
+    },
+  );
 
   it('does not shadow a real credential with its own bare install record', async () => {
     listOperations.mockResolvedValue([
@@ -343,6 +351,95 @@ describe('Credentials: bare installs with no secret', () => {
  * the same planned-and-approved path any other Capability removal takes.
  */
 describe('Credentials: capability actions', () => {
+  /*
+   * The incident these tests exist for: this row sits under a card describing
+   * one application's database and acts on the engine every application shares.
+   * An Operator read it as "delete this database", pressed it, and SlideOps
+   * uninstalled the engine out from under three production applications.
+   */
+  it('says the buttons act on the engine, not on this database', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+
+    show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
+
+    expect(
+      await screen.findByText(/act on the postgresql engine on this server/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/not limited to this database/i)).toBeInTheDocument();
+  });
+
+  it('shows who else is on the engine when the backend refuses, and does not call it a failure', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+    controlCapability.mockRejectedValue(
+      new ApiError(409, 'shared_engine_impact', 'This PostgreSQL holds 3 application databases.', {
+        engine: 'postgresql',
+        action: 'stop',
+        dependants: [
+          { database: 'ghg', username: 'ghg_user', operation_id: 'o-1', project_id: '' },
+          { database: 'docai', username: 'docai_user', operation_id: 'o-2', project_id: '' },
+          { database: 'frc', username: 'frc_user', operation_id: 'o-3', project_id: '' },
+        ],
+      }),
+    );
+
+    show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+
+    // Every affected application, by name, so the Operator can see at once
+    // that the button they wanted is a different button.
+    expect(await screen.findByText('ghg (user ghg_user)')).toBeInTheDocument();
+    expect(screen.getByText('docai (user docai_user)')).toBeInTheDocument();
+    expect(screen.getByText('frc (user frc_user)')).toBeInTheDocument();
+    expect(screen.getByText(/delete that database rather than the engine/i)).toBeInTheDocument();
+  });
+
+  it('only proceeds against the whole engine once the Operator says so', async () => {
+    listOperations.mockResolvedValue([op({})]);
+    listNodes.mockResolvedValue([node()]);
+    listProjects.mockResolvedValue([]);
+    controlCapability.mockRejectedValueOnce(
+      new ApiError(409, 'shared_engine_impact', 'Shared.', {
+        engine: 'postgresql',
+        action: 'stop',
+        dependants: [
+          { database: 'ghg', username: 'ghg_user', operation_id: 'o-1', project_id: '' },
+        ],
+      }),
+    );
+    controlCapability.mockResolvedValue(undefined);
+
+    show();
+    await userEvent.click(await screen.findByText('Manage postgresql'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+    await screen.findByText('ghg (user ghg_user)');
+
+    // The first attempt carried no confirmation, which is what made it refuse.
+    expect(controlCapability).toHaveBeenNthCalledWith(
+      1,
+      'n-1',
+      'install-postgresql',
+      'stop',
+      false,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /yes, stop the engine/i }));
+    await waitFor(() =>
+      expect(controlCapability).toHaveBeenNthCalledWith(
+        2,
+        'n-1',
+        'install-postgresql',
+        'stop',
+        true,
+      ),
+    );
+  });
+
   it('starts, stops, and restarts the engine behind a credential', async () => {
     listOperations.mockResolvedValue([op({})]);
     listNodes.mockResolvedValue([node()]);
@@ -353,17 +450,17 @@ describe('Credentials: capability actions', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
     await waitFor(() =>
-      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'start'),
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'start', false),
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
     await waitFor(() =>
-      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'stop'),
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'stop', false),
     );
 
     await userEvent.click(screen.getByRole('button', { name: 'Restart' }));
     await waitFor(() =>
-      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'restart'),
+      expect(controlCapability).toHaveBeenCalledWith('n-1', 'install-postgresql', 'restart', false),
     );
   });
 
@@ -463,7 +560,9 @@ describe('Credentials: connect', () => {
     listOperations.mockResolvedValue([op({ node_id: 'n-1' })]);
     listNodes.mockResolvedValue([node({ id: 'n-1', project_id: 'proj-1' })]);
     listProjects.mockResolvedValue([{ id: 'proj-1', name: 'Storefront' }]);
-    listServices.mockResolvedValue([service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' })]);
+    listServices.mockResolvedValue([
+      service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' }),
+    ]);
 
     show();
     await userEvent.click(await screen.findByText('Manage postgresql'));
@@ -486,7 +585,9 @@ describe('Credentials: connect', () => {
     listOperations.mockResolvedValue([op({ node_id: 'n-1' })]);
     listNodes.mockResolvedValue([node({ id: 'n-1', project_id: 'proj-1' })]);
     listProjects.mockResolvedValue([{ id: 'proj-1', name: 'Storefront' }]);
-    listServices.mockResolvedValue([service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' })]);
+    listServices.mockResolvedValue([
+      service({ id: 'svc-same', name: 'api', project_id: 'proj-1', node_id: 'n-1' }),
+    ]);
     getCapabilityConnections.mockResolvedValue([
       {
         id: 'conn-1',
@@ -503,7 +604,11 @@ describe('Credentials: connect', () => {
     await userEvent.click(await screen.findByText('Manage postgresql'));
 
     expect(await screen.findByText('Used by: api')).toBeInTheDocument();
-    expect(getCapabilityConnections).toHaveBeenCalledWith('n-1', 'install-postgresql', expect.anything());
+    expect(getCapabilityConnections).toHaveBeenCalledWith(
+      'n-1',
+      'install-postgresql',
+      expect.anything(),
+    );
   });
 });
 
