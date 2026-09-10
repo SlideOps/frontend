@@ -238,9 +238,27 @@ function downloadText(fileName: string, text: string): void {
  * is to stop inviting the mistake in the first place, and to show that refusal
  * as the list of applications it is rather than as a failure.
  */
+/*
+ * The engines with a per-application database, and so with something narrow to
+ * delete. Redis is absent for the reason its Capability is: an application
+ * using it shares the whole keyspace, so there is no one database to drop.
+ */
+const DROPPABLE_ENGINES = new Set(['postgresql', 'mysql', 'mariadb', 'mongodb']);
+
+/** One parameter as text, since an Operation's parameters are untyped values. */
+function parameterText(operation: Operation, key: string): string {
+  const value = operation.parameters?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
 function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   const navigate = useNavigate();
   const family = engineFamilyOf(context.operation);
+  // The database this card is for, when it is one application's rather than
+  // the engine itself. This is what makes a narrow delete possible at all.
+  const database = parameterText(context.operation, 'database');
+  const username = parameterText(context.operation, 'username');
+  const canDropDatabase = Boolean(family && DROPPABLE_ENGINES.has(family) && database);
   const [working, setWorking] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -279,6 +297,32 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
     }
   }
 
+  /**
+   * Delete this application's database and nothing else.
+   *
+   * The button the Operator was reaching for when they pressed the one that
+   * uninstalled the engine. It plans a drop of exactly this database and the
+   * account created with it, and its own verification checks that every other
+   * database on the server is still there afterwards.
+   */
+  async function dropDatabase() {
+    setWorking('drop');
+    setError(null);
+    setShared(null);
+    try {
+      const operation = await createOperation({
+        node_id: nodeId,
+        project_id: context.projectId ?? undefined,
+        capability_key: `drop-${family}-database`,
+        parameters: { database, ...(username ? { username } : {}) },
+      });
+      navigate(`/app/operations/${operation.id}`);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'That database could not be dropped.');
+      setWorking(null);
+    }
+  }
+
   async function remove(confirmShared = false) {
     setWorking('delete');
     setError(null);
@@ -307,11 +351,41 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
 
   return (
     <div className="flex flex-col gap-2 border-t border-border pt-4">
+      {canDropDatabase ? (
+        <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2">
+          <p className="text-xs text-ink">
+            This credential is for the database <span className="font-mono">{database}</span>
+            {username ? (
+              <>
+                {' '}
+                and the account <span className="font-mono">{username}</span>
+              </>
+            ) : null}
+            .
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={working !== null}
+              onClick={() => void dropDatabase()}
+            >
+              {working === 'drop' ? 'Starting' : `Delete only ${database}`}
+            </Button>
+            <span className="text-xs text-ink-muted">
+              Drops this database and its account. Every other database on this server keeps
+              running, and the check afterwards proves it.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       {/* Said before any of them is pressed, because the row reads as acting on
           the card it sits under and does not. */}
       <p className="text-xs text-ink-muted">
-        These act on the {family} engine on this server, which every application with a database on
-        it shares. They are not limited to this database.
+        {canDropDatabase ? 'Everything below acts' : 'These act'} on the {family} engine on this
+        server, which every application with a database on it shares. They are not limited to this
+        database.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -897,6 +971,12 @@ export function Credentials() {
       // credential SlideOps holds -- worse than showing a card with no
       // secret on it, which is exactly what CredentialsCard already renders
       // correctly once given a host and a recognised Capability family.
+      // A database that has since been dropped is off record: it has no host to
+      // connect to and no account that authenticates, so listing it here as a
+      // live credential is the page stating something untrue. The server works
+      // out which those are, from the Operation record rather than a second
+      // store that could disagree with it.
+      .filter((operation) => !operation.resource_deleted)
       .filter((operation) => hasStoredSecret(operation) || isEngineInstall(operation))
       .map((operation) => {
         const node = nodeById.get(operation.node_id) ?? null;
