@@ -2,6 +2,7 @@ import {
   ApiError,
   connectCapability,
   controlCapability,
+  sharedEngineDependants,
   createOperation,
   getCapabilityConnections,
   listNodes,
@@ -13,6 +14,7 @@ import {
   type CapabilityControlAction,
   type Node,
   type NodeCredential,
+  type EngineDependant,
   type Operation,
   type Project,
   type Service,
@@ -221,6 +223,20 @@ function downloadText(fileName: string, text: string): void {
  * Operation and hands the Operator straight to it, to review the plan and
  * approve, exactly like starting any other Capability -- deleting a database
  * is not something this page decides on its own behalf.
+ *
+ * Every one of these acts on the ENGINE, not on this credential's own database,
+ * and the row now says so where it can be read rather than leaving it to be
+ * discovered. This card describes one application's database; the engine
+ * underneath it is shared with every other application that has one on the same
+ * server. An Operator read this row as "delete this database", pressed it, and
+ * SlideOps uninstalled MongoDB out from under three production applications
+ * while reporting success.
+ *
+ * The backend is what actually prevents that now: an engine holding other
+ * applications' databases refuses a stop, a restart or a removal until the
+ * Operator confirms they mean all of them, and names every one. This row's job
+ * is to stop inviting the mistake in the first place, and to show that refusal
+ * as the list of applications it is rather than as a failure.
  */
 function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   const navigate = useNavigate();
@@ -230,6 +246,10 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [dropData, setDropData] = useState(false);
+  // The refusal, when the action reaches further than this one database.
+  const [shared, setShared] = useState<{ action: string; dependants: EngineDependant[] } | null>(
+    null,
+  );
 
   if (!family) {
     return null;
@@ -237,39 +257,62 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
   const installKey = `install-${family}`;
   const nodeId = context.operation.node_id;
 
-  async function control(action: CapabilityControlAction) {
+  async function control(action: CapabilityControlAction, confirmShared = false) {
     setWorking(action);
     setError(null);
     setMessage(null);
+    setShared(null);
     try {
-      await controlCapability(nodeId, installKey, action);
+      await controlCapability(nodeId, installKey, action, confirmShared);
       setMessage(action === 'start' ? 'Started.' : action === 'stop' ? 'Stopped.' : 'Restarted.');
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : `Could not ${action} it.`);
+      const dependants = sharedEngineDependants(cause);
+      if (dependants) {
+        // Not a failure. The action is wider than the card it was pressed on,
+        // and these are the applications it would have reached.
+        setShared({ action, dependants });
+      } else {
+        setError(cause instanceof ApiError ? cause.message : `Could not ${action} it.`);
+      }
     } finally {
       setWorking(null);
     }
   }
 
-  async function remove() {
+  async function remove(confirmShared = false) {
     setWorking('delete');
     setError(null);
+    setShared(null);
     try {
       const operation = await createOperation({
         node_id: nodeId,
         project_id: context.projectId ?? undefined,
         capability_key: `remove-${family}`,
-        parameters: { drop_data: dropData },
+        parameters: {
+          drop_data: dropData,
+          ...(confirmShared ? { confirm_shared_impact: true } : {}),
+        },
       });
       navigate(`/app/operations/${operation.id}`);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'This could not be removed.');
+      const dependants = sharedEngineDependants(cause);
+      if (dependants) {
+        setShared({ action: 'delete', dependants });
+      } else {
+        setError(cause instanceof ApiError ? cause.message : 'This could not be removed.');
+      }
       setWorking(null);
     }
   }
 
   return (
     <div className="flex flex-col gap-2 border-t border-border pt-4">
+      {/* Said before any of them is pressed, because the row reads as acting on
+          the card it sits under and does not. */}
+      <p className="text-xs text-ink-muted">
+        These act on the {family} engine on this server, which every application with a database on
+        it shares. They are not limited to this database.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="ghost"
@@ -349,6 +392,49 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
           </Button>
         </div>
       ) : null}
+      {shared ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-md border border-warning bg-subtle px-3 py-2"
+        >
+          <p className="text-xs font-medium text-ink">
+            This {family} engine holds {shared.dependants.length}{' '}
+            {shared.dependants.length === 1 ? 'application database' : 'application databases'}, and
+            a {shared.action} reaches all of them.
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {shared.dependants.map((dependant) => (
+              <li key={dependant.operation_id} className="font-mono text-xs text-ink-muted">
+                {dependant.database}
+                {dependant.username ? ` (user ${dependant.username})` : ''}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-muted">
+            To remove one application's database, delete that database rather than the engine.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={working !== null}
+              onClick={() => {
+                const action = shared.action;
+                if (action === 'delete') {
+                  void remove(true);
+                } else {
+                  void control(action as CapabilityControlAction, true);
+                }
+              }}
+            >
+              Yes, {shared.action} the engine and every database in it
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShared(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {message ? (
         <p role="status" className="text-xs text-ink-muted">
           {message}
@@ -376,13 +462,20 @@ function CapabilityActionsRow({ context }: { context: CredentialContext }) {
  * own to receive a connection, and a Service in a different Project is not
  * offered since nothing here should wire across Project boundaries silently.
  */
-function ConnectSection({ context, services }: { context: CredentialContext; services: Service[] }) {
+function ConnectSection({
+  context,
+  services,
+}: {
+  context: CredentialContext;
+  services: Service[];
+}) {
   const family = engineFamilyOf(context.operation);
   const nodeId = context.operation.node_id;
   const installKey = family ? `install-${family}` : '';
 
   const connections = useAsyncData<ServiceConnection[]>(
-    (signal) => (family ? getCapabilityConnections(nodeId, installKey, signal) : Promise.resolve([])),
+    (signal) =>
+      family ? getCapabilityConnections(nodeId, installKey, signal) : Promise.resolve([]),
     [nodeId, installKey, family],
   );
 
@@ -995,7 +1088,9 @@ export function Credentials() {
   }
 
   const selectedNode =
-    selected?.kind === 'node' ? (visibleNodes.find((entry) => entry.node.id === selected.id) ?? null) : null;
+    selected?.kind === 'node'
+      ? (visibleNodes.find((entry) => entry.node.id === selected.id) ?? null)
+      : null;
   const selectedCapability =
     selected?.kind === 'capability'
       ? (visible.find((context) => context.operation.id === selected.id) ?? null)
@@ -1152,7 +1247,8 @@ export function Credentials() {
                                 .filter(Boolean)
                                 .join(' · ')}
                               selected={
-                                selected?.kind === 'capability' && selected.id === context.operation.id
+                                selected?.kind === 'capability' &&
+                                selected.id === context.operation.id
                               }
                               onClick={() =>
                                 setSelected({ kind: 'capability', id: context.operation.id })
