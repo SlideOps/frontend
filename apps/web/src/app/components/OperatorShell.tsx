@@ -222,7 +222,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
       label: 'Account',
       items: [
         item('billing', 'Billing', CreditCard, '/app/billing'),
-        item('security', 'Security', Shield, '/app/security'),
+        item('security', 'Profile and security', Shield, '/app/security'),
       ],
     },
     ];

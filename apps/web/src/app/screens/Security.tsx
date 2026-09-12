@@ -1,19 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ApiError,
-  apiBase,
   changePassword,
   mfaDisable,
   mfaEnable,
   mfaSetup,
   type MfaSetup,
+  type Operator,
   type PasswordChanged,
+  type WorkspaceRole,
 } from '@slideops/api-client';
 import { Button, Field, Section, Text } from '@slideops/design-system';
 import { KeyRound, ShieldCheck } from '@slideops/icons';
 import { Guidance } from '@slideops/tooltips';
 import { PageHeader } from '@slideops/ui';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   changePasswordSchema,
@@ -25,6 +26,7 @@ import {
 } from '../../auth-schemas';
 import { OperatorShell } from '../components/OperatorShell';
 import { isAdmin, useAuthStore } from '../../store/auth';
+import { useWorkspaceStore } from '../../store/workspace';
 import { CopyButton } from '../components/CopyButton';
 
 /** Enable MFA: start setup, show the secret, then confirm a code. */
@@ -213,54 +215,128 @@ function DisableMfa() {
   );
 }
 
+const roleLabel: Record<WorkspaceRole, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Member',
+  viewer: 'Viewer',
+};
+
+const planLabel: Record<NonNullable<Operator['tier']>, string> = {
+  free: 'Free',
+  starter: 'Starter',
+  pro: 'Pro',
+  enterprise: 'Enterprise',
+};
+
+/** A date as a person reads it, or the value as given when it is not a date. */
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(date);
+}
+
+/** How this account signs in, in words. */
+function signInMethods(operator: Operator): string {
+  const methods = [
+    operator.has_password ? 'Password' : null,
+    operator.github_login ? `GitHub (@${operator.github_login})` : null,
+  ].filter((method): method is string => method !== null);
+  return methods.length > 0 ? methods.join(' and ') : 'GitHub';
+}
+
+function ProfileRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-1 py-3 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-3">
+      <dt className="text-xs font-medium text-ink-muted">{label}</dt>
+      <dd className="min-w-0 text-sm text-ink">{children}</dd>
+    </div>
+  );
+}
+
 /**
- * Where this deployment's API lives.
- *
- * An Operator running SlideOps on their own server had no way to find the URL
- * their own app was talking to, or the API reference, without asking somebody.
- * It is not a secret and it is not guessable from the outside, so it belongs on
- * a page rather than in a conversation.
- *
- * The base is read from the client itself, so it is always the address this
- * build actually calls rather than one written down and left to drift.
+ * The signed-in Operator's own account: who they are to SlideOps, how they
+ * sign in, which plan the account is on, and every Workspace they can act in
+ * with their role in each. It reads the account itself, never the Workspace
+ * currently switched into, so a Member working in somebody else's Workspace
+ * still sees their own details here.
  */
-function ApiDetails() {
-  const base = apiBase();
-  // The client uses a relative base when the API shares this origin, which is
-  // the usual arrangement. Showing "/api/v1" would be true and useless, so it
-  // is resolved against the page.
-  const absolute = /^https?:\/\//i.test(base) ? base : new URL(base, window.location.origin).href;
-  const docs = new URL('/docs', absolute).href;
+function Profile() {
+  const operator = useAuthStore((state) => state.operator);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  if (!operator) return null;
+
+  const access =
+    operator.role === 'admin'
+      ? 'Operator, with access to the admin control plane'
+      : 'Operator';
 
   return (
-    <div className="flex max-w-xl flex-col gap-3">
-      <Text variant="body-sm" tone="secondary">
-        This is the API your app is talking to, and the reference for it. Useful when you are wiring
-        another client, or checking what a request actually returns.
-      </Text>
-      <div className="flex flex-col divide-y divide-border">
-        <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+    <div className="flex max-w-2xl flex-col gap-5">
+      <div className="flex items-center gap-4">
+        <span
+          aria-hidden
+          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-subtle text-lg font-semibold uppercase text-ink"
+        >
+          {operator.email.charAt(0)}
+        </span>
+        <div className="min-w-0">
+          <Text variant="h4" className="truncate">
+            {operator.email}
+          </Text>
           <Text variant="body-sm" tone="secondary">
-            API base
+            {access}
           </Text>
-          <Text variant="code" className="select-all break-all">
-            {absolute}
-          </Text>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 py-2">
-          <Text variant="body-sm" tone="secondary">
-            API reference
-          </Text>
-          <a
-            href={docs}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all font-mono text-sm text-brand underline underline-offset-2"
-          >
-            {docs}
-          </a>
         </div>
       </div>
+
+      <dl className="flex flex-col divide-y divide-border rounded-md border border-border px-4">
+        <ProfileRow label="Email">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="break-all">{operator.email}</span>
+            <CopyButton value={operator.email} label="your email" />
+          </span>
+        </ProfileRow>
+        <ProfileRow label="Account ID">
+          <span className="flex min-w-0 items-center gap-2">
+            <Text variant="code" className="break-all">
+              {operator.id}
+            </Text>
+            <CopyButton value={operator.id} label="your account ID" />
+          </span>
+        </ProfileRow>
+        <ProfileRow label="Access">{access}</ProfileRow>
+        {operator.tier ? (
+          <ProfileRow label="Plan">{planLabel[operator.tier] ?? operator.tier}</ProfileRow>
+        ) : null}
+        <ProfileRow label="Signs in with">{signInMethods(operator)}</ProfileRow>
+        <ProfileRow label="Two step verification">
+          {operator.mfa_enabled ? (
+            <span className="text-success">On</span>
+          ) : (
+            <span className="text-ink-muted">Off</span>
+          )}
+        </ProfileRow>
+        <ProfileRow label="Member since">{formatDate(operator.created_at)}</ProfileRow>
+        {workspaces.length > 0 ? (
+          <ProfileRow label="Workspaces">
+            <ul className="flex flex-col gap-1.5">
+              {workspaces.map((workspace) => (
+                <li key={workspace.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-medium">{workspace.name}</span>
+                  <span className="text-ink-muted">{roleLabel[workspace.role] ?? workspace.role}</span>
+                  {workspace.active ? (
+                    <span className="rounded-pill bg-subtle px-2 py-0.5 text-xs font-medium text-ink">
+                      Active now
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </ProfileRow>
+        ) : null}
+      </dl>
     </div>
   );
 }
@@ -373,7 +449,7 @@ function ChangePassword() {
   );
 }
 
-/** The Operator security settings: the account password, and two step verification. */
+/** The Operator's own account: their profile, the password, and two step verification. */
 export function Security() {
   const operator = useAuthStore((state) => state.operator);
   const enabled = operator?.mfa_enabled ?? false;
@@ -381,8 +457,8 @@ export function Security() {
   return (
     <OperatorShell active="security">
       <PageHeader
-        title="Security"
-        description="How you prove this account is yours: the password you sign in with, and a second step on top of it."
+        title="Profile and security"
+        description="Who this account is, and how you prove it is yours: the password you sign in with, and a second step on top of it."
         guidanceKey="security.mfa"
       />
 
@@ -406,8 +482,8 @@ export function Security() {
       ) : null}
 
       <div className="flex flex-col gap-8">
-        <Section title="This deployment" flush>
-          <ApiDetails />
+        <Section title="Profile" flush>
+          <Profile />
         </Section>
 
         <Section title="Password">

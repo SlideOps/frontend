@@ -28,6 +28,13 @@ export interface Operator {
    * offered a form that could never succeed.
    */
   has_password: boolean;
+  /** The plan this account is on. */
+  tier?: 'free' | 'starter' | 'pro' | 'enterprise';
+  /**
+   * The GitHub account this Operator signs in with, when they have signed in
+   * that way. A public handle, absent for a password-only account.
+   */
+  github_login?: string;
   created_at: string;
 }
 

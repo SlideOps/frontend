@@ -83,7 +83,7 @@ const structure: { heading: string | null; items: { label: string; path: string 
     heading: 'Account section',
     items: [
       { label: 'Billing', path: '/app/billing' },
-      { label: 'Security', path: '/app/security' },
+      { label: 'Profile and security', path: '/app/security' },
     ],
   },
 ];

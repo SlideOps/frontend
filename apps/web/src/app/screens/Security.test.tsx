@@ -1,9 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderInApp } from '../../test/render';
 import { useAuthStore } from '../../store/auth';
+import { useWorkspaceStore } from '../../store/workspace';
 
 /*
  * Changing a password, from the screen.
@@ -17,9 +18,18 @@ import { useAuthStore } from '../../store/auth';
 
 const changePassword = vi.fn();
 
+// The shell reloads the Workspace list as it mounts, so the list the profile
+// reads is served here rather than only seeded into the store.
+// Hoisted, because vi.mock runs before this module's own declarations do.
+const workspacesFixture = vi.hoisted(() => [
+  { id: 'ws_1', name: 'Personal', is_personal: true, role: 'owner' as const, active: false },
+  { id: 'ws_2', name: 'Acme Labs', is_personal: true, role: 'viewer' as const, active: true },
+]);
+
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   changePassword: (input: unknown) => changePassword(input),
+  listWorkspaces: () => Promise.resolve(workspacesFixture),
   mfaSetup: vi.fn(),
   mfaEnable: vi.fn(),
   mfaDisable: vi.fn(),
@@ -27,16 +37,28 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
 
 const { Security } = await import('./Security');
 
-const account = {
+interface Account {
+  id: string;
+  email: string;
+  role: 'operator' | 'admin';
+  tier?: 'free' | 'starter' | 'pro' | 'enterprise';
+  mfa_enabled: boolean;
+  has_password: boolean;
+  github_login?: string;
+  created_at: string;
+}
+
+const account: Account = {
   id: 'op_1',
   email: 'ada@example.com',
-  role: 'operator' as const,
+  role: 'operator',
+  tier: 'pro',
   mfa_enabled: false,
   has_password: true,
-  created_at: 'now',
+  created_at: '2026-07-26T09:30:00Z',
 };
 
-function signedInAs(operator: typeof account) {
+function signedInAs(operator: Account) {
   useAuthStore.setState({ operator, status: 'authenticated' });
 }
 
@@ -48,21 +70,58 @@ function renderScreen() {
   );
 }
 
-describe('Security: this deployment', () => {
-  beforeEach(() => signedInAs(account));
-
-  // An Operator running SlideOps on their own server had no way to find the URL
-  // their own app was talking to without asking somebody.
-  it('shows the API base this build actually calls, resolved to an address', async () => {
-    renderScreen();
-    const base = await screen.findByText(/\/api\/v1$/);
-    expect(base.textContent).toMatch(/^https?:\/\//);
+describe('Security: profile', () => {
+  beforeEach(() => {
+    signedInAs(account);
+    useWorkspaceStore.setState({ workspaces: workspacesFixture, loaded: true });
   });
 
-  it('links to the API reference', async () => {
+  /** The value beside a label in the profile list. */
+  function row(label: string) {
+    return within(screen.getByText(label, { selector: 'dt' }).parentElement!);
+  }
+
+  it('shows who the account is, its plan, and how it signs in', async () => {
     renderScreen();
-    const link = await screen.findByRole('link', { name: /\/docs$/ });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/docs'));
+    expect(await screen.findByRole('heading', { name: 'Profile' })).toBeInTheDocument();
+    expect(row('Email').getByText('ada@example.com')).toBeInTheDocument();
+    expect(row('Account ID').getByText('op_1')).toBeInTheDocument();
+    expect(row('Plan').getByText('Pro')).toBeInTheDocument();
+    expect(row('Signs in with').getByText('Password')).toBeInTheDocument();
+    expect(row('Member since').getByText(/2026/)).toBeInTheDocument();
+  });
+
+  // The role comes from the membership, never from whether the Workspace is
+  // somebody's Personal one: a Viewer in another Operator's Personal Workspace
+  // is still a Viewer there.
+  it('lists every Workspace with the role held in it, and marks the active one', async () => {
+    renderScreen();
+    const list = await waitFor(() => row('Workspaces'));
+    expect(list.getByText('Acme Labs')).toBeInTheDocument();
+    expect(list.getByText('Viewer')).toBeInTheDocument();
+    expect(list.getByText('Owner')).toBeInTheDocument();
+    expect(list.getByText('Active now')).toBeInTheDocument();
+  });
+
+  it('names GitHub as the way in for an account that signs in with it', async () => {
+    signedInAs({ ...account, has_password: false, github_login: 'ada' });
+    renderScreen();
+    expect(await screen.findByText('GitHub (@ada)')).toBeInTheDocument();
+  });
+
+  it('says when the account can reach the admin control plane', async () => {
+    signedInAs({ ...account, role: 'admin', mfa_enabled: true });
+    renderScreen();
+    expect(
+      (await screen.findAllByText('Operator, with access to the admin control plane')).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('no longer shows the deployment details', async () => {
+    renderScreen();
+    await screen.findByRole('heading', { name: 'Profile' });
+    expect(screen.queryByText('This deployment')).not.toBeInTheDocument();
+    expect(screen.queryByText('API base')).not.toBeInTheDocument();
   });
 });
 
