@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { InvitationAccept } from './auth/InvitationAccept';
 import { NodeTransferAccept } from './auth/NodeTransferAccept';
 import { Login } from './auth/Login';
@@ -8,15 +8,8 @@ import { Register } from './auth/Register';
 import { LogoLoader } from './components/LogoLoader';
 import { RequireAdmin } from './components/RequireAdmin';
 import { RequireAuth } from './components/RequireAuth';
-import { MarketingLayout } from './marketing/MarketingLayout';
-import { docsRoutes } from './marketing/docs-site';
-import {
-  AudiencePage,
-  CapabilitiesPage,
-  MarketingHome,
-  PricingPage,
-  StoryPage,
-} from './marketing/pages';
+import { marketingRoutes } from './marketing/routes';
+import { RouteHead } from './seo/RouteHead';
 import { useAuthStore } from './store/auth';
 
 /*
@@ -208,18 +201,12 @@ export function App() {
 
   return (
     <Suspense fallback={<LogoLoader fullScreen label="Loading" />}>
+      {/* The title, description and canonical follow the route. */}
+      <RouteHead />
       <Routes>
-        {/* Public marketing. */}
-        <Route element={<MarketingLayout />}>
-          <Route path="/" element={<MarketingHome />} />
-          <Route path="/story" element={<StoryPage />} />
-          <Route path="/capabilities" element={<CapabilitiesPage />} />
-          <Route path="/audience" element={<AudiencePage />} />
-          {/* The documentation site. /docs is its index and every page lives
-              at /docs/<section>/<page>, in manifest order. */}
-          {docsRoutes()}
-          <Route path="/pricing" element={<PricingPage />} />
-        </Route>
+        {/* Public marketing and the documentation, with the not found page
+            for any address nothing else claims. */}
+        {marketingRoutes()}
 
         {/* Unified sign in and sign up. */}
         <Route path="/login" element={<Login />} />
@@ -301,9 +288,6 @@ export function App() {
           <Route path="email-deliveries" element={<EmailDeliveries />} />
           <Route path="domains" element={<AdminDomains />} />
         </Route>
-
-        {/* Anything else returns to the marketing home. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   );

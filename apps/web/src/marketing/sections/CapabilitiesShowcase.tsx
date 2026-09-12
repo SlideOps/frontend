@@ -11,14 +11,14 @@ import {
 import { useReveal } from '../useReveal';
 
 /** The Capability set: Core security on every server, the rest from the marketplace. */
-export function CapabilitiesShowcase() {
+export function CapabilitiesShowcase({ standalone = false }: { standalone?: boolean }) {
   return (
     <section id="capabilities" className="mx-auto max-w-6xl px-6 py-20 md:py-24">
       <div className="so-rise max-w-2xl">
         <Text variant="caption" tone="accent">
           Capabilities
         </Text>
-        <Text as="h2" variant="h1" className="mt-3">
+        <Text as={standalone ? 'h1' : 'h2'} variant="h1" className="mt-3">
           Core security on every server, the rest from the marketplace
         </Text>
         <Text variant="body" tone="secondary" className="mt-5">

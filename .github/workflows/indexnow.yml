@@ -1,0 +1,48 @@
+name: IndexNow
+
+# After a production deployment finishes, tell the IndexNow engines which public
+# pages changed. The deployment status comes from the hosting integration, so
+# this runs once the new pages are actually being served, never before.
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Notify search engines of changed pages
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the script and the key file
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/web/scripts
+            apps/web/public
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The manifest from the last notification. The first run has none, and
+      # submits every public page once.
+      - name: Restore the last notified manifest
+        uses: actions/cache/restore@v4
+        with:
+          path: .indexnow/last.json
+          key: indexnow-${{ github.run_id }}
+          restore-keys: indexnow-
+
+      - name: Submit what changed
+        run: node apps/web/scripts/indexnow.mjs --previous .indexnow/last.json --save .indexnow/last.json
+
+      - name: Remember this manifest for next time
+        uses: actions/cache/save@v4
+        with:
+          path: .indexnow/last.json
+          key: indexnow-${{ github.run_id }}

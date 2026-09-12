@@ -27,7 +27,7 @@ const pillars: Pillar[] = [
 ];
 
 /** The story from the blueprint: understandable, in control, and confident by design. */
-export function Story() {
+export function Story({ standalone = false }: { standalone?: boolean }) {
   const { ref, shown } = useReveal<HTMLDivElement>();
   return (
     <section id="how" className="border-y border-border bg-surface">
@@ -36,7 +36,7 @@ export function Story() {
           <Text variant="caption" tone="accent">
             Why SlideOps
           </Text>
-          <Text as="h2" variant="h1" className="mt-3">
+          <Text as={standalone ? 'h1' : 'h2'} variant="h1" className="mt-3">
             One clear path from intent to a verified outcome
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">

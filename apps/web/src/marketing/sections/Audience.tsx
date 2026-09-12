@@ -42,7 +42,7 @@ const audiences: Audience[] = [
 ];
 
 /** Who SlideOps is for, from a single developer to a whole team. */
-export function Audience() {
+export function Audience({ standalone = false }: { standalone?: boolean }) {
   const { ref, shown } = useReveal<HTMLDivElement>();
   return (
     <section id="who" className="border-y border-border bg-surface">
@@ -51,7 +51,7 @@ export function Audience() {
           <Text variant="caption" tone="accent">
             Who it is for
           </Text>
-          <Text as="h2" variant="h1" className="mt-3">
+          <Text as={standalone ? 'h1' : 'h2'} variant="h1" className="mt-3">
             Built for anyone who runs their own Linux
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">

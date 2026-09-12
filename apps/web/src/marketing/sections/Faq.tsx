@@ -7,7 +7,8 @@ interface Item {
   answer: string;
 }
 
-const items: Item[] = [
+/** The questions and answers, also published as the home page's FAQ structured data. */
+export const faqItems: readonly Item[] = [
   {
     question: 'Does SlideOps take control of my servers?',
     answer:
@@ -36,12 +37,12 @@ const items: Item[] = [
   {
     question: 'How are my credentials handled?',
     answer:
-      'Connection secrets are sealed: encrypted at rest and decrypted only at connection time. They are never shown, logged, or returned. Host keys are trusted on first use and pinned after.',
+      'Connection secrets are sealed: encrypted at rest and never written to a log. When you need one back, you reveal or copy it on purpose from Credentials, and a Viewer cannot. Host keys are trusted on first use and pinned after.',
   },
   {
     question: 'Can several Projects share one server?',
     answer:
-      'Yes, that is the point of the two-level model. Every Service runs under a fixed CPU, memory, and disk ceiling set by your tier, so many Projects can share one large server without fighting for resources.',
+      'Yes, that is the point of the two-level model. Every Service runs under its own CPU, memory and process ceilings, which you set and can change in place, so many Projects can share one large server without fighting for resources. Your plan never limits them.',
   },
 ];
 
@@ -61,7 +62,7 @@ export function Faq() {
       </div>
 
       <div className="so-rise-2 mt-10 flex flex-col gap-3">
-        {items.map((item, index) => {
+        {faqItems.map((item, index) => {
           const isOpen = open[index] ?? false;
           const panelId = `faq-panel-${index}`;
           const buttonId = `faq-button-${index}`;

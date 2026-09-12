@@ -35,22 +35,27 @@ export function MarketingHome() {
   );
 }
 
+/*
+ * On its own route a section is the whole page, so its heading is the page's
+ * h1 rather than one h2 among many.
+ */
+
 /** The story, on its own route. */
 export function StoryPage() {
-  return <Story />;
+  return <Story standalone />;
 }
 
 /** The day-one Capability showcase, on its own route. */
 export function CapabilitiesPage() {
-  return <CapabilitiesShowcase />;
+  return <CapabilitiesShowcase standalone />;
 }
 
 /** Who SlideOps is for, on its own route. */
 export function AudiencePage() {
-  return <Audience />;
+  return <Audience standalone />;
 }
 
 /** Pricing, on its own route. */
 export function PricingPage() {
-  return <Pricing />;
+  return <Pricing standalone />;
 }

@@ -1,5 +1,43 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/docs/getting-started", "destination": "/docs/start/quick-start", "permanent": true },
+    { "source": "/docs/servers-and-projects", "destination": "/docs/infrastructure/servers", "permanent": true },
+    { "source": "/docs/how-an-operation-works", "destination": "/docs/start/how-an-operation-works", "permanent": true },
+    { "source": "/docs/deployment-methods", "destination": "/docs/build/deploying", "permanent": true },
+    { "source": "/docs/managing-what-you-installed", "destination": "/docs/infrastructure/capabilities", "permanent": true },
+    { "source": "/docs/day-to-day", "destination": "/docs/observe/activity", "permanent": true },
+    { "source": "/docs/start", "destination": "/docs/start/what-slideops-is", "permanent": true },
+    { "source": "/docs/build", "destination": "/docs/build/projects", "permanent": true },
+    { "source": "/docs/infrastructure", "destination": "/docs/infrastructure/servers", "permanent": true },
+    { "source": "/docs/connect", "destination": "/docs/connect/domains-and-dns", "permanent": true },
+    { "source": "/docs/observe", "destination": "/docs/observe/activity", "permanent": true },
+    { "source": "/docs/configure", "destination": "/docs/configure/credentials", "permanent": true },
+    { "source": "/docs/automate", "destination": "/docs/automate/automations", "permanent": true },
+    { "source": "/docs/account", "destination": "/docs/account/workspaces-and-teams", "permanent": true },
+    { "source": "/docs/reference", "destination": "/docs/reference/glossary", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/app", "destination": "/app-shell.html" },
+    { "source": "/app/:path*", "destination": "/app-shell.html" },
+    { "source": "/admin", "destination": "/app-shell.html" },
+    { "source": "/admin/:path*", "destination": "/app-shell.html" },
+    { "source": "/login", "destination": "/app-shell.html" },
+    { "source": "/register", "destination": "/app-shell.html" },
+    { "source": "/mfa", "destination": "/app-shell.html" },
+    { "source": "/invitations/:path*", "destination": "/app-shell.html" },
+    { "source": "/node-transfers/:path*", "destination": "/app-shell.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/(app|admin|login|register|mfa|invitations|node-transfers)(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
   ]
 }

@@ -6,7 +6,8 @@
   "description": "The SlideOps web application: the marketing site, the Operator dashboard, and the Admin control plane, one React app with role-based routing on a single port.",
   "scripts": {
     "dev": "vite --port 4321",
-    "build": "vite build",
+    "build": "vite build && vite build --ssr src/entry-prerender.tsx --outDir dist-ssr --emptyOutDir && node scripts/prerender.mjs",
+    "seo:indexnow": "node scripts/indexnow.mjs",
     "preview": "vite preview --port 4321",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",

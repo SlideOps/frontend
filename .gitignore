@@ -37,3 +37,6 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# the prerender step's server build, deleted when it finishes
+dist-ssr/

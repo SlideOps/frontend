@@ -21,11 +21,26 @@
          viewport-fit=cover and the safe area insets are already set up for. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <!-- The title and every data-seo tag are per page. The build writes each
+         public page's own (src/seo/head.ts, scripts/prerender.mjs) and the app
+         keeps them in step as the route changes. -->
     <meta
       name="description"
-      content="SlideOps helps Operators discover, configure, deploy, secure, verify, and monitor their own infrastructure. Knowledge becomes Capabilities. Capabilities create Confidence."
+      content="SlideOps helps Operators discover, configure, deploy, secure, verify and monitor the servers they own, over SSH."
+      data-seo
     />
-    <title>SlideOps: Infrastructure Operations, in plain language</title>
+    <title>SlideOps</title>
+    <!-- Only the canonical host is a search result. The same build also serves
+         previews and mirrors (a Netlify address, the VPS), and those must not
+         compete with it. -->
+    <script>
+      if (!/^(www\.)?useslideops\.com$/.test(location.hostname)) {
+        var robots = document.createElement('meta');
+        robots.name = 'robots';
+        robots.content = 'noindex';
+        document.head.appendChild(robots);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

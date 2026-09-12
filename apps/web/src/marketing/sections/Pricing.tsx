@@ -93,7 +93,7 @@ const tiers: Tier[] = [
 
 /** Pricing: we are a command center, not a host, so the tiers meter our service,
  *  never your server's resources. */
-export function Pricing() {
+export function Pricing({ standalone = false }: { standalone?: boolean }) {
   const { ref, shown } = useReveal<HTMLDivElement>();
   /*
    * The written-in prices above are the fallback, not the source.
@@ -118,7 +118,7 @@ export function Pricing() {
           <Text variant="caption" tone="accent">
             Pricing
           </Text>
-          <Text as="h2" variant="h1" className="mt-3">
+          <Text as={standalone ? 'h1' : 'h2'} variant="h1" className="mt-3">
             Priced for the command center, not your hardware
           </Text>
           <Text variant="body" tone="secondary" className="mt-5">
