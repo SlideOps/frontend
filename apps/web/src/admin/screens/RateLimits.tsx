@@ -85,7 +85,7 @@ export function RateLimits() {
             label="Operator email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="operator@slideops.com"
+            placeholder="operator@useslideops.com"
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 runLookup();

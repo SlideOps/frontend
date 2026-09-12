@@ -586,15 +586,15 @@ describe('admin requests', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(200, {
         entries: [
-          { subject: 'op@slideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 },
+          { subject: 'op@useslideops.com|1.2.3.4', attempts: 3, max: 10, resets_in_seconds: 600 },
         ],
       }),
     );
 
-    const entries = await lookupLoginRateLimit('op@slideops.com');
+    const entries = await lookupLoginRateLimit('op@useslideops.com');
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      '/admin/rate-limits/login?email=op%40slideops.com',
+      '/admin/rate-limits/login?email=op%40useslideops.com',
     );
     expect(entries).toHaveLength(1);
     expect(entries[0]?.attempts).toBe(3);
@@ -605,12 +605,12 @@ describe('admin requests', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(jsonResponse(200, { cleared: 2 }));
 
-    const cleared = await resetLoginRateLimit('op@slideops.com');
+    const cleared = await resetLoginRateLimit('op@useslideops.com');
 
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(String(url)).toContain('/admin/rate-limits/login/reset');
     expect(init?.method).toBe('POST');
-    expect(JSON.parse(String(init?.body))).toEqual({ email: 'op@slideops.com' });
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'op@useslideops.com' });
     expect(cleared).toBe(2);
   });
 
@@ -620,7 +620,7 @@ describe('admin requests', () => {
         deliveries: [
           {
             id: 'ed-1',
-            to: 'op@slideops.com',
+            to: 'op@useslideops.com',
             subject: 'Payment successful',
             provider: 'emailjs',
             outcome: 'sent',
@@ -717,7 +717,7 @@ describe('the revision an arrangement editor works from', () => {
       updated_at: '2026-09-08T11:22:33.456789Z',
       term_months: 6,
     },
-    operator_email: 'customer@slideops.com',
+    operator_email: 'customer@useslideops.com',
     revision: '2026-09-08T11:22:33.456789Z',
   };
 
@@ -779,7 +779,7 @@ describe('a customer message on an arrangement', () => {
   const envelope = {
     message: {
       type: 'payment_reminder',
-      to: 'customer@slideops.com',
+      to: 'customer@useslideops.com',
       subject: 'Reminder: payment for your SlideOps pro plan',
       body_html: '<!doctype html><p>Payment reminder</p>',
       body_text: 'Payment reminder\n\nYour payment is due.',
@@ -792,7 +792,7 @@ describe('a customer message on an arrangement', () => {
 
     const preview = await previewArrangementEmail('arr-1', 'payment_reminder');
 
-    expect(preview.to).toBe('customer@slideops.com');
+    expect(preview.to).toBe('customer@useslideops.com');
     expect(preview.subject).toBe('Reminder: payment for your SlideOps pro plan');
     expect(preview.body).toContain('Your payment is due.');
     expect(preview.type).toBe('payment_reminder');
@@ -811,7 +811,7 @@ describe('a customer message on an arrangement', () => {
 
     const sent = await sendArrangementEmail('arr-1', 'payment_reminder');
 
-    expect(sent.to).toBe('customer@slideops.com');
+    expect(sent.to).toBe('customer@useslideops.com');
   });
 
   it('asks the preview endpoint, which sends nothing', async () => {
