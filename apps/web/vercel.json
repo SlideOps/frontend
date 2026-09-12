@@ -20,15 +20,15 @@
     { "source": "/docs/reference", "destination": "/docs/reference/glossary", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/app", "destination": "/app-shell.html" },
-    { "source": "/app/:path*", "destination": "/app-shell.html" },
-    { "source": "/admin", "destination": "/app-shell.html" },
-    { "source": "/admin/:path*", "destination": "/app-shell.html" },
-    { "source": "/login", "destination": "/app-shell.html" },
-    { "source": "/register", "destination": "/app-shell.html" },
-    { "source": "/mfa", "destination": "/app-shell.html" },
-    { "source": "/invitations/:path*", "destination": "/app-shell.html" },
-    { "source": "/node-transfers/:path*", "destination": "/app-shell.html" }
+    { "source": "/app", "destination": "/app-shell" },
+    { "source": "/app/:path*", "destination": "/app-shell" },
+    { "source": "/admin", "destination": "/app-shell" },
+    { "source": "/admin/:path*", "destination": "/app-shell" },
+    { "source": "/login", "destination": "/app-shell" },
+    { "source": "/register", "destination": "/app-shell" },
+    { "source": "/mfa", "destination": "/app-shell" },
+    { "source": "/invitations/:path*", "destination": "/app-shell" },
+    { "source": "/node-transfers/:path*", "destination": "/app-shell" }
   ],
   "headers": [
     {

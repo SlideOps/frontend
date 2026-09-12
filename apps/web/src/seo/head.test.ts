@@ -148,7 +148,9 @@ describe('the hosting config', () => {
   });
 
   it('serves the app shell for the signed-in areas, and nothing else', () => {
-    for (const rule of config.rewrites) expect(rule.destination).toBe('/app-shell.html');
+    // With cleanUrls on, Vercel serves app-shell.html at /app-shell and not at
+    // /app-shell.html, so a rewrite must name the clean path or it 404s.
+    for (const rule of config.rewrites) expect(rule.destination).toBe('/app-shell');
     const sources = config.rewrites.map((rule) => rule.source);
     expect(sources).toEqual(expect.arrayContaining(['/app/:path*', '/admin/:path*', '/login', '/register']));
     expect(sources.some((source) => source === '/(.*)' || source.startsWith('/docs'))).toBe(false);
