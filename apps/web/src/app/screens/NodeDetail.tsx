@@ -30,6 +30,7 @@ import { ShellTerminal } from '../components/ShellTerminal';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useCanWrite } from '../../store/workspace';
+import { useSupportUIStore } from '../support/support-ui-store';
 import {
   blockedBy,
   completedHint,
@@ -91,6 +92,7 @@ export function NodeDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const canWrite = useCanWrite();
+  const openSupport = useSupportUIStore((state) => state.openSupport);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = NODE_TABS.some((tab) => tab.key === searchParams.get('tab'))
     ? (searchParams.get('tab') as string)
@@ -331,6 +333,25 @@ export function NodeDetail() {
                       />
                       <SummaryRow label="Status" value={nodeResult.state.data.status} />
                     </dl>
+                    {nodeResult.state.data.status === 'unreachable' ? (
+                      <div
+                        role="alert"
+                        className="mt-3 rounded-md border border-danger bg-subtle px-3 py-2"
+                      >
+                        <Text variant="body-sm" className="font-medium text-danger">
+                          This server is unreachable
+                        </Text>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mt-1"
+                          onClick={() => openSupport('Why is this unavailable?')}
+                        >
+                          Why is this unavailable?
+                        </Button>
+                      </div>
+                    ) : null}
                   </Card>
 
                   <NodeCapacity nodeId={id} />

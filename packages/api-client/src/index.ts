@@ -136,6 +136,24 @@ export {
   type SearchOperation,
 } from './search';
 export {
+  ask,
+  confirmAction,
+  quickActions,
+  presets as supportPresets,
+  type SupportTurn,
+  type SupportContext,
+  type SupportCard,
+  type SupportAction,
+  type SupportNavigation,
+  type SupportFollowUp,
+  type SupportFollowUpOption,
+  type SupportResponse,
+  type SupportActionResult,
+  type SupportQuickAction,
+  type SupportPreset,
+  type SupportPresetCategory,
+} from './support';
+export {
   getOverview,
   listOperators,
   listSubscribers,

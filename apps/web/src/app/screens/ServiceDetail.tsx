@@ -52,6 +52,7 @@ import { ServiceBrowsePanel } from '../components/ServiceBrowsePanel';
 import { ServiceCredentialsPanel } from '../components/ServiceCredentialsPanel';
 import { ServiceActivityTrail } from '../components/ServiceActivity';
 import { ServiceLogView } from '../components/ServiceLogView';
+import { useSupportUIStore } from '../support/support-ui-store';
 import { ShellTerminal } from '../components/ShellTerminal';
 import { ServicePreview } from '../components/ServicePreview';
 import { ServiceResourcesPanel } from '../components/ServiceResourcesPanel';
@@ -377,6 +378,7 @@ export function ServiceDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const canWrite = useCanWrite();
+  const openSupport = useSupportUIStore((state) => state.openSupport);
   const { state, reload } = useAsyncData((signal) => loadDetail(id, signal), [id]);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = SERVICE_TABS.some((tab) => tab.key === searchParams.get('tab'))
@@ -539,6 +541,15 @@ export function ServiceDetail() {
               <Text variant="body-sm" tone="secondary" className="mt-1 break-words font-mono">
                 {service.last_error}
               </Text>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-2"
+                onClick={() => openSupport('Why did this fail?')}
+              >
+                Why did this fail?
+              </Button>
             </div>
           ) : null}
 

@@ -24,6 +24,7 @@ import { PlanReview } from '../components/PlanReview';
 import { StepTimeline } from '../components/StepTimeline';
 import { VerificationView } from '../components/VerificationView';
 import { OperatorShell } from '../components/OperatorShell';
+import { useSupportUIStore } from '../support/support-ui-store';
 import { useOperationsStore } from '../store/operations';
 import { useCanWrite } from '../../store/workspace';
 
@@ -72,6 +73,7 @@ export function OperationDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const canWrite = useCanWrite();
+  const openSupport = useSupportUIStore((state) => state.openSupport);
 
   const events = useOperationsStore((state) => state.events[id] ?? EMPTY_EVENTS);
   const ingest = useOperationsStore((state) => state.ingest);
@@ -281,6 +283,15 @@ export function OperationDetail() {
             <Text variant="body-sm" tone="secondary" className="mt-0.5">
               {operation.error}
             </Text>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2"
+              onClick={() => openSupport('Why did this fail?')}
+            >
+              Why did this fail?
+            </Button>
           </div>
         </div>
       ) : null}
