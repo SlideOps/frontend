@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderInApp } from '../../test/render';
+import { useSupportUIStore } from '../support/support-ui-store';
 
 /*
  * The Service detail page, as a whole.
@@ -362,6 +363,20 @@ describe('ServiceDetail', () => {
     // was enough to trip the five second default and fail a test about the
     // delete guard for reasons that have nothing to do with the delete guard.
   }, 20000);
+
+  it('opens Support pre-seeded with "Why did this fail?" for a Service with a last deploy error', async () => {
+    getService.mockReset().mockResolvedValue({ ...service, last_error: 'image pull failed' });
+    useSupportUIStore.setState({ open: false, initialMessage: null });
+
+    show();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Why did this fail?' }));
+
+    expect(useSupportUIStore.getState()).toMatchObject({
+      open: true,
+      initialMessage: 'Why did this fail?',
+    });
+  });
 });
 
 const capabilityService = {

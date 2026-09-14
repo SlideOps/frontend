@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Layers,
   ListChecks,
+  MessageSquare,
   Package,
   Search,
   Network,
@@ -30,6 +31,9 @@ import { isAdmin, useAuthStore } from '../../store/auth';
 import { useWorkspaceStore } from '../../store/workspace';
 import { NotificationsBell } from '../notifications/NotificationsBell';
 import { useNavigationPreferences } from '../hooks/useNavigationPreferences';
+import { SupportPanel } from '../support/SupportPanel';
+import { useSupportUIStore } from '../support/support-ui-store';
+import { useSupportContext } from '../support/useSupportContext';
 import { CommandPalette } from './CommandPalette';
 import { InstallApp } from './InstallApp';
 import { LogoutButton } from './LogoutButton';
@@ -80,6 +84,29 @@ function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+/** A visible affordance that opens Support, with its shortcut shown. Its own
+ * shortcut, Control/Command plus Shift plus K, is deliberately distinct from
+ * the command palette's Control/Command plus K so the two never collide. */
+function SupportTrigger({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Ask Support"
+      aria-keyshortcuts="Control+Shift+K Meta+Shift+K"
+      className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-2.5 text-sm text-ink-muted transition-colors duration-fast ease-standard hover:bg-subtle hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:px-3"
+    >
+      <MessageSquare width={16} height={16} aria-hidden />
+      <span className="hidden md:inline">Support</span>
+      <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-xs md:inline">
+        {typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+          ? 'Cmd Shift K'
+          : 'Ctrl Shift K'}
+      </kbd>
+    </button>
+  );
+}
+
 /**
  * A transient notice, shown when another area redirects here with a message,
  * for example when a plain Operator is turned away from the admin area. It reads
@@ -123,6 +150,11 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
   const [paletteOpen, setPaletteOpen] = useState(false);
   const { preferences, toggleGroup, toggleSidebar } = useNavigationPreferences();
   const rail = preferences.sidebar_collapsed;
+  const supportContext = useSupportContext();
+  const supportOpen = useSupportUIStore((state) => state.open);
+  const supportInitialMessage = useSupportUIStore((state) => state.initialMessage);
+  const setSupportOpen = useSupportUIStore((state) => state.setOpen);
+  const openSupport = useSupportUIStore((state) => state.openSupport);
 
   // Read once per app visit which workspaces this Operator can act in, so the
   // switcher and every Viewer-role gate throughout the app have an answer
@@ -142,6 +174,21 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
     }),
     [active, navigate],
   );
+
+  // The global Support shortcut, Control/Command plus Shift plus K. Checked
+  // before the command palette's own listener would fire, since Shift is
+  // part of this combination and not of that one, so the two never compete
+  // for the same keystroke.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        openSupport();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [openSupport]);
 
   /*
    * The navigation, grouped by what an Operator came to do rather than by which
@@ -287,6 +334,7 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
             <WorkspaceSwitcher />
             <InstallApp />
             <SearchTrigger onOpen={() => setPaletteOpen(true)} />
+            <SupportTrigger onOpen={() => openSupport()} />
             <NotificationsBell />
             <LogoutButton />
           </>
@@ -296,6 +344,12 @@ export function OperatorShell({ active, children }: { active: ActiveKey; childre
         {children}
       </AppShell>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <SupportPanel
+        open={supportOpen}
+        onOpenChange={setSupportOpen}
+        context={supportContext}
+        initialMessage={supportInitialMessage}
+      />
     </>
   );
 }
