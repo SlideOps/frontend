@@ -211,6 +211,24 @@ Check that a reverse proxy Capability is actually in place on the machine, and t
 
 A worker with no listening port cannot be given a web address. That is correct behaviour, not a bug.
 
+## HTTPS and certificates
+
+### "no trusted certificate yet; [it] is serving its own internal, browser-untrusted certificate"
+
+> no trusted certificate yet; Caddy is serving its own internal, browser-untrusted certificate
+
+Not a failure by itself. The reverse proxy issues itself a certificate the instant a domain is configured, purely so it has something to serve while it requests a real one, and it keeps using that internal one for as long as the real request keeps failing. This is what a browser is reacting to when it calls a freshly configured domain insecure.
+
+The Operation can report success — the domain is routed, the proxy is running — while this one check stays red, because a real certificate depends on two things entirely outside the machine's own configuration: DNS actually pointing at this Server, and the public internet actually being able to reach it on ports 80 and 443. Neither is something an Operation can make true by retrying.
+
+Give it a minute after DNS first points here; issuance is asynchronous and usually finishes within a minute or two. If it is still on the internal certificate after that, check, in this order:
+
+- **DNS** actually resolves the hostname to this Server's address, not a CDN or an old address.
+- **Port 80** is reachable from the public internet. This is what the validation itself travels over, and a cloud firewall or security group that only opens 443 looks fine to a browser and fails silently here.
+- **Nothing else is already bound to 80 or 443** on the Server.
+
+See [Certificates](/docs/connect/certificates) for what has to be true before one can be issued at all.
+
 ## Configuration and environment
 
 ### The change I saved is not taking effect

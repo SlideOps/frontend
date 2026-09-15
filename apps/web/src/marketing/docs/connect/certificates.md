@@ -66,7 +66,22 @@ source, then obtains a certificate for the domain non interactively and lets
 certbot configure NGINX to redirect to HTTPS.
 
 Verification afterwards confirms a certificate is actually present for the
-domain, rather than assuming the command that ran meant it worked.
+domain, **and that it was issued by a real certificate authority**, rather than
+assuming the command that ran meant it worked.
+
+## The internal certificate in the meantime
+
+Caddy does not wait for a real certificate before it will serve a domain: it
+issues itself one instantly, so there is something to answer with the moment the
+route exists. That certificate is not signed by anyone a browser trusts, which is
+exactly what "not secure" in the address bar is reacting to.
+
+This is expected for the short window between the route existing and the real
+certificate arriving. It stops being expected, and starts being a sign that
+issuance is not going to succeed on its own, if it is still true a few minutes
+after DNS is confirmed pointing here — at that point it almost always means port
+80 is not reachable from the public internet. See
+[Troubleshooting](/docs/reference/troubleshooting) for the checks to run.
 
 ## Renewal
 
