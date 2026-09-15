@@ -40,3 +40,6 @@ pnpm-debug.log*
 
 # the prerender step's server build, deleted when it finishes
 dist-ssr/
+
+# agent guidance stays local, never committed
+CLAUDE.md
