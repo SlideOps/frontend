@@ -1459,12 +1459,22 @@ export function listArrangementEmailTypes(
   ).then((r) => r.types ?? []);
 }
 
-/** A rendered message, produced without sending anything. */
+/**
+ * A rendered message, produced without sending anything.
+ *
+ * `body` stays the plain-text version, read for the on-screen preview:
+ * dumping the HTML there would show an Admin the markup as literal text
+ * rather than the message. `bodyHtml` is the same message as the customer's
+ * mail client actually renders it, kept alongside so it can be printed or
+ * saved as a PDF looking exactly like the email it is a copy of, not
+ * reconstructed from the plain text.
+ */
 export interface ArrangementEmailPreview {
   type: string;
   to: string;
   subject: string;
   body: string;
+  bodyHtml: string;
 }
 
 /**
@@ -1755,6 +1765,7 @@ function readArrangementMessage(body: ArrangementMessageEnvelope): ArrangementEm
     to: message.to ?? '',
     subject: message.subject ?? '',
     body: message.body_text ?? message.body_html ?? '',
+    bodyHtml: message.body_html ?? '',
   };
 }
 

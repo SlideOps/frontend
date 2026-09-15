@@ -26,11 +26,12 @@ import {
   Lock,
   Mail,
   Pencil,
+  Printer,
   RotateCcw,
   ShieldAlert,
 } from '@slideops/icons';
 import { PageHeader } from '@slideops/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   accessReading,
@@ -506,6 +507,20 @@ export function ArrangementDetail() {
   const [preview, setPreview] = useState<ArrangementEmailPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // The styled message, rendered in its own document so the invoice-like
+  // layout the customer actually sees is what prints or saves as a PDF --
+  // the admin dashboard's own styles never reach inside an iframe, so
+  // nothing here can bleed in and it comes out exactly as designed.
+  const messageFrameRef = useRef<HTMLIFrameElement>(null);
+  const runPrint = () => {
+    const frameWindow = messageFrameRef.current?.contentWindow;
+    if (!frameWindow) {
+      return;
+    }
+    frameWindow.focus();
+    frameWindow.print();
+  };
 
   useEffect(() => {
     // Follow the server's own list of message types; never invent one.
@@ -1195,6 +1210,25 @@ export function ArrangementDetail() {
                     <pre className="max-h-80 overflow-auto whitespace-pre-wrap px-4 py-3 text-sm text-ink">
                       {preview.body}
                     </pre>
+                    {preview.bodyHtml ? (
+                      <div className="border-t border-border">
+                        <div className="flex items-center justify-between border-b border-border bg-subtle px-4 py-2">
+                          <Text variant="caption" tone="secondary">
+                            Styled, as the customer will see it
+                          </Text>
+                          <Button variant="ghost" size="sm" onClick={runPrint}>
+                            <Printer width={14} height={14} aria-hidden />
+                            Print / Save as PDF
+                          </Button>
+                        </div>
+                        <iframe
+                          ref={messageFrameRef}
+                          srcDoc={preview.bodyHtml}
+                          title={`${preview.subject} (styled preview)`}
+                          className="h-[32rem] w-full border-0"
+                        />
+                      </div>
+                    ) : null}
                     <div className="border-t border-border px-4 py-3">
                       <Button variant="primary" size="sm" onClick={runSend} disabled={sending}>
                         <Mail width={14} height={14} aria-hidden />

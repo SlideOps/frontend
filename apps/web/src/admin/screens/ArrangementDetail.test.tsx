@@ -267,6 +267,43 @@ describe('managing one arrangement', () => {
     expect(api.sendArrangementEmail).not.toHaveBeenCalled();
   });
 
+  it('offers no print button when the backend sent no styled version', async () => {
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /Preview/ }));
+
+    await screen.findByText(/Preview only. Nothing has been sent./);
+    expect(screen.queryByRole('button', { name: /Print \/ Save as PDF/ })).not.toBeInTheDocument();
+  });
+
+  it('prints the styled message in its own document, looking exactly like the email', async () => {
+    api.previewArrangementEmail.mockReset().mockResolvedValue({
+      type: 'payment_reminder',
+      to: 'chidi@example.test',
+      subject: 'Your payment is due',
+      body: 'Hello, the 150,000.00 for Pro is due on 22 September.',
+      bodyHtml: '<!doctype html><html><body><p>Styled like an invoice</p></body></html>',
+    });
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /Preview/ }));
+
+    const frame = (await screen.findByTitle(/styled preview/i)) as HTMLIFrameElement;
+    // The frame carries the email's own document, so what prints is that
+    // document's own layout, never the admin page around it.
+    expect(frame.srcdoc).toContain('Styled like an invoice');
+
+    const framePrint = vi.fn();
+    Object.defineProperty(frame, 'contentWindow', {
+      configurable: true,
+      value: { print: framePrint, focus: vi.fn() },
+    });
+    const pagePrint = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+    await userEvent.click(screen.getByRole('button', { name: /Print \/ Save as PDF/ }));
+
+    expect(framePrint).toHaveBeenCalledTimes(1);
+    expect(pagePrint).not.toHaveBeenCalled();
+  });
+
   it('sends the message only when the send control is chosen, and says it changed nothing else', async () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: /Preview/ }));
