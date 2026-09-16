@@ -237,6 +237,29 @@ describe('DomainDetail', () => {
       );
     });
 
+    it('records a DNS-only proxy mode with no DNS-01 hint, since HTTP-01 still works', async () => {
+      getDomain.mockResolvedValue(domain());
+      updateDomain.mockResolvedValue(domain({ proxy_mode: 'dns_only' }));
+      renderDetail();
+
+      const section = (
+        await screen.findByRole('heading', { name: /certificate and namespace/i })
+      ).closest('section') as HTMLElement;
+      await userEvent.click(within(section).getByRole('button', { name: /edit/i }));
+      await userEvent.selectOptions(screen.getByLabelText('Proxy mode'), 'dns_only');
+
+      expect(screen.queryByText(/cannot complete an HTTP-01 challenge/i)).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() =>
+        expect(updateDomain).toHaveBeenCalledWith('dom-api', {
+          port: 3000,
+          scheme: 'http',
+          proxyMode: 'dns_only',
+        }),
+      );
+    });
+
     it('offers DNS-01 as the fix when a proxied hostname is still set to HTTP-01', async () => {
       getDomain.mockResolvedValue(domain());
       renderDetail();
