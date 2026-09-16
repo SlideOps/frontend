@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Domain, Node, ServerDomain } from '@slideops/api-client';
 import { ApiError } from '@slideops/api-client';
@@ -62,11 +63,13 @@ function boundDomain(over: Partial<Domain> = {}): Domain {
 
 function show(over: { canAdminister?: boolean; domains?: Domain[] } = {}) {
   return renderInApp(
-    <ServerDomains
-      node={node}
-      domains={over.domains ?? []}
-      canAdminister={over.canAdminister ?? true}
-    />,
+    <MemoryRouter>
+      <ServerDomains
+        node={node}
+        domains={over.domains ?? []}
+        canAdminister={over.canAdminister ?? true}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -94,6 +97,20 @@ describe('ServerDomains', () => {
     show({ domains: [boundDomain(), boundDomain({ id: 'dom-2', hostname: 'api.mycompany.com' })] });
 
     expect(await screen.findByText('2 hostnames claim this namespace.')).toBeInTheDocument();
+  });
+
+  it('names each hostname claimed under a namespace, not just how many', async () => {
+    listServerDomains.mockResolvedValue([serverDomain()]);
+    show({ domains: [boundDomain(), boundDomain({ id: 'dom-2', hostname: 'api.mycompany.com' })] });
+
+    expect(await screen.findByRole('link', { name: 'frc.mycompany.com' })).toHaveAttribute(
+      'href',
+      '/app/domains/dom-1',
+    );
+    expect(screen.getByRole('link', { name: 'api.mycompany.com' })).toHaveAttribute(
+      'href',
+      '/app/domains/dom-2',
+    );
   });
 
   it('says no hostname has claimed it yet, when none have', async () => {

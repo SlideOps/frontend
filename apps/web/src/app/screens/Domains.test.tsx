@@ -50,6 +50,7 @@ function domain(over: Partial<Domain> = {}): Domain {
     dns_mode: 'manual',
     record: { type: 'A', name: 'api', value: '203.0.113.10', ttl: 'Auto' },
     created_at: '2026-09-07T10:00:00Z',
+    cert_method: 'http01',
     ...over,
   } as Domain;
 }
@@ -95,6 +96,13 @@ function show(entry = '/app/domains') {
   );
 }
 
+/** Every test below that exercises a specific tab's content opens it this way,
+ *  matching how an Operator actually gets there rather than asserting on
+ *  internal tab state. */
+async function openTab(label: string) {
+  await userEvent.click(await screen.findByRole('tab', { name: label }));
+}
+
 beforeEach(() => {
   for (const fn of [
     listWorkspaceDomains,
@@ -128,11 +136,129 @@ beforeEach(() => {
   });
 });
 
-describe('Domains and DNS', () => {
+describe('Domains and DNS: the tabbed shell', () => {
+  it('opens on Overview by default', async () => {
+    show();
+    expect(await screen.findByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument();
+    expect(screen.getByText('Needs attention')).toBeInTheDocument();
+  });
+
+  it('switches what is shown when a different tab is chosen, without a full reload', async () => {
+    show();
+    await screen.findByRole('tab', { name: 'Overview', selected: true });
+
+    await openTab('Domains');
+    expect(await screen.findByText('api.example.com')).toBeInTheDocument();
+    expect(listWorkspaceDomains).toHaveBeenCalledTimes(1);
+
+    await openTab('Servers');
+    expect(await screen.findByRole('heading', { name: 'Server Domains' })).toBeInTheDocument();
+    expect(listWorkspaceDomains).toHaveBeenCalledTimes(1);
+  });
+
+  // A link from a Service or a Node page always promised the filtered list
+  // that used to be the whole page; that promise holds even though the page
+  // now opens on a summary by default.
+  it('opens straight on the Domains tab when a Service or Node deep link named one', async () => {
+    show('/app/domains?service=svc-web');
+    expect(await screen.findByRole('tab', { name: 'Domains', selected: true })).toBeInTheDocument();
+    expect(await screen.findByText('web.example.com')).toBeInTheDocument();
+    expect(screen.queryByText('api.example.com')).not.toBeInTheDocument();
+  });
+
+  it('opens directly on a tab named in the URL, for a link or a reload', async () => {
+    show('/app/domains?tab=certificates');
+    expect(
+      await screen.findByRole('tab', { name: 'Certificates', selected: true }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Overview', () => {
+  it('counts every domain and says how many are serving', async () => {
+    show();
+    expect(await screen.findByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1 of 2 serving')).toBeInTheDocument();
+  });
+
+  it('lists a domain that is not serving as something that needs attention', async () => {
+    show();
+    expect(await screen.findByRole('link', { name: 'api.example.com' })).toHaveAttribute(
+      'href',
+      '/app/domains/dom-api',
+    );
+  });
+
+  it('says everything is serving when nothing needs attention', async () => {
+    listWorkspaceDomains.mockResolvedValue([webDomain]);
+    show();
+    expect(await screen.findByText('Every domain in this Workspace is serving.')).toBeInTheDocument();
+  });
+
+  it('opens the Domains tab from its own summary card', async () => {
+    show();
+    await userEvent.click(await screen.findByText('Domains'));
+    expect(await screen.findByRole('tab', { name: 'Domains', selected: true })).toBeInTheDocument();
+  });
+});
+
+describe('Services', () => {
+  it('shows which hostnames belong to which Service', async () => {
+    show();
+    await openTab('Services');
+
+    const apiCard = (await screen.findByRole('link', { name: 'api' })).closest(
+      'div.flex.flex-col',
+    );
+    expect(within(apiCard as HTMLElement).getByText('api.example.com')).toBeInTheDocument();
+  });
+
+  it('says a Service has no hostname yet, rather than showing nothing', async () => {
+    listWorkspaceDomains.mockResolvedValue([]);
+    show();
+    await openTab('Services');
+
+    expect(await screen.findAllByText(/No hostname yet/i)).toHaveLength(2);
+  });
+});
+
+describe('Servers', () => {
+  it('lists a Server Domain under the server it namespaces, once added', async () => {
+    listServerDomains.mockResolvedValue([
+      { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com', created_at: '2026-09-07T10:00:00Z' },
+    ]);
+    show();
+    await openTab('Servers');
+
+    const section = (
+      await screen.findByRole('heading', { name: 'Server Domains' })
+    ).closest('section') as HTMLElement;
+    expect(within(section).getByText('mycompany.com')).toBeInTheDocument();
+    expect(within(section).getByText(nodes[0]?.name as string)).toBeInTheDocument();
+  });
+
+  it('says a server has no Server Domain yet, without implying anything is broken', async () => {
+    show();
+    await openTab('Servers');
+
+    const section = (
+      await screen.findByRole('heading', { name: 'Server Domains' })
+    ).closest('section') as HTMLElement;
+    expect(within(section).getByText('No Server Domains yet')).toBeInTheDocument();
+  });
+
+  it('says adding one assigns nothing to a Service automatically', async () => {
+    show();
+    await openTab('Servers');
+    expect(await screen.findByText(/assigns it to nothing automatically/i)).toBeInTheDocument();
+  });
+});
+
+describe('Domains', () => {
   // Several Services routinely share one server, and no other screen answers
   // which hostname belongs to which of them.
   it('shows two Services on one server, each with its own hostname and its own Service named', async () => {
-    show();
+    show('/app/domains?tab=domains');
 
     expect(await screen.findByText('api.example.com')).toBeInTheDocument();
     expect(screen.getByText('web.example.com')).toBeInTheDocument();
@@ -147,7 +273,7 @@ describe('Domains and DNS', () => {
   });
 
   it('gathers both of that server’s hostnames under the one server it is grouped by', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     expect(screen.getByRole('heading', { name: 'shared-box' })).toBeInTheDocument();
@@ -155,7 +281,7 @@ describe('Domains and DNS', () => {
   });
 
   it('separates the same two hostnames by Service when grouped by Service', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     await userEvent.selectOptions(screen.getByLabelText('Group by'), 'service');
@@ -164,7 +290,7 @@ describe('Domains and DNS', () => {
   });
 
   it('narrows the list to the hostnames matching what was searched for', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     await userEvent.type(screen.getByLabelText('Search domains'), 'web');
@@ -173,7 +299,7 @@ describe('Domains and DNS', () => {
   });
 
   it('narrows the list to one status when a status is chosen', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     await userEvent.selectOptions(screen.getByLabelText('Filter by status'), 'active');
@@ -190,7 +316,7 @@ describe('Domains and DNS', () => {
   });
 
   it('reads DNS as the expected target beside the one that answered', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('web.example.com');
 
     expect(screen.getByText('Expected 203.0.113.10, found 203.0.113.10.')).toBeInTheDocument();
@@ -200,46 +326,9 @@ describe('Domains and DNS', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a missing route as what was expected against what was found', async () => {
-    inspectNodeRoutes.mockResolvedValue(
-      drift({
-        missing: ['api.example.com'],
-        healthy: false,
-        summary: '1 domain is missing a route on this server.',
-      }),
-    );
-    show();
-
-    expect(await screen.findByText('a route for api.example.com')).toBeInTheDocument();
-    expect(screen.getByText('no route on shared-box')).toBeInTheDocument();
-  });
-
-  it('never puts a missing route back until the Operator presses it', async () => {
-    inspectNodeRoutes.mockResolvedValue(
-      drift({ missing: ['api.example.com'], healthy: false, summary: 'x' }),
-    );
-    repairNodeRoutes.mockResolvedValue(drift());
-    show();
-
-    const repair = await screen.findByRole('button', { name: 'Put back the missing routes' });
-    expect(repairNodeRoutes).not.toHaveBeenCalled();
-    await userEvent.click(repair);
-    await waitFor(() => expect(repairNodeRoutes).toHaveBeenCalledWith('node-1'));
-  });
-
-  it('says a server SlideOps did not set up is left alone and is left out of the summary', async () => {
-    inspectNodeRoutes.mockResolvedValue(
-      drift({ unmanaged: ['blog.operators-own.com'], summary: 'x' }),
-    );
-    show();
-
-    expect(await screen.findByText('blog.operators-own.com')).toBeInTheDocument();
-    expect(screen.getByText(/left out of the summary above on purpose/i)).toBeInTheDocument();
-  });
-
   it('says what checking DNS will do, and does not check until it is pressed', async () => {
     verifyDomain.mockResolvedValue(apiDomain);
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     expect(screen.getByText(/Nothing on any server changes/i)).toBeInTheDocument();
@@ -255,7 +344,7 @@ describe('Domains and DNS', () => {
     provisionDomain.mockRejectedValue(
       new ApiError(409, 'dns_not_ready', 'DNS for api.example.com does not resolve here yet.'),
     );
-    show();
+    show('/app/domains?tab=domains');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Put it live' }));
     expect(
@@ -285,14 +374,14 @@ describe('Domains and DNS', () => {
         last_error: 'The certificate authority refused the challenge.',
       }),
     ]);
-    show();
+    show('/app/domains?tab=domains');
 
     expect(await screen.findByText(/no separate certificate retry/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run provisioning again' })).toBeInTheDocument();
   });
 
   it('warns before removing that the DNS record is not touched', async () => {
-    show();
+    show('/app/domains?tab=domains');
     await screen.findByText('api.example.com');
 
     const [firstRemove] = screen.getAllByRole('button', { name: 'Remove' });
@@ -301,34 +390,151 @@ describe('Domains and DNS', () => {
     expect(removeDomain).not.toHaveBeenCalled();
   });
 
-  describe('Server Domains', () => {
-    it('lists a Server Domain under the server it namespaces, once added', async () => {
-      listServerDomains.mockResolvedValue([
-        { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com', created_at: '2026-09-07T10:00:00Z' },
-      ]);
-      show();
+  it('opens the Add a domain flow from the page header on any tab', async () => {
+    show();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a domain' }));
 
-      const section = (
-        await screen.findByRole('heading', { name: 'Server Domains' })
-      ).closest('section') as HTMLElement;
-      expect(within(section).getByText('mycompany.com')).toBeInTheDocument();
-      expect(within(section).getByText(nodes[0]?.name as string)).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('tab', { name: 'Domains', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Add a domain' })).toBeInTheDocument();
+  });
+});
 
-    it('says a server has no Server Domain yet, without implying anything is broken', async () => {
-      show();
+describe('Cloudflare', () => {
+  it('shows Cloudflare credential management, and only that', async () => {
+    show();
+    await openTab('Cloudflare');
 
-      const section = (
-        await screen.findByRole('heading', { name: 'Server Domains' })
-      ).closest('section') as HTMLElement;
-      expect(within(section).getByText('No Server Domains yet')).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText(/only ever changes or removes records it created itself/i),
+    ).toBeInTheDocument();
+  });
+});
 
-    it('says adding one assigns nothing to a Service automatically', async () => {
-      show();
-      expect(
-        await screen.findByText(/assigns it to nothing automatically/i),
-      ).toBeInTheDocument();
-    });
+describe('DNS', () => {
+  it('shows every hostname’s DNS state and its record together', async () => {
+    show();
+    await openTab('DNS');
+
+    expect(await screen.findByText('api.example.com')).toBeInTheDocument();
+    expect(screen.getByText('web.example.com')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Check DNS now' })).toHaveLength(2);
+  });
+
+  it('checks one hostname without touching the others, and re-reads on success', async () => {
+    verifyDomain.mockResolvedValue(apiDomain);
+    show();
+    await openTab('DNS');
+
+    const [firstCheck] = await screen.findAllByRole('button', { name: 'Check DNS now' });
+    await userEvent.click(firstCheck as HTMLElement);
+    await waitFor(() => expect(verifyDomain).toHaveBeenCalledWith('dom-api'));
+    expect(verifyDomain).toHaveBeenCalledTimes(1);
+    // Re-reading the whole list is how the fresh reading gets on screen.
+    await waitFor(() => expect(listWorkspaceDomains).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the backend refusal in its own words when a check fails', async () => {
+    verifyDomain.mockRejectedValue(new ApiError(502, 'dns_lookup_failed', 'The resolver did not answer.'));
+    show();
+    await openTab('DNS');
+
+    const [firstCheck] = await screen.findAllByRole('button', { name: 'Check DNS now' });
+    await userEvent.click(firstCheck as HTMLElement);
+    expect(await screen.findByText('The resolver did not answer.')).toBeInTheDocument();
+  });
+});
+
+describe('Certificates', () => {
+  it('shows every hostname’s certificate state and method together', async () => {
+    show();
+    await openTab('Certificates');
+
+    expect(await screen.findByText('api.example.com')).toBeInTheDocument();
+    expect(screen.getAllByText('HTTP-01').length).toBeGreaterThan(0);
+  });
+
+  it('flags a proxied hostname still left on HTTP-01', async () => {
+    listWorkspaceDomains.mockResolvedValue([
+      domain({ proxy_mode: 'proxied', cert_method: 'http01' }),
+    ]);
+    show();
+    await openTab('Certificates');
+
+    expect(
+      await screen.findByText(/1 hostname is proxied but still set to HTTP-01/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Routing', () => {
+  it('shows the entry-point configuration, not the Cloudflare credential', async () => {
+    show();
+    await openTab('Routing');
+
+    expect(
+      await screen.findByText(/All public traffic for this Workspace passes through it/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/only ever changes or removes records it created itself/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('Diagnostics', () => {
+  it('shows a missing route as what was expected against what was found', async () => {
+    inspectNodeRoutes.mockResolvedValue(
+      drift({
+        missing: ['api.example.com'],
+        healthy: false,
+        summary: '1 domain is missing a route on this server.',
+      }),
+    );
+    show();
+    await openTab('Diagnostics');
+
+    expect(await screen.findByText('a route for api.example.com')).toBeInTheDocument();
+    expect(screen.getByText('no route on shared-box')).toBeInTheDocument();
+  });
+
+  it('never puts a missing route back until the Operator presses it', async () => {
+    inspectNodeRoutes.mockResolvedValue(
+      drift({ missing: ['api.example.com'], healthy: false, summary: 'x' }),
+    );
+    repairNodeRoutes.mockResolvedValue(drift());
+    show();
+    await openTab('Diagnostics');
+
+    const repair = await screen.findByRole('button', { name: 'Put back the missing routes' });
+    expect(repairNodeRoutes).not.toHaveBeenCalled();
+    await userEvent.click(repair);
+    await waitFor(() => expect(repairNodeRoutes).toHaveBeenCalledWith('node-1'));
+  });
+
+  it('says a server SlideOps did not set up is left alone and is left out of the summary', async () => {
+    inspectNodeRoutes.mockResolvedValue(
+      drift({ unmanaged: ['blog.operators-own.com'], summary: 'x' }),
+    );
+    show();
+    await openTab('Diagnostics');
+
+    expect(await screen.findByText('blog.operators-own.com')).toBeInTheDocument();
+    expect(screen.getByText(/left out of the summary above on purpose/i)).toBeInTheDocument();
+  });
+
+  it('lists every hostname’s four states, problems first', async () => {
+    show();
+    await openTab('Diagnostics');
+
+    const rows = await screen.findAllByRole('link', { name: /example\.com/ });
+    expect(rows[0]).toHaveTextContent('api.example.com');
+  });
+
+  it('offers the same remediation the Domains tab offers, from here as well', async () => {
+    verifyDomain.mockResolvedValue(apiDomain);
+    show();
+    await openTab('Diagnostics');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Check DNS now' }));
+    await waitFor(() => expect(verifyDomain).toHaveBeenCalledWith('dom-api'));
   });
 });

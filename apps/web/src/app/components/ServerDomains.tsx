@@ -9,6 +9,7 @@ import {
 } from '@slideops/api-client';
 import { Button, Text } from '@slideops/design-system';
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ErrorNote, Loading } from './Feedback';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -46,8 +47,10 @@ export function ServerDomains({
 
   const list = serverDomains.state.status === 'ready' ? serverDomains.state.data : [];
 
-  const usageCount = (serverDomainId: string) =>
-    domains.filter((candidate) => candidate.server_domain_id === serverDomainId).length;
+  // The relationship a namespace exists to make legible: which hostnames were
+  // actually claimed under it, not just how many.
+  const hostnamesUnder = (serverDomainId: string) =>
+    domains.filter((candidate) => candidate.server_domain_id === serverDomainId);
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -98,31 +101,52 @@ export function ServerDomains({
       {list.length > 0 ? (
         <div className="flex flex-col gap-2">
           {list.map((serverDomain) => {
-            const count = usageCount(serverDomain.id);
+            const hostnames = hostnamesUnder(serverDomain.id);
             return (
               <div
                 key={serverDomain.id}
-                className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2"
+                className="flex flex-col gap-2 rounded-md border border-border px-3 py-2"
               >
-                <div className="min-w-0 flex-1">
-                  <Text variant="body-sm" className="font-mono">
-                    {serverDomain.domain}
-                  </Text>
-                  <Text variant="caption" tone="secondary">
-                    {count === 0
-                      ? 'No hostname claimed under it yet.'
-                      : `${count} ${count === 1 ? 'hostname claims' : 'hostnames claim'} this namespace.`}
-                  </Text>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Text variant="body-sm" className="font-mono">
+                      {serverDomain.domain}
+                    </Text>
+                    <Text variant="caption" tone="secondary">
+                      {hostnames.length === 0
+                        ? 'No hostname claimed under it yet.'
+                        : `${hostnames.length} ${hostnames.length === 1 ? 'hostname claims' : 'hostnames claim'} this namespace.`}
+                    </Text>
+                  </div>
+                  {canAdminister ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => setRemoving(serverDomain)}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
                 </div>
-                {canAdminister ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setRemoving(serverDomain)}
-                  >
-                    Remove
-                  </Button>
+                {/* The relationship itself, not just its size: which hostname
+                    is which Service's, right under the namespace it came from. */}
+                {hostnames.length > 0 ? (
+                  <ul className="flex flex-col gap-1 border-t border-border pt-2">
+                    {hostnames.map((hostname) => (
+                      <li key={hostname.id} className="flex items-center gap-2">
+                        <Link
+                          to={`/app/domains/${hostname.id}`}
+                          className="min-w-0 flex-1 truncate font-mono text-sm text-brand hover:underline"
+                        >
+                          {hostname.hostname}
+                        </Link>
+                        <Text variant="caption" tone="secondary">
+                          {hostname.serving ? 'Serving' : hostname.state_detail}
+                        </Text>
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </div>
             );

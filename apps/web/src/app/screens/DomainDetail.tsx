@@ -177,7 +177,7 @@ export function DomainDetail() {
         domain={domain}
         canWrite={canWrite}
         onChanged={result.reload}
-        onRemoved={() => navigate('/app/domains')}
+        onRemoved={() => navigate('/app/domains?tab=domains')}
       />
     </OperatorShell>
   );
@@ -186,7 +186,7 @@ export function DomainDetail() {
 function BackLink() {
   return (
     <Link
-      to="/app/domains"
+      to="/app/domains?tab=domains"
       className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-muted hover:text-ink"
     >
       <ArrowLeft width={14} height={14} aria-hidden />
