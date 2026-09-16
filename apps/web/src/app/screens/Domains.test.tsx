@@ -207,9 +207,7 @@ describe('Services', () => {
     show();
     await openTab('Services');
 
-    const apiCard = (await screen.findByRole('link', { name: 'api' })).closest(
-      'div.flex.flex-col',
-    );
+    const apiCard = (await screen.findByRole('link', { name: 'api' })).closest('.rounded-md');
     expect(within(apiCard as HTMLElement).getByText('api.example.com')).toBeInTheDocument();
   });
 
@@ -219,6 +217,22 @@ describe('Services', () => {
     await openTab('Services');
 
     expect(await screen.findAllByText(/No hostname yet/i)).toHaveLength(2);
+  });
+
+  // A Capability Service is infrastructure a Project depends on -- a
+  // database, a cache -- and is never what a hostname points at. Listing it
+  // here would be a row that can only ever say "no hostname yet" and never
+  // explain why, so it never appears.
+  it('never lists a Capability Service, only what was deployed as software', async () => {
+    listServices.mockResolvedValue([
+      ...services,
+      { id: 'svc-db', name: 'primary-db', node_id: 'node-1', deployment_type: 'capability' } as Service,
+    ]);
+    show();
+    await openTab('Services');
+
+    await screen.findByRole('link', { name: 'api' });
+    expect(screen.queryByRole('link', { name: 'primary-db' })).not.toBeInTheDocument();
   });
 });
 

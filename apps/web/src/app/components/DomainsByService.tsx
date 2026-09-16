@@ -15,6 +15,12 @@ import { StatusPill } from './DomainStatus';
  * this Service answer on" has an answer that does not require scanning a
  * flat list for a name. Managing a hostname -- adding, correcting, removing
  * it -- stays on the Domains tab and the hostname's own page.
+ *
+ * Only a software Service is shown: something an Operator deployed and runs,
+ * which is what a hostname actually points at. A Capability Service is
+ * infrastructure a Project depends on -- a database, a cache -- and is never
+ * the target of a domain, so listing it here would be a row that can only
+ * ever read "no hostname yet" and never explain why.
  */
 
 export function DomainsByService({
@@ -26,29 +32,33 @@ export function DomainsByService({
   domains: Domain[];
   nodeName: (nodeId: string | undefined) => string;
 }) {
+  // Every Service ever deployed before deployment_type existed is software,
+  // so a row with the field simply absent is kept rather than hidden.
+  const deployed = services.filter((service) => service.deployment_type !== 'capability');
+
   return (
     <Section
       title="Services"
       adornment={<Layers width={16} height={16} className="text-brand" aria-hidden />}
-      description="Every Service in this Workspace, and the hostnames it answers on. A Service can have as many as it needs, or none yet."
+      description="Every deployed Service in this Workspace, and the hostnames it answers on. A Service can have as many as it needs, or none yet."
     >
-      {services.length === 0 ? (
+      {deployed.length === 0 ? (
         <Text variant="body-sm" tone="secondary">
-          No Services in this Workspace yet.
+          No deployed Services in this Workspace yet.
         </Text>
       ) : (
-        <div className="flex flex-col gap-3">
-          {services.map((service) => {
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {deployed.map((service) => {
             const hostnames = domains.filter((domain) => domain.service_id === service.id);
             return (
               <div
                 key={service.id}
                 className="flex flex-col gap-2 rounded-md border border-border px-4 py-3"
               >
-                <div className="flex flex-wrap items-baseline gap-2">
+                <div className="flex flex-col gap-0.5">
                   <Link
                     to={`/app/services/${service.id}`}
-                    className="text-sm font-medium text-ink hover:underline"
+                    className="truncate text-sm font-medium text-ink hover:underline"
                   >
                     {service.name}
                   </Link>
@@ -63,13 +73,10 @@ export function DomainsByService({
                 ) : (
                   <ul className="flex flex-col gap-1.5">
                     {hostnames.map((domain) => (
-                      <li
-                        key={domain.id}
-                        className="flex flex-wrap items-center justify-between gap-2"
-                      >
+                      <li key={domain.id} className="flex items-center gap-2">
                         <Link
                           to={`/app/domains/${domain.id}`}
-                          className="min-w-0 truncate font-mono text-sm text-brand hover:underline"
+                          className="min-w-0 flex-1 truncate font-mono text-sm text-brand hover:underline"
                         >
                           {domain.hostname}
                         </Link>
