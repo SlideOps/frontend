@@ -69,6 +69,35 @@ export interface Domain {
   dns_checked_at?: string;
   record: DomainRecord;
   created_at: string;
+
+  /** Which Server Domain this hostname was tagged as belonging to, absent
+   *  for a hostname entered free-form -- which is how every hostname
+   *  worked before Server Domains existed, and still an entirely ordinary
+   *  way to add one. */
+  server_domain_id?: string;
+  /** Whether the DNS provider is proxying this hostname, absent when not
+   *  known: SlideOps has never asked, which is not the same as knowing it
+   *  is plain DNS. Never sent as a third "not applicable" value -- read
+   *  that from `dns_mode` instead (manual DNS, or no provider connected,
+   *  is where proxying simply does not apply). */
+  proxy_mode?: 'dns_only' | 'proxied';
+  /** How this hostname gets its certificate. `http01` is the ordinary case
+   *  and the only thing every hostname has ever done. `dns01` is for a
+   *  domain proxied through Cloudflare, where the ordinary challenge can
+   *  never reach the server. */
+  cert_method: 'http01' | 'dns01';
+}
+
+/** A domain namespace: a domain made available for a Server's Services to
+ *  claim subdomains under. Adding one creates no hostname, writes no route,
+ *  and requests no certificate by itself -- a Service's own "Add hostname"
+ *  flow does that, exactly as it always has, optionally under this
+ *  namespace. */
+export interface ServerDomain {
+  id: string;
+  node_id: string;
+  domain: string;
+  created_at: string;
 }
 
 /** Every hostname a Service answers on. */
@@ -146,14 +175,33 @@ export function getDomain(id: string): Promise<Domain> {
  * domain live again, and until then the domain comes back with `needs_reapply`
  * set, so what the server is routing and what the record now asks for are both
  * visible rather than one quietly standing in for the other.
+ *
+ * cert_method, proxy_mode and server_domain_id are optional and independent
+ * of the port/scheme correction: send only the ones you mean to change.
+ * cert_method requests nothing from a certificate authority here -- that
+ * happens the next time this domain is put live. server_domain_id is
+ * refused if the hostname is not actually under that namespace's domain.
  */
 export function updateDomain(
   id: string,
-  target: { port: number; scheme?: 'http' | 'https' },
+  target: {
+    port: number;
+    scheme?: 'http' | 'https';
+    certMethod?: 'http01' | 'dns01';
+    /** '' clears it back to not known. */
+    proxyMode?: 'dns_only' | 'proxied' | '';
+    serverDomainId?: string;
+  },
 ): Promise<Domain> {
   return apiRequest<{ domain: Domain }>(`/domains/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: target,
+    body: {
+      port: target.port,
+      scheme: target.scheme,
+      cert_method: target.certMethod,
+      proxy_mode: target.proxyMode,
+      server_domain_id: target.serverDomainId,
+    },
   }).then((r) => r.domain);
 }
 
@@ -193,4 +241,38 @@ export function repairNodeRoutes(nodeId: string): Promise<RouteDrift> {
   return apiRequest<RouteDrift>(`/nodes/${encodeURIComponent(nodeId)}/routes/repair`, {
     method: 'POST',
   });
+}
+
+/** The domains available as a namespace on one Server. */
+export function listServerDomains(nodeId: string): Promise<ServerDomain[]> {
+  return apiRequest<{ server_domains: ServerDomain[] }>(
+    `/nodes/${encodeURIComponent(nodeId)}/server-domains`,
+  ).then((r) => r.server_domains ?? []);
+}
+
+/**
+ * Make a domain available as a namespace for a Server's Services to claim
+ * subdomains under.
+ *
+ * This creates no hostname, writes no route, and requests no certificate by
+ * itself. **Owner or Admin only.**
+ */
+export function addServerDomain(nodeId: string, domain: string): Promise<ServerDomain> {
+  return apiRequest<{ server_domain: ServerDomain }>(
+    `/nodes/${encodeURIComponent(nodeId)}/server-domains`,
+    { method: 'POST', body: { domain } },
+  ).then((r) => r.server_domain);
+}
+
+/**
+ * Take a domain away as a namespace.
+ *
+ * Every hostname tagged under it keeps its route, its DNS record, and its
+ * certificate exactly as they were -- this only removes the namespace
+ * itself. **Owner or Admin only.**
+ */
+export function removeServerDomain(id: string): Promise<void> {
+  return apiRequest<void>(`/server-domains/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }).then(() => undefined);
 }

@@ -568,19 +568,23 @@ export {
 
 export {
   addServiceDomain,
+  addServerDomain,
   inspectNodeRoutes,
   listServiceDomains,
+  listServerDomains,
   listWorkspaceDomains,
   getDomain,
   updateDomain,
   provisionDomain,
   removeDomain,
+  removeServerDomain,
   repairNodeRoutes,
   verifyDomain,
   type Domain,
   type DomainRecord,
   type DomainState,
   type RouteDrift,
+  type ServerDomain,
 } from './domains';
 
 export {

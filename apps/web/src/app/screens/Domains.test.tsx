@@ -16,6 +16,7 @@ const inspectNodeRoutes = vi.fn();
 const repairNodeRoutes = vi.fn();
 const listDNSConnections = vi.fn();
 const getWorkspaceIngress = vi.fn();
+const listServerDomains = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -29,6 +30,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   repairNodeRoutes: (...a: unknown[]) => repairNodeRoutes(...a),
   listDNSConnections: (...a: unknown[]) => listDNSConnections(...a),
   getWorkspaceIngress: (...a: unknown[]) => getWorkspaceIngress(...a),
+  listServerDomains: (...a: unknown[]) => listServerDomains(...a),
 }));
 
 const { Domains } = await import('./Domains');
@@ -105,6 +107,7 @@ beforeEach(() => {
     repairNodeRoutes,
     listDNSConnections,
     getWorkspaceIngress,
+    listServerDomains,
   ]) {
     fn.mockReset();
   }
@@ -113,6 +116,7 @@ beforeEach(() => {
   listNodes.mockResolvedValue(nodes);
   inspectNodeRoutes.mockResolvedValue(drift());
   listDNSConnections.mockResolvedValue([]);
+  listServerDomains.mockResolvedValue([]);
   getWorkspaceIngress.mockResolvedValue({
     node_id: 'node-1',
     public_address: '203.0.113.10',
@@ -295,5 +299,36 @@ describe('Domains and DNS', () => {
     await userEvent.click(firstRemove as HTMLElement);
     expect(await screen.findByText(/no DNS record is touched/i)).toBeInTheDocument();
     expect(removeDomain).not.toHaveBeenCalled();
+  });
+
+  describe('Server Domains', () => {
+    it('lists a Server Domain under the server it namespaces, once added', async () => {
+      listServerDomains.mockResolvedValue([
+        { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com', created_at: '2026-09-07T10:00:00Z' },
+      ]);
+      show();
+
+      const section = (
+        await screen.findByRole('heading', { name: 'Server Domains' })
+      ).closest('section') as HTMLElement;
+      expect(within(section).getByText('mycompany.com')).toBeInTheDocument();
+      expect(within(section).getByText(nodes[0]?.name as string)).toBeInTheDocument();
+    });
+
+    it('says a server has no Server Domain yet, without implying anything is broken', async () => {
+      show();
+
+      const section = (
+        await screen.findByRole('heading', { name: 'Server Domains' })
+      ).closest('section') as HTMLElement;
+      expect(within(section).getByText('No Server Domains yet')).toBeInTheDocument();
+    });
+
+    it('says adding one assigns nothing to a Service automatically', async () => {
+      show();
+      expect(
+        await screen.findByText(/assigns it to nothing automatically/i),
+      ).toBeInTheDocument();
+    });
   });
 });

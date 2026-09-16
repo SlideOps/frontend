@@ -12,7 +12,7 @@ import {
   type Service,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
-import { AlertTriangle, Globe, Network, Plus, RefreshCw } from '@slideops/icons';
+import { AlertTriangle, Globe, Layers, Network, Plus, RefreshCw } from '@slideops/icons';
 import { EmptyState, PageHeader, SearchBar, Toolbar } from '@slideops/ui';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -41,6 +41,7 @@ import { DomainRouting } from '../components/DomainRouting';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { RoutingDrift } from '../components/RoutingDrift';
+import { ServerDomains } from '../components/ServerDomains';
 import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
@@ -322,6 +323,29 @@ export function Domains() {
                       />
                     ))}
                   </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title="Server Domains"
+            adornment={<Layers width={16} height={16} className="text-brand" aria-hidden />}
+            description="A domain made available as a namespace for a server's Services to claim subdomains under, such as frc.mycompany.com. Adding one assigns it to nothing automatically: a Service still claims its own hostname from Add a domain, above, optionally under one of these."
+          >
+            {ready.nodes.length === 0 ? (
+              <Text variant="body-sm" tone="secondary">
+                No servers in this Workspace yet.
+              </Text>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {ready.nodes.map((node) => (
+                  <ServerDomains
+                    key={node.id}
+                    node={node}
+                    domains={all}
+                    canAdminister={canAdminister}
+                  />
                 ))}
               </div>
             )}

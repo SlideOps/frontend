@@ -1,12 +1,15 @@
 import {
   ApiError,
   addServiceDomain,
+  listServerDomains,
   listServiceDomains,
   provisionDomain,
+  updateDomain,
   verifyDomain,
   type Domain,
   type Node,
   type Service,
+  type ServerDomain,
 } from '@slideops/api-client';
 import { Button, Section, Text } from '@slideops/design-system';
 import { AlertTriangle, Check, Globe } from '@slideops/icons';
@@ -19,6 +22,7 @@ import {
   servingReading,
 } from '../domain-status';
 import { DomainRecordFields, ExpectedFound, StatusPill } from './DomainStatus';
+import { useAsyncData } from '../hooks/useAsyncData';
 
 /*
  * Adding a domain, one honest step at a time.
@@ -60,12 +64,29 @@ export function AddDomainStepper({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [useNamespace, setUseNamespace] = useState(false);
+  const [serverDomainId, setServerDomainId] = useState('');
+  const [subdomain, setSubdomain] = useState('');
 
   const service = services.find((candidate) => candidate.id === serviceId) ?? null;
   const node = service
     ? (nodes.find((candidate) => candidate.id === service.node_id) ?? null)
     : null;
   const serverName = node?.name ?? 'the server this Service runs on';
+
+  // A Server Domain is scoped to the server the chosen Service runs on, so this
+  // only ever asks once a Service -- and therefore a server -- is known.
+  const serverDomains = useAsyncData<ServerDomain[]>(
+    () => (node ? listServerDomains(node.id) : Promise.resolve([])),
+    [node?.id],
+  );
+  const serverDomainList = serverDomains.state.status === 'ready' ? serverDomains.state.data : [];
+  const chosenServerDomain = serverDomainList.find((candidate) => candidate.id === serverDomainId);
+  const builtHostname = chosenServerDomain
+    ? subdomain.trim()
+      ? `${subdomain.trim()}.${chosenServerDomain.domain}`
+      : chosenServerDomain.domain
+    : '';
 
   const run = async (action: () => Promise<Domain>): Promise<Domain | null> => {
     setBusy(true);
@@ -90,7 +111,17 @@ export function AddDomainStepper({
       setError('Enter the port your application listens on inside its container, such as 3000.');
       return;
     }
-    const result = await run(() => addServiceDomain(serviceId, hostname.trim(), parsed));
+    const finalHostname = useNamespace ? builtHostname : hostname.trim();
+    let result = await run(() => addServiceDomain(serviceId, finalHostname, parsed));
+    if (result && useNamespace && chosenServerDomain) {
+      // Tagging is a second, separate write: the hostname is already claimed by
+      // the time it happens, so a tagging failure never loses the claim, it
+      // just leaves the namespace untagged for the Operator to retry.
+      const claimedId = result.id;
+      result = await run(() =>
+        updateDomain(claimedId, { port: parsed, serverDomainId: chosenServerDomain.id }),
+      );
+    }
     if (result) {
       setStep(2);
     }
@@ -206,18 +237,81 @@ export function AddDomainStepper({
           }
         >
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="stepper-hostname" className="text-sm font-medium text-ink">
-                Hostname
-              </label>
-              <input
-                id="stepper-hostname"
-                className={`${inputClass} font-mono`}
-                placeholder="api.example.com"
-                value={hostname}
-                onChange={(event) => setHostname(event.target.value)}
-              />
-            </div>
+            {serverDomainList.length > 0 ? (
+              <div className="flex flex-col gap-2 rounded-md border border-dashed border-border px-3 py-2">
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={useNamespace}
+                    onChange={(event) => {
+                      setUseNamespace(event.target.checked);
+                      setServerDomainId('');
+                      setSubdomain('');
+                    }}
+                  />
+                  Build this from a Server Domain
+                </label>
+                <Text variant="caption" tone="secondary">
+                  {serverName} has {serverDomainList.length === 1 ? 'a Server Domain' : 'Server Domains'}{' '}
+                  available as a namespace. Claim a subdomain under one instead of typing a full
+                  hostname, such as frc.mycompany.com.
+                </Text>
+              </div>
+            ) : null}
+
+            {useNamespace ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="stepper-namespace" className="text-sm font-medium text-ink">
+                    Server Domain
+                  </label>
+                  <select
+                    id="stepper-namespace"
+                    className={inputClass}
+                    value={serverDomainId}
+                    onChange={(event) => setServerDomainId(event.target.value)}
+                  >
+                    <option value="">Choose a Server Domain</option>
+                    {serverDomainList.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.domain}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="stepper-subdomain" className="text-sm font-medium text-ink">
+                    Subdomain (optional)
+                  </label>
+                  <input
+                    id="stepper-subdomain"
+                    className={`${inputClass} font-mono`}
+                    placeholder="frc"
+                    value={subdomain}
+                    onChange={(event) => setSubdomain(event.target.value)}
+                  />
+                  <Text variant="caption" tone="secondary">
+                    {chosenServerDomain
+                      ? `This will be ${builtHostname}.`
+                      : 'Choose a Server Domain above to see the hostname this becomes. Leave this blank to claim the Server Domain itself.'}
+                  </Text>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label htmlFor="stepper-hostname" className="text-sm font-medium text-ink">
+                  Hostname
+                </label>
+                <input
+                  id="stepper-hostname"
+                  className={`${inputClass} font-mono`}
+                  placeholder="api.example.com"
+                  value={hostname}
+                  onChange={(event) => setHostname(event.target.value)}
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <label htmlFor="stepper-port" className="text-sm font-medium text-ink">
                 Port your application listens on
@@ -240,7 +334,12 @@ export function AddDomainStepper({
               requested yet.
             </WillHappen>
             <div>
-              <Button disabled={busy || hostname.trim() === ''} onClick={claim}>
+              <Button
+                disabled={
+                  busy || (useNamespace ? serverDomainId === '' : hostname.trim() === '')
+                }
+                onClick={claim}
+              >
                 {busy ? 'Claiming' : 'Claim the hostname'}
               </Button>
             </div>

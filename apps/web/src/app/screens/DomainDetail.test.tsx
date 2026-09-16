@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { type Domain, type Node, type Service } from '@slideops/api-client';
+import { type Domain, type Node, type Service, type ServerDomain } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 import { useWorkspaceStore } from '../../store/workspace';
 
@@ -20,6 +20,7 @@ const getDomain = vi.fn();
 const updateDomain = vi.fn();
 const listServices = vi.fn();
 const listNodes = vi.fn();
+const listServerDomains = vi.fn();
 const verifyDomain = vi.fn();
 const provisionDomain = vi.fn();
 const removeDomain = vi.fn();
@@ -30,6 +31,7 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   updateDomain: (...a: unknown[]) => updateDomain(...a),
   listServices: (...a: unknown[]) => listServices(...a),
   listNodes: (...a: unknown[]) => listNodes(...a),
+  listServerDomains: (...a: unknown[]) => listServerDomains(...a),
   verifyDomain: (...a: unknown[]) => verifyDomain(...a),
   provisionDomain: (...a: unknown[]) => provisionDomain(...a),
   removeDomain: (...a: unknown[]) => removeDomain(...a),
@@ -73,6 +75,7 @@ function domain(over: Partial<Domain> = {}): Domain {
     dns_checked_at: '2026-09-09T09:00:00Z',
     record: { type: 'A', name: 'api', value: '203.0.113.10', ttl: 'Auto' },
     created_at: '2026-09-07T10:00:00Z',
+    cert_method: 'http01',
     ...over,
   } as Domain;
 }
@@ -87,6 +90,7 @@ beforeEach(() => {
   });
   listServices.mockResolvedValue(services);
   listNodes.mockResolvedValue(nodes);
+  listServerDomains.mockResolvedValue([]);
 });
 
 describe('DomainDetail', () => {
@@ -112,7 +116,10 @@ describe('DomainDetail', () => {
     );
     renderDetail();
 
-    await userEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    const where = (
+      await screen.findByRole('heading', { name: /where it points/i })
+    ).closest('section') as HTMLElement;
+    await userEvent.click(within(where).getByRole('button', { name: /edit/i }));
     const port = screen.getByLabelText(/port your application listens on/i);
     await userEvent.clear(port);
     await userEvent.type(port, '8080');
@@ -129,7 +136,10 @@ describe('DomainDetail', () => {
     getDomain.mockResolvedValue(domain());
     renderDetail();
 
-    await userEvent.click(await screen.findByRole('button', { name: /edit/i }));
+    const where = (
+      await screen.findByRole('heading', { name: /where it points/i })
+    ).closest('section') as HTMLElement;
+    await userEvent.click(within(where).getByRole('button', { name: /edit/i }));
     const port = screen.getByLabelText(/port your application listens on/i);
     await userEvent.clear(port);
     await userEvent.type(port, '99999');
@@ -181,5 +191,85 @@ describe('DomainDetail', () => {
     await userEvent.click(await screen.findByRole('button', { name: /remove this domain/i }));
     expect(await screen.findByText(/use Edit instead/i)).toBeInTheDocument();
     expect(removeDomain).not.toHaveBeenCalled();
+  });
+
+  describe('certificate method, proxy mode, and namespace', () => {
+    it('shows the certificate method, and that a plain hostname is not tagged to a namespace', async () => {
+      getDomain.mockResolvedValue(domain());
+      renderDetail();
+
+      const section = (
+        await screen.findByRole('heading', { name: /certificate and namespace/i })
+      ).closest('section') as HTMLElement;
+      expect(within(section).getByText('HTTP-01 (default)')).toBeInTheDocument();
+      expect(within(section).getByText(/None.*free-form hostname/)).toBeInTheDocument();
+      expect(within(section).getByText('Not set')).toBeInTheDocument();
+    });
+
+    it('shows the Server Domain a hostname was tagged under, by name rather than id', async () => {
+      getDomain.mockResolvedValue(domain({ server_domain_id: 'sd-1' }));
+      listServerDomains.mockResolvedValue([
+        { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com' } as ServerDomain,
+      ]);
+      renderDetail();
+
+      expect(await screen.findByText('mycompany.com')).toBeInTheDocument();
+    });
+
+    it('changes the certificate method without touching the port or scheme', async () => {
+      getDomain.mockResolvedValue(domain());
+      updateDomain.mockResolvedValue(domain({ cert_method: 'dns01' }));
+      renderDetail();
+
+      const section = (
+        await screen.findByRole('heading', { name: /certificate and namespace/i })
+      ).closest('section') as HTMLElement;
+      await userEvent.click(within(section).getByRole('button', { name: /edit/i }));
+      await userEvent.selectOptions(screen.getByLabelText('Certificate method'), 'dns01');
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() =>
+        expect(updateDomain).toHaveBeenCalledWith('dom-api', {
+          port: 3000,
+          scheme: 'http',
+          certMethod: 'dns01',
+        }),
+      );
+    });
+
+    it('offers DNS-01 as the fix when a proxied hostname is still set to HTTP-01', async () => {
+      getDomain.mockResolvedValue(domain());
+      renderDetail();
+
+      const section = (
+        await screen.findByRole('heading', { name: /certificate and namespace/i })
+      ).closest('section') as HTMLElement;
+      await userEvent.click(within(section).getByRole('button', { name: /edit/i }));
+      await userEvent.selectOptions(screen.getByLabelText('Proxy mode'), 'proxied');
+
+      expect(
+        screen.getByText(/cannot complete an HTTP-01 challenge/i),
+      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Use DNS-01' }));
+      expect(screen.getByLabelText('Certificate method')).toHaveValue('dns01');
+    });
+
+    it('does not let a Server Domain already tagged be cleared from here', async () => {
+      getDomain.mockResolvedValue(domain({ server_domain_id: 'sd-1' }));
+      listServerDomains.mockResolvedValue([
+        { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com' } as ServerDomain,
+      ]);
+      renderDetail();
+
+      const section = (
+        await screen.findByRole('heading', { name: /certificate and namespace/i })
+      ).closest('section') as HTMLElement;
+      await userEvent.click(within(section).getByRole('button', { name: /edit/i }));
+
+      expect(screen.getByLabelText('Server Domain namespace')).toBeDisabled();
+      expect(
+        screen.getByText(/cannot be cleared from here/i),
+      ).toBeInTheDocument();
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Domain, Node, Service } from '@slideops/api-client';
+import type { Domain, Node, Service, ServerDomain } from '@slideops/api-client';
 import { ApiError } from '@slideops/api-client';
 import { renderInApp } from '../../test/render';
 
@@ -9,6 +9,8 @@ const addServiceDomain = vi.fn();
 const verifyDomain = vi.fn();
 const provisionDomain = vi.fn();
 const listServiceDomains = vi.fn();
+const listServerDomains = vi.fn();
+const updateDomain = vi.fn();
 
 vi.mock('@slideops/api-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -16,6 +18,8 @@ vi.mock('@slideops/api-client', async (importOriginal) => ({
   verifyDomain: (...a: unknown[]) => verifyDomain(...a),
   provisionDomain: (...a: unknown[]) => provisionDomain(...a),
   listServiceDomains: (...a: unknown[]) => listServiceDomains(...a),
+  listServerDomains: (...a: unknown[]) => listServerDomains(...a),
+  updateDomain: (...a: unknown[]) => updateDomain(...a),
 }));
 
 const { AddDomainStepper } = await import('./AddDomainStepper');
@@ -64,11 +68,19 @@ async function walkToTheDNSCheck() {
 }
 
 beforeEach(() => {
-  for (const fn of [addServiceDomain, verifyDomain, provisionDomain, listServiceDomains]) {
+  for (const fn of [
+    addServiceDomain,
+    verifyDomain,
+    provisionDomain,
+    listServiceDomains,
+    listServerDomains,
+    updateDomain,
+  ]) {
     fn.mockReset();
   }
   addServiceDomain.mockResolvedValue(domain());
   listServiceDomains.mockResolvedValue([domain()]);
+  listServerDomains.mockResolvedValue([]);
 });
 
 describe('AddDomainStepper', () => {
@@ -222,5 +234,77 @@ describe('AddDomainStepper', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Check again' }));
     await waitFor(() => expect(listServiceDomains).toHaveBeenCalledWith('svc-api'));
     expect(await screen.findByRole('link', { name: 'api.example.com' })).toBeInTheDocument();
+  });
+
+  describe('building a hostname from a Server Domain', () => {
+    const serverDomain = { id: 'sd-1', node_id: 'node-1', domain: 'mycompany.com' } as ServerDomain;
+
+    it('offers no namespace toggle when the server has no Server Domain', async () => {
+      listServerDomains.mockResolvedValue([]);
+      show();
+      await userEvent.selectOptions(screen.getByLabelText('Service'), 'svc-api');
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+      expect(
+        screen.queryByText(/Build this from a Server Domain/i),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Hostname')).toBeInTheDocument();
+    });
+
+    it('builds the hostname from the Server Domain and a subdomain', async () => {
+      listServerDomains.mockResolvedValue([serverDomain]);
+      addServiceDomain.mockResolvedValue(domain({ hostname: 'frc.mycompany.com' }));
+      show();
+      await userEvent.selectOptions(screen.getByLabelText('Service'), 'svc-api');
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+      await userEvent.click(await screen.findByLabelText(/Build this from a Server Domain/i));
+      await userEvent.selectOptions(screen.getByLabelText('Server Domain'), 'sd-1');
+      await userEvent.type(screen.getByLabelText(/Subdomain/i), 'frc');
+      expect(screen.getByText(/This will be frc\.mycompany\.com/)).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText(/Port your application listens on/), '3000');
+      await userEvent.click(screen.getByRole('button', { name: 'Claim the hostname' }));
+
+      await waitFor(() =>
+        expect(addServiceDomain).toHaveBeenCalledWith('svc-api', 'frc.mycompany.com', 3000),
+      );
+      // Tagging the namespace is a second, explicit write against the hostname
+      // already claimed, not folded silently into the claim itself.
+      await waitFor(() =>
+        expect(updateDomain).toHaveBeenCalledWith('dom-1', { port: 3000, serverDomainId: 'sd-1' }),
+      );
+    });
+
+    it('claims the Server Domain itself when no subdomain is given', async () => {
+      listServerDomains.mockResolvedValue([serverDomain]);
+      addServiceDomain.mockResolvedValue(domain({ hostname: 'mycompany.com' }));
+      show();
+      await userEvent.selectOptions(screen.getByLabelText('Service'), 'svc-api');
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+      await userEvent.click(await screen.findByLabelText(/Build this from a Server Domain/i));
+      await userEvent.selectOptions(screen.getByLabelText('Server Domain'), 'sd-1');
+      expect(screen.getByText(/This will be mycompany\.com/)).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText(/Port your application listens on/), '3000');
+      await userEvent.click(screen.getByRole('button', { name: 'Claim the hostname' }));
+
+      await waitFor(() =>
+        expect(addServiceDomain).toHaveBeenCalledWith('svc-api', 'mycompany.com', 3000),
+      );
+    });
+
+    it('will not let the claim start before a Server Domain is chosen, once the toggle is on', async () => {
+      listServerDomains.mockResolvedValue([serverDomain]);
+      show();
+      await userEvent.selectOptions(screen.getByLabelText('Service'), 'svc-api');
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+      await userEvent.click(await screen.findByLabelText(/Build this from a Server Domain/i));
+      await userEvent.type(screen.getByLabelText(/Port your application listens on/), '3000');
+
+      expect(screen.getByRole('button', { name: 'Claim the hostname' })).toBeDisabled();
+      expect(addServiceDomain).not.toHaveBeenCalled();
+    });
   });
 });

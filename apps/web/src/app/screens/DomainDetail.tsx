@@ -1,6 +1,7 @@
 import {
   getDomain,
   listNodes,
+  listServerDomains,
   listServices,
   provisionDomain,
   removeDomain,
@@ -9,6 +10,7 @@ import {
   type ApiError,
   type Domain,
   type Node,
+  type ServerDomain,
   type Service,
 } from '@slideops/api-client';
 import { Button, Card, Section, Text } from '@slideops/design-system';
@@ -61,6 +63,7 @@ interface DetailData {
   domain: Domain;
   services: Service[];
   nodes: Node[];
+  serverDomains: ServerDomain[];
 }
 
 export function DomainDetail() {
@@ -69,14 +72,18 @@ export function DomainDetail() {
   const canWrite = useCanWrite();
 
   const result = useAsyncData<DetailData>(async () => {
-    // The domain is the page; the two lists only put names on ids. A failure
-    // to read them must not take the page down with them.
+    // The domain is the page; the lists only put names on ids, or offer a
+    // namespace to tag it under. A failure to read any of them must not take
+    // the page down with them.
     const domain = await getDomain(id);
-    const [services, nodes] = await Promise.all([
+    const [services, nodes, serverDomains] = await Promise.all([
       listServices().catch(() => [] as Service[]),
       listNodes().catch(() => [] as Node[]),
+      domain.node_id
+        ? listServerDomains(domain.node_id).catch(() => [] as ServerDomain[])
+        : Promise.resolve([] as ServerDomain[]),
     ]);
-    return { domain, services, nodes };
+    return { domain, services, nodes, serverDomains };
   }, [id]);
 
   if (result.state.status === 'loading') {
@@ -95,7 +102,7 @@ export function DomainDetail() {
     );
   }
 
-  const { domain, services, nodes } = result.state.data;
+  const { domain, services, nodes, serverDomains } = result.state.data;
   const service = services.find((candidate) => candidate.id === domain.service_id);
   const node = nodes.find((candidate) => candidate.id === domain.node_id);
 
@@ -146,6 +153,13 @@ export function DomainDetail() {
         domain={domain}
         service={service}
         node={node}
+        canWrite={canWrite}
+        onSaved={result.reload}
+      />
+
+      <CertificateSection
+        domain={domain}
+        serverDomains={serverDomains}
         canWrite={canWrite}
         onSaved={result.reload}
       />
@@ -396,6 +410,232 @@ function TargetForm({
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={save} disabled={saving || !portValid}>
+          {saving ? 'Saving' : 'Save'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const CERT_METHOD_LABEL: Record<Domain['cert_method'], string> = {
+  http01: 'HTTP-01 (default)',
+  dns01: 'DNS-01 via Cloudflare',
+};
+
+const PROXY_MODE_LABEL: Record<'' | 'dns_only' | 'proxied', string> = {
+  '': 'Not set',
+  dns_only: 'DNS only (grey cloud)',
+  proxied: 'Proxied (orange cloud)',
+};
+
+/**
+ * Whether a hostname is the domain itself or a subdomain of it.
+ *
+ * Mirrors the backend's own check, so the picker never offers a Server Domain
+ * that saving would only be refused for.
+ */
+function isUnderNamespace(hostname: string, domain: string): boolean {
+  const h = hostname.toLowerCase();
+  const d = domain.toLowerCase();
+  return h === d || h.endsWith(`.${d}`);
+}
+
+/**
+ * How this hostname gets its certificate, and whether it belongs to a Server
+ * Domain namespace.
+ *
+ * Kept apart from "Where it points": a port correction and a certificate
+ * strategy are different questions with different consequences, and mixing
+ * them into one form is what the Operator is protected from here.
+ */
+function CertificateSection({
+  domain,
+  serverDomains,
+  canWrite,
+  onSaved,
+}: {
+  domain: Domain;
+  serverDomains: ServerDomain[];
+  canWrite: boolean;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const attachedNamespace = serverDomains.find((candidate) => candidate.id === domain.server_domain_id);
+
+  return (
+    <Section
+      title="Certificate and namespace"
+      description="How this hostname proves ownership to get its certificate, and whether it belongs to a Server Domain."
+      action={
+        canWrite && !editing ? (
+          <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+            <Pencil width={14} height={14} aria-hidden />
+            Edit
+          </Button>
+        ) : null
+      }
+    >
+      <Card>
+        {editing ? (
+          <CertificateForm
+            domain={domain}
+            serverDomains={serverDomains}
+            onCancel={() => setEditing(false)}
+            onSaved={() => {
+              setEditing(false);
+              onSaved();
+            }}
+          />
+        ) : (
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <Field
+              label="Server Domain"
+              value={attachedNamespace ? attachedNamespace.domain : 'None — a free-form hostname'}
+              mono={Boolean(attachedNamespace)}
+            />
+            <Field label="Certificate method" value={CERT_METHOD_LABEL[domain.cert_method]} />
+            <Field label="Proxy mode" value={PROXY_MODE_LABEL[domain.proxy_mode ?? '']} />
+          </dl>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+function CertificateForm({
+  domain,
+  serverDomains,
+  onCancel,
+  onSaved,
+}: {
+  domain: Domain;
+  serverDomains: ServerDomain[];
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [certMethod, setCertMethod] = useState<'http01' | 'dns01'>(domain.cert_method);
+  const [proxyMode, setProxyMode] = useState<'' | 'dns_only' | 'proxied'>(domain.proxy_mode ?? '');
+  const [serverDomainId, setServerDomainId] = useState(domain.server_domain_id ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  // Already valid choices, plus whatever is attached now even if it would no
+  // longer qualify -- the picker describes what is true, it does not hide it.
+  const eligible = serverDomains.filter(
+    (candidate) =>
+      candidate.id === domain.server_domain_id || isUnderNamespace(domain.hostname, candidate.domain),
+  );
+  const alreadyAttached = Boolean(domain.server_domain_id);
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateDomain(domain.id, {
+        port: domain.target_port,
+        scheme: domain.target_scheme,
+        ...(certMethod !== domain.cert_method ? { certMethod } : {}),
+        ...(proxyMode !== (domain.proxy_mode ?? '') ? { proxyMode } : {}),
+        ...(serverDomainId !== '' && serverDomainId !== (domain.server_domain_id ?? '')
+          ? { serverDomainId }
+          : {}),
+      });
+      onSaved();
+    } catch (caught) {
+      setError(caught as ApiError);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-ink-muted">Server Domain</span>
+        <select
+          className={inputClass}
+          value={serverDomainId}
+          onChange={(event) => setServerDomainId(event.target.value)}
+          aria-label="Server Domain namespace"
+          disabled={alreadyAttached}
+        >
+          <option value="">None — a free-form hostname</option>
+          {eligible.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.domain}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-ink-muted">
+          {alreadyAttached
+            ? 'Once tagged to a Server Domain, this cannot be cleared from here.'
+            : eligible.length === 0
+              ? 'No Server Domain on this server covers this hostname yet.'
+              : 'Tagging is informational: it records which namespace this hostname was claimed under. Nothing on any server changes.'}
+        </span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-ink-muted">Certificate method</span>
+          <select
+            className={inputClass}
+            value={certMethod}
+            onChange={(event) => setCertMethod(event.target.value as 'http01' | 'dns01')}
+            aria-label="Certificate method"
+          >
+            <option value="http01">HTTP-01 (default)</option>
+            <option value="dns01">DNS-01 via Cloudflare</option>
+          </select>
+          <span className="text-xs text-ink-muted">
+            HTTP-01 proves ownership over the domain itself and needs DNS pointing straight here.
+            DNS-01 proves it through a connected Cloudflare zone instead, and is needed if this
+            hostname is proxied through Cloudflare.
+          </span>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide text-ink-muted">Proxy mode</span>
+          <select
+            className={inputClass}
+            value={proxyMode}
+            onChange={(event) => setProxyMode(event.target.value as '' | 'dns_only' | 'proxied')}
+            aria-label="Proxy mode"
+          >
+            <option value="">Not set</option>
+            <option value="dns_only">DNS only (grey cloud)</option>
+            <option value="proxied">Proxied (orange cloud)</option>
+          </select>
+          <span className="text-xs text-ink-muted">
+            What Cloudflare itself is set to for this hostname. SlideOps does not control this; it
+            only needs to be told, so it knows which certificate method will actually work.
+          </span>
+        </label>
+      </div>
+
+      {proxyMode === 'proxied' && certMethod === 'http01' ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-warning bg-subtle px-3 py-2">
+          <Text variant="body-sm" tone="secondary" className="min-w-0 flex-1">
+            A proxied hostname cannot complete an HTTP-01 challenge: the request lands on
+            Cloudflare&apos;s edge, not this server. Switch to DNS-01.
+          </Text>
+          <Button size="sm" variant="secondary" onClick={() => setCertMethod('dns01')}>
+            Use DNS-01
+          </Button>
+        </div>
+      ) : null}
+
+      {error ? <ErrorNote error={error} /> : null}
+
+      <Text variant="body-sm" tone="secondary">
+        Saving records the choice. Nothing is requested from a certificate authority here: that
+        happens the next time this domain is put live.
+      </Text>
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={save} disabled={saving}>
           {saving ? 'Saving' : 'Save'}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
