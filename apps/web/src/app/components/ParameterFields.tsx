@@ -346,10 +346,16 @@ export function ParameterFields({
   capabilityKey,
 }: ParameterFieldsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const primary = parameters.filter(
+  // Hidden parameters are never rendered, in Basic or Advanced: their value is
+  // resolved and injected server side before planning (a DNS provider's own
+  // API token, read from a credential already connected elsewhere, is the
+  // first of these), so there is nothing here for an Operator to see or
+  // submit, and nothing lost by never registering the field at all.
+  const visible = parameters.filter((param) => !param.hidden);
+  const primary = visible.filter(
     (param) => param.required || param.type === 'version' || param.notable,
   );
-  const advanced = parameters.filter(
+  const advanced = visible.filter(
     (param) => !param.required && param.type !== 'version' && !param.notable,
   );
 

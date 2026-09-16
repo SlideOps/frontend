@@ -209,6 +209,37 @@ function notableParam(): CapabilityParameter {
   };
 }
 
+function hiddenParam(): CapabilityParameter {
+  return {
+    key: 'cloudflare_api_token',
+    label: 'Cloudflare API token',
+    type: 'string',
+    required: false,
+    hidden: true,
+    help: 'Resolved server side.',
+  };
+}
+
+describe('a hidden parameter', () => {
+  it('never renders, in Basic or Advanced, and is not counted toward Advanced options', () => {
+    renderInApp(<Harness parameters={[requiredParam(), hiddenParam()]} />);
+
+    expect(screen.queryByLabelText(/Cloudflare API token/)).not.toBeInTheDocument();
+    // A hidden parameter is not optional-and-collapsed: it is never a field
+    // at all, so it must not even be what the "Show (1)" count is counting.
+    expect(screen.queryByRole('button', { name: /Show|Hide/ })).not.toBeInTheDocument();
+  });
+
+  it('is excluded from the Advanced options count alongside a real optional field', async () => {
+    renderInApp(<Harness parameters={[requiredParam(), optionalParam(), hiddenParam()]} />);
+
+    expect(screen.getByRole('button', { name: 'Show (1)' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show (1)' }));
+    expect(screen.getByLabelText(/^Max memory/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Cloudflare API token/)).not.toBeInTheDocument();
+  });
+});
+
 describe('ParameterFields, Basic vs Advanced', () => {
   it('always shows required parameters and the version field, with optional parameters collapsed', async () => {
     renderInApp(

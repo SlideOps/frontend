@@ -229,6 +229,14 @@ Give it a minute after DNS first points here; issuance is asynchronous and usual
 
 See [Certificates](/docs/connect/certificates) for what has to be true before one can be issued at all.
 
+If you turned on **Use a DNS challenge via Cloudflare** for this domain, the check reads slightly differently: it persists if the Cloudflare token cannot manage this domain's zone, not if ports 80/443 are unreachable. Check the token is scoped to the right zone (Zone → DNS → Edit, on the zone the domain is actually in) and has not been revoked, from [Domains and DNS](/docs/connect/domains-and-dns).
+
+### "the domain's site block does not carry the DNS challenge; run this Capability again to add it"
+
+Only seen with **Use a DNS challenge via Cloudflare** on. Unlike the trusted-certificate check above, this one is fully within the Capability's own control — it is a file it just wrote — so it fails the Operation outright rather than being reported as a check to watch.
+
+The one common cause: **Configure Reverse Proxy** ran again for this domain after HTTPS was configured with the DNS challenge (pointing it at a different upstream, say), and the route rewrite lost the challenge along with it. Configure HTTPS again to put it back — the reverse proxy Capability now carries an existing DNS challenge forward when it rewrites a route, so this should not recur for the same domain, but did on any run from before that.
+
 ## Configuration and environment
 
 ### The change I saved is not taking effect

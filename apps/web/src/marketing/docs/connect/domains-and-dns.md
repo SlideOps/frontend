@@ -249,6 +249,31 @@ Connecting DNS and choosing the entry point both need **Owner or Admin**. A zone
 credential can rewrite where a company's mail goes, and being allowed to deploy
 an application is not the same thing.
 
+### Using the same credential for the certificate, not just the record
+
+**Put it live** (and the **Configure HTTPS** Capability directly, from a
+Server's Capabilities tab) can prove control of a domain two ways: the
+ordinary way, by answering on the domain itself over port 80, or by proving
+control of the domain's DNS instead, through Cloudflare's API.
+
+The DNS way exists for one specific situation: a domain proxied (orange
+cloud) through Cloudflare. Proxying puts Cloudflare's own servers in front of
+yours, so the ordinary certificate check never reaches your Server at all --
+it lands on Cloudflare's edge instead. If that describes a domain you are
+adding, turn on **Use a DNS challenge via Cloudflare** under Advanced options
+when configuring HTTPS for it. Everything else about adding the domain stays
+the same, and it uses the same Cloudflare credential you already connected
+above -- nothing more to enter.
+
+Leave it off for the ordinary case, DNS pointed straight at the Server, which
+is what most domains want and is unaffected either way: turning this on for
+one domain changes nothing about how any other domain on the same Server, or
+your Server's own default addresses, get their certificates.
+
+Today this option is on the **Configure HTTPS** Capability itself; the guided
+**Put it live** flow above does not yet offer it as a choice in the wizard --
+use the Capability directly for a domain that needs it.
+
 ## Wildcards
 
 A wildcard is accepted only as the leftmost label, which is the only place it

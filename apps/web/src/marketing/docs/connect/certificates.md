@@ -83,6 +83,27 @@ after DNS is confirmed pointing here — at that point it almost always means po
 80 is not reachable from the public internet. See
 [Troubleshooting](/docs/reference/troubleshooting) for the checks to run.
 
+## When the domain is proxied through Cloudflare
+
+Everything above assumes DNS resolves straight to the Server, which is what
+the ordinary challenge needs: it proves control of the domain by answering on
+it, over port 80. A domain proxied (orange cloud) through Cloudflare breaks
+that assumption on purpose -- Cloudflare's own servers answer, not yours -- so
+the challenge never reaches the Server, and the domain is left on the
+internal certificate indefinitely, however long DNS has pointed there.
+
+For a domain like that, **Configure HTTPS** can prove control through
+Cloudflare's DNS instead: turn on **Use a DNS challenge via Cloudflare** (an
+Advanced option) when configuring it. This reuses the same Cloudflare
+credential already connected in [Domains and DNS](/docs/connect/domains-and-dns)
+for that domain's zone -- nothing new to enter -- and only ever changes how
+that one domain gets its certificate. Every other domain on the same Server,
+Server default addresses included, keeps using the ordinary challenge exactly
+as before.
+
+This needs Caddy as the reverse proxy; it is not yet available on the NGINX
+path or on a Server whose proxy runs in a container.
+
 ## Renewal
 
 SlideOps does not run renewals on a schedule of its own. The certificate

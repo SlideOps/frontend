@@ -155,6 +155,11 @@ export interface CapabilityParameter {
   /** The valid values for a "choice" typed parameter, in display order.
    *  Absent for every other type. */
   options?: string[];
+  /** Never rendered: the value is resolved and injected server side before
+   *  planning rather than typed by an Operator (a DNS provider's own API
+   *  token, read from a credential already connected elsewhere, is the first
+   *  of these). Absent or false for every ordinary parameter. */
+  hidden?: boolean;
 }
 
 /**
