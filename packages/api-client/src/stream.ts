@@ -127,6 +127,33 @@ export function dockerContainerLogStreamUrl(nodeID: string, ref: string): string
   );
 }
 
+/** The websocket carrying a Celery worker's live output: recent journal
+ * history, then every new line as the worker prints it. workingDirectory
+ * identifies which worker, the same way it identifies one to every lifecycle
+ * Capability on the backend. */
+export function celeryLogStreamUrl(serviceID: string, workingDirectory: string): string {
+  return websocketUrl(`/services/${encodeURIComponent(serviceID)}/celery/logs/stream`, {
+    working_directory: workingDirectory,
+  });
+}
+
+/** The websocket carrying an interactive shell in a Celery worker's own
+ * working directory. A worker has no container to enter, so this lands on
+ * the server in that directory, the same reasoning a systemd Service's own
+ * shell already uses. */
+export function celeryShellUrl(
+  serviceID: string,
+  workingDirectory: string,
+  cols: number,
+  rows: number,
+): string {
+  return websocketUrl(`/services/${encodeURIComponent(serviceID)}/celery/shell`, {
+    working_directory: workingDirectory,
+    cols,
+    rows,
+  });
+}
+
 /**
  * One frame of a log stream. `type` says what the rest means:
  * `history` and `log` carry `data`, the workload's own text; `status` carries
@@ -192,6 +219,14 @@ export interface DockerContainerLogStreamOptions extends LogStreamHandlers {
   containerRef: string;
 }
 
+export interface CeleryLogStreamOptions extends LogStreamHandlers {
+  /** The Service the worker was configured against. */
+  serviceId: string;
+  /** The worker's configured working directory, which is how the backend
+   * resolves which systemd unit to follow. */
+  workingDirectory: string;
+}
+
 const LOG_STREAM_INITIAL_BACKOFF_MS = 500;
 const LOG_STREAM_DEFAULT_MAX_BACKOFF_MS = 15000;
 
@@ -232,6 +267,21 @@ export function openDockerContainerLogStream(
 ): StreamHandle {
   return openLogStream(
     options.url ?? dockerContainerLogStreamUrl(options.nodeId, options.containerRef),
+    options,
+  );
+}
+
+/**
+ * Open a Celery worker's live output, on the same terms as a Service's own
+ * logs: the backend follows the worker's systemd journal and this client
+ * only has to cover the socket going away entirely. The worker never sends
+ * a `diagnostic` frame -- a systemd unit has no container-replacement event
+ * to mark -- but the frame shape and the reconnect policy are identical, so
+ * this is the same client, pointed at the worker's own stream.
+ */
+export function openCeleryLogStream(options: CeleryLogStreamOptions): StreamHandle {
+  return openLogStream(
+    options.url ?? celeryLogStreamUrl(options.serviceId, options.workingDirectory),
     options,
   );
 }

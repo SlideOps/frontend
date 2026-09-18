@@ -52,6 +52,14 @@ import {
 import { ContainerManager } from '../components/ContainerManager';
 import { WebSitesManager, isWebSitesCapability } from '../components/WebSitesManager';
 import { MessagingManager, isMessagingCapability } from '../components/MessagingManager';
+import {
+  CeleryManager,
+  isCeleryCapability,
+  latestConfiguredWorker,
+  stringParam,
+} from '../components/CeleryManager';
+import { CeleryWorkerLogs } from '../components/CeleryWorkerLogs';
+import { CeleryWorkerTerminal } from '../components/CeleryWorkerTerminal';
 import { StorageExplorer, isStorageCapability } from '../components/StorageExplorer';
 import { SearchIndexManager, isSearchIndexCapability } from '../components/SearchIndexManager';
 import { RuntimeManager, isRuntimeCapability } from '../components/RuntimeManager';
@@ -65,6 +73,60 @@ import { useAsyncData } from '../hooks/useAsyncData';
 
 /** The four security Capabilities SecurityPosturePanel shows together. */
 const SECURITY_CHECKLIST_KEYS = ['install-fail2ban', 'enable-auto-updates', 'enforce-key-only-ssh', 'server-audit'];
+
+/**
+ * The Celery workers configured on this Node, on Redis's own capability
+ * pages -- the explicit Redis <-> Celery relationship an Operator looking
+ * at a Redis instance has no other way to see. Each entry names the worker
+ * by its own working directory and shows the broker it was configured with,
+ * so an Operator can read for themselves whether it is this Redis: multiple
+ * workers can exist on one Node (one per application), and configure-celery-
+ * worker itself only ever surfaces the most recently configured one, the
+ * same simplification Decision 4 of the Celery plan already accepts for
+ * Celery's own page. A link back to History is what each row actually opens,
+ * since there is no per-worker page distinct from the most recent one to
+ * link to yet.
+ */
+function CeleryUsedBy({ nodeId }: { nodeId: string }) {
+  const navigate = useNavigate();
+  const result = useAsyncData<Operation[]>(
+    (signal) => listOperations({ node_id: nodeId, status: 'completed' }, signal),
+    [nodeId],
+  );
+  if (result.state.status === 'loading') {
+    return <Loading label="Reading Celery workers on this Node" />;
+  }
+  if (result.state.status === 'error') {
+    return <ErrorNote error={result.state.error} />;
+  }
+  const workers = result.state.data.filter((op) => op.capability_key === 'configure-celery-worker');
+  if (workers.length === 0) {
+    return (
+      <Text variant="body-sm" tone="secondary">
+        No Celery worker has been configured against this Node yet.
+      </Text>
+    );
+  }
+  return (
+    <div className="flex flex-col divide-y divide-border">
+      {workers.map((op) => (
+        <button
+          key={op.id}
+          type="button"
+          onClick={() => navigate(`/app/operations/${op.id}`)}
+          className="flex flex-col gap-0.5 py-3 text-left transition-colors duration-fast ease-standard hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <Text variant="body-sm" className="font-mono text-ink">
+            {stringParam(op, 'working_directory') || 'unknown working directory'}
+          </Text>
+          <Text variant="caption" tone="secondary">
+            broker: {stringParam(op, 'broker_url') || 'unknown'}
+          </Text>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function Section({
   title,
@@ -525,6 +587,21 @@ export function CapabilityDetail() {
   const states = statesResult.state.status === 'ready' ? statesResult.state.data : {};
   const done = states[key];
 
+  // Celery has no separate stored record of its current configuration --
+  // the latest completed configure-celery-worker Operation on this Node is
+  // the record, exactly like every other database engine already works
+  // (Decision 4 of the Celery plan). Loaded only on Celery's own page.
+  const celeryOperationsResult = useAsyncData<Operation[]>(
+    (signal) =>
+      preselectedNode && isCeleryCapability(key)
+        ? listOperations({ node_id: preselectedNode, status: 'completed' }, signal)
+        : Promise.resolve([]),
+    [preselectedNode, key],
+  );
+  const celeryOperations =
+    celeryOperationsResult.state.status === 'ready' ? celeryOperationsResult.state.data : [];
+  const configuredCeleryWorker = latestConfiguredWorker(celeryOperations);
+
   return (
     <OperatorShell active="capabilities">
       <button
@@ -741,6 +818,63 @@ export function CapabilityDetail() {
                   {done && preselectedNode && isMessagingCapability(key) ? (
                     <Section title={key === 'install-nats' ? 'Streams' : 'Queues'}>
                       <MessagingManager capabilityKey={key} nodeId={preselectedNode} serviceId={preselectedService} />
+                    </Section>
+                  ) : null}
+
+                  {/* Celery has no "done" state of its own the way an install
+                    does -- there is no install-celery-worker Capability, since
+                    a worker is the application's own code, not vendor
+                    software SlideOps installs. So this shows whenever the
+                    Operator is looking at this page with a Node in context,
+                    whether or not a worker has been configured here yet: the
+                    Discovery and Preflight panels are exactly what an
+                    Operator with nothing configured yet needs to see. */}
+                  {preselectedNode && isCeleryCapability(key) ? (
+                    <Section title="Celery worker">
+                      <CeleryManager
+                        capability={capabilityResult.state.data}
+                        nodeId={preselectedNode}
+                        serviceId={preselectedService}
+                        projectId={preselectedProject}
+                        operations={celeryOperations}
+                        operationsLoading={celeryOperationsResult.state.status === 'loading'}
+                        operationsError={
+                          celeryOperationsResult.state.status === 'error'
+                            ? celeryOperationsResult.state.error
+                            : null
+                        }
+                        onReload={celeryOperationsResult.reload}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {preselectedNode &&
+                  preselectedService &&
+                  isCeleryCapability(key) &&
+                  configuredCeleryWorker ? (
+                    <Section title="Worker logs">
+                      <CeleryWorkerLogs
+                        serviceId={preselectedService}
+                        workingDirectory={stringParam(configuredCeleryWorker, 'working_directory')}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {preselectedNode &&
+                  preselectedService &&
+                  isCeleryCapability(key) &&
+                  configuredCeleryWorker ? (
+                    <Section title="Terminal">
+                      <CeleryWorkerTerminal
+                        serviceId={preselectedService}
+                        workingDirectory={stringParam(configuredCeleryWorker, 'working_directory')}
+                      />
+                    </Section>
+                  ) : null}
+
+                  {done && preselectedNode && (key === 'configure-redis' || key === 'inspect-redis') ? (
+                    <Section title="Used by">
+                      <CeleryUsedBy nodeId={preselectedNode} />
                     </Section>
                   ) : null}
 

@@ -317,6 +317,55 @@ Run **Diagnose** from the Logs tab. It checks the things that break *after* a go
 
 The same checks run in the background every ten minutes and record changes, not states, so the activity trail will already show when it stopped working, and when it recovers.
 
+## Celery workers
+
+### "ModuleNotFoundError: No module named 'app'"
+
+This is the exact failure that started this whole area of SlideOps existing: Redis was healthy, the API could enqueue jobs, and nothing was consuming them, because the working directory a worker was started from was not the application's own.
+
+The **working directory** on Configure Celery worker has to be the application's own root — where its Python environment and its `celery_app` object actually live, not SlideOps' own directory. Use **Scan** on the Celery section of the Service's Capability page to find it and a candidate application automatically, rather than typing it from memory.
+
+Every check this page runs, before you approve anything, imports the application exactly the way the worker itself would. A wrong working directory fails the same way here as it would by hand, with the same traceback — nothing is hidden or generalised into "the worker failed to start."
+
+### "celery preflight failed: ..."
+
+Configuring or starting a worker refuses outright when any of the checks it runs first do not pass — never starts something it already knows will not work, and never a generic failure: the message names which check and carries its real error text.
+
+Run **Preflight** (the "Check this configuration" button) on the same page before approving anything. It runs the identical checks Configure itself runs, so whatever it finds is exactly what would otherwise fail the Operation.
+
+### "the working directory ... does not exist on this node"
+
+Either the path is wrong, or it is a path on a different Node than the one this Service is actually configured against — Redis and the application do not have to be on the same machine, and the worker always has to be configured from the application's own.
+
+### The broker check fails
+
+> ConnectionRefusedError: [Errno 111] Connection refused
+
+The broker URL is unreachable **from the worker's own Node**, checked by connecting from there, not from SlideOps' own servers. If Redis is on a different Node than the application, confirm the address in the broker URL is one the application's Node can actually reach — its private address, not `localhost`, unless Redis genuinely runs on the same machine.
+
+### "not tested: no result backend is configured, so a task's completion cannot be read back"
+
+**Send a test task**, on the worker's own page once it is configured, sends a real task through the broker and waits for the result backend to confirm it finished — the one thing a worker merely answering a ping does not prove. Without a result backend configured there is nothing to read that confirmation back from, so the check says so honestly rather than reporting a false pass. Set a result backend to use it.
+
+### A worker is configured and active, but nothing it processes ever finishes
+
+Two different, real causes look identical from the outside, and the Celery section on the worker's own page separates them:
+
+- **Queue depth** shows tasks piling up in the broker's own queue with nothing active — a worker that stopped consuming, even though its process and its systemd unit are both still running.
+- **Task routing** shows the application's own `task_routes`, exactly as configured. If a task is routed to a queue this worker was never configured to consume (the **Queues** field on Configure), it will never be picked up by this worker, no matter how healthy everything else reads.
+
+### "an unmanaged Celery worker is already running and answering for this application"
+
+Preflight found a worker answering for this application that SlideOps does not manage — started by hand, or by something else entirely. Configuring here creates a separate, supervised unit alongside it; **it is never stopped automatically**. Stop the existing process yourself first if you want this configuration to fully replace it, or leave both running if that is genuinely what you want, but decide on purpose rather than by accident.
+
+### Stopping a worker did not wait for its current task
+
+An ordinary stop is a warm shutdown: it waits for whatever the worker is mid-execution to finish, up to systemd's own stop timeout, before the process actually ends. Only **Force stop immediately** ends it right away, at the cost of losing that task outright rather than merely delaying it. If a stop ended a task you expected it to finish, check whether Force stop was the one used.
+
+### "this node's init system is not systemd, which a supervised celery worker needs"
+
+Celery worker management in SlideOps is systemd only for now; OpenRC (Alpine) is not supported.
+
 ## The app itself
 
 ### "The server does not have this endpoint."

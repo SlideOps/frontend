@@ -48,6 +48,7 @@ import { ServiceStatusBadge } from '../components/Badges';
 import { ErrorNote, Loading } from '../components/Feedback';
 import { OperatorShell } from '../components/OperatorShell';
 import { ServiceMetricsPanel } from '../components/ServiceMetrics';
+import { CeleryDeployNudge } from '../components/CeleryDeployNudge';
 import { ServiceEndpoint } from '../components/ServiceEndpoint';
 import { ProjectStack } from '../components/ProjectStack';
 import { ServiceBrowsePanel } from '../components/ServiceBrowsePanel';
@@ -683,6 +684,10 @@ export function ServiceDetail() {
                     serves an API has nothing to show in an iframe, and its address is
                     the whole answer; a Service that renders a page has both. */}
                     <ServiceEndpoint service={service} onChanged={reload} />
+
+                    {isRunning ? (
+                      <CeleryDeployNudge nodeId={service.node_id} serviceId={service.id} />
+                    ) : null}
 
                     <ServicePreview service={service} />
 

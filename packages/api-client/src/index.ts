@@ -13,6 +13,9 @@ export {
   dockerContainerShellUrl,
   dockerContainerLogStreamUrl,
   openDockerContainerLogStream,
+  celeryLogStreamUrl,
+  openCeleryLogStream,
+  celeryShellUrl,
   type StreamHandlers,
   type StreamHandle,
   type StreamStatus,
@@ -22,7 +25,18 @@ export {
   type LogStreamHandlers,
   type ServiceLogStreamOptions,
   type DockerContainerLogStreamOptions,
+  type CeleryLogStreamOptions,
 } from './stream';
+export {
+  discoverCelery,
+  preflightCelery,
+  sendCeleryTestTask,
+  type CeleryCandidate,
+  type CeleryDiscovery,
+  type CeleryPreflightInput,
+  type CeleryCheck,
+  type CeleryTestTaskInput,
+} from './celery';
 export {
   register,
   login,
